@@ -3,6 +3,7 @@ const net = require('node:net');
 
 const TIMEOUT_MS = 9000;
 const MAX_HTML_BYTES = 1_500_000;
+const UA = 'Mozilla/5.0 (Linux; Android 16) AppleWebKit/537.36 Chrome/140 Safari/537.36';
 
 function send(res, status, payload) {
   res.statusCode = status;
@@ -41,11 +42,8 @@ function googleNewsArticleId(rawUrl) {
     const url = new URL(rawUrl);
     if (url.hostname !== 'news.google.com') return '';
     const parts = url.pathname.split('/').filter(Boolean);
-    const marker = parts.lastIndexOf('articles');
-    if (marker >= 0 && parts[marker + 1]) return parts[marker + 1];
-    const readMarker = parts.lastIndexOf('read');
-    if (readMarker >= 0 && parts[readMarker + 1]) return parts[readMarker + 1];
-    return '';
+    const marker = Math.max(parts.lastIndexOf('articles'), parts.lastIndexOf('read'));
+    return marker >= 0 && parts[marker + 1] ? parts[marker + 1] : '';
   } catch {
     return '';
   }
@@ -54,8 +52,7 @@ function googleNewsArticleId(rawUrl) {
 function tryLegacyGoogleDecode(id) {
   try {
     const normalized = id.replace(/-/g, '+').replace(/_/g, '/');
-    const bytes = Buffer.from(normalized, 'base64');
-    const text = bytes.toString('utf8');
+    const text = Buffer.from(normalized, 'base64').toString('utf8');
     const match = text.match(/https?:\/\/[^\u0000-\u001f\s]+/i);
     return match ? match[0] : '';
   } catch {
@@ -63,15 +60,50 @@ function tryLegacyGoogleDecode(id) {
   }
 }
 
-function unescapeBatchUrl(value) {
-  return String(value || '')
-    .replace(/\\u003d/gi, '=')
-    .replace(/\\u0026/gi, '&')
-    .replace(/\\u0025/gi, '%')
-    .replace(/\\u003f/gi, '?')
-    .replace(/\\u002f/gi, '/')
-    .replace(/\\\//g, '/')
-    .replace(/\\"/g, '"');
+async function fetchGoogleParams(id) {
+  const candidates = [
+    `https://news.google.com/articles/${id}`,
+    `https://news.google.com/rss/articles/${id}`
+  ];
+  let lastError = 'Google params unavailable';
+  for (const url of candidates) {
+    try {
+      const response = await fetch(url, {
+        redirect: 'follow',
+        signal: AbortSignal.timeout(TIMEOUT_MS),
+        headers: { 'User-Agent': UA, 'Accept': 'text/html,application/xhtml+xml' }
+      });
+      if (!response.ok) { lastError = `Google params HTTP ${response.status}`; continue; }
+      const html = await response.text();
+      const signature = (html.match(/data-n-a-sg=["']([^"']+)["']/i) || [])[1] || '';
+      const timestamp = (html.match(/data-n-a-ts=["']([^"']+)["']/i) || [])[1] || '';
+      if (signature && timestamp) return { signature, timestamp };
+      lastError = 'Google params attributes missing';
+    } catch (error) {
+      lastError = String(error?.message || error);
+    }
+  }
+  throw new Error(lastError);
+}
+
+function extractDecodedUrl(text) {
+  for (const chunk of text.split('\n\n')) {
+    const trimmed = chunk.trim();
+    if (!trimmed.startsWith('[')) continue;
+    try {
+      const parsed = JSON.parse(trimmed);
+      const rows = Array.isArray(parsed) ? parsed : [];
+      for (const row of rows) {
+        if (!Array.isArray(row) || typeof row[2] !== 'string') continue;
+        try {
+          const inner = JSON.parse(row[2]);
+          if (Array.isArray(inner) && inner[0] === 'garturlres' && /^https?:\/\//i.test(inner[1] || '')) return inner[1];
+        } catch {}
+      }
+    } catch {}
+  }
+  const match = text.match(/garturlres\\?"\s*,\s*\\?"(https?:\\?\/\\?\/[^"\\]+)/i);
+  return match ? match[1].replace(/\\u0026/gi, '&').replace(/\\u003d/gi, '=').replace(/\\\//g, '/') : '';
 }
 
 async function decodeGoogleNewsUrl(rawUrl) {
@@ -81,27 +113,23 @@ async function decodeGoogleNewsUrl(rawUrl) {
   const legacy = tryLegacyGoogleDecode(id);
   if (/^https?:\/\//i.test(legacy)) return legacy;
 
-  const request = '[[["Fbv4je","[\\"garturlreq\\",[[\\"fr-FR\\",\\"FR\\",[\\"FINANCE_TOP_INDICES\\",\\"WEB_TEST_1_0_0\\"],null,null,1,1,\\"FR:fr\\",null,180,null,null,null,null,null,0,null,null,[1608992183,723341000]],\\"fr-FR\\",\\"FR\\",1,[2,3,4,8],1,0,\\"655000234\\",0,0,null,0],\\"' + id + '\\"]",null,"generic"]]]';
-  const response = await fetch('https://news.google.com/_/DotsSplashUi/data/batchexecute?rpcids=Fbv4je', {
+  const { signature, timestamp } = await fetchGoogleParams(id);
+  const innerRequest = `["garturlreq",[["X","X",["X","X"],null,null,1,1,"US:en",null,1,null,null,null,null,null,0,1],"X","X",1,[1,1,1],1,1,null,0,0,null,0],"${id}",${timestamp},"${signature}"]`;
+  const fReq = JSON.stringify([[['Fbv4je', innerRequest]]]);
+
+  const response = await fetch('https://news.google.com/_/DotsSplashUi/data/batchexecute', {
     method: 'POST',
     signal: AbortSignal.timeout(TIMEOUT_MS),
     headers: {
       'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
-      'User-Agent': 'Mozilla/5.0 (Linux; Android 16) AppleWebKit/537.36 Chrome/140 Safari/537.36',
+      'User-Agent': UA,
       'Referer': 'https://news.google.com/'
     },
-    body: 'f.req=' + encodeURIComponent(request)
+    body: 'f.req=' + encodeURIComponent(fReq)
   });
   if (!response.ok) throw new Error(`Google decode HTTP ${response.status}`);
-  const text = await response.text();
-  const marker = '[\\"garturlres\\",\\"';
-  const start = text.indexOf(marker);
-  if (start < 0) throw new Error('Google decode marker missing');
-  const tail = text.slice(start + marker.length);
-  const end = tail.indexOf('\\",');
-  if (end < 0) throw new Error('Google decode terminator missing');
-  const decoded = unescapeBatchUrl(tail.slice(0, end));
-  if (!/^https?:\/\//i.test(decoded)) throw new Error('Google decode invalid URL');
+  const decoded = extractDecodedUrl(await response.text());
+  if (!decoded) throw new Error('Google decode result missing');
   return decoded;
 }
 
@@ -112,10 +140,7 @@ async function fetchHtml(rawUrl) {
     const response = await fetch(url, {
       redirect: 'manual',
       signal: AbortSignal.timeout(TIMEOUT_MS),
-      headers: {
-        'User-Agent': 'Mozilla/5.0 (Linux; Android 16) AppleWebKit/537.36 Chrome/140 Safari/537.36',
-        'Accept': 'text/html,application/xhtml+xml'
-      }
+      headers: { 'User-Agent': UA, 'Accept': 'text/html,application/xhtml+xml' }
     });
     if (response.status >= 300 && response.status < 400 && response.headers.get('location')) {
       current = new URL(response.headers.get('location'), url).href;
@@ -152,7 +177,6 @@ function findImage(html, finalUrl) {
     metaContent(html, 'twitter:image:src'),
     ((html.match(/<link[^>]+rel=["']image_src["'][^>]+href=["']([^"']+)["']/i) || [])[1] || '')
   ].filter(Boolean);
-
   for (const candidate of candidates) {
     try {
       const resolved = new URL(candidate, finalUrl);
@@ -172,6 +196,6 @@ module.exports = async function handler(req, res) {
     const { html, finalUrl } = await fetchHtml(articleUrl);
     return send(res, 200, { image: findImage(html, finalUrl), articleUrl: finalUrl, decoded: articleUrl !== rawUrl });
   } catch (error) {
-    return send(res, 200, { image: '', error: String(error?.message || 'unavailable').slice(0, 140) });
+    return send(res, 200, { image: '', error: String(error?.message || 'unavailable').slice(0, 160) });
   }
 };
