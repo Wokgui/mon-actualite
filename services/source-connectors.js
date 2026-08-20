@@ -14,7 +14,9 @@ export async function importOpmlPreview(file) {
     title: node.getAttribute('title') || node.getAttribute('text') || 'Source sans nom',
     url: node.getAttribute('xmlUrl'),
     htmlUrl: node.getAttribute('htmlUrl') || '',
-    category: node.parentElement?.getAttribute('text') || '',
+    // Les dossiers OPML ont souvent des noms libres ("News", "Divers", etc.).
+    // On laisse donc le moteur classer chaque article selon son contenu.
+    category: '',
     enabled: true
   }));
 
