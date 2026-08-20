@@ -1,0 +1,85 @@
+/* Compact list inspired by Feedly mobile's image + title + source/time view. */
+.feed { gap: 0; background: #fff; border-radius: 0; overflow: hidden; }
+.article-card {
+  grid-template-columns: minmax(0,1fr) 92px;
+  grid-template-areas: "body image";
+  min-height: 88px;
+  padding: 10px 0;
+  background: #fff;
+  border: 0;
+  border-bottom: 1px solid #ececec;
+  border-radius: 0;
+  box-shadow: none;
+  overflow: visible;
+  transform: none !important;
+}
+.article-card:last-child { border-bottom: 0; }
+.article-card .article-body {
+  grid-area: body;
+  min-width: 0;
+  padding: 1px 12px 0 0;
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-start;
+}
+.article-card .article-image,
+.article-card .article-placeholder {
+  grid-area: image;
+  width: 92px;
+  height: 68px;
+  min-height: 68px;
+  align-self: center;
+  border-radius: 4px;
+  object-fit: cover;
+  overflow: hidden;
+  background: #f0f0f0;
+}
+.article-card .article-placeholder svg { width: 22px; height: 22px; }
+.article-card .article-placeholder span { display: none; }
+.article-card h2 {
+  margin: 0;
+  padding: 0;
+  font-size: 14px;
+  line-height: 1.28;
+  letter-spacing: -.1px;
+  font-weight: 650;
+  color: #222;
+  display: -webkit-box;
+  -webkit-line-clamp: 3;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.article-card .card-top,
+.article-card .summary,
+.article-card .save-btn,
+.article-card .meta .dot,
+.article-card .meta .category-link { display: none !important; }
+.article-card .meta {
+  display: flex;
+  align-items: center;
+  gap: 0;
+  margin-top: 5px;
+  padding: 0;
+  min-width: 0;
+  color: #8f8f8f;
+  font-size: 10.5px;
+  line-height: 1.2;
+  white-space: nowrap;
+}
+.article-card .meta .source {
+  max-width: 58%;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: #7d7d7d;
+  font-weight: 500;
+}
+.article-card .meta .source::after { content: " · "; }
+.article-card .meta > span:not(.source) { color: #999; }
+.original-article-image { object-fit: cover; }
+@media (max-width: 380px) {
+  .article-card { grid-template-columns: minmax(0,1fr) 88px; min-height: 84px; }
+  .article-card .article-image,
+  .article-card .article-placeholder { width: 88px; height: 64px; min-height: 64px; }
+  .article-card h2 { font-size: 13.5px; }
+}
