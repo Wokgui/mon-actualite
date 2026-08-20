@@ -1,5 +1,5 @@
-const CACHE = 'mon-actualite-v6-feedly-images';
-const ASSETS = ['./', './index.html', './styles.css', './feedly-compact.css', './app.js', './article-images.js', './services/source-connectors.js', './manifest.webmanifest', './assets/app-icon.svg', './assets/icon-192.png', './assets/icon-512.png', './assets/icon-maskable-512.png'];
+const CACHE = 'mon-actualite-v7-left-images-more-news';
+const ASSETS = ['./', './index.html', './styles.css', './feedly-compact.css', './feedly-left.css', './app.js', './feedly-runtime.js', './article-images.js', './services/source-connectors.js', './manifest.webmanifest', './assets/app-icon.svg', './assets/icon-192.png', './assets/icon-512.png', './assets/icon-maskable-512.png'];
 
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(ASSETS)).then(() => self.skipWaiting()));
