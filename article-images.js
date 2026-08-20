@@ -39,7 +39,7 @@ async function resolvePublisherImage(article) {
   const key = String(article.id || article.url);
   if (resolverRequests.has(key)) return resolverRequests.get(key);
 
-  const request = fetch(`/api/article-image?url=${encodeURIComponent(article.url)}`, { cache: 'force-cache' })
+  const request = fetch(`/api/article-image?v=2&url=${encodeURIComponent(article.url)}`, { cache: 'no-cache' })
     .then(response => response.ok ? response.json() : null)
     .then(data => {
       const image = validImageUrl(data?.image);
@@ -53,11 +53,11 @@ async function resolvePublisherImage(article) {
   return request;
 }
 
-function showImage(placeholder, src, detail = false) {
+function showImage(placeholder, src, detail = false, brief = false) {
   return new Promise(resolve => {
     if (!placeholder?.isConnected || !src) return resolve(false);
     const image = new Image();
-    image.className = detail ? 'detail-hero original-article-image' : 'article-image original-article-image';
+    image.className = detail ? 'detail-hero original-article-image' : brief ? 'brief-thumb article-image original-article-image' : 'article-image original-article-image';
     image.alt = '';
     image.loading = detail ? 'eager' : 'lazy';
     image.decoding = 'async';
@@ -81,7 +81,7 @@ function showImage(placeholder, src, detail = false) {
   });
 }
 
-async function loadOriginalImage(placeholder, article, detail = false) {
+async function loadOriginalImage(placeholder, article, detail = false, brief = false) {
   if (!placeholder || !article || placeholder.dataset.imageAttempted === '1') return;
   placeholder.dataset.imageAttempted = '1';
 
@@ -89,11 +89,11 @@ async function loadOriginalImage(placeholder, article, detail = false) {
   const feedImage = validImageUrl(article.image);
   const first = cached || feedImage;
 
-  if (first && await showImage(placeholder, first, detail)) return;
+  if (first && await showImage(placeholder, first, detail, brief)) return;
   if (!placeholder.isConnected) return;
 
   const resolved = await resolvePublisherImage(article);
-  if (resolved && resolved !== first) await showImage(placeholder, resolved, detail);
+  if (resolved && resolved !== first) await showImage(placeholder, resolved, detail, brief);
 }
 
 function applyOriginalArticleImages() {
@@ -103,13 +103,18 @@ function applyOriginalArticleImages() {
 
   document.querySelectorAll('.article-card[data-article]').forEach(card => {
     const article = byId.get(String(card.dataset.article));
-    loadOriginalImage(card.querySelector('.article-placeholder'), article, false);
+    loadOriginalImage(card.querySelector('.article-placeholder'), article, false, false);
+  });
+
+  document.querySelectorAll('.brief-point[data-article]').forEach(row => {
+    const article = byId.get(String(row.dataset.article));
+    loadOriginalImage(row.querySelector('.brief-thumb.article-placeholder'), article, false, true);
   });
 
   const detailPage = document.querySelector('.detail-page');
   if (detailPage) {
     const id = detailPage.querySelector('.save-btn-detail[data-save]')?.dataset.save;
-    loadOriginalImage(detailPage.querySelector('.detail-hero.article-placeholder'), byId.get(String(id || '')), true);
+    loadOriginalImage(detailPage.querySelector('.detail-hero.article-placeholder'), byId.get(String(id || '')), true, false);
   }
 }
 
