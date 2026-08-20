@@ -1,7 +1,7 @@
 const dns = require('node:dns').promises;
 const net = require('node:net');
 
-const TIMEOUT_MS = 7000;
+const TIMEOUT_MS = 9000;
 const MAX_HTML_BYTES = 1_500_000;
 
 function send(res, status, payload) {
@@ -34,6 +34,75 @@ async function assertPublicUrl(raw) {
     if (!records.length || records.some(r => isPrivateIp(r.address))) throw new Error('private address blocked');
   }
   return url;
+}
+
+function googleNewsArticleId(rawUrl) {
+  try {
+    const url = new URL(rawUrl);
+    if (url.hostname !== 'news.google.com') return '';
+    const parts = url.pathname.split('/').filter(Boolean);
+    const marker = parts.lastIndexOf('articles');
+    if (marker >= 0 && parts[marker + 1]) return parts[marker + 1];
+    const readMarker = parts.lastIndexOf('read');
+    if (readMarker >= 0 && parts[readMarker + 1]) return parts[readMarker + 1];
+    return '';
+  } catch {
+    return '';
+  }
+}
+
+function tryLegacyGoogleDecode(id) {
+  try {
+    const normalized = id.replace(/-/g, '+').replace(/_/g, '/');
+    const bytes = Buffer.from(normalized, 'base64');
+    const text = bytes.toString('utf8');
+    const match = text.match(/https?:\/\/[^\u0000-\u001f\s]+/i);
+    return match ? match[0] : '';
+  } catch {
+    return '';
+  }
+}
+
+function unescapeBatchUrl(value) {
+  return String(value || '')
+    .replace(/\\u003d/gi, '=')
+    .replace(/\\u0026/gi, '&')
+    .replace(/\\u0025/gi, '%')
+    .replace(/\\u003f/gi, '?')
+    .replace(/\\u002f/gi, '/')
+    .replace(/\\\//g, '/')
+    .replace(/\\"/g, '"');
+}
+
+async function decodeGoogleNewsUrl(rawUrl) {
+  const id = googleNewsArticleId(rawUrl);
+  if (!id) return rawUrl;
+
+  const legacy = tryLegacyGoogleDecode(id);
+  if (/^https?:\/\//i.test(legacy)) return legacy;
+
+  const request = '[[["Fbv4je","[\\"garturlreq\\",[[\\"fr-FR\\",\\"FR\\",[\\"FINANCE_TOP_INDICES\\",\\"WEB_TEST_1_0_0\\"],null,null,1,1,\\"FR:fr\\",null,180,null,null,null,null,null,0,null,null,[1608992183,723341000]],\\"fr-FR\\",\\"FR\\",1,[2,3,4,8],1,0,\\"655000234\\",0,0,null,0],\\"' + id + '\\"]",null,"generic"]]]';
+  const response = await fetch('https://news.google.com/_/DotsSplashUi/data/batchexecute?rpcids=Fbv4je', {
+    method: 'POST',
+    signal: AbortSignal.timeout(TIMEOUT_MS),
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
+      'User-Agent': 'Mozilla/5.0 (Linux; Android 16) AppleWebKit/537.36 Chrome/140 Safari/537.36',
+      'Referer': 'https://news.google.com/'
+    },
+    body: 'f.req=' + encodeURIComponent(request)
+  });
+  if (!response.ok) throw new Error(`Google decode HTTP ${response.status}`);
+  const text = await response.text();
+  const marker = '[\\"garturlres\\",\\"';
+  const start = text.indexOf(marker);
+  if (start < 0) throw new Error('Google decode marker missing');
+  const tail = text.slice(start + marker.length);
+  const end = tail.indexOf('\\",');
+  if (end < 0) throw new Error('Google decode terminator missing');
+  const decoded = unescapeBatchUrl(tail.slice(0, end));
+  if (!/^https?:\/\//i.test(decoded)) throw new Error('Google decode invalid URL');
+  return decoded;
 }
 
 async function fetchHtml(rawUrl) {
@@ -77,6 +146,7 @@ function metaContent(html, key) {
 function findImage(html, finalUrl) {
   const candidates = [
     metaContent(html, 'og:image'),
+    metaContent(html, 'og:image:secure_url'),
     metaContent(html, 'og:image:url'),
     metaContent(html, 'twitter:image'),
     metaContent(html, 'twitter:image:src'),
@@ -97,9 +167,11 @@ module.exports = async function handler(req, res) {
   const rawUrl = String(req.query?.url || '').slice(0, 2000);
   if (!rawUrl) return send(res, 400, { image: '' });
   try {
-    const { html, finalUrl } = await fetchHtml(rawUrl);
-    return send(res, 200, { image: findImage(html, finalUrl), articleUrl: finalUrl });
+    let articleUrl = rawUrl;
+    if (googleNewsArticleId(rawUrl)) articleUrl = await decodeGoogleNewsUrl(rawUrl);
+    const { html, finalUrl } = await fetchHtml(articleUrl);
+    return send(res, 200, { image: findImage(html, finalUrl), articleUrl: finalUrl, decoded: articleUrl !== rawUrl });
   } catch (error) {
-    return send(res, 200, { image: '', error: String(error?.message || 'unavailable').slice(0, 100) });
+    return send(res, 200, { image: '', error: String(error?.message || 'unavailable').slice(0, 140) });
   }
 };
