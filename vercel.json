@@ -1,4 +1,7 @@
 {
+  "functions": {
+    "api/news.js": { "maxDuration": 30 }
+  },
   "headers": [
     {
       "source": "/manifest.webmanifest",
@@ -12,6 +15,12 @@
       "headers": [
         { "key": "Cache-Control", "value": "public, max-age=0, must-revalidate" },
         { "key": "Service-Worker-Allowed", "value": "/" }
+      ]
+    },
+    {
+      "source": "/api/(.*)",
+      "headers": [
+        { "key": "Cache-Control", "value": "no-store" }
       ]
     }
   ]
