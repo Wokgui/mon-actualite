@@ -1,3 +1,5 @@
+const resolverRequests = new Map();
+
 function readCachedArticles() {
   try {
     const cached = JSON.parse(localStorage.getItem('news-live-cache') || '{}');
@@ -5,6 +7,19 @@ function readCachedArticles() {
   } catch {
     return [];
   }
+}
+
+function readImageCache() {
+  try { return JSON.parse(localStorage.getItem('news-original-images') || '{}') || {}; }
+  catch { return {}; }
+}
+
+function saveImageCache(id, url) {
+  if (!id || !url) return;
+  const cache = readImageCache();
+  cache[String(id)] = url;
+  const entries = Object.entries(cache).slice(-180);
+  try { localStorage.setItem('news-original-images', JSON.stringify(Object.fromEntries(entries))); } catch {}
 }
 
 function validImageUrl(value) {
@@ -16,23 +31,69 @@ function validImageUrl(value) {
   }
 }
 
-function loadOriginalImage(placeholder, article, detail = false) {
-  if (!placeholder || placeholder.dataset.imageAttempted === '1') return;
+async function resolvePublisherImage(article) {
+  if (!article?.url) return '';
+  const cached = validImageUrl(readImageCache()[String(article.id)]);
+  if (cached) return cached;
+
+  const key = String(article.id || article.url);
+  if (resolverRequests.has(key)) return resolverRequests.get(key);
+
+  const request = fetch(`/api/article-image?url=${encodeURIComponent(article.url)}`, { cache: 'force-cache' })
+    .then(response => response.ok ? response.json() : null)
+    .then(data => {
+      const image = validImageUrl(data?.image);
+      if (image) saveImageCache(article.id, image);
+      return image;
+    })
+    .catch(() => '')
+    .finally(() => resolverRequests.delete(key));
+
+  resolverRequests.set(key, request);
+  return request;
+}
+
+function showImage(placeholder, src, detail = false) {
+  return new Promise(resolve => {
+    if (!placeholder?.isConnected || !src) return resolve(false);
+    const image = new Image();
+    image.className = detail ? 'detail-hero original-article-image' : 'article-image original-article-image';
+    image.alt = '';
+    image.loading = detail ? 'eager' : 'lazy';
+    image.decoding = 'async';
+    image.referrerPolicy = 'no-referrer';
+    let proxied = false;
+
+    image.onload = () => {
+      if (placeholder.isConnected) placeholder.replaceWith(image);
+      resolve(true);
+    };
+    image.onerror = () => {
+      if (!proxied) {
+        proxied = true;
+        image.removeAttribute('referrerpolicy');
+        image.src = `/api/image-proxy?url=${encodeURIComponent(src)}`;
+      } else {
+        resolve(false);
+      }
+    };
+    image.src = src;
+  });
+}
+
+async function loadOriginalImage(placeholder, article, detail = false) {
+  if (!placeholder || !article || placeholder.dataset.imageAttempted === '1') return;
   placeholder.dataset.imageAttempted = '1';
 
-  const src = validImageUrl(article?.image);
-  if (!src) return;
+  const cached = validImageUrl(readImageCache()[String(article.id)]);
+  const feedImage = validImageUrl(article.image);
+  const first = cached || feedImage;
 
-  const image = new Image();
-  image.className = detail ? 'detail-hero original-article-image' : 'article-image original-article-image';
-  image.alt = '';
-  image.loading = detail ? 'eager' : 'lazy';
-  image.decoding = 'async';
-  image.referrerPolicy = 'no-referrer';
-  image.onload = () => {
-    if (placeholder.isConnected) placeholder.replaceWith(image);
-  };
-  image.src = src;
+  if (first && await showImage(placeholder, first, detail)) return;
+  if (!placeholder.isConnected) return;
+
+  const resolved = await resolvePublisherImage(article);
+  if (resolved && resolved !== first) await showImage(placeholder, resolved, detail);
 }
 
 function applyOriginalArticleImages() {
