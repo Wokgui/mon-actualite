@@ -1,0 +1,24 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="bg" x1="70" y1="54" x2="448" y2="466" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#9D8CFF"/>
+      <stop offset="1" stop-color="#5C45D2"/>
+    </linearGradient>
+    <linearGradient id="paper" x1="176" y1="156" x2="348" y2="369" gradientUnits="userSpaceOnUse">
+      <stop stop-color="#FFFFFF"/>
+      <stop offset="1" stop-color="#EFEAFF"/>
+    </linearGradient>
+  </defs>
+  <rect width="512" height="512" rx="116" fill="url(#bg)"/>
+  <circle cx="402" cy="104" r="78" fill="#B9ACFF" opacity=".24"/>
+  <circle cx="104" cy="422" r="104" fill="#4027B6" opacity=".18"/>
+  <rect x="145" y="134" width="222" height="250" rx="48" fill="url(#paper)"/>
+  <rect x="180" y="190" width="78" height="78" rx="24" fill="#7964E5"/>
+  <path d="m219 208 7 18 18 7-18 7-7 18-7-18-18-7 18-7 7-18Z" fill="#fff"/>
+  <rect x="278" y="195" width="54" height="14" rx="7" fill="#5C45D2"/>
+  <rect x="278" y="221" width="43" height="11" rx="5.5" fill="#A89CE4"/>
+  <rect x="278" y="244" width="51" height="11" rx="5.5" fill="#A89CE4"/>
+  <rect x="180" y="297" width="152" height="13" rx="6.5" fill="#6B58CE"/>
+  <rect x="180" y="323" width="121" height="11" rx="5.5" fill="#B3A8E8"/>
+  <rect x="180" y="346" width="138" height="11" rx="5.5" fill="#B3A8E8"/>
+</svg>
