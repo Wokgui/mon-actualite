@@ -1,43 +1,35 @@
 /**
- * Frontière entre l'interface et les futures sources réelles.
- * Le prototype analyse un OPML localement, sans envoyer le fichier.
- * Un futur backend pourra implémenter les deux adaptateurs décrits plus bas
- * sans modifier les écrans de l'application.
+ * Sources et synchronisation de Mon actualité.
+ * Les préférences restent sur l'appareil ; le serveur ne reçoit que la liste
+ * nécessaire pour récupérer les flux demandés au moment d'une synchronisation.
  */
 
 export async function importOpmlPreview(file) {
   const xml = await file.text();
-  const documentXml = new DOMParser().parseFromString(xml, "application/xml");
-  if (documentXml.querySelector("parsererror")) throw new Error("Invalid OPML");
+  const documentXml = new DOMParser().parseFromString(xml, 'application/xml');
+  if (documentXml.querySelector('parsererror')) throw new Error('Invalid OPML');
 
-  const feeds = [...documentXml.querySelectorAll("outline[xmlUrl]")].map(node => ({
-    title: node.getAttribute("title") || node.getAttribute("text") || "Source sans nom",
-    xmlUrl: node.getAttribute("xmlUrl"),
-    htmlUrl: node.getAttribute("htmlUrl") || "",
-    category: node.parentElement?.getAttribute("text") || "Non classée"
+  const feeds = [...documentXml.querySelectorAll('outline[xmlUrl]')].map(node => ({
+    id: crypto.randomUUID ? crypto.randomUUID() : `feed-${Date.now()}-${Math.random()}`,
+    title: node.getAttribute('title') || node.getAttribute('text') || 'Source sans nom',
+    url: node.getAttribute('xmlUrl'),
+    htmlUrl: node.getAttribute('htmlUrl') || '',
+    // Les dossiers OPML ont souvent des noms libres ("News", "Divers", etc.).
+    // On laisse donc le moteur classer chaque article selon son contenu.
+    category: '',
+    enabled: true
   }));
 
   return { feeds, importedAt: new Date().toISOString() };
 }
 
-export const futureSourceGateway = {
-  /** Remplacera les données factices par les articles des flux prioritaires. */
-  async fetchPriorityFeeds() {
-    return [];
-  },
-
-  /** Connexion Feedly éventuelle après autorisation OAuth côté serveur. */
-  async syncFeedly() {
-    throw new Error("Connecteur Feedly non configuré dans le prototype");
-  }
-};
-
-export const futureWebSearchGateway = {
-  /**
-   * Appelé uniquement après comparaison avec les flux : le sujet doit être
-   * important et insuffisamment couvert. Le serveur gardera les clés privées.
-   */
-  async searchMissingTopic() {
-    return [];
-  }
-};
+export async function fetchLiveNews({ sources = [], keywords = [], preferredCategories = [], webSearch = true, sourcePriority = true } = {}) {
+  const response = await fetch('/api/news', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    cache: 'no-store',
+    body: JSON.stringify({ sources, keywords, preferredCategories, webSearch, sourcePriority })
+  });
+  if (!response.ok) throw new Error(`Synchronisation impossible (${response.status})`);
+  return response.json();
+}
