@@ -1,7 +1,4 @@
 {
   "name": "mon-actualite",
-  "private": true,
-  "dependencies": {
-    "ai": "^6.0.0"
-  }
+  "private": true
 }
