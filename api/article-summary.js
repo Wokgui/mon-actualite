@@ -105,6 +105,29 @@ async function decodeGoogleNewsUrl(rawUrl) {
   return decoded;
 }
 
+function repairMojibake(value = '') {
+  const replacements = [
+    ['â€™', '’'], ['â€˜', '‘'], ['â€œ', '“'], ['â€', '”'], ['â€“', '–'], ['â€”', '—'], ['â€¦', '…'],
+    ['Â ', ' '], ['Â«', '«'], ['Â»', '»'], ['Ã©', 'é'], ['Ã¨', 'è'], ['Ãª', 'ê'], ['Ã«', 'ë'],
+    ['Ã ', 'à'], ['Ã¢', 'â'], ['Ã§', 'ç'], ['Ã®', 'î'], ['Ã¯', 'ï'], ['Ã´', 'ô'], ['Ã¹', 'ù'], ['Ã»', 'û'], ['Ã‰', 'É'], ['Å“', 'œ']
+  ];
+  let text = String(value || '');
+  for (const [bad, good] of replacements) text = text.split(bad).join(good);
+  return text.replace(/\uFFFD+/g, '');
+}
+
+function decodeBuffer(buffer, contentType = '') {
+  const probe = buffer.subarray(0, Math.min(buffer.length, 4096)).toString('latin1');
+  const declared = (contentType.match(/charset\s*=\s*["']?([^;"'\s]+)/i) || [])[1]
+    || (probe.match(/<meta[^>]+charset\s*=\s*["']?([^"'\s/>]+)/i) || [])[1]
+    || (probe.match(/<meta[^>]+content=["'][^"']*charset=([^;"'\s]+)/i) || [])[1]
+    || 'utf-8';
+  const charset = String(declared).toLowerCase().replace(/^['"]|['"]$/g, '');
+  const normalized = /^(iso-8859-1|latin1|windows-1252|cp1252)$/.test(charset) ? 'windows-1252' : 'utf-8';
+  try { return repairMojibake(new TextDecoder(normalized).decode(buffer)); }
+  catch { return repairMojibake(buffer.toString('utf8')); }
+}
+
 async function fetchHtml(rawUrl) {
   let current = rawUrl;
   for (let i = 0; i < 6; i++) {
@@ -119,37 +142,46 @@ async function fetchHtml(rawUrl) {
     if (!type.includes('text/html') && !type.includes('application/xhtml+xml')) throw new Error('not html');
     const buffer = Buffer.from(await response.arrayBuffer());
     if (buffer.byteLength > MAX_HTML_BYTES) throw new Error('page too large');
-    return { html: buffer.toString('utf8'), finalUrl: url.href };
+    return { html: decodeBuffer(buffer, type), finalUrl: url.href };
   }
   throw new Error('too many redirects');
 }
 
 function decodeHtml(value = '') {
-  return value
+  return repairMojibake(value
     .replace(/&nbsp;/gi, ' ')
     .replace(/&amp;/gi, '&').replace(/&quot;/gi, '"').replace(/&#39;|&apos;/gi, "'")
     .replace(/&lt;/gi, '<').replace(/&gt;/gi, '>')
-    .replace(/&#(\d+);/g, (_, n) => String.fromCharCode(Number(n)))
-    .replace(/&#x([0-9a-f]+);/gi, (_, n) => String.fromCharCode(parseInt(n, 16)));
+    .replace(/&#(\d+);/g, (_, n) => String.fromCodePoint(Number(n)))
+    .replace(/&#x([0-9a-f]+);/gi, (_, n) => String.fromCodePoint(parseInt(n, 16))));
 }
 
 function cleanText(value = '') {
   return decodeHtml(value.replace(/<[^>]+>/g, ' ')).replace(/\s+/g, ' ').trim();
 }
 
+function chooseArticleRegion(html) {
+  const articles = [...html.matchAll(/<article\b[^>]*>([\s\S]*?)<\/article>/gi)].map(m => m[1]);
+  if (articles.length) return articles.sort((a, b) => b.length - a.length)[0];
+  const mains = [...html.matchAll(/<main\b[^>]*>([\s\S]*?)<\/main>/gi)].map(m => m[1]);
+  if (mains.length) return mains.sort((a, b) => b.length - a.length)[0];
+  return html;
+}
+
 function extractArticleText(html) {
-  const cleaned = html
+  const region = chooseArticleRegion(html)
     .replace(/<script\b[\s\S]*?<\/script>/gi, ' ')
     .replace(/<style\b[\s\S]*?<\/style>/gi, ' ')
     .replace(/<noscript\b[\s\S]*?<\/noscript>/gi, ' ')
-    .replace(/<(nav|header|footer|aside|form|svg)\b[\s\S]*?<\/\1>/gi, ' ');
+    .replace(/<(nav|header|footer|aside|form|svg)\b[\s\S]*?<\/\1>/gi, ' ')
+    .replace(/<[^>]+(?:class|id)=["'][^"']*(?:related|recommend|newsletter|advert|promo|sidebar|share|social)[^"']*["'][^>]*>[\s\S]*?<\/[^>]+>/gi, ' ');
   const paragraphs = [];
   const seen = new Set();
-  for (const match of cleaned.matchAll(/<p\b[^>]*>([\s\S]*?)<\/p>/gi)) {
+  for (const match of region.matchAll(/<p\b[^>]*>([\s\S]*?)<\/p>/gi)) {
     const text = cleanText(match[1]);
     if (text.length < 55) continue;
-    if (/cookies?|abonnez|inscrivez|newsletter|publicit|©|tous droits|javascript/i.test(text)) continue;
-    const key = text.toLowerCase().slice(0, 120);
+    if (/cookies?|abonnez|inscrivez|newsletter|publicit|©|tous droits|javascript|lire aussi|à lire aussi|articles? similaires?/i.test(text)) continue;
+    const key = text.toLowerCase().slice(0, 140);
     if (seen.has(key)) continue;
     seen.add(key);
     paragraphs.push(text);
@@ -158,37 +190,64 @@ function extractArticleText(html) {
   return paragraphs.join('\n').slice(0, 14000);
 }
 
+function sentences(text = '') {
+  return String(text || '').replace(/\s+/g, ' ').trim().match(/[^.!?]+[.!?]+|[^.!?]+$/g)?.map(s => s.trim()).filter(Boolean) || [];
+}
+
+function paragraphize(text = '', wanted = 2) {
+  const clean = repairMojibake(String(text || '').trim()).replace(/\n{3,}/g, '\n\n');
+  if (!clean) return '';
+  const existing = clean.split(/\n\s*\n/).map(p => p.replace(/\s+/g, ' ').trim()).filter(Boolean);
+  if (existing.length >= wanted) return existing.slice(0, Math.max(wanted, 3)).join('\n\n');
+  const parts = sentences(clean);
+  if (parts.length < 4) return clean.replace(/\s+/g, ' ');
+  const cut = Math.ceil(parts.length / wanted);
+  const groups = [];
+  for (let i = 0; i < parts.length; i += cut) groups.push(parts.slice(i, i + cut).join(' '));
+  return groups.join('\n\n');
+}
+
 function sentenceFallback(text, fallback = '') {
-  const source = (text || fallback || '').replace(/\s+/g, ' ').trim();
+  const source = repairMojibake((text || fallback || '').replace(/\s+/g, ' ').trim());
   if (!source) return 'Résumé indisponible pour cet article.';
-  const sentences = source.match(/[^.!?]+[.!?]+|[^.!?]+$/g) || [source];
-  const selected = sentences.map(s => s.trim()).filter(s => s.length > 35).slice(0, 5);
-  const result = selected.join(' ');
-  return (result || source).slice(0, 900);
+  const selected = sentences(source).filter(s => s.length > 35).slice(0, 5);
+  const result = (selected.join(' ') || source).slice(0, 1000);
+  return paragraphize(result, 2);
+}
+
+function meaningfulTokens(value = '') {
+  const stop = new Set(['alors','après','avant','avec','avoir','cette','comme','dans','depuis','devrait','elles','entre','étaient','faire','leurs','mais','même','moins','notamment','nous','plus','pour','sans','selon','sont','sous','tout','toute','toutes','tous','très','vers','votre','ainsi','cela','celui','celle','être','fait','faits']);
+  return String(value).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().match(/[a-z0-9]{5,}/g)?.filter(t => !stop.has(t)) || [];
+}
+
+function summarySupported(summary, source) {
+  const generated = meaningfulTokens(summary);
+  if (generated.length < 8) return false;
+  const sourceSet = new Set(meaningfulTokens(source));
+  if (!sourceSet.size) return false;
+  const supported = generated.filter(token => sourceSet.has(token)).length;
+  return supported / generated.length >= 0.28;
 }
 
 async function getArticleMaterial(article) {
   const rawUrl = String(article?.url || '').slice(0, 2000);
-  if (!rawUrl) return { title: String(article?.title || ''), text: '', fallback: String(article?.summary || ''), finalUrl: '' };
+  const fallback = repairMojibake(String(article?.summary || ''));
+  const title = repairMojibake(String(article?.title || ''));
+  if (!rawUrl) return { title, text: '', fallback, finalUrl: '' };
   try {
     const decoded = googleNewsArticleId(rawUrl) ? await decodeGoogleNewsUrl(rawUrl) : rawUrl;
     const { html, finalUrl } = await fetchHtml(decoded);
-    return { title: String(article?.title || ''), text: extractArticleText(html), fallback: String(article?.summary || ''), finalUrl };
+    return { title, text: extractArticleText(html), fallback, finalUrl };
   } catch {
-    return { title: String(article?.title || ''), text: '', fallback: String(article?.summary || ''), finalUrl: rawUrl };
+    return { title, text: '', fallback, finalUrl: rawUrl };
   }
 }
 
 async function aiGenerate(system, prompt) {
   try {
     const { generateText } = await import('ai');
-    const { text } = await generateText({
-      model: 'openai/gpt-5.6-sol',
-      system,
-      prompt,
-      maxOutputTokens: 420
-    });
-    const clean = String(text || '').trim();
+    const { text } = await generateText({ model: 'openai/gpt-5.6-sol', system, prompt, maxOutputTokens: 460 });
+    const clean = repairMojibake(String(text || '').trim());
     return clean.length >= 80 ? clean : '';
   } catch (error) {
     console.error('AI summary unavailable:', String(error?.message || error).slice(0, 220));
@@ -196,7 +255,7 @@ async function aiGenerate(system, prompt) {
   }
 }
 
-const SYSTEM = `Tu es un rédacteur de presse factuel. Résume uniquement les informations présentes dans le texte fourni. N'écris ni accroche, ni formule promotionnelle, ni opinion, ni conseil. Commence directement par les faits. Donne le contexte nécessaire, les éléments importants et les conséquences concrètes lorsqu'elles sont indiquées. N'invente rien et signale implicitement l'incertitude du texte source.`;
+const SYSTEM = `Tu es un rédacteur de presse factuel. Tu dois résumer EXCLUSIVEMENT le contenu source fourni pour l'article demandé. Ignore toute navigation, recommandation, publicité, lien « à lire aussi », contenu d'un autre article ou texte sans rapport qui aurait été extrait de la page. N'ajoute aucun fait, nom, chiffre, contexte externe, opinion, conseil ou connaissance générale qui n'apparaît pas dans la source. Si une information n'est pas suffisamment étayée par le texte, ne l'écris pas. Commence par le fait principal. Utilise un français naturel et précis.`;
 
 module.exports = async function handler(req, res) {
   if (req.method === 'GET' && req.query?.status) {
@@ -208,24 +267,23 @@ module.exports = async function handler(req, res) {
   const mode = body.mode === 'category' ? 'category' : 'article';
 
   if (mode === 'category') {
-    const category = String(body.category || 'cette rubrique').slice(0, 80);
+    const category = repairMojibake(String(body.category || 'cette rubrique')).slice(0, 80);
     const articles = Array.isArray(body.articles) ? body.articles.slice(0, 4) : [];
     const materials = await Promise.all(articles.map(getArticleMaterial));
     const source = materials.map((item, i) => `ARTICLE ${i + 1} — ${item.title}\n${item.text || item.fallback}`).join('\n\n').slice(0, 30000);
-    const prompt = `Fais un résumé cohérent de l'actualité de la rubrique « ${category} » à partir des articles ci-dessous. 5 à 7 phrases, environ 120 à 180 mots. Fusionne les informations qui parlent du même sujet et privilégie les faits réellement importants.\n\n${source}`;
-    const generated = source ? await aiGenerate(SYSTEM, prompt) : '';
-    const fallback = materials.map(item => sentenceFallback(item.text, item.fallback)).filter(Boolean).slice(0, 3).join(' ');
-    return send(res, 200, { summary: generated || fallback || `Aucun résumé disponible pour ${category}.`, ai: Boolean(generated) });
+    const prompt = `Synthétise l'actualité de la rubrique « ${category} » uniquement à partir des articles ci-dessous. Fais 5 à 7 phrases, environ 120 à 180 mots, réparties en 2 ou 3 paragraphes courts séparés par une ligne vide. Regroupe seulement les informations qui concernent réellement le même sujet. N'introduis aucun élément extérieur aux textes.\n\n${source}`;
+    let generated = source.length >= 120 ? await aiGenerate(SYSTEM, prompt) : '';
+    if (generated && !summarySupported(generated, source)) generated = '';
+    const fallback = materials.map(item => sentenceFallback(item.text, item.fallback)).filter(Boolean).slice(0, 3).join('\n\n');
+    return send(res, 200, { summary: paragraphize(generated || fallback || `Aucun résumé disponible pour ${category}.`, 2), ai: Boolean(generated) });
   }
 
   const article = body.article || {};
   const material = await getArticleMaterial(article);
   const source = material.text || material.fallback;
-  const prompt = `Résume cet article en français en 4 à 6 phrases, environ 90 à 140 mots. Le résumé doit permettre de comprendre l'information sans lire l'article et doit commencer par le fait principal.\n\nTITRE : ${material.title}\n\nTEXTE :\n${source}`;
-  const generated = source ? await aiGenerate(SYSTEM, prompt) : '';
-  return send(res, 200, {
-    summary: generated || sentenceFallback(material.text, material.fallback),
-    ai: Boolean(generated),
-    articleUrl: material.finalUrl || String(article?.url || '')
-  });
+  const prompt = `Résume cet article en français en 4 à 6 phrases, environ 90 à 140 mots. Fais exactement 2 paragraphes courts séparés par une ligne vide. Le premier paragraphe donne le fait principal et son contexte immédiat. Le second donne les précisions, conséquences ou chiffres présents dans le texte. Ne parle d'aucun autre sujet, même s'il apparaît dans des recommandations de la page.\n\nTITRE : ${material.title}\n\nTEXTE SOURCE :\n${source}`;
+  let generated = source.length >= 120 ? await aiGenerate(SYSTEM, prompt) : '';
+  if (generated && !summarySupported(generated, `${material.title}\n${source}`)) generated = '';
+  const summary = paragraphize(generated || sentenceFallback(material.text, material.fallback), 2);
+  return send(res, 200, { summary, ai: Boolean(generated), articleUrl: material.finalUrl || String(article?.url || '') });
 };
