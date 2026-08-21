@@ -61,13 +61,10 @@ function blockedBy(article, terms = blockedTerms()) {
 
 function smartIllustrationUrl(article) {
   const params = new URLSearchParams({
-    v: '2',
-    url: String(article?.url || '').slice(0, 1800),
-    title: String(article?.title || '').slice(0, 280),
-    category: String(article?.category || '').slice(0, 70)
+    v: '3',
+    url: String(article?.url || '').slice(0, 1900)
   });
-  if (/^https?:\/\//i.test(article?.image || '') && String(article.image).length < 1600) params.set('image', article.image);
-  return `/api/article-illustration?${params}`;
+  return `/api/article-thumbnail?${params}`;
 }
 
 function purgeWeakSummaryCache() {
