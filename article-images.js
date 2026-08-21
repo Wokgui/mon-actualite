@@ -1,4 +1,5 @@
 const resolverRequests = new Map();
+const IMAGE_CACHE_KEY = 'news-original-images-v2';
 
 function readCachedArticles() {
   try {
@@ -10,7 +11,7 @@ function readCachedArticles() {
 }
 
 function readImageCache() {
-  try { return JSON.parse(localStorage.getItem('news-original-images') || '{}') || {}; }
+  try { return JSON.parse(localStorage.getItem(IMAGE_CACHE_KEY) || '{}') || {}; }
   catch { return {}; }
 }
 
@@ -18,8 +19,8 @@ function saveImageCache(id, url) {
   if (!id || !url) return;
   const cache = readImageCache();
   cache[String(id)] = url;
-  const entries = Object.entries(cache).slice(-180);
-  try { localStorage.setItem('news-original-images', JSON.stringify(Object.fromEntries(entries))); } catch {}
+  const entries = Object.entries(cache).slice(-240);
+  try { localStorage.setItem(IMAGE_CACHE_KEY, JSON.stringify(Object.fromEntries(entries))); } catch {}
 }
 
 function validImageUrl(value) {
@@ -39,7 +40,7 @@ async function resolvePublisherImage(article) {
   const key = String(article.id || article.url);
   if (resolverRequests.has(key)) return resolverRequests.get(key);
 
-  const request = fetch(`/api/article-image?v=2&url=${encodeURIComponent(article.url)}`, { cache: 'no-cache' })
+  const request = fetch(`/api/article-image?v=4&url=${encodeURIComponent(article.url)}`, { cache: 'no-store' })
     .then(response => response.ok ? response.json() : null)
     .then(data => {
       const image = validImageUrl(data?.image);
