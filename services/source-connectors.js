@@ -11,7 +11,7 @@ export async function importOpmlPreview(file) {
 
   const feeds = [...documentXml.querySelectorAll('outline[xmlUrl]')].map(node => ({
     id: crypto.randomUUID ? crypto.randomUUID() : `feed-${Date.now()}-${Math.random()}`,
-    title: node.getAttribute('title') || node.getAttribute('text') || 'Source sans nom',
+    title: cleanText(node.getAttribute('title') || node.getAttribute('text') || 'Source sans nom'),
     url: node.getAttribute('xmlUrl'),
     htmlUrl: node.getAttribute('htmlUrl') || '',
     category: '',
@@ -19,6 +19,46 @@ export async function importOpmlPreview(file) {
   }));
 
   return { feeds, importedAt: new Date().toISOString() };
+}
+
+const MOJIBAKE = new Map([
+  ['â€™', '’'], ['â€˜', '‘'], ['â€œ', '“'], ['â€', '”'], ['â€ž', '„'],
+  ['â€“', '–'], ['â€”', '—'], ['â€¦', '…'], ['Â ', ' '], ['Â«', '«'], ['Â»', '»'],
+  ['Ã€', 'À'], ['Ã‚', 'Â'], ['Ã‡', 'Ç'], ['Ãˆ', 'È'], ['Ã‰', 'É'], ['ÃŠ', 'Ê'], ['Ã‹', 'Ë'],
+  ['ÃŽ', 'Î'], ['ÃÏ', 'Ï'], ['Ã”', 'Ô'], ['Ã™', 'Ù'], ['Ã›', 'Û'], ['Ãœ', 'Ü'],
+  ['Ã ', 'à'], ['Ã¢', 'â'], ['Ã§', 'ç'], ['Ã¨', 'è'], ['Ã©', 'é'], ['Ãª', 'ê'], ['Ã«', 'ë'],
+  ['Ã®', 'î'], ['Ã¯', 'ï'], ['Ã´', 'ô'], ['Ã¹', 'ù'], ['Ã»', 'û'], ['Ã¼', 'ü'], ['Å“', 'œ'], ['Å’', 'Œ']
+]);
+
+function decodeEntities(value = '') {
+  if (!/[&][a-z#0-9]+;/i.test(value)) return value;
+  const textarea = document.createElement('textarea');
+  textarea.innerHTML = value;
+  return textarea.value;
+}
+
+function repairMojibake(value = '') {
+  let text = String(value ?? '');
+  for (const [broken, fixed] of MOJIBAKE) text = text.split(broken).join(fixed);
+  return text.replace(/\uFFFD+/g, '').replace(/\s+([,.;:!?])/g, '$1');
+}
+
+function cleanText(value = '') {
+  return repairMojibake(decodeEntities(String(value ?? ''))).trim();
+}
+
+function normalizeArticle(article = {}) {
+  return {
+    ...article,
+    title: cleanText(article.title),
+    summary: cleanText(article.summary),
+    detail: cleanText(article.detail),
+    source: cleanText(article.source),
+    feedTitle: cleanText(article.feedTitle),
+    category: cleanText(article.category),
+    tags: Array.isArray(article.tags) ? article.tags.map(cleanText) : article.tags,
+    sources: Array.isArray(article.sources) ? article.sources.map(cleanText) : article.sources
+  };
 }
 
 function hash32(text, seed) {
@@ -39,7 +79,9 @@ function stableArticleId(article) {
 function readArticleHistory() {
   try {
     const cache = JSON.parse(localStorage.getItem('news-live-cache') || '{}');
-    return Array.isArray(cache.articles) ? cache.articles.filter(article => String(article?.id || '').startsWith('a-')) : [];
+    return Array.isArray(cache.articles)
+      ? cache.articles.filter(article => String(article?.id || '').startsWith('a-')).map(normalizeArticle)
+      : [];
   } catch {
     return [];
   }
@@ -47,7 +89,8 @@ function readArticleHistory() {
 
 function mergeArticleHistory(fresh) {
   const byId = new Map();
-  for (const article of [...fresh, ...readArticleHistory()]) {
+  for (const rawArticle of [...fresh, ...readArticleHistory()]) {
+    const article = normalizeArticle(rawArticle);
     if (!article?.id || byId.has(article.id)) continue;
     byId.set(article.id, article);
   }
@@ -68,7 +111,10 @@ export async function fetchLiveNews({ sources = [], keywords = [], preferredCate
   if (!response.ok) throw new Error(`Synchronisation impossible (${response.status})`);
   const payload = await response.json();
   if (Array.isArray(payload.articles)) {
-    const fresh = payload.articles.map(article => ({ ...article, id: stableArticleId(article) }));
+    const fresh = payload.articles.map(rawArticle => {
+      const article = normalizeArticle(rawArticle);
+      return { ...article, id: stableArticleId(article) };
+    });
     payload.articles = mergeArticleHistory(fresh);
   }
   return payload;
