@@ -1,5 +1,5 @@
 const nativeFetch = window.fetch.bind(window);
-const MIGRATION_FLAG = 'news-summary-fix-v3-applied';
+const MIGRATION_FLAG = 'news-summary-fix-v4-groq-applied';
 
 const ENTITY_MAP = new Map([
   ['nbsp', ' '], ['amp', '&'], ['quot', '"'], ['apos', "'"], ['lt', '<'], ['gt', '>'],
@@ -11,7 +11,7 @@ const ENTITY_MAP = new Map([
 
 function decodeEntities(value = '') {
   let text = String(value ?? '');
-  for (let pass = 0; pass < 3; pass++) {
+  for (let pass = 0; pass < 4; pass++) {
     const before = text;
     text = text
       .replace(/&#(\d+);/g, (full, n) => {
@@ -26,10 +26,35 @@ function decodeEntities(value = '') {
   return text.replace(/\uFFFD+/g, '').trim();
 }
 
+function isBoilerplate(text = '') {
+  const value = decodeEntities(text).toLowerCase();
+  return [
+    /pour\s+(?:sauvegarder|enregistrer|mémoriser|partager|commenter|lire)\s+(?:cet|cette|l[’']?)?\s*article/,
+    /connectez[- ]?vous|se connecter|identifiez[- ]?vous|connexion à votre compte/,
+    /créez (?:votre|un) compte|créer (?:votre|un) compte/,
+    /abonnez[- ]?vous|déjà abonné|offre d[’']abonnement|nos offres|accès abonnés?/,
+    /newsletter|recevez (?:nos|les) actualités|inscrivez[- ]?vous à/,
+    /acceptez les cookies|gestion des cookies|préférences de confidentialité|consentement/,
+    /activez les notifications|notifications? pour ne rien manquer/,
+    /partager sur|suivez[- ]?nous|retrouvez[- ]?nous sur/,
+    /lire aussi|à lire aussi|voir aussi|à découvrir|sur le même sujet/,
+    /ajouter (?:cet|l[’']?)?\s*article (?:à|dans) (?:vos|mes) favoris/
+  ].some(pattern => pattern.test(value));
+}
+
+function cleanSummary(value = '') {
+  const decoded = decodeEntities(value);
+  const parts = decoded.replace(/\s+/g, ' ').match(/[^.!?]+[.!?]+|[^.!?]+$/g) || [];
+  const useful = parts.map(s => s.trim()).filter(s => s.length >= 25 && !isBoilerplate(s));
+  return (useful.join(' ') || decoded).trim();
+}
+
 try {
   if (localStorage.getItem(MIGRATION_FLAG) !== '1') {
     localStorage.removeItem('news-factual-summaries-v1');
     localStorage.removeItem('news-factual-summaries-v2');
+    localStorage.removeItem('news-factual-summaries-v3');
+    localStorage.removeItem('news-ai-summaries-v4');
     localStorage.setItem(MIGRATION_FLAG, '1');
   }
 } catch {}
@@ -41,9 +66,9 @@ window.fetch = async function patchedFetch(input, init) {
 
   try {
     const url = new URL(raw, location.href);
-    if (url.pathname === '/api/article-summary') {
-      url.pathname = '/api/article-summary-v3';
-      url.searchParams.set('v', '3');
+    if (url.pathname === '/api/article-summary' || url.pathname === '/api/article-summary-v3') {
+      url.pathname = '/api/article-summary-groq';
+      url.searchParams.set('v', '4');
       isSummary = true;
       nextInput = typeof input === 'string' ? `${url.pathname}${url.search}` : new Request(url.href, input);
     }
@@ -54,7 +79,7 @@ window.fetch = async function patchedFetch(input, init) {
 
   try {
     const data = await response.clone().json();
-    if (data && typeof data.summary === 'string') data.summary = decodeEntities(data.summary);
+    if (data && typeof data.summary === 'string') data.summary = cleanSummary(data.summary);
     const headers = new Headers(response.headers);
     headers.set('Content-Type', 'application/json; charset=utf-8');
     return new Response(JSON.stringify(data), {
