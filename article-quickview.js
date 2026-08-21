@@ -80,19 +80,11 @@ function enhanceArticleTitlesAndTabs() {
   document.querySelectorAll('[data-article]').forEach(card => {
     const article = quickArticle(card.dataset.article);
     if (!article) return;
+    const cleanTitle = titleWithoutSource(article.title, article.source);
     const title = card.querySelector('h2, .brief-copy strong');
-    if (title) title.textContent = titleWithoutSource(article.title, article.source);
-    card.setAttribute('aria-label', `Lire : ${titleWithoutSource(article.title, article.source)}`);
-    if (card.querySelector('[data-quick-summary]')) return;
-    const meta = card.querySelector('.meta, .brief-meta');
-    if (!meta) return;
-    const button = document.createElement('button');
-    button.type = 'button';
-    button.className = 'quick-summary-tab';
-    button.dataset.quickSummary = String(article.id);
-    button.textContent = 'Résumé';
-    button.setAttribute('aria-label', `Ouvrir le résumé de ${titleWithoutSource(article.title, article.source)}`);
-    meta.appendChild(button);
+    if (title) title.textContent = cleanTitle;
+    card.setAttribute('aria-label', `Ouvrir le résumé : ${cleanTitle}`);
+    card.querySelectorAll('[data-quick-summary]').forEach(node => node.remove());
   });
 
   const detail = document.querySelector('.detail-page');
@@ -191,15 +183,6 @@ function openQuickSummary(article) {
 }
 
 document.addEventListener('click', event => {
-  const summaryButton = event.target.closest('[data-quick-summary]');
-  if (summaryButton) {
-    event.preventDefault();
-    event.stopPropagation();
-    const article = quickArticle(summaryButton.dataset.quickSummary);
-    if (article) openQuickSummary(article);
-    return;
-  }
-
   if (event.target.matches('.quick-summary-backdrop') || event.target.closest('[data-quick-close]')) {
     event.preventDefault();
     closeQuickSummary();
@@ -218,6 +201,16 @@ document.addEventListener('click', event => {
     quickWriteJson('news-feedback', feedback);
     modal.querySelectorAll('[data-quick-feedback]').forEach(button => button.classList.toggle('selected', button === feedbackButton));
     window.dispatchEvent(new Event('focus'));
+    return;
+  }
+
+  const card = event.target.closest('[data-article]');
+  if (card && !event.target.closest('button, a, input, select, textarea')) {
+    const article = quickArticle(card.dataset.article);
+    if (!article) return;
+    event.preventDefault();
+    event.stopPropagation();
+    openQuickSummary(article);
   }
 }, true);
 
