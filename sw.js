@@ -1,4 +1,4 @@
-const CACHE = 'mon-actualite-v20-direct-summary-open';
+const CACHE = 'mon-actualite-v21-fullscreen-summary';
 const ASSETS = ['./', './index.html', './styles.css', './feedly-compact.css', './feedly-left.css', './ui-fixes-v2.css', './article-quickview.css', './app.js', './feedly-runtime.js', './summary-fixes.js', './article-images.js', './article-quickview.js', './services/source-connectors.js', './manifest.webmanifest', './assets/app-icon.svg', './assets/icon-192.png', './assets/icon-512.png', './assets/icon-maskable-512.png'];
 
 self.addEventListener('install', event => {
