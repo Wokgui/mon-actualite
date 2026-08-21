@@ -1,7 +1,12 @@
 const legacyHandler = require('./article-summary.js');
 
 const GROQ_ENDPOINT = 'https://api.groq.com/openai/v1/chat/completions';
-const GROQ_MODEL = String(process.env.GROQ_MODEL || 'openai/gpt-oss-20b').trim();
+const GROQ_MODELS = [...new Set([
+  process.env.GROQ_MODEL,
+  'llama-3.3-70b-versatile',
+  'llama-3.1-8b-instant',
+  'openai/gpt-oss-20b'
+].filter(Boolean).map(value => String(value).trim()).filter(Boolean))];
 const GROQ_TIMEOUT_MS = 18000;
 
 const SYSTEM = `Tu es un rédacteur de presse factuel. Résume uniquement les informations fournies. N'invente aucun fait, nom, chiffre, contexte ou conséquence. Commence par le fait principal. Écris un français naturel, précis et neutre. Ignore entièrement les éléments d'interface, appels à se connecter, sauvegarder un article, s'abonner, accepter des cookies, partager, activer des notifications ou toute autre phrase de service du site. N'écris ni titre accrocheur, ni formule promotionnelle, ni invitation à cliquer.`;
@@ -47,6 +52,7 @@ function isBoilerplate(text = '') {
   if (!value) return true;
   return [
     /pour\s+(?:sauvegarder|enregistrer|mémoriser|partager|commenter|lire)\s+(?:cet|cette|l[’']?)?\s*article/,
+    /partager\s+(?:la\s+)?publication|partager\s+cet(?:te)?\s+(?:publication|article)/,
     /connectez[- ]?vous|se connecter|identifiez[- ]?vous|connexion à votre compte/,
     /créez (?:votre|un) compte|créer (?:votre|un) compte/,
     /abonnez[- ]?vous|déjà abonné|offre d[’']abonnement|nos offres|accès abonnés?/,
@@ -74,7 +80,7 @@ function sanitizeFactual(value = '') {
   if (!result) {
     result = sentences(decoded).filter(sentence => sentence.length >= 30 && !isBoilerplate(sentence)).slice(0, 6).join(' ');
   }
-  return result.slice(0, 3200).trim();
+  return result.slice(0, 4200).trim();
 }
 
 function groqKey() {
@@ -107,7 +113,7 @@ function summarySupported(summary, source) {
   const sourceSet = new Set(meaningfulTokens(source));
   if (!sourceSet.size) return false;
   const supported = generated.filter(token => sourceSet.has(token)).length;
-  return supported / generated.length >= 0.18;
+  return supported / generated.length >= 0.14;
 }
 
 function paragraphize(value = '', wanted = 2) {
@@ -130,10 +136,21 @@ function promptFor(body, factual) {
     return `Synthétise l'actualité de la rubrique « ${category} » uniquement à partir du texte factuel ci-dessous. Fais 5 à 7 phrases, environ 120 à 180 mots, en 2 ou 3 paragraphes courts. Commence directement par les faits les plus importants. Supprime mentalement toute phrase de connexion, abonnement, sauvegarde d'article, cookies, partage ou navigation si elle subsiste. N'ajoute aucune information extérieure.\n\nTEXTE FACTUEL :\n${factual}`;
   }
   const title = decodeEntities(body?.article?.title || '');
-  return `Résume cet article en français en 4 à 6 phrases, environ 90 à 140 mots, en exactement 2 paragraphes courts. Commence directement par le fait principal et son contexte immédiat. Le second paragraphe donne les précisions, chiffres ou conséquences présents dans le texte. Supprime mentalement toute phrase de connexion, abonnement, sauvegarde d'article, cookies, partage ou navigation si elle subsiste. Ne complète avec aucune connaissance extérieure.\n\nTITRE : ${title}\n\nTEXTE FACTUEL :\n${factual}`;
+  return `Résume cet article en français en 4 à 6 phrases, environ 90 à 140 mots, en exactement 2 paragraphes courts. Commence directement par le fait principal et son contexte immédiat. Le second paragraphe donne les précisions, chiffres ou conséquences présents dans le texte. Supprime mentalement toute phrase de connexion, abonnement, sauvegarde d'article, cookies, partage ou navigation si elle subsiste. Ne complète avec aucune connaissance extérieure. Ne recopie pas de longues citations : reformule.\n\nTITRE : ${title}\n\nTEXTE FACTUEL :\n${factual}`;
 }
 
-async function generateWithGroq(key, prompt) {
+async function generateWithGroq(model, key, prompt, minLength = 60) {
+  const body = {
+    model,
+    messages: [
+      { role: 'system', content: SYSTEM },
+      { role: 'user', content: prompt }
+    ],
+    temperature: 0.1,
+    max_tokens: 520
+  };
+  if (model.startsWith('openai/gpt-oss-')) body.include_reasoning = false;
+
   const response = await fetch(GROQ_ENDPOINT, {
     method: 'POST',
     signal: AbortSignal.timeout(GROQ_TIMEOUT_MS),
@@ -141,34 +158,43 @@ async function generateWithGroq(key, prompt) {
       'Content-Type': 'application/json',
       'Authorization': `Bearer ${key}`
     },
-    body: JSON.stringify({
-      model: GROQ_MODEL,
-      messages: [
-        { role: 'system', content: SYSTEM },
-        { role: 'user', content: prompt }
-      ],
-      temperature: 0.1,
-      max_tokens: 460,
-      include_reasoning: false
-    })
+    body: JSON.stringify(body)
   });
   const payload = await response.json().catch(() => ({}));
   if (!response.ok) {
     const message = payload?.error?.message || `HTTP ${response.status}`;
-    throw new Error(`${GROQ_MODEL}: ${message}`);
+    throw new Error(`${model}: ${message}`);
   }
   const text = decodeEntities(payload?.choices?.[0]?.message?.content || '');
-  if (text.length < 60) throw new Error(`${GROQ_MODEL}: réponse trop courte`);
+  if (text.length < minLength) throw new Error(`${model}: réponse trop courte`);
   return text;
 }
 
-async function probeGroq(key) {
-  try {
-    const text = await generateWithGroq(key, 'Réponds uniquement par : OK');
-    return { ok: /ok/i.test(text), model: GROQ_MODEL };
-  } catch (error) {
-    return { ok: false, error: String(error?.message || error).replace(/gsk_[A-Za-z0-9_-]+/g, '[clé masquée]').slice(0, 420) };
+async function generateWithFallback(key, prompt) {
+  let lastError = '';
+  for (const model of GROQ_MODELS) {
+    try {
+      const text = await generateWithGroq(model, key, prompt);
+      return { text, model };
+    } catch (error) {
+      lastError = String(error?.message || error).slice(0, 360);
+    }
   }
+  throw new Error(lastError || 'Aucun modèle Groq disponible');
+}
+
+async function probeGroq(key) {
+  let lastError = '';
+  for (const model of GROQ_MODELS) {
+    try {
+      const text = await generateWithGroq(model, key, 'Réponds uniquement par : OK', 2);
+      if (/ok/i.test(text)) return { ok: true, model };
+      lastError = `${model}: réponse inattendue`;
+    } catch (error) {
+      lastError = String(error?.message || error).slice(0, 360);
+    }
+  }
+  return { ok: false, error: lastError.replace(/gsk_[A-Za-z0-9_-]+/g, '[clé masquée]').slice(0, 420) };
 }
 
 module.exports = async function handler(req, res) {
@@ -178,7 +204,8 @@ module.exports = async function handler(req, res) {
     const payload = {
       ok: true,
       provider: 'groq',
-      model: GROQ_MODEL,
+      model: GROQ_MODELS[0],
+      models: GROQ_MODELS,
       hasGroqKey: Boolean(key),
       gatewayDisabled: true
     };
@@ -217,14 +244,14 @@ module.exports = async function handler(req, res) {
   const prompt = promptFor(body, factual);
 
   try {
-    const generated = await generateWithGroq(key, prompt);
-    if (!summarySupported(generated, factual)) throw new Error('Résumé Groq insuffisamment étayé par la source');
+    const aiResult = await generateWithFallback(key, prompt);
+    if (!summarySupported(aiResult.text, factual)) throw new Error(`${aiResult.model}: résumé insuffisamment étayé par la source`);
     return send(res, 200, {
       ...base,
-      summary: paragraphize(generated, body.mode === 'category' ? 2 : 2),
+      summary: paragraphize(aiResult.text, 2),
       ai: true,
       provider: 'groq',
-      model: GROQ_MODEL
+      model: aiResult.model
     });
   } catch (error) {
     const message = String(error?.message || error).replace(/gsk_[A-Za-z0-9_-]+/g, '[clé masquée]').slice(0, 420);
