@@ -31,8 +31,8 @@ function hash32(text, seed) {
   return (hash >>> 0).toString(16).padStart(8, '0');
 }
 
-function stableArticleId(article, index) {
-  const key = `${article?.url || ''}|${article?.title || ''}|${article?.publishedAt || ''}|${index}`;
+function stableArticleId(article) {
+  const key = `${article?.url || ''}|${article?.title || ''}|${article?.publishedAt || ''}`;
   return `a-${hash32(key, 2166136261)}${hash32(key, 0x9e3779b1)}`;
 }
 
@@ -46,7 +46,7 @@ export async function fetchLiveNews({ sources = [], keywords = [], preferredCate
   if (!response.ok) throw new Error(`Synchronisation impossible (${response.status})`);
   const payload = await response.json();
   if (Array.isArray(payload.articles)) {
-    payload.articles = payload.articles.map((article, index) => ({ ...article, id: stableArticleId(article, index) }));
+    payload.articles = payload.articles.map(article => ({ ...article, id: stableArticleId(article) }));
   }
   return payload;
 }
