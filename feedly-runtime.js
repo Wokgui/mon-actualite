@@ -2,13 +2,19 @@ const GENERAL = ['Politique','International','Économie','Société','Santé','E
 const PERSONAL = ['IA','Tech','Smartphones','VR','Automobile','Énergie'];
 const FRANCE_CATEGORIES = ['Politique','Économie','Société','Santé','Éducation','Environnement','Culture','Tech'];
 const WORLD_CATEGORIES = ['International','Europe'];
+const SUMMARY_CACHE_KEY = 'news-factual-summaries-v1';
 let scheduled = false;
 let briefMode = 'essential';
 let briefCategory = null;
+const summaryRequests = new Map();
 
 function readJson(key, fallback) {
   try { return JSON.parse(localStorage.getItem(key) || 'null') ?? fallback; }
   catch { return fallback; }
+}
+
+function writeJson(key, value) {
+  try { localStorage.setItem(key, JSON.stringify(value)); } catch {}
 }
 
 function esc(value) {
@@ -34,9 +40,13 @@ function currentSettings() {
   };
 }
 
-function visibleArticles() {
+function allCachedArticles() {
   const cache = readJson('news-live-cache', {});
-  const articles = Array.isArray(cache.articles) ? cache.articles : [];
+  return Array.isArray(cache.articles) ? cache.articles : [];
+}
+
+function visibleArticles() {
+  const articles = allCachedArticles();
   const current = currentSettings();
   const feedback = readJson('news-feedback', {});
   const allowed = new Set([...current.general, ...current.interests, 'À suivre']);
@@ -56,9 +66,13 @@ function importanceArticles() {
   });
 }
 
+function thumbnailUrl(article) {
+  return `/api/article-thumbnail?url=${encodeURIComponent(article?.url || '')}`;
+}
+
 function compactRow(article) {
   return `<article class="article-card runtime-row" data-article="${esc(article.id)}" tabindex="0" aria-label="Lire : ${esc(article.title)}">
-    <div class="article-image article-placeholder" aria-hidden="true"></div>
+    <img class="article-image original-article-image direct-thumb" src="${esc(thumbnailUrl(article))}" alt="" loading="lazy" decoding="async">
     <div class="article-body">
       <h2>${esc(article.title)}</h2>
       <div class="meta"><span class="source">${esc(article.source || 'Source')}</span><span>${esc(timeLabel(article.publishedAt))}</span></div>
@@ -70,8 +84,13 @@ function removeRedundantUi() {
   document.querySelectorAll('.sync-strip').forEach(node => node.remove());
   document.querySelectorAll('.install-section').forEach(node => node.remove());
   document.querySelectorAll('.bottom-nav').forEach(nav => {
-    nav.querySelector('[data-view="news"]')?.remove();
-    nav.classList.add('nav-four');
+    const home = nav.querySelector('[data-view="home"]');
+    const plus = nav.querySelector('[data-view="sheet"]');
+    const brief = nav.querySelector('[data-view="brief"]');
+    if (!home || !plus || !brief) return;
+    nav.replaceChildren(home, plus, brief);
+    nav.classList.remove('nav-four');
+    nav.classList.add('nav-three');
   });
 }
 
@@ -119,27 +138,66 @@ function selectedBriefCategories() {
   return [...new Set([...current.general, ...current.interests])];
 }
 
-function categorySummary(category) {
-  const items = importanceArticles().filter(article => article.category === category).slice(0, 3);
-  const texts = items.map(article => String(article.summary || '').trim()).filter(Boolean);
-  if (!texts.length) return `Pas de fait marquant suffisamment récent dans ${category}.`;
-  const joined = texts.join(' ');
-  return joined.length > 520 ? `${joined.slice(0, 517).trim()}…` : joined;
-}
-
 function renderEssential() {
   const { france, world } = essentialBrief();
   const section = (title, items) => `<section class="journal-section"><h2 class="brief-section-title">${title}</h2><div class="feed">${items.length ? items.map(compactRow).join('') : '<p class="muted-note">Aucune information majeure récente.</p>'}</div></section>`;
   return `${section('France', france)}${section('Monde', world)}`;
 }
 
+function categoryCacheKey(category, items) {
+  return `category:${category}:${items.map(item => item.id).join(',')}`;
+}
+
+async function requestSummary(key, payload) {
+  const cache = readJson(SUMMARY_CACHE_KEY, {});
+  if (cache[key]?.summary) return cache[key];
+  if (summaryRequests.has(key)) return summaryRequests.get(key);
+  const request = fetch('/api/article-summary', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    cache: 'no-store',
+    body: JSON.stringify(payload)
+  }).then(response => response.ok ? response.json() : null)
+    .then(data => {
+      if (data?.summary) {
+        const latest = readJson(SUMMARY_CACHE_KEY, {});
+        latest[key] = { summary: data.summary, ai: Boolean(data.ai), savedAt: Date.now() };
+        const entries = Object.entries(latest).slice(-180);
+        writeJson(SUMMARY_CACHE_KEY, Object.fromEntries(entries));
+      }
+      return data;
+    })
+    .catch(() => null)
+    .finally(() => summaryRequests.delete(key));
+  summaryRequests.set(key, request);
+  return request;
+}
+
+async function loadCategorySummary(category, items) {
+  const target = document.querySelector('[data-runtime-category-summary]');
+  if (!target) return;
+  const key = categoryCacheKey(category, items);
+  const result = await requestSummary(key, {
+    mode: 'category',
+    category,
+    articles: items.slice(0, 4).map(article => ({ url: article.url, title: article.title, summary: article.summary }))
+  });
+  if (!target.isConnected || target.dataset.summaryKey !== key) return;
+  target.textContent = result?.summary || 'Résumé indisponible pour cette rubrique.';
+  const label = document.querySelector('.runtime-category-summary .brief-label');
+  if (label) label.textContent = result?.ai ? `${category} · Résumé IA` : `${category} · Résumé factuel`;
+}
+
 function renderCategories() {
   const categories = selectedBriefCategories();
   if (!categories.length) return '<p class="muted-note">Choisissez des rubriques dans Réglages.</p>';
   if (!briefCategory || !categories.includes(briefCategory)) briefCategory = categories[0];
-  const items = visibleArticles().filter(article => article.category === briefCategory).slice(0, 8);
+  const items = importanceArticles().filter(article => article.category === briefCategory).slice(0, 8);
+  const summaryItems = items.slice(0, 4);
+  const key = categoryCacheKey(briefCategory, summaryItems);
+  const cached = readJson(SUMMARY_CACHE_KEY, {})[key];
   return `<div class="brief-category-tabs">${categories.map(category => `<button class="brief-category-tab ${category === briefCategory ? 'active' : ''}" data-brief-category="${esc(category)}">${esc(category)}</button>`).join('')}</div>
-    <section class="brief-card runtime-category-summary"><span class="brief-label">${esc(briefCategory)}</span><h2>En bref</h2><p>${esc(categorySummary(briefCategory))}</p></section>
+    <section class="brief-card runtime-category-summary"><span class="brief-label">${esc(briefCategory)}${cached?.ai ? ' · Résumé IA' : ''}</span><h2>En bref</h2><p data-runtime-category-summary data-summary-key="${esc(key)}">${esc(cached?.summary || 'Résumé en cours…')}</p></section>
     <div class="feed">${items.length ? items.map(compactRow).join('') : '<p class="muted-note">Aucun article récent dans cette rubrique.</p>'}</div>`;
 }
 
@@ -154,10 +212,88 @@ function enhanceBrief() {
   page.dataset.runtimeBriefSignature = signature;
   [...page.children].forEach(child => { if (child !== topbar) child.remove(); });
   page.insertAdjacentHTML('beforeend', `<div class="brief-mode-tabs"><button class="brief-mode-tab ${briefMode === 'essential' ? 'active' : ''}" data-brief-mode="essential">Essentiel</button><button class="brief-mode-tab ${briefMode === 'categories' ? 'active' : ''}" data-brief-mode="categories">Mes rubriques</button></div><div class="runtime-brief-content">${briefMode === 'essential' ? renderEssential() : renderCategories()}</div>`);
+  if (briefMode === 'categories' && briefCategory) {
+    const items = importanceArticles().filter(article => article.category === briefCategory).slice(0, 4);
+    loadCategorySummary(briefCategory, items);
+  }
+}
+
+function feedbackMarkup(key) {
+  const map = {
+    more: ['+', 'Plus comme ça', 'Montre davantage de sujets similaires'],
+    less: ['−', 'Moins comme ça', 'Réduis ce type d’articles'],
+    not: ['×', 'Pas intéressé', 'Masque les sujets de ce type'],
+    follow: ['☆', 'Sujet à suivre', 'Fais remonter ce sujet à l’avenir']
+  };
+  const [symbol, title, text] = map[key] || ['', key, ''];
+  return `<span class="feedback-symbol">${symbol}</span><span class="feedback-copy"><strong>${title}</strong><small>${text}</small></span>`;
+}
+
+async function loadArticleSummary(article, box) {
+  const key = `article:${article.id}`;
+  const cached = readJson(SUMMARY_CACHE_KEY, {})[key];
+  const paragraph = box.querySelector('p');
+  const label = box.querySelector('strong');
+  if (cached?.summary) {
+    paragraph.textContent = cached.summary;
+    label.textContent = cached.ai ? 'Résumé IA' : 'Résumé factuel';
+    return;
+  }
+  paragraph.textContent = 'Résumé en cours…';
+  const result = await requestSummary(key, { mode: 'article', article: { url: article.url, title: article.title, summary: article.summary } });
+  if (!box.isConnected) return;
+  paragraph.textContent = result?.summary || 'Résumé indisponible pour cet article.';
+  label.textContent = result?.ai ? 'Résumé IA' : 'Résumé factuel';
+}
+
+function enhanceDetail() {
+  const page = document.querySelector('.detail-page');
+  if (!page) return;
+  const id = page.querySelector('.save-btn-detail[data-save]')?.dataset.save;
+  const article = allCachedArticles().find(item => String(item.id) === String(id || ''));
+  if (!article) return;
+  if (page.dataset.runtimeDetailId === article.id) return;
+  page.dataset.runtimeDetailId = article.id;
+
+  const hero = page.querySelector('.detail-hero');
+  if (hero) {
+    const image = document.createElement('img');
+    image.className = 'detail-hero original-article-image runtime-detail-image';
+    image.alt = '';
+    image.src = thumbnailUrl(article);
+    image.decoding = 'async';
+    image.loading = 'eager';
+    hero.replaceWith(image);
+  }
+
+  const summary = page.querySelector('.ai-summary');
+  if (summary) {
+    summary.classList.add('runtime-summary');
+    summary.innerHTML = '<strong>Résumé</strong><p>Résumé en cours…</p>';
+    const meta = page.querySelector('.detail-meta');
+    if (meta) meta.insertAdjacentElement('afterend', summary);
+    loadArticleSummary(article, summary);
+  }
+
+  page.querySelector('.feedback-title')?.remove();
+  page.querySelectorAll('.feedback-grid [data-feedback]').forEach(button => {
+    button.classList.add('runtime-feedback-card');
+    button.innerHTML = feedbackMarkup(button.dataset.feedback);
+  });
+}
+
+function enhanceSheet() {
+  const sheet = document.querySelector('.sheet');
+  if (!sheet || sheet.querySelector('.runtime-sheet-tabs')) return;
+  const handle = sheet.querySelector('.sheet-handle');
+  const tabs = document.createElement('div');
+  tabs.className = 'runtime-sheet-tabs';
+  tabs.innerHTML = '<button class="runtime-sheet-tab active">Ajouter</button><button class="runtime-sheet-tab" data-runtime-settings>Réglages</button>';
+  handle?.insertAdjacentElement('afterend', tabs);
 }
 
 function enhanceSettings() {
-  if (!document.querySelector('.nav-item.active[data-view="settings"]')) return;
+  if (!document.querySelector('.page .settings-section')) return;
   document.querySelectorAll('.install-section').forEach(node => node.remove());
 }
 
@@ -166,6 +302,8 @@ function enhance() {
   removeRedundantUi();
   enhanceHome();
   enhanceBrief();
+  enhanceDetail();
+  enhanceSheet();
   enhanceSettings();
 }
 
@@ -175,7 +313,29 @@ function scheduleEnhance() {
   requestAnimationFrame(enhance);
 }
 
+function openSettingsFromSheet() {
+  const backdrop = document.querySelector('.sheet-backdrop[data-close-sheet]');
+  if (backdrop) backdrop.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+  setTimeout(() => {
+    const app = document.getElementById('app');
+    if (!app) return;
+    const button = document.createElement('button');
+    button.hidden = true;
+    button.dataset.view = 'settings';
+    app.appendChild(button);
+    button.click();
+    button.remove();
+  }, 0);
+}
+
 document.addEventListener('click', event => {
+  const settings = event.target.closest('[data-runtime-settings]');
+  if (settings) {
+    event.preventDefault();
+    event.stopPropagation();
+    openSettingsFromSheet();
+    return;
+  }
   const mode = event.target.closest('[data-brief-mode]');
   if (mode) {
     event.preventDefault();

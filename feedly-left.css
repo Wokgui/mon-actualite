@@ -82,8 +82,6 @@
 /* Redundant UI removed by the runtime, with CSS as a no-flash fallback. */
 .sync-strip,
 .install-section { display: none !important; }
-.bottom-nav.nav-four { grid-template-columns: repeat(4,1fr) !important; }
-.bottom-nav.nav-four .nav-item.plus { transform: translateY(-12px); }
 
 .brief-mode-tabs {
   display: grid;
@@ -142,6 +140,142 @@
 }
 .runtime-category-summary { margin-bottom: 14px; }
 .runtime-category-summary h2 { margin-top: 7px; }
+.runtime-category-summary p { line-height: 1.48; }
+
+/* Three truly symmetric bottom destinations, with the + exactly centered. */
+.bottom-nav.nav-three {
+  grid-template-columns: repeat(3, 1fr) !important;
+  padding-left: max(18px, env(safe-area-inset-left));
+  padding-right: max(18px, env(safe-area-inset-right));
+}
+.bottom-nav.nav-three .nav-item.plus {
+  order: 2;
+  justify-self: center;
+  transform: translateY(-13px) !important;
+}
+.bottom-nav.nav-three [data-view="home"] { order: 1; }
+.bottom-nav.nav-three [data-view="brief"] { order: 3; }
+
+.runtime-sheet-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 4px;
+  margin: 6px 0 16px;
+  padding: 4px;
+  border-radius: 14px;
+  background: #ece8f3;
+}
+.runtime-sheet-tab {
+  min-height: 40px;
+  border: 0;
+  border-radius: 11px;
+  background: transparent;
+  color: #777080;
+  font-size: 12px;
+  font-weight: 750;
+}
+.runtime-sheet-tab.active {
+  background: #fff;
+  color: #514567;
+  box-shadow: 0 3px 12px rgba(64,47,95,.08);
+}
+
+/* Detail page: the real summary must be visible immediately. */
+.detail-page .runtime-detail-image,
+.detail-page .detail-hero {
+  width: 100% !important;
+  height: 142px !important;
+  min-height: 142px !important;
+  margin: 4px 0 12px !important;
+  border-radius: 12px !important;
+  object-fit: cover !important;
+  background: #f0f0f0;
+}
+.detail-page .detail-content { padding-top: 0 !important; }
+.detail-page .detail-content > .badge,
+.detail-page .tags { display: none !important; }
+.detail-page .detail-content > h1 {
+  margin: 0 0 6px !important;
+  font-size: 20px !important;
+  line-height: 1.18 !important;
+  letter-spacing: -.35px !important;
+}
+.detail-page .detail-meta {
+  margin-bottom: 10px !important;
+  font-size: 11px !important;
+  line-height: 1.25 !important;
+}
+.detail-page .runtime-summary {
+  margin: 0 0 14px !important;
+  padding: 14px 15px !important;
+  border-radius: 14px !important;
+  background: #f5f2fb !important;
+  border: 1px solid #e7e0f3 !important;
+}
+.detail-page .runtime-summary strong {
+  display: block;
+  margin-bottom: 7px;
+  font-size: 12px !important;
+  color: #625275;
+}
+.detail-page .runtime-summary strong svg { display: none !important; }
+.detail-page .runtime-summary p {
+  margin: 0 !important;
+  color: #2e2b33 !important;
+  font-size: 13px !important;
+  line-height: 1.5 !important;
+}
+.detail-page .primary-btn { margin-top: 4px !important; }
+.detail-page .feedback-title { display: none !important; }
+.detail-page .feedback-grid {
+  display: grid !important;
+  grid-template-columns: 1fr 1fr !important;
+  gap: 9px !important;
+  margin-top: 16px !important;
+}
+.detail-page .runtime-feedback-card {
+  display: flex !important;
+  align-items: flex-start !important;
+  gap: 9px !important;
+  min-height: 78px !important;
+  padding: 11px !important;
+  border: 1px solid #e3dfea !important;
+  border-radius: 13px !important;
+  background: #fff !important;
+  color: #403b48 !important;
+  text-align: left !important;
+  box-shadow: 0 2px 10px rgba(48,37,68,.035) !important;
+}
+.detail-page .runtime-feedback-card.selected {
+  border-color: #9f8be9 !important;
+  background: #f2edff !important;
+}
+.feedback-symbol {
+  display: grid;
+  place-items: center;
+  flex: 0 0 25px;
+  width: 25px;
+  height: 25px;
+  border-radius: 8px;
+  background: #f0ecf7;
+  color: #5e4f73;
+  font-size: 17px;
+  font-weight: 700;
+  line-height: 1;
+}
+.feedback-copy { min-width: 0; }
+.feedback-copy strong {
+  display: block;
+  margin: 1px 0 4px;
+  font-size: 11.5px;
+  line-height: 1.15;
+}
+.feedback-copy small {
+  display: block;
+  color: #8b8592;
+  font-size: 9.5px;
+  line-height: 1.28;
+}
 
 @media (max-width: 380px) {
   .article-card,
@@ -150,4 +284,7 @@
   .brief-point .brief-thumb.article-image,
   .brief-point .brief-thumb.article-placeholder { width: 88px; height: 64px; min-height: 64px; }
   .brief-point .brief-copy strong { font-size: 13.5px !important; }
+  .detail-page .detail-content > h1 { font-size: 18.5px !important; }
+  .detail-page .runtime-detail-image,
+  .detail-page .detail-hero { height: 126px !important; min-height: 126px !important; }
 }

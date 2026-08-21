@@ -1,4 +1,4 @@
-const CACHE = 'mon-actualite-v8-journal-unique-ids';
+const CACHE = 'mon-actualite-v9-reading-summary-thumbnails';
 const ASSETS = ['./', './index.html', './styles.css', './feedly-compact.css', './feedly-left.css', './app.js', './feedly-runtime.js', './article-images.js', './services/source-connectors.js', './manifest.webmanifest', './assets/app-icon.svg', './assets/icon-192.png', './assets/icon-512.png', './assets/icon-maskable-512.png'];
 
 self.addEventListener('install', event => {
