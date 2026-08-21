@@ -1,5 +1,5 @@
 const nativeFetch = window.fetch.bind(window);
-const MIGRATION_FLAG = 'news-summary-fix-v5-groq-live-applied';
+const MIGRATION_FLAG = 'news-summary-fix-v6-groq-llama-applied';
 
 const ENTITY_MAP = new Map([
   ['nbsp', ' '], ['amp', '&'], ['quot', '"'], ['apos', "'"], ['lt', '<'], ['gt', '>'],
@@ -30,7 +30,7 @@ function isBoilerplate(text = '') {
   const value = decodeEntities(text).toLowerCase();
   return [
     /pour\s+(?:sauvegarder|enregistrer|mémoriser|partager|commenter|lire)\s+(?:cet|cette|l[’']?)?\s*article/,
-    /partager\s+(?:la\s+)?publication/,
+    /partager\s+(?:la\s+)?publication|partager\s+cet(?:te)?\s+(?:publication|article)/,
     /connectez[- ]?vous|se connecter|identifiez[- ]?vous|connexion à votre compte/,
     /créez (?:votre|un) compte|créer (?:votre|un) compte/,
     /abonnez[- ]?vous|déjà abonné|offre d[’']abonnement|nos offres|accès abonnés?/,
@@ -70,7 +70,7 @@ window.fetch = async function patchedFetch(input, init) {
     const url = new URL(raw, location.href);
     if (url.pathname === '/api/article-summary' || url.pathname === '/api/article-summary-v3') {
       url.pathname = '/api/article-summary-groq';
-      url.searchParams.set('v', '5');
+      url.searchParams.set('v', '6');
       isSummary = true;
       nextInput = typeof input === 'string' ? `${url.pathname}${url.search}` : new Request(url.href, input);
     }
