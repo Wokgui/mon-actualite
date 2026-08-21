@@ -79,6 +79,70 @@
   text-overflow: ellipsis;
 }
 
+/* Redundant UI removed by the runtime, with CSS as a no-flash fallback. */
+.sync-strip,
+.install-section { display: none !important; }
+.bottom-nav.nav-four { grid-template-columns: repeat(4,1fr) !important; }
+.bottom-nav.nav-four .nav-item.plus { transform: translateY(-12px); }
+
+.brief-mode-tabs {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 5px;
+  margin: 8px 0 18px;
+  padding: 4px;
+  border-radius: 15px;
+  background: #eae6f3;
+}
+.brief-mode-tab {
+  min-height: 42px;
+  border: 0;
+  border-radius: 12px;
+  background: transparent;
+  color: #7e788a;
+  font-size: 12px;
+  font-weight: 750;
+}
+.brief-mode-tab.active {
+  background: #fff;
+  color: #4f4567;
+  box-shadow: 0 4px 14px rgba(76,61,114,.08);
+}
+.journal-section { margin-bottom: 22px; }
+.brief-section-title {
+  margin: 0 0 8px;
+  font-size: 18px;
+  letter-spacing: -.35px;
+}
+.runtime-brief-content .feed { margin-bottom: 0; }
+.brief-category-tabs {
+  display: flex;
+  gap: 7px;
+  overflow-x: auto;
+  margin: 0 -18px 14px;
+  padding: 0 18px 4px;
+  scrollbar-width: none;
+}
+.brief-category-tabs::-webkit-scrollbar { display: none; }
+.brief-category-tab {
+  flex: 0 0 auto;
+  min-height: 35px;
+  padding: 0 12px;
+  border: 1px solid #e6e1ee;
+  border-radius: 999px;
+  background: #fff;
+  color: #716b7d;
+  font-size: 10.5px;
+  font-weight: 750;
+}
+.brief-category-tab.active {
+  border-color: #cfc5f8;
+  background: #f1edff;
+  color: #5a46cf;
+}
+.runtime-category-summary { margin-bottom: 14px; }
+.runtime-category-summary h2 { margin-top: 7px; }
+
 @media (max-width: 380px) {
   .article-card,
   .brief-point.feedly-brief-row { grid-template-columns: 88px minmax(0,1fr) !important; }
