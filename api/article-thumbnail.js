@@ -112,7 +112,7 @@ async function fetchHtml(rawUrl) {
   let current = rawUrl;
   for (let i = 0; i < 6; i++) {
     const url = await assertPublicUrl(current);
-    const response = await fetch(url, { redirect: 'manual', signal: AbortSignal.timeout(TIMEOUT_MS), headers: { 'User-Agent': UA, 'Accept': 'text/html,application/xhtml+xml' } });
+    const response = await fetch(url, { redirect: 'manual', signal: AbortSignal.timeout(TIMEOUT_MS), headers: { 'User-Agent': UA, 'Accept': 'text/html,application/xhtml+xml', 'Accept-Language': 'fr-FR,fr;q=0.9' } });
     if (response.status >= 300 && response.status < 400 && response.headers.get('location')) {
       current = new URL(response.headers.get('location'), url).href;
       continue;
@@ -150,7 +150,7 @@ function inlineImageCandidates(html) {
   for (const match of region.matchAll(/<img\b([^>]+)>/gi)) {
     const attrs = match[1];
     const descriptive = `${attrs} ${(attrs.match(/\balt=["']([^"']*)["']/i) || [])[1] || ''}`;
-    if (/logo|avatar|icon|emoji|badge|author|profil|pixel|tracking|advert|publicit|sprite/i.test(descriptive)) continue;
+    if (/logo|avatar|icon|emoji|badge|author|profil|pixel|tracking|advert|publicit|sprite|brand|wordmark|favicon/i.test(descriptive)) continue;
     for (const attr of ['src', 'data-src', 'data-original', 'data-lazy-src', 'data-image']) {
       const value = (attrs.match(new RegExp(`\\b${attr}=["']([^"']+)["']`, 'i')) || [])[1] || '';
       if (value && !/^data:/i.test(value)) candidates.push(value);
@@ -184,6 +184,16 @@ function jsonLdCandidates(html) {
   return out;
 }
 
+function isGenericImageUrl(rawUrl = '') {
+  try {
+    const url = new URL(rawUrl);
+    const haystack = `${url.hostname}${url.pathname}${url.search}`.toLowerCase();
+    if (/(favicon|\/logo(?:[._/-]|$)|logo[-_.]|icon[-_.]|\/icon(?:[._/-]|$)|avatar|sprite|wordmark|brandmark|site-logo|google-news|googlenews)/i.test(haystack)) return true;
+    if (/^(news\.google\.com|www\.google\.com)$/i.test(url.hostname)) return true;
+    return false;
+  } catch { return true; }
+}
+
 function findImage(html, finalUrl) {
   const candidates = [
     metaContent(html, 'og:image:secure_url'), metaContent(html, 'og:image'), metaContent(html, 'og:image:url'),
@@ -196,7 +206,7 @@ function findImage(html, finalUrl) {
     try {
       const url = new URL(decode(candidate), finalUrl);
       if (!['http:', 'https:'].includes(url.protocol)) continue;
-      if (/logo|avatar|icon|sprite|tracking|pixel/i.test(url.pathname)) continue;
+      if (isGenericImageUrl(url.href)) continue;
       return url.href;
     } catch {}
   }
@@ -212,7 +222,7 @@ async function fetchImage(rawUrl, referer) {
       signal: AbortSignal.timeout(TIMEOUT_MS),
       headers: {
         'User-Agent': UA,
-        'Accept': 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
+        'Accept': 'image/avif,image/webp,image/apng,image/jpeg,image/png,image/*,*/*;q=0.8',
         'Referer': referer || url.origin + '/'
       }
     });
@@ -224,17 +234,18 @@ async function fetchImage(rawUrl, referer) {
     const type = response.headers.get('content-type') || '';
     if (!type.startsWith('image/')) throw new Error('not image');
     const buffer = Buffer.from(await response.arrayBuffer());
-    if (buffer.byteLength > MAX_IMAGE_BYTES) throw new Error('image too large');
+    if (!buffer.length || buffer.byteLength > MAX_IMAGE_BYTES) throw new Error('image too large');
     return { buffer, type };
   }
   throw new Error('too many image redirects');
 }
 
 function fallback(res) {
-  const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="184" height="136" viewBox="0 0 184 136"><rect width="184" height="136" fill="#f1f1f1"/></svg>';
+  const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="184" height="136" viewBox="0 0 184 136"><rect width="184" height="136" rx="8" fill="#f1f1f1"/></svg>';
   res.statusCode = 200;
   res.setHeader('Content-Type', 'image/svg+xml');
   res.setHeader('Cache-Control', 'public, s-maxage=600');
+  res.setHeader('X-Thumbnail-Status', 'fallback');
   res.end(svg);
 }
 
@@ -252,6 +263,7 @@ module.exports = async function handler(req, res) {
     res.setHeader('Content-Type', image.type);
     res.setHeader('Content-Length', String(image.buffer.byteLength));
     res.setHeader('Cache-Control', 'public, s-maxage=21600, stale-while-revalidate=172800');
+    res.setHeader('X-Thumbnail-Status', 'original');
     return res.end(image.buffer);
   } catch (error) {
     console.error('thumbnail unavailable:', String(error?.message || error).slice(0, 180));
