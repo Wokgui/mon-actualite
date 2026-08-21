@@ -1,4 +1,7 @@
 {
   "name": "mon-actualite",
-  "private": true
+  "private": true,
+  "dependencies": {
+    "@google/genai": "^2.17.1"
+  }
 }
