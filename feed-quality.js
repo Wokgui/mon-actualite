@@ -61,6 +61,7 @@ function blockedBy(article, terms = blockedTerms()) {
 
 function smartIllustrationUrl(article) {
   const params = new URLSearchParams({
+    v: '2',
     url: String(article?.url || '').slice(0, 1800),
     title: String(article?.title || '').slice(0, 280),
     category: String(article?.category || '').slice(0, 70)
