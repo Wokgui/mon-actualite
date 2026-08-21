@@ -2,8 +2,8 @@ const dns = require('node:dns').promises;
 const net = require('node:net');
 
 const TIMEOUT_MS = 9000;
-const MAX_HTML_BYTES = 1_500_000;
-const MAX_IMAGE_BYTES = 6_000_000;
+const MAX_HTML_BYTES = 1_800_000;
+const MAX_IMAGE_BYTES = 7_000_000;
 const UA = 'Mozilla/5.0 (Linux; Android 16) AppleWebKit/537.36 Chrome/140 Safari/537.36';
 
 function isPrivateIp(address) {
@@ -98,6 +98,16 @@ async function decodeGoogleNewsUrl(rawUrl) {
   return decoded;
 }
 
+function decodeBuffer(buffer, contentType = '') {
+  const probe = buffer.subarray(0, Math.min(buffer.length, 4096)).toString('latin1');
+  const declared = (contentType.match(/charset\s*=\s*["']?([^;"'\s]+)/i) || [])[1]
+    || (probe.match(/<meta[^>]+charset\s*=\s*["']?([^"'\s/>]+)/i) || [])[1]
+    || 'utf-8';
+  const charset = /^(iso-8859-1|latin1|windows-1252|cp1252)$/i.test(declared) ? 'windows-1252' : 'utf-8';
+  try { return new TextDecoder(charset).decode(buffer); }
+  catch { return buffer.toString('utf8'); }
+}
+
 async function fetchHtml(rawUrl) {
   let current = rawUrl;
   for (let i = 0; i < 6; i++) {
@@ -108,15 +118,21 @@ async function fetchHtml(rawUrl) {
       continue;
     }
     if (!response.ok) throw new Error(`HTTP ${response.status}`);
+    const type = response.headers.get('content-type') || '';
+    if (!type.includes('text/html') && !type.includes('application/xhtml+xml')) throw new Error('not html');
     const buffer = Buffer.from(await response.arrayBuffer());
     if (buffer.byteLength > MAX_HTML_BYTES) throw new Error('page too large');
-    return { html: buffer.toString('utf8'), finalUrl: url.href };
+    return { html: decodeBuffer(buffer, type), finalUrl: url.href };
   }
   throw new Error('too many redirects');
 }
 
 function decode(value = '') {
-  return value.replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&#39;|&apos;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>');
+  return value
+    .replace(/&amp;/gi, '&').replace(/&quot;/gi, '"').replace(/&#39;|&apos;/gi, "'")
+    .replace(/&lt;/gi, '<').replace(/&gt;/gi, '>')
+    .replace(/&#(\d+);/g, (_, n) => String.fromCodePoint(Number(n)))
+    .replace(/&#x([0-9a-f]+);/gi, (_, n) => String.fromCodePoint(parseInt(n, 16)));
 }
 
 function metaContent(html, key) {
@@ -127,26 +143,79 @@ function metaContent(html, key) {
   return b ? decode(b[1]) : '';
 }
 
+function inlineImageCandidates(html) {
+  const articleMatch = [...html.matchAll(/<article\b[^>]*>([\s\S]*?)<\/article>/gi)].sort((a, b) => b[1].length - a[1].length)[0];
+  const region = articleMatch?.[1] || html;
+  const candidates = [];
+  for (const match of region.matchAll(/<img\b([^>]+)>/gi)) {
+    const attrs = match[1];
+    const descriptive = `${attrs} ${(attrs.match(/\balt=["']([^"']*)["']/i) || [])[1] || ''}`;
+    if (/logo|avatar|icon|emoji|badge|author|profil|pixel|tracking|advert|publicit|sprite/i.test(descriptive)) continue;
+    for (const attr of ['src', 'data-src', 'data-original', 'data-lazy-src', 'data-image']) {
+      const value = (attrs.match(new RegExp(`\\b${attr}=["']([^"']+)["']`, 'i')) || [])[1] || '';
+      if (value && !/^data:/i.test(value)) candidates.push(value);
+    }
+    const srcset = (attrs.match(/\bsrcset=["']([^"']+)["']/i) || [])[1] || '';
+    if (srcset) {
+      const values = srcset.split(',').map(part => part.trim().split(/\s+/)[0]).filter(Boolean);
+      if (values.length) candidates.push(values[values.length - 1]);
+    }
+    if (candidates.length >= 18) break;
+  }
+  return candidates;
+}
+
+function jsonLdCandidates(html) {
+  const out = [];
+  for (const match of html.matchAll(/<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi)) {
+    try {
+      const parsed = JSON.parse(match[1].trim());
+      const queue = Array.isArray(parsed) ? [...parsed] : [parsed];
+      for (const item of queue) {
+        const image = item?.image;
+        if (typeof image === 'string') out.push(image);
+        else if (Array.isArray(image)) out.push(...image.filter(v => typeof v === 'string'));
+        else if (image?.url) out.push(image.url);
+        if (item?.thumbnailUrl) out.push(item.thumbnailUrl);
+      }
+    } catch {}
+    if (out.length >= 10) break;
+  }
+  return out;
+}
+
 function findImage(html, finalUrl) {
   const candidates = [
-    metaContent(html, 'og:image'), metaContent(html, 'og:image:secure_url'), metaContent(html, 'og:image:url'),
+    metaContent(html, 'og:image:secure_url'), metaContent(html, 'og:image'), metaContent(html, 'og:image:url'),
     metaContent(html, 'twitter:image'), metaContent(html, 'twitter:image:src'),
-    ((html.match(/<link[^>]+rel=["']image_src["'][^>]+href=["']([^"']+)["']/i) || [])[1] || '')
+    ((html.match(/<link[^>]+rel=["']image_src["'][^>]+href=["']([^"']+)["']/i) || [])[1] || ''),
+    ...jsonLdCandidates(html),
+    ...inlineImageCandidates(html)
   ].filter(Boolean);
   for (const candidate of candidates) {
     try {
-      const url = new URL(candidate, finalUrl);
-      if (['http:', 'https:'].includes(url.protocol)) return url.href;
+      const url = new URL(decode(candidate), finalUrl);
+      if (!['http:', 'https:'].includes(url.protocol)) continue;
+      if (/logo|avatar|icon|sprite|tracking|pixel/i.test(url.pathname)) continue;
+      return url.href;
     } catch {}
   }
   return '';
 }
 
-async function fetchImage(rawUrl) {
+async function fetchImage(rawUrl, referer) {
   let current = rawUrl;
   for (let i = 0; i < 5; i++) {
     const url = await assertPublicUrl(current);
-    const response = await fetch(url, { redirect: 'manual', signal: AbortSignal.timeout(TIMEOUT_MS), headers: { 'User-Agent': UA, 'Accept': 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8', 'Referer': url.origin + '/' } });
+    const response = await fetch(url, {
+      redirect: 'manual',
+      signal: AbortSignal.timeout(TIMEOUT_MS),
+      headers: {
+        'User-Agent': UA,
+        'Accept': 'image/avif,image/webp,image/apng,image/svg+xml,image/*,*/*;q=0.8',
+        'Referer': referer || url.origin + '/'
+      }
+    });
     if (response.status >= 300 && response.status < 400 && response.headers.get('location')) {
       current = new URL(response.headers.get('location'), url).href;
       continue;
@@ -165,7 +234,7 @@ function fallback(res) {
   const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="184" height="136" viewBox="0 0 184 136"><rect width="184" height="136" fill="#f1f1f1"/></svg>';
   res.statusCode = 200;
   res.setHeader('Content-Type', 'image/svg+xml');
-  res.setHeader('Cache-Control', 'public, s-maxage=1800');
+  res.setHeader('Cache-Control', 'public, s-maxage=600');
   res.end(svg);
 }
 
@@ -178,11 +247,11 @@ module.exports = async function handler(req, res) {
     const { html, finalUrl } = await fetchHtml(articleUrl);
     const imageUrl = findImage(html, finalUrl);
     if (!imageUrl) return fallback(res);
-    const image = await fetchImage(imageUrl);
+    const image = await fetchImage(imageUrl, finalUrl);
     res.statusCode = 200;
     res.setHeader('Content-Type', image.type);
     res.setHeader('Content-Length', String(image.buffer.byteLength));
-    res.setHeader('Cache-Control', 'public, s-maxage=86400, stale-while-revalidate=604800');
+    res.setHeader('Cache-Control', 'public, s-maxage=21600, stale-while-revalidate=172800');
     return res.end(image.buffer);
   } catch (error) {
     console.error('thumbnail unavailable:', String(error?.message || error).slice(0, 180));
