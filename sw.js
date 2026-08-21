@@ -1,4 +1,4 @@
-const CACHE = 'mon-actualite-v15-groq-after-save';
+const CACHE = 'mon-actualite-v16-groq-summary-refresh';
 const ASSETS = ['./', './index.html', './styles.css', './feedly-compact.css', './feedly-left.css', './ui-fixes-v2.css', './app.js', './feedly-runtime.js', './summary-fixes.js', './article-images.js', './services/source-connectors.js', './manifest.webmanifest', './assets/app-icon.svg', './assets/icon-192.png', './assets/icon-512.png', './assets/icon-maskable-512.png'];
 
 self.addEventListener('install', event => {
