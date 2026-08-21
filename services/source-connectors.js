@@ -36,6 +36,28 @@ function stableArticleId(article) {
   return `a-${hash32(key, 2166136261)}${hash32(key, 0x9e3779b1)}`;
 }
 
+function readArticleHistory() {
+  try {
+    const cache = JSON.parse(localStorage.getItem('news-live-cache') || '{}');
+    return Array.isArray(cache.articles) ? cache.articles.filter(article => String(article?.id || '').startsWith('a-')) : [];
+  } catch {
+    return [];
+  }
+}
+
+function mergeArticleHistory(fresh) {
+  const byId = new Map();
+  for (const article of [...fresh, ...readArticleHistory()]) {
+    if (!article?.id || byId.has(article.id)) continue;
+    byId.set(article.id, article);
+  }
+  const cutoff = Date.now() - 45 * 24 * 60 * 60 * 1000;
+  return [...byId.values()]
+    .filter(article => !article.publishedAt || Date.parse(article.publishedAt) >= cutoff)
+    .sort((a, b) => Date.parse(b.publishedAt || 0) - Date.parse(a.publishedAt || 0))
+    .slice(0, 400);
+}
+
 export async function fetchLiveNews({ sources = [], keywords = [], preferredCategories = [], webSearch = true, sourcePriority = true } = {}) {
   const response = await fetch('/api/news', {
     method: 'POST',
@@ -46,7 +68,8 @@ export async function fetchLiveNews({ sources = [], keywords = [], preferredCate
   if (!response.ok) throw new Error(`Synchronisation impossible (${response.status})`);
   const payload = await response.json();
   if (Array.isArray(payload.articles)) {
-    payload.articles = payload.articles.map(article => ({ ...article, id: stableArticleId(article) }));
+    const fresh = payload.articles.map(article => ({ ...article, id: stableArticleId(article) }));
+    payload.articles = mergeArticleHistory(fresh);
   }
   return payload;
 }
