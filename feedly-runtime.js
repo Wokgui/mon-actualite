@@ -1,6 +1,10 @@
 const GENERAL = ['Politique','International','Économie','Société','Santé','Environnement','Science','Culture','Éducation','Europe'];
 const PERSONAL = ['IA','Tech','Smartphones','VR','Automobile','Énergie'];
+const FRANCE_CATEGORIES = ['Politique','Économie','Société','Santé','Éducation','Environnement','Culture','Tech'];
+const WORLD_CATEGORIES = ['International','Europe'];
 let scheduled = false;
+let briefMode = 'essential';
+let briefCategory = null;
 
 function readJson(key, fallback) {
   try { return JSON.parse(localStorage.getItem(key) || 'null') ?? fallback; }
@@ -22,19 +26,34 @@ function timeLabel(value) {
   return `Il y a ${days} j`;
 }
 
+function currentSettings() {
+  const raw = readJson('news-settings', {});
+  return {
+    general: Array.isArray(raw.generalCategories) ? raw.generalCategories : GENERAL,
+    interests: Array.isArray(raw.interests) ? raw.interests : PERSONAL
+  };
+}
+
 function visibleArticles() {
   const cache = readJson('news-live-cache', {});
   const articles = Array.isArray(cache.articles) ? cache.articles : [];
-  const settings = readJson('news-settings', {});
+  const current = currentSettings();
   const feedback = readJson('news-feedback', {});
-  const general = Array.isArray(settings.generalCategories) ? settings.generalCategories : GENERAL;
-  const interests = Array.isArray(settings.interests) ? settings.interests : PERSONAL;
-  const allowed = new Set([...general, ...interests, 'À suivre']);
-  const feedbackScore = id => ({ more: 24, less: -20, follow: 38 }[feedback[id]] || 0);
+  const allowed = new Set([...current.general, ...current.interests, 'À suivre']);
   return articles
     .filter(article => allowed.has(article.category) && feedback[article.id] !== 'not')
     .slice()
-    .sort((a, b) => ((b.score || 0) + feedbackScore(b.id)) - ((a.score || 0) + feedbackScore(a.id)));
+    .sort((a, b) => Date.parse(b.publishedAt || 0) - Date.parse(a.publishedAt || 0));
+}
+
+function importanceArticles() {
+  const feedback = readJson('news-feedback', {});
+  return visibleArticles().slice().sort((a, b) => {
+    const pref = id => ({ more: 24, less: -20, follow: 38 }[feedback[id]] || 0);
+    const recencyA = Math.max(0, 72 - ((Date.now() - Date.parse(a.publishedAt || 0)) / 3600000));
+    const recencyB = Math.max(0, 72 - ((Date.now() - Date.parse(b.publishedAt || 0)) / 3600000));
+    return ((b.score || 0) + pref(b.id) + recencyB * .35) - ((a.score || 0) + pref(a.id) + recencyA * .35);
+  });
 }
 
 function compactRow(article) {
@@ -47,49 +66,107 @@ function compactRow(article) {
   </article>`;
 }
 
-function expandHome() {
+function removeRedundantUi() {
+  document.querySelectorAll('.sync-strip').forEach(node => node.remove());
+  document.querySelectorAll('.install-section').forEach(node => node.remove());
+  document.querySelectorAll('.bottom-nav').forEach(nav => {
+    nav.querySelector('[data-view="news"]')?.remove();
+    nav.classList.add('nav-four');
+  });
+}
+
+function enhanceHome() {
   if (!document.querySelector('.nav-item.active[data-view="home"]')) return;
   const savedButton = document.querySelector('.saved-filter [data-saved-filter]');
   if (savedButton && /voir toute/i.test(savedButton.textContent || '')) return;
   const feed = document.querySelector('.page .feed');
   if (!feed) return;
-  const articles = visibleArticles().slice(0, 40);
-  const present = new Set([...feed.querySelectorAll('[data-article]')].map(el => String(el.dataset.article)));
-  const missing = articles.filter(article => !present.has(String(article.id)));
-  if (missing.length) feed.insertAdjacentHTML('beforeend', missing.map(compactRow).join(''));
-}
-
-function makeNewsRolling24h() {
-  if (!document.querySelector('.nav-item.active[data-view="news"]')) return;
-  const active = document.querySelector('.period.active[data-period="today"]');
-  if (!active) return;
-  active.textContent = '24 h';
-  const feed = document.querySelector('.page .feed');
-  if (!feed) return;
-  const cutoff = Date.now() - 24 * 60 * 60 * 1000;
-  const articles = visibleArticles().filter(article => Date.parse(article.publishedAt) >= cutoff).slice(0, 60);
+  const articles = visibleArticles();
+  const signature = articles.map(article => article.id).join('|');
+  if (feed.dataset.runtimeSignature === signature) return;
+  feed.dataset.runtimeSignature = signature;
   if (articles.length) feed.innerHTML = articles.map(compactRow).join('');
 }
 
-function styleBrief() {
-  const list = document.querySelector('.brief-points');
-  if (!list) return;
-  const byId = new Map(visibleArticles().map(article => [String(article.id), article]));
-  list.querySelectorAll('.brief-point[data-article]').forEach(item => {
-    if (item.classList.contains('feedly-brief-row')) return;
-    const article = byId.get(String(item.dataset.article));
-    if (!article) return;
-    const title = item.querySelector('strong')?.textContent || article.title;
-    item.classList.add('feedly-brief-row');
-    item.innerHTML = `<div class="brief-thumb article-image article-placeholder" aria-hidden="true"></div><div class="brief-copy"><strong>${esc(title)}</strong><span class="brief-meta">${esc(article.source || 'Source')} · ${esc(timeLabel(article.publishedAt))}</span></div>`;
-  });
+function pickDiverse(source, categories, limit) {
+  const selected = [];
+  const used = new Set();
+  for (const category of categories) {
+    const article = source.find(item => item.category === category && !used.has(item.id));
+    if (article) { selected.push(article); used.add(article.id); }
+    if (selected.length >= limit) return selected;
+  }
+  for (const article of source) {
+    if (!categories.includes(article.category) || used.has(article.id)) continue;
+    selected.push(article); used.add(article.id);
+    if (selected.length >= limit) break;
+  }
+  return selected;
+}
+
+function essentialBrief() {
+  const ranked = importanceArticles();
+  const recent = ranked.filter(article => Date.now() - Date.parse(article.publishedAt || 0) <= 72 * 3600000);
+  const pool = recent.length >= 6 ? recent : ranked;
+  return {
+    france: pickDiverse(pool, FRANCE_CATEGORIES, 5),
+    world: pickDiverse(pool, WORLD_CATEGORIES, 5)
+  };
+}
+
+function selectedBriefCategories() {
+  const current = currentSettings();
+  return [...new Set([...current.general, ...current.interests])];
+}
+
+function categorySummary(category) {
+  const items = importanceArticles().filter(article => article.category === category).slice(0, 3);
+  const texts = items.map(article => String(article.summary || '').trim()).filter(Boolean);
+  if (!texts.length) return `Pas de fait marquant suffisamment récent dans ${category}.`;
+  const joined = texts.join(' ');
+  return joined.length > 520 ? `${joined.slice(0, 517).trim()}…` : joined;
+}
+
+function renderEssential() {
+  const { france, world } = essentialBrief();
+  const section = (title, items) => `<section class="journal-section"><h2 class="brief-section-title">${title}</h2><div class="feed">${items.length ? items.map(compactRow).join('') : '<p class="muted-note">Aucune information majeure récente.</p>'}</div></section>`;
+  return `${section('France', france)}${section('Monde', world)}`;
+}
+
+function renderCategories() {
+  const categories = selectedBriefCategories();
+  if (!categories.length) return '<p class="muted-note">Choisissez des rubriques dans Réglages.</p>';
+  if (!briefCategory || !categories.includes(briefCategory)) briefCategory = categories[0];
+  const items = visibleArticles().filter(article => article.category === briefCategory).slice(0, 8);
+  return `<div class="brief-category-tabs">${categories.map(category => `<button class="brief-category-tab ${category === briefCategory ? 'active' : ''}" data-brief-category="${esc(category)}">${esc(category)}</button>`).join('')}</div>
+    <section class="brief-card runtime-category-summary"><span class="brief-label">${esc(briefCategory)}</span><h2>En bref</h2><p>${esc(categorySummary(briefCategory))}</p></section>
+    <div class="feed">${items.length ? items.map(compactRow).join('') : '<p class="muted-note">Aucun article récent dans cette rubrique.</p>'}</div>`;
+}
+
+function enhanceBrief() {
+  if (!document.querySelector('.nav-item.active[data-view="brief"]')) return;
+  const page = document.querySelector('.page');
+  const topbar = page?.querySelector('.topbar');
+  if (!page || !topbar) return;
+  const articles = visibleArticles();
+  const signature = `${briefMode}|${briefCategory || ''}|${articles.map(article => article.id).join('|')}`;
+  if (page.dataset.runtimeBriefSignature === signature) return;
+  page.dataset.runtimeBriefSignature = signature;
+  [...page.children].forEach(child => { if (child !== topbar) child.remove(); });
+  page.insertAdjacentHTML('beforeend', `<div class="brief-mode-tabs"><button class="brief-mode-tab ${briefMode === 'essential' ? 'active' : ''}" data-brief-mode="essential">Essentiel</button><button class="brief-mode-tab ${briefMode === 'categories' ? 'active' : ''}" data-brief-mode="categories">Mes rubriques</button></div><div class="runtime-brief-content">${briefMode === 'essential' ? renderEssential() : renderCategories()}</div>`);
+}
+
+function enhanceSettings() {
+  if (!document.querySelector('.nav-item.active[data-view="settings"]')) return;
+  document.querySelectorAll('.install-section').forEach(node => node.remove());
 }
 
 function enhance() {
   scheduled = false;
-  expandHome();
-  makeNewsRolling24h();
-  styleBrief();
+  removeRedundantUi();
+  enhanceHome();
+  enhanceBrief();
+  enhanceSettings();
 }
 
 function scheduleEnhance() {
@@ -97,6 +174,26 @@ function scheduleEnhance() {
   scheduled = true;
   requestAnimationFrame(enhance);
 }
+
+document.addEventListener('click', event => {
+  const mode = event.target.closest('[data-brief-mode]');
+  if (mode) {
+    event.preventDefault();
+    briefMode = mode.dataset.briefMode;
+    const page = document.querySelector('.page');
+    if (page) page.dataset.runtimeBriefSignature = '';
+    scheduleEnhance();
+    return;
+  }
+  const category = event.target.closest('[data-brief-category]');
+  if (category) {
+    event.preventDefault();
+    briefCategory = category.dataset.briefCategory;
+    const page = document.querySelector('.page');
+    if (page) page.dataset.runtimeBriefSignature = '';
+    scheduleEnhance();
+  }
+}, true);
 
 const root = document.getElementById('app');
 if (root) new MutationObserver(scheduleEnhance).observe(root, { childList: true, subtree: true });
