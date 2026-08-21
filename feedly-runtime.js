@@ -2,7 +2,7 @@ const GENERAL = ['Politique','International','Économie','Société','Santé','E
 const PERSONAL = ['IA','Tech','Smartphones','VR','Automobile','Énergie'];
 const FRANCE_CATEGORIES = ['Politique','Économie','Société','Santé','Éducation','Environnement','Culture','Tech'];
 const WORLD_CATEGORIES = ['International','Europe'];
-const SUMMARY_CACHE_KEY = 'news-factual-summaries-v1';
+const SUMMARY_CACHE_KEY = 'news-factual-summaries-v2';
 let scheduled = false;
 let briefMode = 'essential';
 let briefCategory = null;
@@ -17,8 +17,20 @@ function writeJson(key, value) {
   try { localStorage.setItem(key, JSON.stringify(value)); } catch {}
 }
 
+const MOJIBAKE = [
+  ['â€™','’'],['â€˜','‘'],['â€œ','“'],['â€','”'],['â€“','–'],['â€”','—'],['â€¦','…'],
+  ['Â ',' '],['Â«','«'],['Â»','»'],['Ã©','é'],['Ã¨','è'],['Ãª','ê'],['Ã«','ë'],['Ã ','à'],
+  ['Ã¢','â'],['Ã§','ç'],['Ã®','î'],['Ã¯','ï'],['Ã´','ô'],['Ã¹','ù'],['Ã»','û'],['Ã‰','É'],['Å“','œ']
+];
+
+function cleanText(value) {
+  let text = String(value ?? '');
+  for (const [bad, good] of MOJIBAKE) text = text.split(bad).join(good);
+  return text.replace(/\uFFFD+/g, '').trim();
+}
+
 function esc(value) {
-  return String(value ?? '').replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
+  return cleanText(value).replace(/[&<>'"]/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
 }
 
 function timeLabel(value) {
@@ -67,7 +79,7 @@ function importanceArticles() {
 }
 
 function thumbnailUrl(article) {
-  return `/api/article-thumbnail?url=${encodeURIComponent(article?.url || '')}`;
+  return `/api/article-thumbnail?v=2&url=${encodeURIComponent(article?.url || '')}`;
 }
 
 function compactRow(article) {
@@ -96,6 +108,8 @@ function removeRedundantUi() {
 
 function enhanceHome() {
   if (!document.querySelector('.nav-item.active[data-view="home"]')) return;
+  const subtitle = document.querySelector('.hero-header p');
+  if (subtitle) subtitle.textContent = 'Sélection du jour';
   const savedButton = document.querySelector('.saved-filter [data-saved-filter]');
   if (savedButton && /voir toute/i.test(savedButton.textContent || '')) return;
   const feed = document.querySelector('.page .feed');
@@ -152,7 +166,7 @@ async function requestSummary(key, payload) {
   const cache = readJson(SUMMARY_CACHE_KEY, {});
   if (cache[key]?.summary) return cache[key];
   if (summaryRequests.has(key)) return summaryRequests.get(key);
-  const request = fetch('/api/article-summary', {
+  const request = fetch('/api/article-summary?v=2', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     cache: 'no-store',
@@ -161,7 +175,7 @@ async function requestSummary(key, payload) {
     .then(data => {
       if (data?.summary) {
         const latest = readJson(SUMMARY_CACHE_KEY, {});
-        latest[key] = { summary: data.summary, ai: Boolean(data.ai), savedAt: Date.now() };
+        latest[key] = { summary: cleanText(data.summary), ai: Boolean(data.ai), savedAt: Date.now() };
         const entries = Object.entries(latest).slice(-180);
         writeJson(SUMMARY_CACHE_KEY, Object.fromEntries(entries));
       }
@@ -180,10 +194,10 @@ async function loadCategorySummary(category, items) {
   const result = await requestSummary(key, {
     mode: 'category',
     category,
-    articles: items.slice(0, 4).map(article => ({ url: article.url, title: article.title, summary: article.summary }))
+    articles: items.slice(0, 4).map(article => ({ url: article.url, title: cleanText(article.title), summary: cleanText(article.summary) }))
   });
   if (!target.isConnected || target.dataset.summaryKey !== key) return;
-  target.textContent = result?.summary || 'Résumé indisponible pour cette rubrique.';
+  target.textContent = cleanText(result?.summary || 'Résumé indisponible pour cette rubrique.');
   const label = document.querySelector('.runtime-category-summary .brief-label');
   if (label) label.textContent = result?.ai ? `${category} · Résumé IA` : `${category} · Résumé factuel`;
 }
@@ -235,14 +249,14 @@ async function loadArticleSummary(article, box) {
   const paragraph = box.querySelector('p');
   const label = box.querySelector('strong');
   if (cached?.summary) {
-    paragraph.textContent = cached.summary;
+    paragraph.textContent = cleanText(cached.summary);
     label.textContent = cached.ai ? 'Résumé IA' : 'Résumé factuel';
     return;
   }
   paragraph.textContent = 'Résumé en cours…';
-  const result = await requestSummary(key, { mode: 'article', article: { url: article.url, title: article.title, summary: article.summary } });
+  const result = await requestSummary(key, { mode: 'article', article: { url: article.url, title: cleanText(article.title), summary: cleanText(article.summary) } });
   if (!box.isConnected) return;
-  paragraph.textContent = result?.summary || 'Résumé indisponible pour cet article.';
+  paragraph.textContent = cleanText(result?.summary || 'Résumé indisponible pour cet article.');
   label.textContent = result?.ai ? 'Résumé IA' : 'Résumé factuel';
 }
 
@@ -292,9 +306,29 @@ function enhanceSheet() {
   handle?.insertAdjacentElement('afterend', tabs);
 }
 
+function followedTopicsMarkup() {
+  const feedback = readJson('news-feedback', {});
+  const followedIds = Object.keys(feedback).filter(id => feedback[id] === 'follow');
+  if (!followedIds.length) return '<p class="muted-note runtime-no-followed">Aucun sujet marqué « Sujet à suivre ».</p>';
+  const byId = new Map(allCachedArticles().map(article => [String(article.id), article]));
+  return `<div class="runtime-followed-list">${followedIds.map(id => {
+    const article = byId.get(String(id));
+    const title = article?.title || 'Sujet suivi';
+    return `<div class="runtime-followed-item"><span>${esc(title)}</span><button type="button" data-runtime-follow-delete="${esc(id)}" aria-label="Supprimer ce sujet">×</button></div>`;
+  }).join('')}</div>`;
+}
+
 function enhanceSettings() {
-  if (!document.querySelector('.page .settings-section')) return;
+  const sections = [...document.querySelectorAll('.page .settings-section')];
+  if (!sections.length) return;
   document.querySelectorAll('.install-section').forEach(node => node.remove());
+  if (document.querySelector('.runtime-followed-section')) return;
+  const interests = sections.find(section => /centres d[’']intérêt/i.test(section.querySelector('h2')?.textContent || ''));
+  if (!interests) return;
+  const section = document.createElement('section');
+  section.className = 'settings-section runtime-followed-section';
+  section.innerHTML = `<h2>Sujets suivis</h2><p>Les sujets marqués « Sujet à suivre » peuvent être retirés ici.</p>${followedTopicsMarkup()}`;
+  interests.insertAdjacentElement('afterend', section);
 }
 
 function enhance() {
@@ -329,6 +363,16 @@ function openSettingsFromSheet() {
 }
 
 document.addEventListener('click', event => {
+  const deleteFollowed = event.target.closest('[data-runtime-follow-delete]');
+  if (deleteFollowed) {
+    event.preventDefault();
+    event.stopPropagation();
+    const feedback = readJson('news-feedback', {});
+    delete feedback[deleteFollowed.dataset.runtimeFollowDelete];
+    writeJson('news-feedback', feedback);
+    window.location.reload();
+    return;
+  }
   const settings = event.target.closest('[data-runtime-settings]');
   if (settings) {
     event.preventDefault();
