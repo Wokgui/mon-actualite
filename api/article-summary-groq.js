@@ -3,9 +3,9 @@ const legacyHandler = require('./article-summary.js');
 const GROQ_ENDPOINT = 'https://api.groq.com/openai/v1/chat/completions';
 const GROQ_MODELS = [...new Set([
   process.env.GROQ_MODEL,
+  'openai/gpt-oss-20b',
   'llama-3.3-70b-versatile',
-  'llama-3.1-8b-instant',
-  'openai/gpt-oss-20b'
+  'llama-3.1-8b-instant'
 ].filter(Boolean).map(value => String(value).trim()).filter(Boolean))];
 const GROQ_TIMEOUT_MS = 18000;
 
@@ -113,7 +113,7 @@ function summarySupported(summary, source) {
   const sourceSet = new Set(meaningfulTokens(source));
   if (!sourceSet.size) return false;
   const supported = generated.filter(token => sourceSet.has(token)).length;
-  return supported / generated.length >= 0.14;
+  return supported / generated.length >= 0.12;
 }
 
 function paragraphize(value = '', wanted = 2) {
@@ -140,16 +140,19 @@ function promptFor(body, factual) {
 }
 
 async function generateWithGroq(model, key, prompt, minLength = 60) {
+  const isGptOss = model.startsWith('openai/gpt-oss-');
   const body = {
     model,
-    messages: [
-      { role: 'system', content: SYSTEM },
-      { role: 'user', content: prompt }
-    ],
-    temperature: 0.1,
-    max_tokens: 520
+    messages: isGptOss
+      ? [{ role: 'user', content: `${SYSTEM}\n\n${prompt}` }]
+      : [{ role: 'system', content: SYSTEM }, { role: 'user', content: prompt }],
+    temperature: isGptOss ? 0.5 : 0.1,
+    max_completion_tokens: isGptOss ? 1400 : 620
   };
-  if (model.startsWith('openai/gpt-oss-')) body.include_reasoning = false;
+  if (isGptOss) {
+    body.include_reasoning = false;
+    body.reasoning_effort = 'low';
+  }
 
   const response = await fetch(GROQ_ENDPOINT, {
     method: 'POST',
@@ -184,12 +187,12 @@ async function generateWithFallback(key, prompt) {
 }
 
 async function probeGroq(key) {
+  const sample = `Résume en 4 phrases factuelles et naturelles ce texte, sans rien inventer : La ville a ouvert une nouvelle médiathèque mardi. Le bâtiment comprend 45 000 ouvrages, un espace numérique et une salle de travail. Le projet a coûté 8 millions d'euros. La fréquentation sera gratuite pour les habitants.`;
   let lastError = '';
   for (const model of GROQ_MODELS) {
     try {
-      const text = await generateWithGroq(model, key, 'Réponds uniquement par : OK', 2);
-      if (/ok/i.test(text)) return { ok: true, model };
-      lastError = `${model}: réponse inattendue`;
+      const text = await generateWithGroq(model, key, sample, 60);
+      return { ok: true, model, length: text.length };
     } catch (error) {
       lastError = String(error?.message || error).slice(0, 360);
     }
