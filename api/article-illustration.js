@@ -138,50 +138,123 @@ function normalizeWords(value = '') {
   return String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
 }
 
-function searchQuery(title = '', category = '') {
-  const stop = new Set(['avec','dans','pour','plus','apres','avant','cette','sont','etre','leur','leurs','tout','tous','toute','mais','sans','vers','entre','dont','selon','comme','fait','aux','une','des','les','par','sur','qui','que','quoi','comment','nouveau','nouvelle']);
-  const words = normalizeWords(title)
+const CATEGORY_QUERIES = {
+  'politique': 'French politics government parliament',
+  'international': 'international diplomacy world leaders',
+  'economie': 'economy finance business France',
+  'societe': 'France society public life',
+  'sante': 'health medicine hospital research',
+  'environnement': 'climate environment nature',
+  'science': 'science research laboratory',
+  'culture': 'arts culture museum theatre',
+  'education': 'education school classroom university',
+  'europe': 'European Union Europe institutions',
+  'ia': 'artificial intelligence computing',
+  'tech': 'technology computing electronics',
+  'smartphones': 'smartphone mobile technology',
+  'vr': 'virtual reality headset',
+  'automobile': 'automobile car transport',
+  'energie': 'renewable energy electricity infrastructure'
+};
+
+const ACRONYM_QUERIES = {
+  'MBS': 'Mohammed bin Salman',
+  'UE': 'European Union',
+  'USA': 'United States',
+  'OTAN': 'NATO',
+  'IA': 'artificial intelligence'
+};
+
+const TITLE_STOP = new Set([
+  'avec','dans','pour','plus','apres','avant','cette','sont','etre','leur','leurs','tout','tous','toute','mais','sans','vers','entre','dont','selon','comme','fait','faits','aux','une','des','les','par','sur','qui','que','quoi','comment','nouveau','nouvelle','plusieurs','sujets','sujet','table','visite','accord','accords','seront','signe','signes','transport','transports','energie','france','francais','francaise','aujourd','hui','hier','demain','annonce','annoncee','annoncees','apres','contre','autour','encore','voici','pourquoi','quand','comment']
+);
+
+function titleTerms(title = '') {
+  return normalizeWords(title)
     .replace(/\s+[-–—|]\s+[^-–—|]{2,45}$/u, '')
     .replace(/[^a-z0-9]+/g, ' ')
     .split(/\s+/)
-    .filter(word => word.length >= 4 && !stop.has(word));
-  const selected = [...new Set(words)].slice(0, 7).join(' ');
-  return (selected || normalizeWords(category) || 'actualite').slice(0, 120);
+    .filter(word => word.length >= 4 && !TITLE_STOP.has(word));
+}
+
+function entityQueries(title = '') {
+  const raw = String(title || '').replace(/\s+/g, ' ').trim();
+  const queries = [];
+
+  for (const acronym of raw.match(/\b[A-Z]{2,7}\b/g) || []) {
+    if (ACRONYM_QUERIES[acronym]) queries.push(`${ACRONYM_QUERIES[acronym]} France`);
+    else if (!['TV','AFP','BFM','RMC'].includes(acronym)) queries.push(acronym);
+  }
+
+  const properSequences = raw.match(/\b[A-ZÀ-ÖØ-Ý][A-Za-zÀ-ÖØ-öø-ÿ'’.-]{2,}(?:\s+(?:[A-ZÀ-ÖØ-Ý][A-Za-zÀ-ÖØ-öø-ÿ'’.-]{2,}|de|du|des|la|le|les|bin|ben)){0,2}/g) || [];
+  for (const sequence of properSequences) {
+    const cleaned = sequence.trim();
+    if (/^(Parc|France|Europe|International|Politique|Economie|Économie|Société|Societe|Santé|Sante|Science|Culture|Education|Éducation)$/i.test(cleaned)) continue;
+    if (cleaned.length >= 4) queries.push(cleaned);
+  }
+
+  const terms = [...new Set(titleTerms(raw))];
+  if (terms.length >= 2) queries.push(terms.slice(0, 4).join(' '));
+  else if (terms.length === 1) queries.push(terms[0]);
+
+  return [...new Set(queries.map(q => q.trim()).filter(Boolean))].slice(0, 4);
+}
+
+function categoryQuery(category = '') {
+  return CATEGORY_QUERIES[normalizeWords(category).trim()] || 'current events news illustration';
+}
+
+function scoreCandidate(pageTitle = '', query = '') {
+  const haystack = normalizeWords(pageTitle).replace(/[^a-z0-9]+/g, ' ');
+  const important = normalizeWords(query).replace(/[^a-z0-9]+/g, ' ').split(/\s+/).filter(word => word.length >= 3 && !['the','and','with','from','france'].includes(word));
+  if (!important.length) return 0;
+  return important.reduce((score, word) => score + (haystack.includes(word) ? 1 : 0), 0);
+}
+
+async function commonsSearch(query, requireOverlap = true) {
+  const api = new URL('https://commons.wikimedia.org/w/api.php');
+  api.search = new URLSearchParams({
+    action: 'query',
+    generator: 'search',
+    gsrsearch: query,
+    gsrnamespace: '6',
+    gsrlimit: '12',
+    prop: 'imageinfo',
+    iiprop: 'url|mime|size',
+    iiurlwidth: '720',
+    format: 'json'
+  }).toString();
+  const response = await fetch(api, { signal: AbortSignal.timeout(TIMEOUT_MS), headers: { 'User-Agent': 'MonActualite/3.1' } });
+  if (!response.ok) return '';
+  const data = await response.json().catch(() => ({}));
+  const pages = Object.values(data?.query?.pages || {});
+  const candidates = [];
+  for (const page of pages) {
+    const info = page?.imageinfo?.[0];
+    if (!info) continue;
+    if (!/^image\/(jpeg|png|webp)$/i.test(info.mime || '')) continue;
+    const width = Number(info.thumbwidth || info.width || 0);
+    const height = Number(info.thumbheight || info.height || 0);
+    if (width && width < 320) continue;
+    if (height && height < 180) continue;
+    const url = info.thumburl || info.url;
+    const label = `${page.title || ''} ${url || ''}`;
+    if (/logo|icon|coat_of_arms|flag_of|map_of|diagram|symbol|wordmark/i.test(label)) continue;
+    if (!url) continue;
+    candidates.push({ url, score: scoreCandidate(page.title || '', query) });
+  }
+  candidates.sort((a, b) => b.score - a.score);
+  if (!candidates.length) return '';
+  if (requireOverlap && candidates[0].score < 1) return '';
+  return candidates[0].url;
 }
 
 async function commonsImage(title, category) {
-  const attempts = [searchQuery(title, category), normalizeWords(category || '')].filter(Boolean);
-  for (const query of [...new Set(attempts)]) {
-    const api = new URL('https://commons.wikimedia.org/w/api.php');
-    api.search = new URLSearchParams({
-      action: 'query',
-      generator: 'search',
-      gsrsearch: query,
-      gsrnamespace: '6',
-      gsrlimit: '8',
-      prop: 'imageinfo',
-      iiprop: 'url|mime|size',
-      iiurlwidth: '720',
-      format: 'json'
-    }).toString();
-    const response = await fetch(api, { signal: AbortSignal.timeout(TIMEOUT_MS), headers: { 'User-Agent': 'MonActualite/3.0' } });
-    if (!response.ok) continue;
-    const data = await response.json().catch(() => ({}));
-    const pages = Object.values(data?.query?.pages || {});
-    for (const page of pages) {
-      const info = page?.imageinfo?.[0];
-      if (!info) continue;
-      if (!/^image\/(jpeg|png|webp)$/i.test(info.mime || '')) continue;
-      const width = Number(info.thumbwidth || info.width || 0);
-      const height = Number(info.thumbheight || info.height || 0);
-      if (width && width < 320) continue;
-      if (height && height < 180) continue;
-      const url = info.thumburl || info.url;
-      if (/logo|icon|coat_of_arms|flag_of/i.test(String(page.title || '') + ' ' + String(url || ''))) continue;
-      if (url) return url;
-    }
+  for (const query of entityQueries(title)) {
+    const url = await commonsSearch(query, true);
+    if (url) return url;
   }
-  return '';
+  return commonsSearch(categoryQuery(category), false);
 }
 
 function fallbackSvg(res, category = '') {
@@ -190,6 +263,7 @@ function fallbackSvg(res, category = '') {
   res.statusCode = 200;
   res.setHeader('Content-Type', 'image/svg+xml; charset=utf-8');
   res.setHeader('Cache-Control', 'public, s-maxage=86400, stale-while-revalidate=604800');
+  res.setHeader('X-Illustration-Source', 'category-fallback');
   res.end(svg);
 }
 
