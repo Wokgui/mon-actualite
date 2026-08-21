@@ -2,8 +2,15 @@ const dns = require('node:dns').promises;
 const net = require('node:net');
 
 const TIMEOUT_MS = 9000;
+const GEMINI_TIMEOUT_MS = 18000;
 const MAX_HTML_BYTES = 2_000_000;
 const UA = 'Mozilla/5.0 (Linux; Android 16) AppleWebKit/537.36 Chrome/140 Safari/537.36';
+const GEMINI_MODELS = [...new Set([
+  process.env.GEMINI_MODEL,
+  'gemini-3.5-flash-lite',
+  'gemini-3.1-flash-lite',
+  'gemini-2.5-flash-lite'
+].filter(Boolean))];
 
 function send(res, status, payload) {
   res.statusCode = status;
@@ -243,23 +250,64 @@ async function getArticleMaterial(article) {
   }
 }
 
-async function aiGenerate(system, prompt) {
-  try {
-    const { generateText } = await import('ai');
-    const { text } = await generateText({ model: 'openai/gpt-5.6-sol', system, prompt, maxOutputTokens: 460 });
-    const clean = repairMojibake(String(text || '').trim());
-    return clean.length >= 80 ? clean : '';
-  } catch (error) {
-    console.error('AI summary unavailable:', String(error?.message || error).slice(0, 220));
-    return '';
-  }
+function geminiKey() {
+  return String(process.env.GEMINI_API_KEY || process.env.GOOGLE_GENERATIVE_AI_API_KEY || '').trim();
 }
 
-const SYSTEM = `Tu es un rédacteur de presse factuel. Tu dois résumer EXCLUSIVEMENT le contenu source fourni pour l'article demandé. Ignore toute navigation, recommandation, publicité, lien « à lire aussi », contenu d'un autre article ou texte sans rapport qui aurait été extrait de la page. N'ajoute aucun fait, nom, chiffre, contexte externe, opinion, conseil ou connaissance générale qui n'apparaît pas dans la source. Si une information n'est pas suffisamment étayée par le texte, ne l'écris pas. Commence par le fait principal. Utilise un français naturel et précis.`;
+async function callGemini(model, key, system, prompt) {
+  const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
+    method: 'POST',
+    signal: AbortSignal.timeout(GEMINI_TIMEOUT_MS),
+    headers: {
+      'Content-Type': 'application/json',
+      'x-goog-api-key': key
+    },
+    body: JSON.stringify({
+      systemInstruction: { parts: [{ text: system }] },
+      contents: [{ role: 'user', parts: [{ text: prompt }] }],
+      generationConfig: { maxOutputTokens: 460 }
+    })
+  });
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
+    const message = payload?.error?.message || `HTTP ${response.status}`;
+    throw new Error(`${model}: ${message}`);
+  }
+  const text = (payload?.candidates?.[0]?.content?.parts || []).map(part => part?.text || '').join('').trim();
+  return repairMojibake(text);
+}
+
+async function aiGenerate(system, prompt) {
+  const key = geminiKey();
+  if (!key) {
+    console.error('Gemini summary unavailable: GEMINI_API_KEY missing');
+    return { text: '', model: '' };
+  }
+  let lastError = '';
+  for (const model of GEMINI_MODELS) {
+    try {
+      const text = await callGemini(model, key, system, prompt);
+      if (text.length >= 80) return { text, model };
+      lastError = `${model}: réponse trop courte`;
+    } catch (error) {
+      lastError = String(error?.message || error).slice(0, 300);
+    }
+  }
+  console.error('Gemini summary unavailable:', lastError || 'unknown error');
+  return { text: '', model: '' };
+}
+
+const SYSTEM = `Tu es un rédacteur de presse factuel. Tu dois résumer EXCLUSIVEMENT le contenu source fourni pour l'article demandé. Ignore toute navigation, recommandation, publicité, lien « à lire aussi », contenu d'un autre article ou texte sans rapport qui aurait été extrait de la page. N'ajoute aucun fait, nom, chiffre, contexte externe, opinion, conseil ou connaissance générale qui n'apparaît pas dans la source. Si une information n'est pas suffisamment étayée par le texte, ne l'écris pas. Commence par le fait principal. Utilise un français naturel et précis. N'écris jamais un titre accrocheur, une introduction promotionnelle ou une formule destinée à donner envie de cliquer.`;
 
 module.exports = async function handler(req, res) {
   if (req.method === 'GET' && req.query?.status) {
-    return send(res, 200, { ok: true, aiSdk: true, hasOidc: Boolean(process.env.VERCEL_OIDC_TOKEN), hasGatewayKey: Boolean(process.env.AI_GATEWAY_API_KEY) });
+    return send(res, 200, {
+      ok: true,
+      provider: 'gemini',
+      model: GEMINI_MODELS[0],
+      hasGeminiKey: Boolean(geminiKey()),
+      gatewayDisabled: true
+    });
   }
   if (req.method !== 'POST') return send(res, 405, { error: 'Méthode non autorisée' });
 
@@ -271,19 +319,32 @@ module.exports = async function handler(req, res) {
     const articles = Array.isArray(body.articles) ? body.articles.slice(0, 4) : [];
     const materials = await Promise.all(articles.map(getArticleMaterial));
     const source = materials.map((item, i) => `ARTICLE ${i + 1} — ${item.title}\n${item.text || item.fallback}`).join('\n\n').slice(0, 30000);
-    const prompt = `Synthétise l'actualité de la rubrique « ${category} » uniquement à partir des articles ci-dessous. Fais 5 à 7 phrases, environ 120 à 180 mots, réparties en 2 ou 3 paragraphes courts séparés par une ligne vide. Regroupe seulement les informations qui concernent réellement le même sujet. N'introduis aucun élément extérieur aux textes.\n\n${source}`;
-    let generated = source.length >= 120 ? await aiGenerate(SYSTEM, prompt) : '';
+    const prompt = `Fais un vrai résumé journalistique de l'actualité de la rubrique « ${category} » uniquement à partir des articles ci-dessous. Fais 5 à 7 phrases, environ 120 à 180 mots, réparties en 2 ou 3 paragraphes courts séparés par une ligne vide. Commence directement par les faits les plus importants. Regroupe seulement les informations qui concernent réellement le même sujet. Ne rédige ni accroche, ni slogan, ni conseil, ni phrase du type « à retenir ». N'introduis aucun élément extérieur aux textes.\n\n${source}`;
+    const aiResult = source.length >= 120 ? await aiGenerate(SYSTEM, prompt) : { text: '', model: '' };
+    let generated = aiResult.text;
     if (generated && !summarySupported(generated, source)) generated = '';
     const fallback = materials.map(item => sentenceFallback(item.text, item.fallback)).filter(Boolean).slice(0, 3).join('\n\n');
-    return send(res, 200, { summary: paragraphize(generated || fallback || `Aucun résumé disponible pour ${category}.`, 2), ai: Boolean(generated) });
+    return send(res, 200, {
+      summary: paragraphize(generated || fallback || `Aucun résumé disponible pour ${category}.`, 2),
+      ai: Boolean(generated),
+      provider: generated ? 'gemini' : 'extractif',
+      model: generated ? aiResult.model : ''
+    });
   }
 
   const article = body.article || {};
   const material = await getArticleMaterial(article);
   const source = material.text || material.fallback;
-  const prompt = `Résume cet article en français en 4 à 6 phrases, environ 90 à 140 mots. Fais exactement 2 paragraphes courts séparés par une ligne vide. Le premier paragraphe donne le fait principal et son contexte immédiat. Le second donne les précisions, conséquences ou chiffres présents dans le texte. Ne parle d'aucun autre sujet, même s'il apparaît dans des recommandations de la page.\n\nTITRE : ${material.title}\n\nTEXTE SOURCE :\n${source}`;
-  let generated = source.length >= 120 ? await aiGenerate(SYSTEM, prompt) : '';
+  const prompt = `Résume cet article en français en 4 à 6 phrases, environ 90 à 140 mots. Fais exactement 2 paragraphes courts séparés par une ligne vide. Commence directement par le fait principal et son contexte immédiat. Le second paragraphe donne uniquement les précisions, conséquences ou chiffres présents dans le texte. Le résultat doit ressembler à un résumé de dépêche ou de journal, pas à une accroche destinée à faire cliquer. Ne parle d'aucun autre sujet, même s'il apparaît dans des recommandations de la page.\n\nTITRE : ${material.title}\n\nTEXTE SOURCE :\n${source}`;
+  const aiResult = source.length >= 120 ? await aiGenerate(SYSTEM, prompt) : { text: '', model: '' };
+  let generated = aiResult.text;
   if (generated && !summarySupported(generated, `${material.title}\n${source}`)) generated = '';
   const summary = paragraphize(generated || sentenceFallback(material.text, material.fallback), 2);
-  return send(res, 200, { summary, ai: Boolean(generated), articleUrl: material.finalUrl || String(article?.url || '') });
+  return send(res, 200, {
+    summary,
+    ai: Boolean(generated),
+    provider: generated ? 'gemini' : 'extractif',
+    model: generated ? aiResult.model : '',
+    articleUrl: material.finalUrl || String(article?.url || '')
+  });
 };
