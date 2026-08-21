@@ -1,5 +1,5 @@
 const nativeFetch = window.fetch.bind(window);
-const MIGRATION_FLAG = 'news-summary-fix-v6-groq-llama-applied';
+const MIGRATION_FLAG = 'news-summary-fix-v7-groq-gptoss-applied';
 
 const ENTITY_MAP = new Map([
   ['nbsp', ' '], ['amp', '&'], ['quot', '"'], ['apos', "'"], ['lt', '<'], ['gt', '>'],
@@ -70,7 +70,7 @@ window.fetch = async function patchedFetch(input, init) {
     const url = new URL(raw, location.href);
     if (url.pathname === '/api/article-summary' || url.pathname === '/api/article-summary-v3') {
       url.pathname = '/api/article-summary-groq';
-      url.searchParams.set('v', '6');
+      url.searchParams.set('v', '7');
       isSummary = true;
       nextInput = typeof input === 'string' ? `${url.pathname}${url.search}` : new Request(url.href, input);
     }
