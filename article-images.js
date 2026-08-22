@@ -25,7 +25,7 @@ function saveImageCache(id, url) {
 
 function validImageUrl(value) {
   try {
-    const url = new URL(value);
+    const url = new URL(value, location.href);
     if (!['http:', 'https:'].includes(url.protocol)) return '';
     const host = url.hostname.toLowerCase();
     const haystack = `${host}${url.pathname}${url.search}`.toLowerCase();
@@ -45,7 +45,7 @@ async function resolvePublisherImage(article) {
   const key = String(article.id || article.url);
   if (resolverRequests.has(key)) return resolverRequests.get(key);
 
-  const request = fetch(`/api/article-image?v=5&url=${encodeURIComponent(article.url)}`, { cache: 'no-store' })
+  const request = fetch(`/api/article-image?v=6&url=${encodeURIComponent(article.url)}`, { cache: 'force-cache' })
     .then(response => response.ok ? response.json() : null)
     .then(data => {
       const image = validImageUrl(data?.image);
@@ -59,14 +59,15 @@ async function resolvePublisherImage(article) {
   return request;
 }
 
-function showImage(placeholder, src, detail = false, brief = false) {
+function showImage(placeholder, src, detail = false, brief = false, priority = false, allowProxy = true) {
   return new Promise(resolve => {
     if (!placeholder?.isConnected || !src) return resolve(false);
     const image = new Image();
     image.className = detail ? 'detail-hero original-article-image' : brief ? 'brief-thumb article-image original-article-image' : 'article-image original-article-image';
     image.alt = '';
-    image.loading = detail ? 'eager' : 'lazy';
+    image.loading = detail || priority ? 'eager' : 'lazy';
     image.decoding = 'async';
+    if (priority) image.fetchPriority = 'high';
     image.referrerPolicy = 'no-referrer';
     let proxied = false;
 
@@ -75,7 +76,7 @@ function showImage(placeholder, src, detail = false, brief = false) {
       resolve(true);
     };
     image.onerror = () => {
-      if (!proxied) {
+      if (allowProxy && !proxied && /^https?:\/\//i.test(src)) {
         proxied = true;
         image.removeAttribute('referrerpolicy');
         image.src = `/api/image-proxy?url=${encodeURIComponent(src)}`;
@@ -87,7 +88,7 @@ function showImage(placeholder, src, detail = false, brief = false) {
   });
 }
 
-async function loadOriginalImage(placeholder, article, detail = false, brief = false) {
+async function loadOriginalImage(placeholder, article, detail = false, brief = false, priority = false) {
   if (!placeholder || !article || placeholder.dataset.imageAttempted === '1') return;
   placeholder.dataset.imageAttempted = '1';
 
@@ -95,11 +96,15 @@ async function loadOriginalImage(placeholder, article, detail = false, brief = f
   const feedImage = validImageUrl(article.image);
   const first = cached || feedImage;
 
-  if (first && await showImage(placeholder, first, detail, brief)) return;
+  if (first && await showImage(placeholder, first, detail, brief, priority, true)) return;
   if (!placeholder.isConnected) return;
 
   const resolved = await resolvePublisherImage(article);
-  if (resolved && resolved !== first) await showImage(placeholder, resolved, detail, brief);
+  if (resolved && resolved !== first && await showImage(placeholder, resolved, detail, brief, priority, true)) return;
+  if (!placeholder.isConnected || !article.url) return;
+
+  const fallback = `/api/article-thumbnail?v=3&url=${encodeURIComponent(article.url)}`;
+  await showImage(placeholder, fallback, detail, brief, priority, false);
 }
 
 function applyOriginalArticleImages() {
@@ -107,20 +112,20 @@ function applyOriginalArticleImages() {
   if (!articles.length) return;
   const byId = new Map(articles.map(article => [String(article.id), article]));
 
-  document.querySelectorAll('.article-card[data-article]').forEach(card => {
+  document.querySelectorAll('.article-card[data-article]').forEach((card, index) => {
     const article = byId.get(String(card.dataset.article));
-    loadOriginalImage(card.querySelector('.article-placeholder'), article, false, false);
+    loadOriginalImage(card.querySelector('.article-placeholder'), article, false, false, index < 6);
   });
 
-  document.querySelectorAll('.brief-point[data-article]').forEach(row => {
+  document.querySelectorAll('.brief-point[data-article]').forEach((row, index) => {
     const article = byId.get(String(row.dataset.article));
-    loadOriginalImage(row.querySelector('.brief-thumb.article-placeholder'), article, false, true);
+    loadOriginalImage(row.querySelector('.brief-thumb.article-placeholder'), article, false, true, index < 4);
   });
 
   const detailPage = document.querySelector('.detail-page');
   if (detailPage) {
     const id = detailPage.querySelector('.save-btn-detail[data-save]')?.dataset.save;
-    loadOriginalImage(detailPage.querySelector('.detail-hero.article-placeholder'), byId.get(String(id || '')), true, false);
+    loadOriginalImage(detailPage.querySelector('.detail-hero.article-placeholder'), byId.get(String(id || '')), true, false, true);
   }
 }
 
