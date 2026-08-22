@@ -61,10 +61,13 @@ function blockedBy(article, terms = blockedTerms()) {
 
 function smartIllustrationUrl(article) {
   const params = new URLSearchParams({
-    v: '3',
-    url: String(article?.url || '').slice(0, 1900)
+    v: '1',
+    url: String(article?.url || '').slice(0, 1900),
+    title: String(article?.title || '').slice(0, 280),
+    category: String(article?.category || '').slice(0, 70)
   });
-  return `/api/article-thumbnail?${params}`;
+  if (/^https?:\/\//i.test(article?.image || '') && String(article.image).length < 1900) params.set('image', article.image);
+  return `/api/article-photo?${params}`;
 }
 
 function purgeWeakSummaryCache() {
@@ -95,12 +98,15 @@ window.fetch = function smartSummaryFetch(input, init) {
 };
 
 function enhanceImages() {
-  document.querySelectorAll('[data-article]').forEach(card => {
+  document.querySelectorAll('[data-article]').forEach((card, index) => {
     const article = articleById(card.dataset.article);
     if (!article) return;
     const image = card.querySelector('img.article-image, img.brief-thumb, img.original-article-image, img.direct-thumb');
     if (!image) return;
     const wanted = smartIllustrationUrl(article);
+    if (index < 4) image.loading = 'eager';
+    else image.loading = 'lazy';
+    if (index < 2) image.fetchPriority = 'high';
     if (image.dataset.smartIllustration === wanted && image.getAttribute('src') === wanted) return;
     image.dataset.smartIllustration = wanted;
     image.src = wanted;
