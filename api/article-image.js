@@ -1,14 +1,17 @@
 const dns = require('node:dns').promises;
 const net = require('node:net');
 
-const TIMEOUT_MS = 9000;
+const TIMEOUT_MS = 5000;
 const MAX_HTML_BYTES = 1_500_000;
 const UA = 'Mozilla/5.0 (Linux; Android 16) AppleWebKit/537.36 Chrome/140 Safari/537.36';
 
 function send(res, status, payload) {
   res.statusCode = status;
   res.setHeader('Content-Type', 'application/json; charset=utf-8');
-  res.setHeader('Cache-Control', status === 200 ? 'public, s-maxage=86400, stale-while-revalidate=604800' : 'no-store');
+  const hasImage = status === 200 && Boolean(payload?.image);
+  res.setHeader('Cache-Control', hasImage
+    ? 'public, max-age=21600, s-maxage=86400, stale-while-revalidate=604800'
+    : 'public, max-age=0, s-maxage=120, stale-while-revalidate=300');
   res.end(JSON.stringify(payload));
 }
 
@@ -140,7 +143,7 @@ async function fetchHtml(rawUrl) {
     const response = await fetch(url, {
       redirect: 'manual',
       signal: AbortSignal.timeout(TIMEOUT_MS),
-      headers: { 'User-Agent': UA, 'Accept': 'text/html,application/xhtml+xml' }
+      headers: { 'User-Agent': UA, 'Accept': 'text/html,application/xhtml+xml', 'Accept-Language': 'fr-FR,fr;q=0.9' }
     });
     if (response.status >= 300 && response.status < 400 && response.headers.get('location')) {
       current = new URL(response.headers.get('location'), url).href;
@@ -157,7 +160,11 @@ async function fetchHtml(rawUrl) {
 }
 
 function decode(value = '') {
-  return value.replace(/&amp;/g, '&').replace(/&quot;/g, '"').replace(/&#39;|&apos;/g, "'").replace(/&lt;/g, '<').replace(/&gt;/g, '>');
+  return value
+    .replace(/&amp;/gi, '&').replace(/&quot;/gi, '"').replace(/&#39;|&apos;/gi, "'")
+    .replace(/&lt;/gi, '<').replace(/&gt;/gi, '>')
+    .replace(/&#(\d+);/g, (_, n) => String.fromCodePoint(Number(n)))
+    .replace(/&#x([0-9a-f]+);/gi, (_, n) => String.fromCodePoint(parseInt(n, 16)));
 }
 
 function metaContent(html, key) {
@@ -168,10 +175,23 @@ function metaContent(html, key) {
   return b ? decode(b[1]) : '';
 }
 
+function isGenericImageUrl(rawUrl = '') {
+  try {
+    const url = new URL(rawUrl);
+    const host = url.hostname.toLowerCase();
+    const haystack = `${host}${url.pathname}${url.search}`.toLowerCase();
+    if (/(favicon|\/logo(?:[._/-]|$)|logo[-_.]|icon[-_.]|\/icon(?:[._/-]|$)|avatar|sprite|wordmark|brandmark|site-logo|google[-_ ]?news|googlenews|google_actualites|google-actualites)/i.test(haystack)) return true;
+    if (host === 'news.google.com' || host === 'www.google.com' || host.endsWith('.gstatic.com') || host.endsWith('.googleusercontent.com')) return true;
+    return false;
+  } catch {
+    return true;
+  }
+}
+
 function findImage(html, finalUrl) {
   const candidates = [
-    metaContent(html, 'og:image'),
     metaContent(html, 'og:image:secure_url'),
+    metaContent(html, 'og:image'),
     metaContent(html, 'og:image:url'),
     metaContent(html, 'twitter:image'),
     metaContent(html, 'twitter:image:src'),
@@ -179,8 +199,10 @@ function findImage(html, finalUrl) {
   ].filter(Boolean);
   for (const candidate of candidates) {
     try {
-      const resolved = new URL(candidate, finalUrl);
-      if (['http:', 'https:'].includes(resolved.protocol)) return resolved.href;
+      const resolved = new URL(decode(candidate), finalUrl);
+      if (!['http:', 'https:'].includes(resolved.protocol)) continue;
+      if (isGenericImageUrl(resolved.href)) continue;
+      return resolved.href;
     } catch {}
   }
   return '';
@@ -194,7 +216,8 @@ module.exports = async function handler(req, res) {
     let articleUrl = rawUrl;
     if (googleNewsArticleId(rawUrl)) articleUrl = await decodeGoogleNewsUrl(rawUrl);
     const { html, finalUrl } = await fetchHtml(articleUrl);
-    return send(res, 200, { image: findImage(html, finalUrl), articleUrl: finalUrl, decoded: articleUrl !== rawUrl });
+    const image = findImage(html, finalUrl);
+    return send(res, 200, { image, articleUrl: finalUrl, decoded: articleUrl !== rawUrl });
   } catch (error) {
     return send(res, 200, { image: '', error: String(error?.message || 'unavailable').slice(0, 160) });
   }
