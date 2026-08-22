@@ -1,17 +1,35 @@
-/* Feedly-like compact rows with thumbnails on the LEFT. */
+/* Feedly mobile layout: text on the LEFT, photo on the RIGHT. */
 .article-card {
-  grid-template-columns: 92px minmax(0,1fr) !important;
-  grid-template-areas: "image body" !important;
-  column-gap: 12px;
+  grid-template-columns: minmax(0,1fr) 112px !important;
+  grid-template-areas: "body image" !important;
+  column-gap: 14px;
+  min-height: 92px !important;
+  padding: 8px 0 !important;
 }
 .article-card .article-image,
 .article-card .article-placeholder {
   grid-area: image !important;
-  justify-self: start;
+  justify-self: end;
+  width: 112px !important;
+  height: 76px !important;
+  min-height: 76px !important;
+  border-radius: 4px !important;
+  object-fit: cover !important;
+  background: #f0f0f0;
 }
 .article-card .article-body {
   grid-area: body !important;
   padding: 1px 0 0 0 !important;
+}
+.article-card h2 {
+  font-size: 15.5px !important;
+  line-height: 1.22 !important;
+  font-weight: 650 !important;
+  letter-spacing: -.12px !important;
+}
+.article-card .meta {
+  margin-top: 5px !important;
+  font-size: 11px !important;
 }
 
 /* The brief uses the exact same compact visual language as the article list. */
@@ -22,14 +40,14 @@
 }
 .brief-point.feedly-brief-row {
   display: grid;
-  grid-template-columns: 92px minmax(0,1fr);
-  grid-template-areas: "image content";
-  column-gap: 12px;
-  min-height: 88px;
+  grid-template-columns: minmax(0,1fr) 112px;
+  grid-template-areas: "content image";
+  column-gap: 14px;
+  min-height: 92px;
   margin: 0 !important;
-  padding: 10px 0 !important;
+  padding: 8px 0 !important;
   border-radius: 0 !important;
-  border-bottom: 1px solid #ececec;
+  border-bottom: 1px solid #eeeeee;
   background: #fff !important;
   box-shadow: none !important;
 }
@@ -39,9 +57,10 @@
 .brief-point .brief-thumb.article-image,
 .brief-point .brief-thumb.article-placeholder {
   grid-area: image;
-  width: 92px;
-  height: 68px;
-  min-height: 68px;
+  width: 112px;
+  height: 76px;
+  min-height: 76px;
+  justify-self: end;
   align-self: center;
   border-radius: 4px;
   object-fit: cover;
@@ -59,10 +78,10 @@
   display: -webkit-box !important;
   margin: 0 !important;
   color: #222;
-  font-size: 14px !important;
-  line-height: 1.28 !important;
+  font-size: 15.5px !important;
+  line-height: 1.22 !important;
   font-weight: 650 !important;
-  letter-spacing: -.1px;
+  letter-spacing: -.12px;
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
@@ -72,7 +91,7 @@
   display: block !important;
   margin-top: 5px !important;
   color: #8f8f8f !important;
-  font-size: 10.5px !important;
+  font-size: 11px !important;
   line-height: 1.2 !important;
   white-space: nowrap;
   overflow: hidden;
@@ -279,11 +298,14 @@
 
 @media (max-width: 380px) {
   .article-card,
-  .brief-point.feedly-brief-row { grid-template-columns: 88px minmax(0,1fr) !important; }
+  .brief-point.feedly-brief-row { grid-template-columns: minmax(0,1fr) 106px !important; }
+  .article-card .article-image,
+  .article-card .article-placeholder,
   .brief-point .brief-thumb,
   .brief-point .brief-thumb.article-image,
-  .brief-point .brief-thumb.article-placeholder { width: 88px; height: 64px; min-height: 64px; }
-  .brief-point .brief-copy strong { font-size: 13.5px !important; }
+  .brief-point .brief-thumb.article-placeholder { width: 106px !important; height: 72px !important; min-height: 72px !important; }
+  .article-card h2,
+  .brief-point .brief-copy strong { font-size: 15px !important; }
   .detail-page .detail-content > h1 { font-size: 18.5px !important; }
   .detail-page .runtime-detail-image,
   .detail-page .detail-hero { height: 126px !important; min-height: 126px !important; }
