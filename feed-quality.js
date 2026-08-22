@@ -80,14 +80,11 @@ function cachedPublisherImage(article) {
 
 function fallbackIllustrationUrl(article) {
   const params = new URLSearchParams({
-    v: '4',
-    url: String(article?.url || '').slice(0, 1900),
+    v: '1',
     title: String(article?.title || '').slice(0, 280),
     category: String(article?.category || '').slice(0, 70)
   });
-  const feedImage = validDirectImage(article?.image || '');
-  if (feedImage && feedImage.length < 1900) params.set('image', feedImage);
-  return `/api/article-photo?${params}`;
+  return `/api/article-photo-fast?${params}`;
 }
 
 function smartIllustrationUrl(article) {
@@ -123,11 +120,25 @@ window.fetch = function smartSummaryFetch(input, init) {
   return previousFetch(input, init);
 };
 
+function ensureCardImage(card) {
+  let image = card.querySelector('img.article-image, img.brief-thumb, img.original-article-image, img.direct-thumb');
+  if (image) return image;
+  const placeholder = card.querySelector('.article-placeholder, .brief-thumb.article-placeholder');
+  if (!placeholder) return null;
+  image = document.createElement('img');
+  image.alt = '';
+  image.className = placeholder.classList.contains('brief-thumb')
+    ? 'brief-thumb article-image original-article-image'
+    : 'article-image original-article-image';
+  placeholder.replaceWith(image);
+  return image;
+}
+
 function enhanceImages() {
   document.querySelectorAll('[data-article]').forEach((card, index) => {
     const article = articleById(card.dataset.article);
     if (!article) return;
-    const image = card.querySelector('img.article-image, img.brief-thumb, img.original-article-image, img.direct-thumb');
+    const image = ensureCardImage(card);
     if (!image) return;
     const wanted = smartIllustrationUrl(article);
     const fallback = fallbackIllustrationUrl(article);
@@ -137,7 +148,7 @@ function enhanceImages() {
     image.decoding = 'async';
     image.referrerPolicy = 'no-referrer';
     image.onerror = () => {
-      if (image.dataset.photoFallback === '1' || image.src.includes('/api/article-photo?')) return;
+      if (image.dataset.photoFallback === '1' || image.src.includes('/api/article-photo-fast?')) return;
       image.dataset.photoFallback = '1';
       image.removeAttribute('referrerpolicy');
       image.src = fallback;
