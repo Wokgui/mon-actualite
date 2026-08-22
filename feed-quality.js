@@ -1,6 +1,6 @@
 const BLOCK_KEY = 'news-blocked-terms-v1';
 const SUMMARY_CACHE_KEY = 'news-factual-summaries-v2';
-const SUMMARY_MIGRATION = 'news-smart-summary-v2';
+const SUMMARY_MIGRATION = 'news-smart-summary-v3';
 const previousFetch = window.fetch.bind(window);
 let qualityScheduled = false;
 let qualityApplying = false;
@@ -80,7 +80,7 @@ function cachedPublisherImage(article) {
 
 function fallbackIllustrationUrl(article) {
   const params = new URLSearchParams({
-    v: '1',
+    v: '2',
     title: String(article?.title || '').slice(0, 280),
     category: String(article?.category || '').slice(0, 70)
   });
