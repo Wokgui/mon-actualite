@@ -1,13 +1,13 @@
-/* Compact list inspired by Feedly mobile's image + title + source/time view. */
+/* Feedly mobile-style magazine rows: title left, visual right, compact metadata. */
 .feed { gap: 0; background: #fff; border-radius: 0; overflow: hidden; }
 .article-card {
-  grid-template-columns: minmax(0,1fr) 92px;
+  grid-template-columns: minmax(0,1fr) 112px;
   grid-template-areas: "body image";
-  min-height: 88px;
-  padding: 10px 0;
+  min-height: 92px;
+  padding: 8px 0;
   background: #fff;
   border: 0;
-  border-bottom: 1px solid #ececec;
+  border-bottom: 1px solid #eeeeee;
   border-radius: 0;
   box-shadow: none;
   overflow: visible;
@@ -17,7 +17,7 @@
 .article-card .article-body {
   grid-area: body;
   min-width: 0;
-  padding: 1px 12px 0 0;
+  padding: 1px 14px 0 0;
   display: flex;
   flex-direction: column;
   justify-content: flex-start;
@@ -25,9 +25,9 @@
 .article-card .article-image,
 .article-card .article-placeholder {
   grid-area: image;
-  width: 92px;
-  height: 68px;
-  min-height: 68px;
+  width: 112px;
+  height: 76px;
+  min-height: 76px;
   align-self: center;
   border-radius: 4px;
   object-fit: cover;
@@ -39,9 +39,9 @@
 .article-card h2 {
   margin: 0;
   padding: 0;
-  font-size: 14px;
-  line-height: 1.28;
-  letter-spacing: -.1px;
+  font-size: 15.5px;
+  line-height: 1.22;
+  letter-spacing: -.12px;
   font-weight: 650;
   color: #222;
   display: -webkit-box;
@@ -61,8 +61,8 @@
   margin-top: 5px;
   padding: 0;
   min-width: 0;
-  color: #8f8f8f;
-  font-size: 10.5px;
+  color: #949494;
+  font-size: 11px;
   line-height: 1.2;
   white-space: nowrap;
 }
@@ -78,8 +78,9 @@
 .article-card .meta > span:not(.source) { color: #999; }
 .original-article-image { object-fit: cover; }
 @media (max-width: 380px) {
-  .article-card { grid-template-columns: minmax(0,1fr) 88px; min-height: 84px; }
+  .article-card { grid-template-columns: minmax(0,1fr) 106px; min-height: 88px; }
   .article-card .article-image,
-  .article-card .article-placeholder { width: 88px; height: 64px; min-height: 64px; }
-  .article-card h2 { font-size: 13.5px; }
+  .article-card .article-placeholder { width: 106px; height: 72px; min-height: 72px; }
+  .article-card h2 { font-size: 15px; }
+  .article-card .meta { font-size: 10.7px; }
 }
