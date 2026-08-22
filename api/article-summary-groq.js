@@ -61,7 +61,9 @@ function isBoilerplate(text = '') {
     /activez les notifications|notifications? pour ne rien manquer/,
     /partager sur|suivez[- ]?nous|retrouvez[- ]?nous sur/,
     /lire aussi|à lire aussi|voir aussi|à découvrir|sur le même sujet/,
-    /ajouter (?:cet|l[’']?)?\s*article (?:à|dans) (?:vos|mes) favoris/
+    /ajouter (?:cet|l[’']?)?\s*article (?:à|dans) (?:vos|mes) favoris/,
+    /ouvrez?\s+l[’']article|consultez?\s+(?:les?\s+)?détails|détails publiés par la source/,
+    /résumé indisponible(?: pour cet article)?/
   ].some(pattern => pattern.test(value));
 }
 
@@ -231,13 +233,25 @@ module.exports = async function handler(req, res) {
   catch { return send(res, legacy.statusCode || 500, { error: 'Réponse de résumé invalide' }); }
 
   const factual = sanitizeFactual(base?.summary || '');
-  const safeFallback = paragraphize(factual || 'Résumé indisponible pour cet article.', 2);
+  if (factual.length < 80) {
+    return send(res, 200, {
+      ...base,
+      summary: 'Résumé indisponible pour cet article.',
+      ai: false,
+      unavailable: true,
+      provider: 'unavailable',
+      model: ''
+    });
+  }
 
-  if (!key || factual.length < 80) {
+  const safeFallback = paragraphize(factual, 2);
+
+  if (!key) {
     return send(res, 200, {
       ...base,
       summary: safeFallback,
       ai: false,
+      unavailable: false,
       provider: 'factual',
       model: ''
     });
@@ -253,6 +267,7 @@ module.exports = async function handler(req, res) {
       ...base,
       summary: paragraphize(aiResult.text, 2),
       ai: true,
+      unavailable: false,
       provider: 'groq',
       model: aiResult.model
     });
@@ -263,6 +278,7 @@ module.exports = async function handler(req, res) {
       ...base,
       summary: safeFallback,
       ai: false,
+      unavailable: false,
       provider: 'factual',
       model: ''
     });
