@@ -74,7 +74,7 @@ async function commonsSearch(query, requireOverlap) {
   }).toString();
   const response = await fetch(api, {
     signal: AbortSignal.timeout(COMMONS_TIMEOUT_MS),
-    headers: { 'User-Agent': 'MonActualite/6.1 (+https://mon-actualite.vercel.app)' }
+    headers: { 'User-Agent': 'MonActualite/7.0 (+https://mon-actualite.vercel.app)' }
   });
   if (!response.ok) return '';
   const data = await response.json().catch(() => ({}));
@@ -110,7 +110,7 @@ async function fetchImage(url) {
   const response = await fetch(url, {
     redirect: 'follow',
     signal: AbortSignal.timeout(IMAGE_TIMEOUT_MS),
-    headers: { 'User-Agent': 'MonActualite/6.1', 'Accept': 'image/avif,image/webp,image/jpeg,image/png,image/*' }
+    headers: { 'User-Agent': 'MonActualite/7.0', 'Accept': 'image/avif,image/webp,image/jpeg,image/png,image/*' }
   });
   if (!response.ok) throw new Error(`image HTTP ${response.status}`);
   const type = response.headers.get('content-type') || '';
@@ -124,12 +124,12 @@ function neutralFallback(res) {
   const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="640" height="420" viewBox="0 0 640 420"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#eeeeF1"/><stop offset="1" stop-color="#ddddE3"/></linearGradient></defs><rect width="640" height="420" rx="22" fill="url(#g)"/><path d="M0 330L155 220l105 70 104-105 276 235H0Z" fill="#c9c9d1"/><circle cx="470" cy="120" r="42" fill="#d2d2d9"/></svg>';
   res.statusCode = 200;
   res.setHeader('Content-Type', 'image/svg+xml; charset=utf-8');
-  res.setHeader('Cache-Control', 'public, s-maxage=300, stale-while-revalidate=1800');
+  res.setHeader('Cache-Control', 'public, max-age=300, s-maxage=300, stale-while-revalidate=1800');
   res.setHeader('X-Photo-Source', 'neutral-fallback');
   res.end(svg);
 }
 
-module.exports = async function handler(req, res) {
+async function handler(req, res) {
   if (req.method !== 'GET') { res.statusCode = 405; return res.end(); }
   const title = String(req.query?.title || '').slice(0, 300);
   const category = String(req.query?.category || '').slice(0, 80);
@@ -140,11 +140,15 @@ module.exports = async function handler(req, res) {
     res.statusCode = 200;
     res.setHeader('Content-Type', image.type);
     res.setHeader('Content-Length', String(image.buffer.byteLength));
-    res.setHeader('Cache-Control', 'public, s-maxage=604800, stale-while-revalidate=2592000');
+    res.setHeader('Cache-Control', 'public, max-age=86400, s-maxage=604800, stale-while-revalidate=2592000');
     res.setHeader('X-Photo-Source', 'wikimedia-fast');
     return res.end(image.buffer);
   } catch (error) {
     console.error('fast photo:', String(error?.message || error).slice(0, 140));
     return neutralFallback(res);
   }
-};
+}
+
+module.exports = handler;
+module.exports.chooseImage = chooseImage;
+module.exports.fetchImage = fetchImage;
