@@ -1,5 +1,5 @@
 const resolverRequests = new Map();
-const IMAGE_CACHE_KEY = 'news-original-images-v2';
+const IMAGE_CACHE_KEY = 'news-original-images-v3-no-google-logo';
 
 function readCachedArticles() {
   try {
@@ -26,7 +26,12 @@ function saveImageCache(id, url) {
 function validImageUrl(value) {
   try {
     const url = new URL(value);
-    return ['http:', 'https:'].includes(url.protocol) ? url.href : '';
+    if (!['http:', 'https:'].includes(url.protocol)) return '';
+    const host = url.hostname.toLowerCase();
+    const haystack = `${host}${url.pathname}${url.search}`.toLowerCase();
+    if (/(favicon|\/logo(?:[._/-]|$)|logo[-_.]|icon[-_.]|\/icon(?:[._/-]|$)|avatar|sprite|wordmark|brandmark|site-logo|google[-_ ]?news|googlenews|google_actualites|google-actualites)/i.test(haystack)) return '';
+    if (host === 'news.google.com' || host === 'www.google.com' || host.endsWith('.gstatic.com') || host.endsWith('.googleusercontent.com')) return '';
+    return url.href;
   } catch {
     return '';
   }
@@ -40,7 +45,7 @@ async function resolvePublisherImage(article) {
   const key = String(article.id || article.url);
   if (resolverRequests.has(key)) return resolverRequests.get(key);
 
-  const request = fetch(`/api/article-image?v=4&url=${encodeURIComponent(article.url)}`, { cache: 'no-store' })
+  const request = fetch(`/api/article-image?v=5&url=${encodeURIComponent(article.url)}`, { cache: 'no-store' })
     .then(response => response.ok ? response.json() : null)
     .then(data => {
       const image = validImageUrl(data?.image);
