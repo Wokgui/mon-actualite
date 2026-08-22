@@ -47,12 +47,25 @@ function cleanText(value = '') {
   return repairMojibake(decodeEntities(String(value ?? ''))).trim();
 }
 
+function cleanSummaryText(value = '') {
+  const text = cleanText(value);
+  const lower = text.toLowerCase();
+  if (!text) return '';
+  if (/ouvrez?\s+l[’']article/.test(lower)) return '';
+  if (/consultez?\s+(?:les?\s+)?détails/.test(lower)) return '';
+  if (/détails publiés par la source/.test(lower)) return '';
+  if (/résumé indisponible/.test(lower)) return '';
+  return text;
+}
+
 function normalizeArticle(article = {}) {
+  const summary = cleanSummaryText(article.summary);
+  const detail = cleanSummaryText(article.detail);
   return {
     ...article,
     title: cleanText(article.title),
-    summary: cleanText(article.summary),
-    detail: cleanText(article.detail),
+    summary,
+    detail: detail || summary,
     source: cleanText(article.source),
     feedTitle: cleanText(article.feedTitle),
     category: cleanText(article.category),
