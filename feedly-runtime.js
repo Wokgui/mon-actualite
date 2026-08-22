@@ -2,7 +2,8 @@ const GENERAL = ['Politique','International','Économie','Société','Santé','E
 const PERSONAL = ['IA','Tech','Smartphones','VR','Automobile','Énergie'];
 const FRANCE_CATEGORIES = ['Politique','Économie','Société','Santé','Éducation','Environnement','Culture','Tech'];
 const WORLD_CATEGORIES = ['International','Europe'];
-const SUMMARY_CACHE_KEY = 'news-factual-summaries-v2';
+const SUMMARY_CACHE_KEY = 'news-article-summaries-v4';
+const IMAGE_CACHE_KEY = 'news-original-images-v3-no-google-logo';
 let scheduled = false;
 let briefMode = 'essential';
 let briefCategory = null;
@@ -78,18 +79,60 @@ function importanceArticles() {
   });
 }
 
-function thumbnailUrl(article) {
-  return `/api/article-thumbnail?v=2&url=${encodeURIComponent(article?.url || '')}`;
+function validImageUrl(value = '') {
+  try {
+    const url = new URL(value, location.href);
+    if (!['http:', 'https:'].includes(url.protocol)) return '';
+    const host = url.hostname.toLowerCase();
+    const haystack = `${host}${url.pathname}${url.search}`.toLowerCase();
+    if (/(favicon|\/logo(?:[._/-]|$)|logo[-_.]|icon[-_.]|\/icon(?:[._/-]|$)|avatar|sprite|wordmark|brandmark|site-logo|google[-_ ]?news|googlenews|google_actualites|google-actualites)/i.test(haystack)) return '';
+    if (host === 'news.google.com' || host === 'www.google.com' || host.endsWith('.gstatic.com') || host.endsWith('.googleusercontent.com')) return '';
+    return url.href;
+  } catch {
+    return '';
+  }
 }
 
-function compactRow(article) {
+function cachedImageUrl(article) {
+  const cache = readJson(IMAGE_CACHE_KEY, {});
+  return validImageUrl(cache[String(article?.id || '')]);
+}
+
+function directImageUrl(article) {
+  return cachedImageUrl(article) || validImageUrl(article?.image);
+}
+
+function thumbnailUrl(article) {
+  return `/api/article-thumbnail?v=3&url=${encodeURIComponent(article?.url || '')}`;
+}
+
+function rowImageMarkup(article, index = 0) {
+  const direct = directImageUrl(article);
+  const priority = index < 6;
+  const fallback = thumbnailUrl(article);
+  if (direct) {
+    return `<img class="article-image original-article-image direct-thumb" src="${esc(direct)}" data-thumbnail-fallback="${esc(fallback)}" alt="" loading="${priority ? 'eager' : 'lazy'}" decoding="async" ${priority ? 'fetchpriority="high"' : ''} referrerpolicy="no-referrer">`;
+  }
+  return `<div class="article-image article-placeholder runtime-image-placeholder" data-image-priority="${priority ? 'high' : 'auto'}"></div>`;
+}
+
+function compactRow(article, index = 0) {
   return `<article class="article-card runtime-row" data-article="${esc(article.id)}" tabindex="0" aria-label="Lire : ${esc(article.title)}">
-    <img class="article-image original-article-image direct-thumb" src="${esc(thumbnailUrl(article))}" alt="" loading="lazy" decoding="async">
+    ${rowImageMarkup(article, index)}
     <div class="article-body">
       <h2>${esc(article.title)}</h2>
       <div class="meta"><span class="source">${esc(article.source || 'Source')}</span><span>${esc(timeLabel(article.publishedAt))}</span></div>
     </div>
   </article>`;
+}
+
+function isUnavailableSummary(value = '') {
+  const text = cleanText(value).toLowerCase();
+  return !text
+    || /résumé indisponible/.test(text)
+    || /ouvrez?\s+l[’']article/.test(text)
+    || /consultez?\s+(?:les?\s+)?détails/.test(text)
+    || /détails publiés par la source/.test(text);
 }
 
 function removeRedundantUi() {
@@ -118,7 +161,7 @@ function enhanceHome() {
   const signature = articles.map(article => article.id).join('|');
   if (feed.dataset.runtimeSignature === signature) return;
   feed.dataset.runtimeSignature = signature;
-  if (articles.length) feed.innerHTML = articles.map(compactRow).join('');
+  if (articles.length) feed.innerHTML = articles.map((article, index) => compactRow(article, index)).join('');
 }
 
 function pickDiverse(source, categories, limit) {
@@ -154,7 +197,7 @@ function selectedBriefCategories() {
 
 function renderEssential() {
   const { france, world } = essentialBrief();
-  const section = (title, items) => `<section class="journal-section"><h2 class="brief-section-title">${title}</h2><div class="feed">${items.length ? items.map(compactRow).join('') : '<p class="muted-note">Aucune information majeure récente.</p>'}</div></section>`;
+  const section = (title, items) => `<section class="journal-section"><h2 class="brief-section-title">${title}</h2><div class="feed">${items.length ? items.map((article, index) => compactRow(article, index)).join('') : '<p class="muted-note">Aucune information majeure récente.</p>'}</div></section>`;
   return `${section('France', france)}${section('Monde', world)}`;
 }
 
@@ -164,18 +207,18 @@ function categoryCacheKey(category, items) {
 
 async function requestSummary(key, payload) {
   const cache = readJson(SUMMARY_CACHE_KEY, {});
-  if (cache[key]?.summary) return cache[key];
+  if (cache[key]?.summary && !cache[key]?.unavailable && !isUnavailableSummary(cache[key].summary)) return cache[key];
   if (summaryRequests.has(key)) return summaryRequests.get(key);
-  const request = fetch('/api/article-summary?v=2', {
+  const request = fetch('/api/article-summary?v=4', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     cache: 'no-store',
     body: JSON.stringify(payload)
   }).then(response => response.ok ? response.json() : null)
     .then(data => {
-      if (data?.summary) {
+      if (data?.summary && !data?.unavailable && !isUnavailableSummary(data.summary)) {
         const latest = readJson(SUMMARY_CACHE_KEY, {});
-        latest[key] = { summary: cleanText(data.summary), ai: Boolean(data.ai), savedAt: Date.now() };
+        latest[key] = { summary: cleanText(data.summary), ai: Boolean(data.ai), unavailable: false, savedAt: Date.now() };
         const entries = Object.entries(latest).slice(-180);
         writeJson(SUMMARY_CACHE_KEY, Object.fromEntries(entries));
       }
@@ -194,7 +237,7 @@ async function loadCategorySummary(category, items) {
   const result = await requestSummary(key, {
     mode: 'category',
     category,
-    articles: items.slice(0, 4).map(article => ({ url: article.url, title: cleanText(article.title), summary: cleanText(article.summary) }))
+    articles: items.slice(0, 4).map(article => ({ url: article.url, title: cleanText(article.title), summary: isUnavailableSummary(article.summary) ? '' : cleanText(article.summary) }))
   });
   if (!target.isConnected || target.dataset.summaryKey !== key) return;
   target.textContent = cleanText(result?.summary || 'Résumé indisponible pour cette rubrique.');
@@ -212,7 +255,7 @@ function renderCategories() {
   const cached = readJson(SUMMARY_CACHE_KEY, {})[key];
   return `<div class="brief-category-tabs">${categories.map(category => `<button class="brief-category-tab ${category === briefCategory ? 'active' : ''}" data-brief-category="${esc(category)}">${esc(category)}</button>`).join('')}</div>
     <section class="brief-card runtime-category-summary"><span class="brief-label">${esc(briefCategory)}${cached?.ai ? ' · Résumé IA' : ''}</span><h2>En bref</h2><p data-runtime-category-summary data-summary-key="${esc(key)}">${esc(cached?.summary || 'Résumé en cours…')}</p></section>
-    <div class="feed">${items.length ? items.map(compactRow).join('') : '<p class="muted-note">Aucun article récent dans cette rubrique.</p>'}</div>`;
+    <div class="feed">${items.length ? items.map((article, index) => compactRow(article, index)).join('') : '<p class="muted-note">Aucun article récent dans cette rubrique.</p>'}</div>`;
 }
 
 function enhanceBrief() {
@@ -248,14 +291,26 @@ async function loadArticleSummary(article, box) {
   const cached = readJson(SUMMARY_CACHE_KEY, {})[key];
   const paragraph = box.querySelector('p');
   const label = box.querySelector('strong');
-  if (cached?.summary) {
+  if (cached?.summary && !cached.unavailable && !isUnavailableSummary(cached.summary)) {
     paragraph.textContent = cleanText(cached.summary);
     label.textContent = cached.ai ? 'Résumé IA' : 'Résumé factuel';
     return;
   }
   paragraph.textContent = 'Résumé en cours…';
-  const result = await requestSummary(key, { mode: 'article', article: { url: article.url, title: cleanText(article.title), summary: cleanText(article.summary) } });
+  const result = await requestSummary(key, {
+    mode: 'article',
+    article: {
+      url: article.url,
+      title: cleanText(article.title),
+      summary: isUnavailableSummary(article.summary) ? '' : cleanText(article.summary)
+    }
+  });
   if (!box.isConnected) return;
+  if (result?.unavailable || isUnavailableSummary(result?.summary)) {
+    paragraph.textContent = 'Résumé indisponible pour cet article.';
+    label.textContent = 'Résumé indisponible';
+    return;
+  }
   paragraph.textContent = cleanText(result?.summary || 'Résumé indisponible pour cet article.');
   label.textContent = result?.ai ? 'Résumé IA' : 'Résumé factuel';
 }
@@ -272,11 +327,15 @@ function enhanceDetail() {
   const hero = page.querySelector('.detail-hero');
   if (hero) {
     const image = document.createElement('img');
-    image.className = 'detail-hero original-article-image runtime-detail-image';
+    image.className = 'detail-hero original-article-image runtime-detail-image direct-thumb';
     image.alt = '';
-    image.src = thumbnailUrl(article);
+    const direct = directImageUrl(article);
+    image.src = direct || thumbnailUrl(article);
+    image.dataset.thumbnailFallback = thumbnailUrl(article);
     image.decoding = 'async';
     image.loading = 'eager';
+    image.fetchPriority = 'high';
+    if (direct) image.referrerPolicy = 'no-referrer';
     hero.replaceWith(image);
   }
 
@@ -361,6 +420,16 @@ function openSettingsFromSheet() {
     button.remove();
   }, 0);
 }
+
+document.addEventListener('error', event => {
+  const image = event.target;
+  if (!(image instanceof HTMLImageElement) || !image.classList.contains('direct-thumb')) return;
+  const fallback = image.dataset.thumbnailFallback;
+  if (!fallback || image.dataset.fallbackApplied === '1' || image.src.includes('/api/article-thumbnail')) return;
+  image.dataset.fallbackApplied = '1';
+  image.removeAttribute('referrerpolicy');
+  image.src = fallback;
+}, true);
 
 document.addEventListener('click', event => {
   const deleteFollowed = event.target.closest('[data-runtime-follow-delete]');
