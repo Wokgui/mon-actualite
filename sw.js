@@ -1,5 +1,5 @@
-const CACHE = 'mon-actualite-v34-stable-dom';
-const ASSETS = ['./', './index.html', './styles.css', './feedly-compact.css', './feedly-left.css', './ui-fixes-v2.css', './article-quickview.css', './feed-quality.css', './stable-dom.js', './app.js', './feedly-runtime.js', './summary-fixes.js', './article-quickview.js', './feed-quality.js', './brief-quality.js', './services/source-connectors.js', './manifest.webmanifest', './assets/app-icon.svg', './assets/icon-192.png', './assets/icon-512.png', './assets/icon-maskable-512.png'];
+const CACHE = 'mon-actualite-v35-new-icon';
+const ASSETS = ['./', './index.html', './styles.css', './feedly-compact.css', './feedly-left.css', './ui-fixes-v2.css', './article-quickview.css', './feed-quality.css', './stable-dom.js', './app.js', './feedly-runtime.js', './summary-fixes.js', './article-quickview.js', './feed-quality.js', './brief-quality.js', './services/source-connectors.js', './manifest.webmanifest', './assets/app-icon.svg'];
 
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(ASSETS)).then(() => self.skipWaiting()));
