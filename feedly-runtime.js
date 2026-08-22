@@ -3,11 +3,11 @@ const PERSONAL = ['IA','Tech','Smartphones','VR','Automobile','Énergie'];
 const FRANCE_CATEGORIES = ['Politique','Économie','Société','Santé','Éducation','Environnement','Culture','Tech'];
 const WORLD_CATEGORIES = ['International','Europe'];
 const SUMMARY_CACHE_KEY = 'news-article-summaries-v4';
-const IMAGE_CACHE_KEY = 'news-original-images-v3-no-google-logo';
 let scheduled = false;
 let briefMode = 'essential';
 let briefCategory = null;
 const summaryRequests = new Map();
+const warmedVisuals = new Set();
 
 function readJson(key, fallback) {
   try { return JSON.parse(localStorage.getItem(key) || 'null') ?? fallback; }
@@ -93,27 +93,33 @@ function validImageUrl(value = '') {
   }
 }
 
-function cachedImageUrl(article) {
-  const cache = readJson(IMAGE_CACHE_KEY, {});
-  return validImageUrl(cache[String(article?.id || '')]);
+function visualUrl(article) {
+  const params = new URLSearchParams({
+    v: '8',
+    url: String(article?.url || '').slice(0, 1900),
+    image: validImageUrl(article?.image || ''),
+    title: cleanText(article?.title || '').slice(0, 280),
+    category: cleanText(article?.category || '').slice(0, 70)
+  });
+  return `/api/article-thumbnail?${params}`;
 }
 
-function directImageUrl(article) {
-  return cachedImageUrl(article) || validImageUrl(article?.image);
-}
-
-function thumbnailUrl(article) {
-  return `/api/article-thumbnail?v=3&url=${encodeURIComponent(article?.url || '')}`;
+function warmVisuals(articles, limit = 10) {
+  articles.slice(0, limit).forEach((article, index) => {
+    const src = visualUrl(article);
+    if (warmedVisuals.has(src)) return;
+    warmedVisuals.add(src);
+    const image = new Image();
+    image.decoding = 'async';
+    image.loading = 'eager';
+    if ('fetchPriority' in image) image.fetchPriority = index < 4 ? 'high' : 'auto';
+    image.src = src;
+  });
 }
 
 function rowImageMarkup(article, index = 0) {
-  const direct = directImageUrl(article);
-  const priority = index < 6;
-  const fallback = thumbnailUrl(article);
-  if (direct) {
-    return `<img class="article-image original-article-image direct-thumb" src="${esc(direct)}" data-thumbnail-fallback="${esc(fallback)}" alt="" loading="${priority ? 'eager' : 'lazy'}" decoding="async" ${priority ? 'fetchpriority="high"' : ''} referrerpolicy="no-referrer">`;
-  }
-  return `<div class="article-image article-placeholder runtime-image-placeholder" data-image-priority="${priority ? 'high' : 'auto'}"></div>`;
+  const priority = index < 8;
+  return `<img class="article-image original-article-image stable-visual" src="${esc(visualUrl(article))}" alt="" loading="${priority ? 'eager' : 'lazy'}" decoding="async" ${index < 4 ? 'fetchpriority="high"' : ''}>`;
 }
 
 function compactRow(article, index = 0) {
@@ -160,6 +166,7 @@ function enhanceHome() {
   const articles = visibleArticles();
   const signature = articles.map(article => article.id).join('|');
   if (feed.dataset.runtimeSignature === signature) return;
+  warmVisuals(articles, 12);
   feed.dataset.runtimeSignature = signature;
   if (articles.length) feed.innerHTML = articles.map((article, index) => compactRow(article, index)).join('');
 }
@@ -197,6 +204,7 @@ function selectedBriefCategories() {
 
 function renderEssential() {
   const { france, world } = essentialBrief();
+  warmVisuals([...france, ...world], 10);
   const section = (title, items) => `<section class="journal-section"><h2 class="brief-section-title">${title}</h2><div class="feed">${items.length ? items.map((article, index) => compactRow(article, index)).join('') : '<p class="muted-note">Aucune information majeure récente.</p>'}</div></section>`;
   return `${section('France', france)}${section('Monde', world)}`;
 }
@@ -250,6 +258,7 @@ function renderCategories() {
   if (!categories.length) return '<p class="muted-note">Choisissez des rubriques dans Réglages.</p>';
   if (!briefCategory || !categories.includes(briefCategory)) briefCategory = categories[0];
   const items = importanceArticles().filter(article => article.category === briefCategory).slice(0, 8);
+  warmVisuals(items, 8);
   const summaryItems = items.slice(0, 4);
   const key = categoryCacheKey(briefCategory, summaryItems);
   const cached = readJson(SUMMARY_CACHE_KEY, {})[key];
@@ -327,15 +336,12 @@ function enhanceDetail() {
   const hero = page.querySelector('.detail-hero');
   if (hero) {
     const image = document.createElement('img');
-    image.className = 'detail-hero original-article-image runtime-detail-image direct-thumb';
+    image.className = 'detail-hero original-article-image runtime-detail-image stable-visual';
     image.alt = '';
-    const direct = directImageUrl(article);
-    image.src = direct || thumbnailUrl(article);
-    image.dataset.thumbnailFallback = thumbnailUrl(article);
+    image.src = visualUrl(article);
     image.decoding = 'async';
     image.loading = 'eager';
     image.fetchPriority = 'high';
-    if (direct) image.referrerPolicy = 'no-referrer';
     hero.replaceWith(image);
   }
 
@@ -420,16 +426,6 @@ function openSettingsFromSheet() {
     button.remove();
   }, 0);
 }
-
-document.addEventListener('error', event => {
-  const image = event.target;
-  if (!(image instanceof HTMLImageElement) || !image.classList.contains('direct-thumb')) return;
-  const fallback = image.dataset.thumbnailFallback;
-  if (!fallback || image.dataset.fallbackApplied === '1' || image.src.includes('/api/article-thumbnail')) return;
-  image.dataset.fallbackApplied = '1';
-  image.removeAttribute('referrerpolicy');
-  image.src = fallback;
-}, true);
 
 document.addEventListener('click', event => {
   const deleteFollowed = event.target.closest('[data-runtime-follow-delete]');
