@@ -1,5 +1,5 @@
 const nativeFetch = window.fetch.bind(window);
-const MIGRATION_FLAG = 'news-summary-fix-v7-groq-gptoss-applied';
+const MIGRATION_FLAG = 'news-summary-fix-v8-unavailable-guard-applied';
 
 const ENTITY_MAP = new Map([
   ['nbsp', ' '], ['amp', '&'], ['quot', '"'], ['apos', "'"], ['lt', '<'], ['gt', '>'],
@@ -39,15 +39,18 @@ function isBoilerplate(text = '') {
     /activez les notifications|notifications? pour ne rien manquer/,
     /partager sur|suivez[- ]?nous|retrouvez[- ]?nous sur/,
     /lire aussi|à lire aussi|voir aussi|à découvrir|sur le même sujet/,
-    /ajouter (?:cet|l[’']?)?\s*article (?:à|dans) (?:vos|mes) favoris/
+    /ajouter (?:cet|l[’']?)?\s*article (?:à|dans) (?:vos|mes) favoris/,
+    /ouvrez?\s+l[’']article|consultez?\s+(?:les?\s+)?détails|détails publiés par la source/,
+    /résumé indisponible(?: pour cet article)?/
   ].some(pattern => pattern.test(value));
 }
 
 function cleanSummary(value = '') {
   const decoded = decodeEntities(value);
+  if (!decoded || isBoilerplate(decoded)) return '';
   const parts = decoded.replace(/\s+/g, ' ').match(/[^.!?]+[.!?]+|[^.!?]+$/g) || [];
   const useful = parts.map(s => s.trim()).filter(s => s.length >= 25 && !isBoilerplate(s));
-  return (useful.join(' ') || decoded).trim();
+  return useful.join(' ').trim();
 }
 
 try {
@@ -57,6 +60,7 @@ try {
     localStorage.removeItem('news-factual-summaries-v3');
     localStorage.removeItem('news-ai-summaries-v4');
     localStorage.removeItem('news-ai-summaries-v5');
+    localStorage.removeItem('news-article-summaries-v4');
     localStorage.setItem(MIGRATION_FLAG, '1');
   }
 } catch {}
@@ -70,7 +74,7 @@ window.fetch = async function patchedFetch(input, init) {
     const url = new URL(raw, location.href);
     if (url.pathname === '/api/article-summary' || url.pathname === '/api/article-summary-v3') {
       url.pathname = '/api/article-summary-groq';
-      url.searchParams.set('v', '7');
+      url.searchParams.set('v', '8');
       isSummary = true;
       nextInput = typeof input === 'string' ? `${url.pathname}${url.search}` : new Request(url.href, input);
     }
@@ -81,7 +85,18 @@ window.fetch = async function patchedFetch(input, init) {
 
   try {
     const data = await response.clone().json();
-    if (data && typeof data.summary === 'string') data.summary = cleanSummary(data.summary);
+    if (data && typeof data.summary === 'string') {
+      const cleaned = cleanSummary(data.summary);
+      if (cleaned) {
+        data.summary = cleaned;
+      } else {
+        data.summary = 'Résumé indisponible pour cet article.';
+        data.ai = false;
+        data.unavailable = true;
+        data.provider = 'unavailable';
+        data.model = '';
+      }
+    }
     const headers = new Headers(response.headers);
     headers.set('Content-Type', 'application/json; charset=utf-8');
     return new Response(JSON.stringify(data), {
