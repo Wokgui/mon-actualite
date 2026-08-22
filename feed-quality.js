@@ -61,7 +61,7 @@ function blockedBy(article, terms = blockedTerms()) {
 
 function smartIllustrationUrl(article) {
   const params = new URLSearchParams({
-    v: '1',
+    v: '3',
     url: String(article?.url || '').slice(0, 1900),
     title: String(article?.title || '').slice(0, 280),
     category: String(article?.category || '').slice(0, 70)
@@ -121,6 +121,36 @@ function applyBlockedCards() {
     const term = blockedBy(article, terms);
     if (!term) return;
     card.remove();
+  });
+}
+
+function canonicalArticleUrl(article) {
+  try {
+    const url = new URL(article?.url || '');
+    if (!/^https?:$/.test(url.protocol)) return '';
+    url.hash = '';
+    ['utm_source','utm_medium','utm_campaign','utm_term','utm_content','gclid','fbclid'].forEach(key => url.searchParams.delete(key));
+    return `${url.hostname.toLowerCase()}${url.pathname.replace(/\/$/, '')}${url.search}`;
+  } catch { return ''; }
+}
+
+function removeDuplicateCards() {
+  document.querySelectorAll('.feed').forEach(feed => {
+    const seenTitles = new Set();
+    const seenUrls = new Set();
+    [...feed.querySelectorAll(':scope > .article-card[data-article], :scope > .brief-point[data-article]')].forEach(card => {
+      const article = articleById(card.dataset.article);
+      if (!article) return;
+      const titleKey = qNormalize(article.title || '').replace(/\b(le parisien|le monde|le figaro|ouest france|rmc sport|radio classique)\b$/i, '').trim();
+      const urlKey = canonicalArticleUrl(article);
+      const duplicate = (titleKey && seenTitles.has(titleKey)) || (urlKey && seenUrls.has(urlKey));
+      if (duplicate) {
+        card.remove();
+        return;
+      }
+      if (titleKey) seenTitles.add(titleKey);
+      if (urlKey) seenUrls.add(urlKey);
+    });
   });
 }
 
@@ -204,6 +234,7 @@ function addBlockedTerm(raw) {
   qWrite(BLOCK_KEY, terms.slice(0, 40));
   updateManagers();
   applyBlockedCards();
+  removeDuplicateCards();
   diversifyHome();
   const quick = document.querySelector('.quick-summary-backdrop');
   if (quick) {
@@ -224,6 +255,7 @@ function applyQuality() {
   try {
     injectManagers();
     applyBlockedCards();
+    removeDuplicateCards();
     enhanceImages();
     diversifyHome();
   } finally {
