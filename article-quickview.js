@@ -1,4 +1,4 @@
-const QUICK_CACHE_KEY = 'news-factual-summaries-v2';
+const QUICK_CACHE_KEY = 'news-article-summaries-v4';
 let quickScheduled = false;
 
 function quickReadJson(key, fallback) {
@@ -25,6 +25,15 @@ function quickClean(value = '') {
 
 function quickEsc(value = '') {
   return quickClean(value).replace(/[&<>'"]/g, c => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;', "'":'&#39;', '"':'&quot;' }[c]));
+}
+
+function quickUnavailable(value = '') {
+  const text = quickClean(value).toLowerCase();
+  return !text
+    || /résumé indisponible/.test(text)
+    || /ouvrez?\s+l[’']article/.test(text)
+    || /consultez?\s+(?:les?\s+)?détails/.test(text)
+    || /détails publiés par la source/.test(text);
 }
 
 function escapeRegExp(value = '') {
@@ -115,14 +124,15 @@ async function quickLoadSummary(article, modal) {
   const cache = quickReadJson(QUICK_CACHE_KEY, {});
   const text = modal.querySelector('[data-quick-summary-text]');
   const label = modal.querySelector('[data-quick-summary-label]');
-  if (cache[key]?.summary) {
-    text.textContent = quickClean(cache[key].summary);
-    label.textContent = cache[key].ai ? 'Résumé IA' : 'Résumé factuel';
+  const cached = cache[key];
+  if (cached?.summary && !cached.unavailable && !quickUnavailable(cached.summary)) {
+    text.textContent = quickClean(cached.summary);
+    label.textContent = cached.ai ? 'Résumé IA' : 'Résumé factuel';
     return;
   }
 
   try {
-    const response = await fetch('/api/article-summary-groq?v=9', {
+    const response = await fetch('/api/article-summary-groq?v=10', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       cache: 'no-store',
@@ -131,24 +141,35 @@ async function quickLoadSummary(article, modal) {
         article: {
           url: article.url,
           title: quickClean(article.title),
-          summary: quickClean(article.summary)
+          summary: quickUnavailable(article.summary) ? '' : quickClean(article.summary)
         }
       })
     });
     const data = response.ok ? await response.json() : null;
     if (!modal.isConnected) return;
-    const summary = quickClean(data?.summary || 'Résumé indisponible pour cet article.');
+
+    if (data?.unavailable || quickUnavailable(data?.summary)) {
+      text.textContent = 'Résumé indisponible pour cet article.';
+      label.textContent = 'Résumé indisponible';
+      return;
+    }
+
+    const summary = quickClean(data?.summary || '');
+    if (!summary) {
+      text.textContent = 'Résumé indisponible pour cet article.';
+      label.textContent = 'Résumé indisponible';
+      return;
+    }
+
     text.textContent = summary;
     label.textContent = data?.ai ? 'Résumé IA' : 'Résumé factuel';
-    if (data?.summary) {
-      const latest = quickReadJson(QUICK_CACHE_KEY, {});
-      latest[key] = { summary, ai: Boolean(data.ai), savedAt: Date.now() };
-      quickWriteJson(QUICK_CACHE_KEY, Object.fromEntries(Object.entries(latest).slice(-180)));
-    }
+    const latest = quickReadJson(QUICK_CACHE_KEY, {});
+    latest[key] = { summary, ai: Boolean(data.ai), unavailable: false, savedAt: Date.now() };
+    quickWriteJson(QUICK_CACHE_KEY, Object.fromEntries(Object.entries(latest).slice(-180)));
   } catch {
     if (modal.isConnected) {
       text.textContent = 'Résumé indisponible pour le moment.';
-      label.textContent = 'Résumé';
+      label.textContent = 'Résumé indisponible';
     }
   }
 }
