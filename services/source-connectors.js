@@ -71,8 +71,37 @@ function hash32(text, seed) {
   return (hash >>> 0).toString(16).padStart(8, '0');
 }
 
+function canonicalArticleUrl(raw = '') {
+  try {
+    const url = new URL(String(raw || ''));
+    url.hash = '';
+    for (const key of [...url.searchParams.keys()]) {
+      if (/^(utm_|fbclid$|gclid$|mc_cid$|mc_eid$)/i.test(key)) url.searchParams.delete(key);
+    }
+    url.pathname = url.pathname.replace(/\/$/, '') || '/';
+    return url.href;
+  } catch {
+    return String(raw || '').trim();
+  }
+}
+
+function fingerprintText(value = '') {
+  return cleanText(value)
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function articleTitleKey(article = {}) {
+  const title = fingerprintText(article.title);
+  const source = fingerprintText(article.source || article.feedTitle);
+  return title ? `${source}|${title}` : '';
+}
+
 function stableArticleId(article) {
-  const key = `${article?.url || ''}|${article?.title || ''}|${article?.publishedAt || ''}`;
+  const key = `${canonicalArticleUrl(article?.url || '')}|${fingerprintText(article?.title || '')}`;
   return `a-${hash32(key, 2166136261)}${hash32(key, 0x9e3779b1)}`;
 }
 
@@ -88,14 +117,30 @@ function readArticleHistory() {
 }
 
 function mergeArticleHistory(fresh) {
-  const byId = new Map();
+  const merged = [];
+  const seenUrls = new Set();
+  const recentTitles = new Map();
+  const MAX_SAME_TITLE_AGE = 48 * 60 * 60 * 1000;
+
   for (const rawArticle of [...fresh, ...readArticleHistory()]) {
     const article = normalizeArticle(rawArticle);
-    if (!article?.id || byId.has(article.id)) continue;
-    byId.set(article.id, article);
+    if (!article?.id) continue;
+
+    const urlKey = canonicalArticleUrl(article.url);
+    if (urlKey && seenUrls.has(urlKey)) continue;
+
+    const titleKey = articleTitleKey(article);
+    const published = Date.parse(article.publishedAt || 0);
+    const previousPublished = titleKey ? recentTitles.get(titleKey) : null;
+    if (titleKey && Number.isFinite(published) && Number.isFinite(previousPublished) && Math.abs(published - previousPublished) <= MAX_SAME_TITLE_AGE) continue;
+
+    merged.push(article);
+    if (urlKey) seenUrls.add(urlKey);
+    if (titleKey && Number.isFinite(published)) recentTitles.set(titleKey, published);
   }
+
   const cutoff = Date.now() - 45 * 24 * 60 * 60 * 1000;
-  return [...byId.values()]
+  return merged
     .filter(article => !article.publishedAt || Date.parse(article.publishedAt) >= cutoff)
     .sort((a, b) => Date.parse(b.publishedAt || 0) - Date.parse(a.publishedAt || 0))
     .slice(0, 400);
