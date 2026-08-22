@@ -80,7 +80,7 @@ function cachedPublisherImage(article) {
 
 function fallbackIllustrationUrl(article) {
   const params = new URLSearchParams({
-    v: '2',
+    v: '4',
     title: String(article?.title || '').slice(0, 280),
     category: String(article?.category || '').slice(0, 70)
   });
@@ -140,22 +140,32 @@ function enhanceImages() {
     if (!article) return;
     const image = ensureCardImage(card);
     if (!image) return;
-    const wanted = smartIllustrationUrl(article);
+
+    if (image.dataset.imageStableV4 === '1') return;
+
+    const direct = cachedPublisherImage(article) || validDirectImage(article?.image || '');
     const fallback = fallbackIllustrationUrl(article);
+    const wanted = direct || fallback;
+
+    image.classList.remove('direct-thumb');
+    image.removeAttribute('data-thumbnail-fallback');
+    image.removeAttribute('data-fallback-applied');
+    image.removeAttribute('referrerpolicy');
+
     if (index < 6) image.loading = 'eager';
     else image.loading = 'lazy';
     if (index < 3) image.fetchPriority = 'high';
     image.decoding = 'async';
-    image.referrerPolicy = 'no-referrer';
+
+    image.dataset.imageStableV4 = '1';
+    image.dataset.imageFallbackV4 = direct ? '0' : '1';
+
     image.onerror = () => {
-      if (image.dataset.photoFallback === '1' || image.src.includes('/api/article-photo-fast?')) return;
-      image.dataset.photoFallback = '1';
-      image.removeAttribute('referrerpolicy');
+      if (image.dataset.imageFallbackV4 === '1') return;
+      image.dataset.imageFallbackV4 = '1';
       image.src = fallback;
     };
-    if (image.dataset.smartIllustration === wanted && image.getAttribute('src') === wanted) return;
-    image.dataset.smartIllustration = wanted;
-    image.dataset.photoFallback = '0';
+
     image.src = wanted;
   });
 }
