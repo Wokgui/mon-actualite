@@ -1,8 +1,9 @@
 const dns = require('node:dns').promises;
 const net = require('node:net');
+const photoFast = require('./article-photo-fast.js');
 
-const HTML_TIMEOUT_MS = 5500;
-const IMAGE_TIMEOUT_MS = 5500;
+const HTML_TIMEOUT_MS = 4200;
+const IMAGE_TIMEOUT_MS = 3800;
 const MAX_HTML_BYTES = 1_800_000;
 const MAX_IMAGE_BYTES = 7_000_000;
 const UA = 'Mozilla/5.0 (Linux; Android 16) AppleWebKit/537.36 Chrome/140 Safari/537.36';
@@ -92,7 +93,6 @@ function extractDecodedUrl(text) {
 async function decodeGoogleNewsUrl(rawUrl) {
   const id = googleNewsArticleId(rawUrl);
   if (!id) return rawUrl;
-
   const legacy = tryLegacyGoogleDecode(id);
   if (/^https?:\/\//i.test(legacy)) return legacy;
 
@@ -120,11 +120,8 @@ function decodeBuffer(buffer, contentType = '') {
     || (probe.match(/<meta[^>]+charset\s*=\s*["']?([^"'\s/>]+)/i) || [])[1]
     || 'utf-8';
   const charset = /^(iso-8859-1|latin1|windows-1252|cp1252)$/i.test(declared) ? 'windows-1252' : 'utf-8';
-  try {
-    return new TextDecoder(charset).decode(buffer);
-  } catch {
-    return buffer.toString('utf8');
-  }
+  try { return new TextDecoder(charset).decode(buffer); }
+  catch { return buffer.toString('utf8'); }
 }
 
 async function fetchHtml(rawUrl) {
@@ -174,17 +171,14 @@ function inlineImageCandidates(html) {
   const articleMatch = [...html.matchAll(/<article\b[^>]*>([\s\S]*?)<\/article>/gi)].sort((a, b) => b[1].length - a[1].length)[0];
   const region = articleMatch?.[1] || html;
   const candidates = [];
-
   for (const match of region.matchAll(/<img\b([^>]+)>/gi)) {
     const attrs = match[1];
     const descriptive = `${attrs} ${(attrs.match(/\balt=["']([^"']*)["']/i) || [])[1] || ''}`;
     if (/logo|avatar|icon|emoji|badge|author|profil|pixel|tracking|advert|publicit|sprite|brand|wordmark|favicon/i.test(descriptive)) continue;
-
     for (const attr of ['src', 'data-src', 'data-original', 'data-lazy-src', 'data-image']) {
       const value = (attrs.match(new RegExp(`\\b${attr}=["']([^"']+)["']`, 'i')) || [])[1] || '';
       if (value && !/^data:/i.test(value)) candidates.push(value);
     }
-
     const srcset = (attrs.match(/\bsrcset=["']([^"']+)["']/i) || [])[1] || '';
     if (srcset) {
       const values = srcset.split(',').map(part => part.trim().split(/\s+/)[0]).filter(Boolean);
@@ -219,14 +213,10 @@ function isGenericImageUrl(rawUrl = '') {
     const url = new URL(rawUrl);
     const host = url.hostname.toLowerCase();
     const haystack = `${host}${url.pathname}${url.search}`.toLowerCase();
-
     if (/(favicon|\/logo(?:[._/-]|$)|logo[-_.]|icon[-_.]|\/icon(?:[._/-]|$)|avatar|sprite|wordmark|brandmark|site-logo|google[-_ ]?news|googlenews|google_actualites|google-actualites)/i.test(haystack)) return true;
-    if (host === 'news.google.com' || host === 'www.google.com' || host.endsWith('.gstatic.com')) return true;
-    if (host.endsWith('.googleusercontent.com')) return true;
+    if (host === 'news.google.com' || host === 'www.google.com' || host.endsWith('.gstatic.com') || host.endsWith('.googleusercontent.com')) return true;
     return false;
-  } catch {
-    return true;
-  }
+  } catch { return true; }
 }
 
 function findImage(html, finalUrl) {
@@ -240,7 +230,6 @@ function findImage(html, finalUrl) {
     ...jsonLdCandidates(html),
     ...inlineImageCandidates(html)
   ].filter(Boolean);
-
   for (const candidate of candidates) {
     try {
       const url = new URL(decode(candidate), finalUrl);
@@ -286,7 +275,6 @@ async function fetchImage(rawUrl, referer) {
   for (let i = 0; i < 5; i++) {
     const url = await assertPublicUrl(current);
     if (isGenericImageUrl(url.href)) throw new Error('generic image blocked');
-
     const response = await fetch(url, {
       redirect: 'manual',
       signal: AbortSignal.timeout(IMAGE_TIMEOUT_MS),
@@ -311,42 +299,66 @@ async function fetchImage(rawUrl, referer) {
   throw new Error('too many image redirects');
 }
 
+function sendImage(res, image, source) {
+  res.statusCode = 200;
+  res.setHeader('Content-Type', image.type);
+  res.setHeader('Content-Length', String(image.buffer.byteLength));
+  res.setHeader('Cache-Control', 'public, max-age=86400, s-maxage=604800, stale-while-revalidate=2592000');
+  res.setHeader('X-Thumbnail-Status', source);
+  return res.end(image.buffer);
+}
+
 function fallback(res) {
-  const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="184" height="136" viewBox="0 0 184 136"><rect width="184" height="136" rx="8" fill="#f1f1f1"/></svg>';
+  const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="640" height="420" viewBox="0 0 640 420"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#eeeeF1"/><stop offset="1" stop-color="#ddddE3"/></linearGradient></defs><rect width="640" height="420" rx="22" fill="url(#g)"/><path d="M0 330L155 220l105 70 104-105 276 235H0Z" fill="#c9c9d1"/><circle cx="470" cy="120" r="42" fill="#d2d2d9"/></svg>';
   res.statusCode = 200;
   res.setHeader('Content-Type', 'image/svg+xml');
-  res.setHeader('Cache-Control', 'public, s-maxage=600');
+  res.setHeader('Cache-Control', 'public, max-age=180, s-maxage=300, stale-while-revalidate=1200');
   res.setHeader('X-Thumbnail-Status', 'fallback');
   res.end(svg);
 }
 
 module.exports = async function handler(req, res) {
-  if (req.method !== 'GET') {
-    res.statusCode = 405;
-    return res.end();
-  }
+  if (req.method !== 'GET') { res.statusCode = 405; return res.end(); }
 
   const rawUrl = String(req.query?.url || '').slice(0, 2000);
-  if (!rawUrl) return fallback(res);
+  const suppliedImage = String(req.query?.image || '').slice(0, 2000);
+  const title = String(req.query?.title || '').slice(0, 300);
+  const category = String(req.query?.category || '').slice(0, 80);
+
+  if (suppliedImage && !isGenericImageUrl(suppliedImage)) {
+    try {
+      const image = await fetchImage(suppliedImage, rawUrl || undefined);
+      return sendImage(res, image, 'feed');
+    } catch (error) {
+      console.warn('feed image unavailable:', String(error?.message || error).slice(0, 120));
+    }
+  }
+
+  if (rawUrl) {
+    try {
+      const articleUrl = googleNewsArticleId(rawUrl) ? await decodeGoogleNewsUrl(rawUrl) : rawUrl;
+      const decodedHost = new URL(articleUrl).hostname.toLowerCase();
+      if (decodedHost === 'news.google.com' || decodedHost.endsWith('.google.com')) throw new Error('Google wrapper not decoded');
+      const { html, finalUrl } = await fetchHtml(articleUrl);
+      const imageUrl = findImage(html, finalUrl);
+      if (imageUrl) {
+        const image = await fetchImage(imageUrl, finalUrl);
+        return sendImage(res, image, 'publisher');
+      }
+    } catch (error) {
+      console.warn('publisher image unavailable:', String(error?.message || error).slice(0, 140));
+    }
+  }
 
   try {
-    const articleUrl = googleNewsArticleId(rawUrl) ? await decodeGoogleNewsUrl(rawUrl) : rawUrl;
-    const decodedHost = new URL(articleUrl).hostname.toLowerCase();
-    if (decodedHost === 'news.google.com' || decodedHost.endsWith('.google.com')) throw new Error('Google wrapper not decoded');
-
-    const { html, finalUrl } = await fetchHtml(articleUrl);
-    const imageUrl = findImage(html, finalUrl);
-    if (!imageUrl) return fallback(res);
-
-    const image = await fetchImage(imageUrl, finalUrl);
-    res.statusCode = 200;
-    res.setHeader('Content-Type', image.type);
-    res.setHeader('Content-Length', String(image.buffer.byteLength));
-    res.setHeader('Cache-Control', 'public, s-maxage=21600, stale-while-revalidate=172800');
-    res.setHeader('X-Thumbnail-Status', 'original');
-    return res.end(image.buffer);
+    const fallbackUrl = await photoFast.chooseImage(title, category);
+    if (fallbackUrl) {
+      const image = await photoFast.fetchImage(fallbackUrl);
+      return sendImage(res, image, 'illustration');
+    }
   } catch (error) {
-    console.error('thumbnail unavailable:', String(error?.message || error).slice(0, 180));
-    return fallback(res);
+    console.warn('illustration unavailable:', String(error?.message || error).slice(0, 120));
   }
+
+  return fallback(res);
 };
