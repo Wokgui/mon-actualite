@@ -26,7 +26,7 @@ function bTime(value) {
 
 function bPhoto(article) {
   const params = new URLSearchParams({
-    v: '1',
+    v: '3',
     url: String(article?.url || '').slice(0, 1900),
     title: String(article?.title || '').slice(0, 280),
     category: String(article?.category || '').slice(0, 70)
@@ -120,12 +120,16 @@ function curatedBrief() {
   const select = zone => {
     const out = [];
     const sources = new Map();
+    const titles = new Set();
     for (const item of scored) {
       if (briefZone(item.article) !== zone) continue;
+      const title = bNorm(item.article?.title || '');
+      if (title && titles.has(title)) continue;
       const source = bNorm(item.article?.source || item.article?.feedTitle || 'source');
       const count = sources.get(source) || 0;
       if (count >= 2) continue;
       out.push(item.article);
+      if (title) titles.add(title);
       sources.set(source, count + 1);
       if (out.length >= 5) break;
     }
