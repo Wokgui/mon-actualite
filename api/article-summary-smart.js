@@ -64,6 +64,14 @@ function cleanText(value = '') {
   return decode(String(value || '').replace(/<[^>]+>/g, ' ')).replace(/\s+/g, ' ').trim();
 }
 
+function boilerplate(value = '') {
+  const text = cleanText(value).toLowerCase();
+  return !text
+    || /ouvrez?\s+l[’']article|consultez?\s+(?:les?\s+)?détails|détails publiés par la source/.test(text)
+    || /résumé indisponible|flux ne fournit pas assez de texte/.test(text)
+    || /connectez[- ]?vous|abonnez[- ]?vous|newsletter|cookies?|partager cet article/.test(text);
+}
+
 async function fetchHtml(rawUrl) {
   let current = rawUrl;
   for (let i = 0; i < 5; i++) {
@@ -109,9 +117,9 @@ function jsonLdMaterial(html) {
         const item = queue.shift();
         if (!item || typeof item !== 'object') continue;
         if (Array.isArray(item['@graph'])) queue.push(...item['@graph']);
-        for (const key of ['articleBody', 'description']) {
+        for (const key of ['articleBody', 'description', 'abstract']) {
           const value = cleanText(item[key] || '');
-          if (value.length >= 80) candidates.push(value);
+          if (value.length >= 45 && !boilerplate(value)) candidates.push(value);
         }
       }
     } catch {}
@@ -123,29 +131,34 @@ function paragraphMaterial(html) {
   const region = ([...html.matchAll(/<article\b[^>]*>([\s\S]*?)<\/article>/gi)]
     .sort((a, b) => b[1].length - a[1].length)[0] || [null, html])[1];
   const parts = [];
+  const seen = new Set();
   for (const match of region.matchAll(/<p\b[^>]*>([\s\S]*?)<\/p>/gi)) {
     const text = cleanText(match[1]);
-    if (text.length < 55) continue;
-    if (/cookies?|abonnez|newsletter|publicit|connexion|connectez|lire aussi|à lire aussi|partager/i.test(text)) continue;
+    if (text.length < 45 || boilerplate(text)) continue;
+    if (/publicit|lire aussi|à lire aussi|articles? similaires?|tous droits|©/.test(text.toLowerCase())) continue;
+    const key = text.toLowerCase().slice(0, 150);
+    if (seen.has(key)) continue;
+    seen.add(key);
     parts.push(text);
     if (parts.join(' ').length >= 7000) break;
   }
   return parts.join('\n').slice(0, 7000);
 }
 
-function useful(value = '') {
+function useful(value = '', minimum = 55) {
   const text = cleanText(value);
-  return text.length >= 80 && !/^ouvrez l.article pour consulter les détails/i.test(text);
+  return text.length >= minimum && !boilerplate(text);
 }
 
 async function enrichFromPage(url) {
   if (!/^https?:\/\//i.test(url || '')) return '';
   const html = await fetchHtml(url);
-  const ld = jsonLdMaterial(html);
   const paragraphs = paragraphMaterial(html);
+  const ld = jsonLdMaterial(html);
   const description = metaContent(html, 'og:description') || metaContent(html, 'twitter:description') || metaContent(html, 'description');
-  const candidates = [ld, paragraphs, description].filter(useful).sort((a, b) => b.length - a.length);
-  return (candidates[0] || '').slice(0, 7000);
+  if (paragraphs.length >= 220) return paragraphs.slice(0, 7000);
+  const combined = [...new Set([description, ld, paragraphs].map(cleanText).filter(text => useful(text, 45)))].join('\n');
+  return combined.slice(0, 7000);
 }
 
 function cloneRequest(req, article) {
@@ -160,6 +173,31 @@ function cloneRequest(req, article) {
   return copy;
 }
 
+function requestMaterial(article, first) {
+  const pieces = [article?.detail, article?.summary, first?.summary]
+    .map(cleanText)
+    .filter(text => useful(text, 35));
+  return [...new Set(pieces)].join('\n').slice(0, 5000);
+}
+
+function shortTitleSummary(article) {
+  const title = cleanText(article?.title || '').replace(/\s+-\s+[^-]{2,45}$/u, '').trim();
+  if (!title) return 'Les informations essentielles sont disponibles dans l’article source.';
+  const punctuation = /[.!?…]$/.test(title) ? '' : '.';
+  return `L’article porte sur le sujet suivant : ${title}${punctuation}`;
+}
+
+async function retryWithMaterial(req, article, material) {
+  const retryReq = cloneRequest(req, {
+    ...article,
+    url: '',
+    summary: material,
+    detail: material
+  });
+  const retry = await capture(groqHandler, retryReq);
+  return JSON.parse(retry.body || '{}');
+}
+
 module.exports = async function handler(req, res) {
   if (req.method !== 'POST') return send(res, 405, { error: 'Méthode non autorisée' });
   const body = req.body && typeof req.body === 'object' ? req.body : {};
@@ -169,8 +207,8 @@ module.exports = async function handler(req, res) {
   try {
     const captured = await capture(groqHandler, req);
     first = JSON.parse(captured.body || '{}');
-    if (first?.ai && useful(first.summary)) return send(res, 200, first);
-    if (useful(first?.summary) && !/^ouvrez l.article/i.test(cleanText(first.summary))) return send(res, 200, first);
+    if (!first?.unavailable && first?.ai && useful(first.summary, 70)) return send(res, 200, first);
+    if (!first?.unavailable && useful(first?.summary, 70)) return send(res, 200, first);
   } catch (error) {
     console.error('smart summary first pass:', String(error?.message || error).slice(0, 180));
   }
@@ -182,34 +220,41 @@ module.exports = async function handler(req, res) {
     console.error('smart summary enrichment:', String(error?.message || error).slice(0, 180));
   }
 
-  if (!useful(material)) {
-    const fallback = useful(article.summary) ? cleanText(article.summary) : cleanText(first?.summary || '');
-    return send(res, 200, {
-      ...(first || {}),
-      summary: fallback || 'Le flux ne fournit pas assez de texte pour produire un résumé fiable. Utilisez « Lire l’article complet » pour consulter la source.',
-      ai: Boolean(first?.ai),
-      enriched: false
-    });
+  if (!useful(material, 55)) material = requestMaterial(article, first);
+
+  if (useful(material, 55)) {
+    try {
+      const result = await retryWithMaterial(req, article, material);
+      if (!result?.unavailable && useful(result?.summary, 55)) {
+        return send(res, 200, { ...result, unavailable: false, enriched: true });
+      }
+    } catch (error) {
+      console.error('smart summary retry:', String(error?.message || error).slice(0, 180));
+    }
+
+    const extractive = cleanText(material).slice(0, 1200);
+    if (extractive) {
+      return send(res, 200, {
+        ...(first || {}),
+        summary: extractive,
+        ai: false,
+        unavailable: false,
+        limited: extractive.length < 180,
+        provider: 'source',
+        enriched: true,
+        model: ''
+      });
+    }
   }
 
-  try {
-    const retryReq = cloneRequest(req, {
-      ...article,
-      url: '',
-      summary: material,
-      detail: material
-    });
-    const retry = await capture(groqHandler, retryReq);
-    const result = JSON.parse(retry.body || '{}');
-    return send(res, 200, { ...result, enriched: true });
-  } catch (error) {
-    console.error('smart summary retry:', String(error?.message || error).slice(0, 180));
-    return send(res, 200, {
-      ...(first || {}),
-      summary: material.slice(0, 1200),
-      ai: false,
-      provider: 'source',
-      enriched: true
-    });
-  }
+  return send(res, 200, {
+    ...(first || {}),
+    summary: shortTitleSummary(article),
+    ai: false,
+    unavailable: false,
+    limited: true,
+    provider: 'title',
+    enriched: false,
+    model: ''
+  });
 };
