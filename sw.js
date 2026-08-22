@@ -1,4 +1,4 @@
-const CACHE = 'mon-actualite-v35-new-icon';
+const CACHE = 'mon-actualite-v36-icon-vivid';
 const ASSETS = ['./', './index.html', './styles.css', './feedly-compact.css', './feedly-left.css', './ui-fixes-v2.css', './article-quickview.css', './feed-quality.css', './stable-dom.js', './app.js', './feedly-runtime.js', './summary-fixes.js', './article-quickview.js', './feed-quality.js', './brief-quality.js', './services/source-connectors.js', './manifest.webmanifest', './assets/app-icon.svg'];
 
 self.addEventListener('install', event => {
