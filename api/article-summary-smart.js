@@ -391,11 +391,14 @@ function liveDomMaterial(html) {
     return out.join('\n').slice(0, 7000);
   };
 
+  const latest = choose(0, 24);
+  if (latest.length >= 220) return latest;
+
   if (essentialIndex >= 0) {
     const essential = choose(essentialIndex, 18);
     if (essential.length >= 220) return essential;
   }
-  return choose(0, 24);
+  return latest;
 }
 
 function paragraphMaterial(html) {
@@ -508,7 +511,7 @@ async function retryWithMaterial(req, article, material) {
 
 module.exports = async function handler(req, res) {
   if (req.method === 'GET' && req.query?.status) {
-    return send(res, 200, { ok: true, version: 'live-v1', maxHtmlBytes: MAX_HTML_BYTES });
+    return send(res, 200, { ok: true, version: 'live-v2-latest-first', maxHtmlBytes: MAX_HTML_BYTES });
   }
   if (req.method !== 'POST') return send(res, 405, { error: 'Méthode non autorisée' });
 
