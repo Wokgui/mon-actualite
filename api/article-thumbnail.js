@@ -1,7 +1,8 @@
 const dns = require('node:dns').promises;
 const net = require('node:net');
 
-const TIMEOUT_MS = 9000;
+const HTML_TIMEOUT_MS = 5500;
+const IMAGE_TIMEOUT_MS = 5500;
 const MAX_HTML_BYTES = 1_800_000;
 const MAX_IMAGE_BYTES = 7_000_000;
 const UA = 'Mozilla/5.0 (Linux; Android 16) AppleWebKit/537.36 Chrome/140 Safari/537.36';
@@ -38,20 +39,28 @@ function googleNewsArticleId(rawUrl) {
     const parts = url.pathname.split('/').filter(Boolean);
     const marker = Math.max(parts.lastIndexOf('articles'), parts.lastIndexOf('read'));
     return marker >= 0 && parts[marker + 1] ? parts[marker + 1] : '';
-  } catch { return ''; }
+  } catch {
+    return '';
+  }
 }
 
 function tryLegacyGoogleDecode(id) {
   try {
     const text = Buffer.from(id.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf8');
     return (text.match(/https?:\/\/[^\u0000-\u001f\s]+/i) || [])[0] || '';
-  } catch { return ''; }
+  } catch {
+    return '';
+  }
 }
 
 async function fetchGoogleParams(id) {
   for (const url of [`https://news.google.com/articles/${id}`, `https://news.google.com/rss/articles/${id}`]) {
     try {
-      const response = await fetch(url, { redirect: 'follow', signal: AbortSignal.timeout(TIMEOUT_MS), headers: { 'User-Agent': UA, 'Accept': 'text/html' } });
+      const response = await fetch(url, {
+        redirect: 'follow',
+        signal: AbortSignal.timeout(HTML_TIMEOUT_MS),
+        headers: { 'User-Agent': UA, 'Accept': 'text/html' }
+      });
       if (!response.ok) continue;
       const html = await response.text();
       const signature = (html.match(/data-n-a-sg=["']([^"']+)["']/i) || [])[1] || '';
@@ -83,13 +92,20 @@ function extractDecodedUrl(text) {
 async function decodeGoogleNewsUrl(rawUrl) {
   const id = googleNewsArticleId(rawUrl);
   if (!id) return rawUrl;
+
   const legacy = tryLegacyGoogleDecode(id);
   if (/^https?:\/\//i.test(legacy)) return legacy;
+
   const { signature, timestamp } = await fetchGoogleParams(id);
   const innerRequest = `["garturlreq",[["X","X",["X","X"],null,null,1,1,"US:en",null,1,null,null,null,null,null,0,1],"X","X",1,[1,1,1],1,1,null,0,0,null,0],"${id}",${timestamp},"${signature}"]`;
   const response = await fetch('https://news.google.com/_/DotsSplashUi/data/batchexecute', {
-    method: 'POST', signal: AbortSignal.timeout(TIMEOUT_MS),
-    headers: { 'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8', 'User-Agent': UA, 'Referer': 'https://news.google.com/' },
+    method: 'POST',
+    signal: AbortSignal.timeout(HTML_TIMEOUT_MS),
+    headers: {
+      'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
+      'User-Agent': UA,
+      'Referer': 'https://news.google.com/'
+    },
     body: 'f.req=' + encodeURIComponent(JSON.stringify([[['Fbv4je', innerRequest]]]))
   });
   if (!response.ok) throw new Error(`Google decode HTTP ${response.status}`);
@@ -104,15 +120,26 @@ function decodeBuffer(buffer, contentType = '') {
     || (probe.match(/<meta[^>]+charset\s*=\s*["']?([^"'\s/>]+)/i) || [])[1]
     || 'utf-8';
   const charset = /^(iso-8859-1|latin1|windows-1252|cp1252)$/i.test(declared) ? 'windows-1252' : 'utf-8';
-  try { return new TextDecoder(charset).decode(buffer); }
-  catch { return buffer.toString('utf8'); }
+  try {
+    return new TextDecoder(charset).decode(buffer);
+  } catch {
+    return buffer.toString('utf8');
+  }
 }
 
 async function fetchHtml(rawUrl) {
   let current = rawUrl;
   for (let i = 0; i < 6; i++) {
     const url = await assertPublicUrl(current);
-    const response = await fetch(url, { redirect: 'manual', signal: AbortSignal.timeout(TIMEOUT_MS), headers: { 'User-Agent': UA, 'Accept': 'text/html,application/xhtml+xml', 'Accept-Language': 'fr-FR,fr;q=0.9' } });
+    const response = await fetch(url, {
+      redirect: 'manual',
+      signal: AbortSignal.timeout(HTML_TIMEOUT_MS),
+      headers: {
+        'User-Agent': UA,
+        'Accept': 'text/html,application/xhtml+xml',
+        'Accept-Language': 'fr-FR,fr;q=0.9'
+      }
+    });
     if (response.status >= 300 && response.status < 400 && response.headers.get('location')) {
       current = new URL(response.headers.get('location'), url).href;
       continue;
@@ -147,14 +174,17 @@ function inlineImageCandidates(html) {
   const articleMatch = [...html.matchAll(/<article\b[^>]*>([\s\S]*?)<\/article>/gi)].sort((a, b) => b[1].length - a[1].length)[0];
   const region = articleMatch?.[1] || html;
   const candidates = [];
+
   for (const match of region.matchAll(/<img\b([^>]+)>/gi)) {
     const attrs = match[1];
     const descriptive = `${attrs} ${(attrs.match(/\balt=["']([^"']*)["']/i) || [])[1] || ''}`;
     if (/logo|avatar|icon|emoji|badge|author|profil|pixel|tracking|advert|publicit|sprite|brand|wordmark|favicon/i.test(descriptive)) continue;
+
     for (const attr of ['src', 'data-src', 'data-original', 'data-lazy-src', 'data-image']) {
       const value = (attrs.match(new RegExp(`\\b${attr}=["']([^"']+)["']`, 'i')) || [])[1] || '';
       if (value && !/^data:/i.test(value)) candidates.push(value);
     }
+
     const srcset = (attrs.match(/\bsrcset=["']([^"']+)["']/i) || [])[1] || '';
     if (srcset) {
       const values = srcset.split(',').map(part => part.trim().split(/\s+/)[0]).filter(Boolean);
@@ -187,21 +217,30 @@ function jsonLdCandidates(html) {
 function isGenericImageUrl(rawUrl = '') {
   try {
     const url = new URL(rawUrl);
-    const haystack = `${url.hostname}${url.pathname}${url.search}`.toLowerCase();
-    if (/(favicon|\/logo(?:[._/-]|$)|logo[-_.]|icon[-_.]|\/icon(?:[._/-]|$)|avatar|sprite|wordmark|brandmark|site-logo|google-news|googlenews)/i.test(haystack)) return true;
-    if (/^(news\.google\.com|www\.google\.com)$/i.test(url.hostname)) return true;
+    const host = url.hostname.toLowerCase();
+    const haystack = `${host}${url.pathname}${url.search}`.toLowerCase();
+
+    if (/(favicon|\/logo(?:[._/-]|$)|logo[-_.]|icon[-_.]|\/icon(?:[._/-]|$)|avatar|sprite|wordmark|brandmark|site-logo|google[-_ ]?news|googlenews|google_actualites|google-actualites)/i.test(haystack)) return true;
+    if (host === 'news.google.com' || host === 'www.google.com' || host.endsWith('.gstatic.com')) return true;
+    if (host.endsWith('.googleusercontent.com')) return true;
     return false;
-  } catch { return true; }
+  } catch {
+    return true;
+  }
 }
 
 function findImage(html, finalUrl) {
   const candidates = [
-    metaContent(html, 'og:image:secure_url'), metaContent(html, 'og:image'), metaContent(html, 'og:image:url'),
-    metaContent(html, 'twitter:image'), metaContent(html, 'twitter:image:src'),
+    metaContent(html, 'og:image:secure_url'),
+    metaContent(html, 'og:image'),
+    metaContent(html, 'og:image:url'),
+    metaContent(html, 'twitter:image'),
+    metaContent(html, 'twitter:image:src'),
     ((html.match(/<link[^>]+rel=["']image_src["'][^>]+href=["']([^"']+)["']/i) || [])[1] || ''),
     ...jsonLdCandidates(html),
     ...inlineImageCandidates(html)
   ].filter(Boolean);
+
   for (const candidate of candidates) {
     try {
       const url = new URL(decode(candidate), finalUrl);
@@ -213,13 +252,44 @@ function findImage(html, finalUrl) {
   return '';
 }
 
+function pngDimensions(buffer) {
+  if (buffer.length < 24 || buffer.toString('ascii', 1, 4) !== 'PNG') return null;
+  return { width: buffer.readUInt32BE(16), height: buffer.readUInt32BE(20) };
+}
+
+function jpegDimensions(buffer) {
+  if (buffer.length < 4 || buffer[0] !== 0xff || buffer[1] !== 0xd8) return null;
+  let offset = 2;
+  while (offset + 9 < buffer.length) {
+    if (buffer[offset] !== 0xff) { offset++; continue; }
+    const marker = buffer[offset + 1];
+    if ([0xc0, 0xc1, 0xc2, 0xc3, 0xc5, 0xc6, 0xc7, 0xc9, 0xca, 0xcb, 0xcd, 0xce, 0xcf].includes(marker)) {
+      return { height: buffer.readUInt16BE(offset + 5), width: buffer.readUInt16BE(offset + 7) };
+    }
+    if (marker === 0xd8 || marker === 0xd9) { offset += 2; continue; }
+    const size = buffer.readUInt16BE(offset + 2);
+    if (!size || size < 2) break;
+    offset += 2 + size;
+  }
+  return null;
+}
+
+function imageLooksUseful(buffer, type) {
+  if (/svg/i.test(type)) return false;
+  const dimensions = pngDimensions(buffer) || jpegDimensions(buffer);
+  if (!dimensions) return true;
+  return dimensions.width >= 240 && dimensions.height >= 120;
+}
+
 async function fetchImage(rawUrl, referer) {
   let current = rawUrl;
   for (let i = 0; i < 5; i++) {
     const url = await assertPublicUrl(current);
+    if (isGenericImageUrl(url.href)) throw new Error('generic image blocked');
+
     const response = await fetch(url, {
       redirect: 'manual',
-      signal: AbortSignal.timeout(TIMEOUT_MS),
+      signal: AbortSignal.timeout(IMAGE_TIMEOUT_MS),
       headers: {
         'User-Agent': UA,
         'Accept': 'image/avif,image/webp,image/apng,image/jpeg,image/png,image/*,*/*;q=0.8',
@@ -235,6 +305,7 @@ async function fetchImage(rawUrl, referer) {
     if (!type.startsWith('image/')) throw new Error('not image');
     const buffer = Buffer.from(await response.arrayBuffer());
     if (!buffer.length || buffer.byteLength > MAX_IMAGE_BYTES) throw new Error('image too large');
+    if (!imageLooksUseful(buffer, type)) throw new Error('generic or too small image');
     return { buffer, type };
   }
   throw new Error('too many image redirects');
@@ -250,14 +321,23 @@ function fallback(res) {
 }
 
 module.exports = async function handler(req, res) {
-  if (req.method !== 'GET') { res.statusCode = 405; return res.end(); }
+  if (req.method !== 'GET') {
+    res.statusCode = 405;
+    return res.end();
+  }
+
   const rawUrl = String(req.query?.url || '').slice(0, 2000);
   if (!rawUrl) return fallback(res);
+
   try {
     const articleUrl = googleNewsArticleId(rawUrl) ? await decodeGoogleNewsUrl(rawUrl) : rawUrl;
+    const decodedHost = new URL(articleUrl).hostname.toLowerCase();
+    if (decodedHost === 'news.google.com' || decodedHost.endsWith('.google.com')) throw new Error('Google wrapper not decoded');
+
     const { html, finalUrl } = await fetchHtml(articleUrl);
     const imageUrl = findImage(html, finalUrl);
     if (!imageUrl) return fallback(res);
+
     const image = await fetchImage(imageUrl, finalUrl);
     res.statusCode = 200;
     res.setHeader('Content-Type', image.type);
