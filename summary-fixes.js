@@ -1,5 +1,5 @@
 const nativeFetch = window.fetch.bind(window);
-const MIGRATION_FLAG = 'news-summary-fix-v8-unavailable-guard-applied';
+const MIGRATION_FLAG = 'news-summary-fix-v9-live-pages-applied';
 
 const ENTITY_MAP = new Map([
   ['nbsp', ' '], ['amp', '&'], ['quot', '"'], ['apos', "'"], ['lt', '<'], ['gt', '>'],
@@ -41,7 +41,12 @@ function isBoilerplate(text = '') {
     /lire aussi|à lire aussi|voir aussi|à découvrir|sur le même sujet/,
     /ajouter (?:cet|l[’']?)?\s*article (?:à|dans) (?:vos|mes) favoris/,
     /ouvrez?\s+l[’']article|consultez?\s+(?:les?\s+)?détails|détails publiés par la source/,
-    /résumé indisponible(?: pour cet article)?/
+    /résumé indisponible(?: pour cet article)?/,
+    /lire\s+(?:tous\s+)?nos\s+articles(?:,\s*analyses)?(?:\s+et\s+reportages)?/,
+    /retrouvez?\s+notre\s+(?:précédent|ancien|nouveau)\s+live|en cliquant sur ce lien/,
+    /ce live est fermé|basculer vers (?:notre|le) nouveau live/,
+    /pourquoi votre soutien est essentiel|pour faire vivre nos lives|soutenez (?:une|notre) rédaction/,
+    /accédez à tous nos contenus|articles les plus lus|lire plus tard|temps de lecture/
   ].some(pattern => pattern.test(value));
 }
 
@@ -74,7 +79,7 @@ window.fetch = async function patchedFetch(input, init) {
     const url = new URL(raw, location.href);
     if (url.pathname === '/api/article-summary' || url.pathname === '/api/article-summary-v3') {
       url.pathname = '/api/article-summary-groq';
-      url.searchParams.set('v', '8');
+      url.searchParams.set('v', '9');
       isSummary = true;
       nextInput = typeof input === 'string' ? `${url.pathname}${url.search}` : new Request(url.href, input);
     }
