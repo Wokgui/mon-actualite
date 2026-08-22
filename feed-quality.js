@@ -1,6 +1,6 @@
 const BLOCK_KEY = 'news-blocked-terms-v1';
 const SUMMARY_CACHE_KEY = 'news-factual-summaries-v2';
-const SUMMARY_MIGRATION = 'news-smart-summary-v1';
+const SUMMARY_MIGRATION = 'news-smart-summary-v2';
 const previousFetch = window.fetch.bind(window);
 let qualityScheduled = false;
 let qualityApplying = false;
@@ -59,26 +59,52 @@ function blockedBy(article, terms = blockedTerms()) {
   return terms.find(term => haystack.includes(qNormalize(term))) || '';
 }
 
-function smartIllustrationUrl(article) {
+function validDirectImage(value = '') {
+  try {
+    const url = new URL(String(value || ''), location.href);
+    if (!['http:', 'https:'].includes(url.protocol)) return '';
+    const host = url.hostname.toLowerCase();
+    const text = `${host}${url.pathname}${url.search}`.toLowerCase();
+    if (/logo|avatar|icon|sprite|tracking|pixel|wordmark|favicon|site-logo|google-news|googlenews|google_actualites|google-actualites/i.test(text)) return '';
+    if (host === 'news.google.com' || host === 'www.google.com' || host.endsWith('.gstatic.com') || host.endsWith('.googleusercontent.com')) return '';
+    return url.href;
+  } catch { return ''; }
+}
+
+function cachedPublisherImage(article) {
+  try {
+    const cache = qRead('news-original-images-v3-no-google-logo', {});
+    return validDirectImage(cache[String(article?.id || '')] || '');
+  } catch { return ''; }
+}
+
+function fallbackIllustrationUrl(article) {
   const params = new URLSearchParams({
-    v: '3',
+    v: '4',
     url: String(article?.url || '').slice(0, 1900),
     title: String(article?.title || '').slice(0, 280),
     category: String(article?.category || '').slice(0, 70)
   });
-  if (/^https?:\/\//i.test(article?.image || '') && String(article.image).length < 1900) params.set('image', article.image);
+  const feedImage = validDirectImage(article?.image || '');
+  if (feedImage && feedImage.length < 1900) params.set('image', feedImage);
   return `/api/article-photo?${params}`;
+}
+
+function smartIllustrationUrl(article) {
+  return cachedPublisherImage(article) || validDirectImage(article?.image || '') || fallbackIllustrationUrl(article);
 }
 
 function purgeWeakSummaryCache() {
   try {
     if (localStorage.getItem(SUMMARY_MIGRATION) === '1') return;
-    const cache = qRead(SUMMARY_CACHE_KEY, {});
-    for (const [key, value] of Object.entries(cache)) {
-      const summary = String(value?.summary || '');
-      if (!value?.ai || /ouvrez l.article pour consulter|flux ne fournit pas assez/i.test(summary) || summary.length < 90) delete cache[key];
+    for (const key of ['news-factual-summaries-v2', 'news-article-summaries-v4']) {
+      const cache = qRead(key, {});
+      for (const [entryKey, value] of Object.entries(cache)) {
+        const summary = String(value?.summary || '');
+        if (value?.unavailable || /résumé indisponible|ouvrez l.article pour consulter|flux ne fournit pas assez/i.test(summary) || summary.length < 55) delete cache[entryKey];
+      }
+      qWrite(key, cache);
     }
-    qWrite(SUMMARY_CACHE_KEY, cache);
     localStorage.setItem(SUMMARY_MIGRATION, '1');
   } catch {}
 }
@@ -89,7 +115,7 @@ window.fetch = function smartSummaryFetch(input, init) {
     const url = new URL(raw, location.href);
     if (url.origin === location.origin && ['/api/article-summary', '/api/article-summary-v3', '/api/article-summary-groq'].includes(url.pathname)) {
       const next = new URL('/api/article-summary-smart', location.origin);
-      next.searchParams.set('v', '1');
+      next.searchParams.set('v', '2');
       const nextInput = typeof input === 'string' ? `${next.pathname}${next.search}` : new Request(next.href, input);
       return previousFetch(nextInput, init);
     }
@@ -104,11 +130,21 @@ function enhanceImages() {
     const image = card.querySelector('img.article-image, img.brief-thumb, img.original-article-image, img.direct-thumb');
     if (!image) return;
     const wanted = smartIllustrationUrl(article);
-    if (index < 4) image.loading = 'eager';
+    const fallback = fallbackIllustrationUrl(article);
+    if (index < 6) image.loading = 'eager';
     else image.loading = 'lazy';
-    if (index < 2) image.fetchPriority = 'high';
+    if (index < 3) image.fetchPriority = 'high';
+    image.decoding = 'async';
+    image.referrerPolicy = 'no-referrer';
+    image.onerror = () => {
+      if (image.dataset.photoFallback === '1' || image.src.includes('/api/article-photo?')) return;
+      image.dataset.photoFallback = '1';
+      image.removeAttribute('referrerpolicy');
+      image.src = fallback;
+    };
     if (image.dataset.smartIllustration === wanted && image.getAttribute('src') === wanted) return;
     image.dataset.smartIllustration = wanted;
+    image.dataset.photoFallback = '0';
     image.src = wanted;
   });
 }
