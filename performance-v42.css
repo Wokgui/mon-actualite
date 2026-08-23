@@ -1,0 +1,57 @@
+/* v42 Android performance. */
+.article-card {
+  content-visibility: auto;
+  contain-intrinsic-size: 75px;
+  contain: layout paint style;
+  user-select: none;
+  -webkit-user-select: none;
+  touch-action: pan-y;
+}
+.article-card .article-image {
+  opacity: 0 !important;
+  visibility: hidden !important;
+  background: #f1f1f1 !important;
+}
+.article-card.v42-image-loaded .article-image {
+  opacity: 1 !important;
+  visibility: visible !important;
+}
+.article-card.v42-image-pending,
+.article-card.v42-image-failed {
+  background-image: linear-gradient(to left, #f1f1f1 112px, transparent 112px) !important;
+  background-position: right top !important;
+  background-size: 112px 75px !important;
+  background-repeat: no-repeat !important;
+}
+
+.quick-summary-backdrop {
+  background: #fbfaff !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+.quick-summary-sheet {
+  animation: none !important;
+  transition: none !important;
+  contain: layout paint style;
+}
+.quick-summary-close {
+  touch-action: manipulation;
+}
+.quick-summary-v42-image {
+  width: 100%;
+  height: 168px;
+  margin: 0 0 14px;
+  overflow: hidden;
+  border-radius: 14px;
+  background: #f1f1f1;
+}
+.quick-summary-v42-image img {
+  display: block;
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+@media (max-width: 380px) {
+  .quick-summary-v42-image { height: 154px; }
+}
