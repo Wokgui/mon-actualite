@@ -1,4 +1,10 @@
 /* v42 Android performance. */
+.page {
+  animation: none !important;
+}
+.nav-item {
+  touch-action: manipulation;
+}
 .article-card {
   content-visibility: auto;
   contain-intrinsic-size: 75px;

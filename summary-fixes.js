@@ -1,5 +1,5 @@
 const nativeFetch = window.fetch.bind(window);
-const MIGRATION_FLAG = 'news-summary-fix-v9-live-pages-applied';
+const MIGRATION_FLAG = 'news-summary-fix-v10-clean-fallbacks-applied';
 
 const ENTITY_MAP = new Map([
   ['nbsp', ' '], ['amp', '&'], ['quot', '"'], ['apos', "'"], ['lt', '<'], ['gt', '>'],
@@ -29,7 +29,7 @@ function decodeEntities(value = '') {
 function isBoilerplate(text = '') {
   const value = decodeEntities(text).toLowerCase();
   return [
-    /pour\s+(?:sauvegarder|enregistrer|mémoriser|partager|commenter|lire)\s+(?:cet|cette|l[’']?)?\s*article/,
+    /pour\s+(?:sauvegarder|enregistrer|mémoriser|partager|commenter|lire)\s+(?:(?:cet|cette|un|une|l[’']?)\s*)?article/,
     /partager\s+(?:la\s+)?publication|partager\s+cet(?:te)?\s+(?:publication|article)/,
     /connectez[- ]?vous|se connecter|identifiez[- ]?vous|connexion à votre compte/,
     /créez (?:votre|un) compte|créer (?:votre|un) compte/,

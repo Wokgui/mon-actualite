@@ -51,7 +51,7 @@ function isBoilerplate(text = '') {
   const value = decodeEntities(text).toLowerCase();
   if (!value) return true;
   return [
-    /pour\s+(?:sauvegarder|enregistrer|mémoriser|partager|commenter|lire)\s+(?:cet|cette|l[’']?)?\s*article/,
+    /pour\s+(?:sauvegarder|enregistrer|mémoriser|partager|commenter|lire)\s+(?:(?:cet|cette|un|une|l[’']?)\s*)?article/,
     /partager\s+(?:la\s+)?publication|partager\s+cet(?:te)?\s+(?:publication|article)/,
     /connectez[- ]?vous|se connecter|identifiez[- ]?vous|connexion à votre compte/,
     /créez (?:votre|un) compte|créer (?:votre|un) compte/,
@@ -232,8 +232,16 @@ module.exports = async function handler(req, res) {
   try { base = JSON.parse(legacy.body || '{}'); }
   catch { return send(res, legacy.statusCode || 500, { error: 'Réponse de résumé invalide' }); }
 
-  const factual = sanitizeFactual(base?.summary || '');
-  if (factual.length < 80) {
+  const body = req.body && typeof req.body === 'object' ? req.body : {};
+  const mode = body?.mode === 'category' ? 'category' : 'article';
+  let factual = sanitizeFactual(base?.summary || '');
+  // Some publishers expose only a headline through Google News or block the
+  // server-side article fetch. The verified title is still a factual fallback
+  // and prevents an empty summary while keeping the response honest.
+  if (mode === 'article' && factual.length < 80) {
+    factual = sanitizeFactual([body?.article?.summary, body?.article?.title].filter(Boolean).join('\n'));
+  }
+  if (factual.length < (mode === 'article' ? 30 : 80)) {
     return send(res, 200, {
       ...base,
       summary: 'Résumé indisponible pour cet article.',
@@ -257,7 +265,6 @@ module.exports = async function handler(req, res) {
     });
   }
 
-  const body = req.body && typeof req.body === 'object' ? req.body : {};
   const prompt = promptFor(body, factual);
 
   try {

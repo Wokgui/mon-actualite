@@ -34,6 +34,7 @@
     return !text
       || /résumé indisponible/.test(text)
       || /ouvrez?\s+l[’']article|consultez?\s+(?:les?\s+)?détails/.test(text)
+      || /pour\s+(?:sauvegarder|enregistrer|mémoriser|partager|commenter|lire)\s+(?:(?:cet|cette|un|une|l[’']?)\s*)?article/.test(text)
       || /lire\s+(?:tous\s+)?nos\s+articles(?:,\s*analyses)?(?:\s+et\s+reportages)?/.test(text)
       || /retrouvez?\s+notre\s+(?:précédent|ancien|nouveau)\s+live|en cliquant sur ce lien/.test(text)
       || /ce live est fermé|basculer vers (?:notre|le) nouveau live/.test(text);
@@ -83,6 +84,11 @@
       if (!image) return;
       const target = card.querySelector('img.article-image, img.brief-thumb, img.original-article-image, .article-placeholder, .brief-thumb.article-placeholder');
       if (target && target !== image) target.replaceWith(image);
+      // The image node keeps its v42Loaded marker, but the surrounding card is
+      // new. Restore the visual state as well or performance-v42 will consider
+      // the image configured while CSS keeps it hidden.
+      card.classList.remove('v42-image-pending', 'v42-image-failed');
+      card.classList.add('v42-image-loaded');
     });
   }
 

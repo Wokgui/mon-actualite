@@ -149,7 +149,10 @@ function removeRedundantUi() {
     const plus = nav.querySelector('[data-view="sheet"]');
     const brief = nav.querySelector('[data-view="brief"]');
     if (!home || !plus || !brief) return;
-    nav.replaceChildren(home, plus, brief);
+    const expected = [home, plus, brief];
+    const current = [...nav.children];
+    const alreadyStable = current.length === expected.length && expected.every((item, index) => current[index] === item);
+    if (!alreadyStable) nav.replaceChildren(...expected);
     nav.classList.remove('nav-four');
     nav.classList.add('nav-three');
   });

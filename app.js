@@ -363,7 +363,9 @@ function persistCache() {
 async function syncNews({ silent = false } = {}) {
   if (syncPromise) return syncPromise;
   state.syncStatus = 'loading'; state.syncError = '';
-  if (!silent || state.view !== 'detail') render();
+  // Background refreshes keep the current DOM in place until fresh data is
+  // ready. Re-rendering here made every cached thumbnail disappear briefly.
+  if (!silent) render();
   syncPromise = (async () => {
     try {
       const result = await fetchLiveNews({
@@ -420,7 +422,12 @@ app.addEventListener('click', async event => {
   const category = event.target.closest('[data-category]');
   if (category) { event.preventDefault(); event.stopPropagation(); state.sheet = false; navigate('category', { category: category.dataset.category, categoryTab: 'brief' }); return; }
   const article = event.target.closest('[data-article]');
-  if (article) { navigate('detail', { articleId: article.dataset.article }); return; }
+  if (article) {
+    event.preventDefault();
+    event.stopPropagation();
+    navigate('detail', { articleId: article.dataset.article });
+    return;
+  }
   const viewButton = event.target.closest('[data-view]');
   if (viewButton) {
     const view = viewButton.dataset.view;

@@ -33,7 +33,30 @@ function quickUnavailable(value = '') {
     || /résumé indisponible/.test(text)
     || /ouvrez?\s+l[’']article/.test(text)
     || /consultez?\s+(?:les?\s+)?détails/.test(text)
-    || /détails publiés par la source/.test(text);
+    || /détails publiés par la source/.test(text)
+    || /pour\s+(?:sauvegarder|enregistrer|mémoriser|partager|commenter|lire)\s+(?:(?:cet|cette|un|une|l[’']?)\s*)?article/.test(text);
+}
+
+function quickArticleSummary(article = {}) {
+  const value = quickClean(article.summary || '');
+  if (quickUnavailable(value) || value.length < 60) return '';
+  try {
+    if (new URL(String(article.url || ''), location.href).hostname === 'news.google.com') return '';
+  } catch {}
+  const lower = value.toLowerCase();
+  const sources = [...new Set([article.source, ...(article.sources || [])].map(quickClean).filter(Boolean))];
+  if (sources.filter(source => lower.includes(source.toLowerCase())).length >= 2) return '';
+  return value;
+}
+
+function quickProvisionalSummary(article = {}) {
+  const factual = quickArticleSummary(article);
+  if (factual) return factual;
+  const title = titleWithoutSource(article.title, article.source);
+  const source = quickClean(article.source || '');
+  if (title && source) return `Cet article de ${source} porte sur : ${title}.`;
+  if (title) return `Le sujet principal de cet article est : ${title}.`;
+  return 'La synthèse détaillée de cet article est en cours de préparation.';
 }
 
 function escapeRegExp(value = '') {
@@ -124,6 +147,7 @@ async function quickLoadSummary(article, modal) {
   const cache = quickReadJson(QUICK_CACHE_KEY, {});
   const text = modal.querySelector('[data-quick-summary-text]');
   const label = modal.querySelector('[data-quick-summary-label]');
+  const fallback = quickProvisionalSummary(article);
   const cached = cache[key];
   if (cached?.summary && !cached.unavailable && !quickUnavailable(cached.summary)) {
     text.textContent = quickClean(cached.summary);
@@ -141,7 +165,8 @@ async function quickLoadSummary(article, modal) {
         article: {
           url: article.url,
           title: quickClean(article.title),
-          summary: quickUnavailable(article.summary) ? '' : quickClean(article.summary)
+          summary: quickArticleSummary(article),
+          source: quickClean(article.source || '')
         }
       })
     });
@@ -149,15 +174,15 @@ async function quickLoadSummary(article, modal) {
     if (!modal.isConnected) return;
 
     if (data?.unavailable || quickUnavailable(data?.summary)) {
-      text.textContent = 'Résumé indisponible pour cet article.';
-      label.textContent = 'Résumé indisponible';
+      text.textContent = fallback;
+      label.textContent = 'Synthèse provisoire';
       return;
     }
 
     const summary = quickClean(data?.summary || '');
     if (!summary) {
-      text.textContent = 'Résumé indisponible pour cet article.';
-      label.textContent = 'Résumé indisponible';
+      text.textContent = fallback;
+      label.textContent = 'Synthèse provisoire';
       return;
     }
 
@@ -168,8 +193,8 @@ async function quickLoadSummary(article, modal) {
     quickWriteJson(QUICK_CACHE_KEY, Object.fromEntries(Object.entries(latest).slice(-180)));
   } catch {
     if (modal.isConnected) {
-      text.textContent = 'Résumé indisponible pour le moment.';
-      label.textContent = 'Résumé indisponible';
+      text.textContent = fallback;
+      label.textContent = 'Synthèse provisoire';
     }
   }
 }
@@ -184,15 +209,16 @@ function openQuickSummary(article) {
   const feedback = quickReadJson('news-feedback', {});
   const current = feedback[article.id] || '';
   const cleanTitle = titleWithoutSource(article.title, article.source);
+  const immediate = quickProvisionalSummary(article);
   const backdrop = document.createElement('div');
   backdrop.className = 'quick-summary-backdrop';
   backdrop.innerHTML = `<section class="quick-summary-sheet" role="dialog" aria-modal="true" aria-label="Résumé de l’article">
     <header class="quick-summary-head">
-      <div><span class="quick-summary-kicker" data-quick-summary-label>Résumé en cours…</span><h2>${quickEsc(cleanTitle)}</h2></div>
+      <div><span class="quick-summary-kicker" data-quick-summary-label>Synthèse provisoire · IA en cours…</span><h2>${quickEsc(cleanTitle)}</h2></div>
       <button type="button" class="quick-summary-close" data-quick-close aria-label="Fermer">×</button>
     </header>
     <div class="quick-summary-meta"><span>${quickEsc(article.source || '')}</span><span>${quickEsc(quickTime(article.publishedAt))}</span><span>${quickEsc(article.category || '')}</span></div>
-    <div class="quick-summary-text" data-quick-summary-text>Résumé en cours…</div>
+    <div class="quick-summary-text" data-quick-summary-text>${quickEsc(immediate)}</div>
     <a class="quick-full-article" href="${quickEsc(article.url || '#')}" target="_blank" rel="noopener noreferrer">Lire l’article complet <span aria-hidden="true">↗</span></a>
     <div class="quick-feedback-grid" data-quick-feedback-grid>
       ${['more','less','not','follow'].map(key => quickFeedbackMarkup(key, current)).join('')}
@@ -226,7 +252,7 @@ document.addEventListener('click', event => {
   }
 
   const card = event.target.closest('[data-article]');
-  if (card && !event.target.closest('button, a, input, select, textarea')) {
+  if (card && !event.target.closest('button, input, select, textarea')) {
     const article = quickArticle(card.dataset.article);
     if (!article) return;
     event.preventDefault();

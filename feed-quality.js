@@ -110,7 +110,7 @@ window.fetch = function smartSummaryFetch(input, init) {
   const raw = typeof input === 'string' ? input : input?.url || '';
   try {
     const url = new URL(raw, location.href);
-    if (url.origin === location.origin && ['/api/article-summary', '/api/article-summary-v3', '/api/article-summary-groq'].includes(url.pathname)) {
+    if (url.origin === location.origin && ['/api/article-summary', '/api/article-summary-v3'].includes(url.pathname)) {
       const next = new URL('/api/article-summary-smart', location.origin);
       next.searchParams.set('v', '2');
       const nextInput = typeof input === 'string' ? `${next.pathname}${next.search}` : new Request(next.href, input);
@@ -135,6 +135,10 @@ function ensureCardImage(card) {
 }
 
 function enhanceImages() {
+  // performance-v42 is the single image loader in the current pipeline. The
+  // legacy quality pass used to replace every row source at once, triggering
+  // dozens of illustration requests and rate limits before rows were visible.
+  if (window.__NEWS_IMAGE_PLACEHOLDER__) return;
   document.querySelectorAll('[data-article]').forEach((card, index) => {
     const article = articleById(card.dataset.article);
     if (!article) return;

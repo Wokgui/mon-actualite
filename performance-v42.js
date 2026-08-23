@@ -26,7 +26,30 @@ function esc(value = '') { return clean(value).replace(/[&<>'"]/g, c => ({'&':'&
 function summaryUsable(value = '') {
   const text = clean(value);
   const lower = text.toLowerCase();
-  return text.length >= 60 && !/résumé indisponible/.test(lower) && !/ouvrez?\s+l[’']article/.test(lower) && !/consultez?\s+(?:les?\s+)?détails/.test(lower) && !/détails publiés par la source/.test(lower);
+  return text.length >= 60 && !/résumé indisponible/.test(lower) && !/ouvrez?\s+l[’']article/.test(lower) && !/consultez?\s+(?:les?\s+)?détails/.test(lower) && !/détails publiés par la source/.test(lower) && !/pour\s+(?:sauvegarder|enregistrer|mémoriser|partager|commenter|lire)\s+(?:(?:cet|cette|un|une|l[’']?)\s*)?article/.test(lower);
+}
+function articleSummary(article = {}) {
+  const value = clean(article.summary || '');
+  if (!summaryUsable(value)) return '';
+  try {
+    if (new URL(String(article.url || ''), location.href).hostname === 'news.google.com') return '';
+  } catch {}
+  const lower = value.toLowerCase();
+  const sources = [...new Set([article.source, ...(article.sources || [])].map(clean).filter(Boolean))];
+  const sourceHits = sources.filter(source => lower.includes(source.toLowerCase())).length;
+  // Google Actualités descriptions sometimes flatten a list of related
+  // headlines into one paragraph. That is not a summary of the opened story.
+  if (sourceHits >= 2) return '';
+  return value;
+}
+function provisionalSummary(article = {}, card = null) {
+  const factual = articleSummary(article);
+  if (factual) return factual;
+  const title = titleFor(article, card);
+  const source = clean(article.source || '');
+  if (title && source) return `Cet article de ${source} porte sur : ${title}.`;
+  if (title) return `Le sujet principal de cet article est : ${title}.`;
+  return 'La synthèse détaillée de cet article est en cours de préparation.';
 }
 function timeLabel(value) {
   const date = new Date(value);
@@ -102,7 +125,16 @@ function preconnect(src) {
 
 function loadCardImage(card, article, index) {
   const img = card.querySelector('img.article-image');
-  if (!img || !article || img.dataset.v42Loaded === '1') return;
+  if (!img || !article) return;
+  if (img.dataset.v42Loaded === '1' && img.complete && img.naturalWidth > 1) {
+    card.classList.remove('v42-image-pending', 'v42-image-failed');
+    card.classList.add('v42-image-loaded');
+    return;
+  }
+  if (img.dataset.v42Loaded === '1') {
+    delete img.dataset.v42Loaded;
+    card.classList.remove('v42-image-loaded');
+  }
   img.dataset.v42Loaded = '1';
   img.alt = '';
   img.decoding = 'async';
@@ -118,6 +150,10 @@ function loadCardImage(card, article, index) {
   if (direct) preconnect(direct);
 
   const loaded = () => {
+    if (img.naturalWidth < 2) {
+      failed();
+      return;
+    }
     card.classList.remove('v42-image-pending', 'v42-image-failed');
     card.classList.add('v42-image-loaded');
     remember(article, img.currentSrc || img.src);
@@ -180,13 +216,14 @@ async function updateSummary(article, modal) {
   const initial = readJson(V42_SUMMARY_CACHE, {})[key];
   const text = modal.querySelector('[data-quick-summary-text]');
   const label = modal.querySelector('[data-quick-summary-label]');
+  const fallback = provisionalSummary(article);
   if (initial?.summary && !initial.unavailable && summaryUsable(initial.summary)) {
     text.textContent = clean(initial.summary);
     label.textContent = initial.ai ? 'Résumé IA' : 'Résumé factuel';
     return;
   }
 
-  const body = JSON.stringify({ mode: 'article', article: { url: article.url, title: clean(article.title), summary: summaryUsable(article.summary) ? clean(article.summary) : '' } });
+  const body = JSON.stringify({ mode: 'article', article: { url: article.url, title: clean(article.title), summary: articleSummary(article), source: clean(article.source || '') } });
   const requestKey = `v42|${body}`;
   let request = summaryInflight.get(requestKey);
   if (!request) {
@@ -197,14 +234,25 @@ async function updateSummary(article, modal) {
   }
   try {
     const data = await request;
-    if (!data?.summary || data?.unavailable || !summaryUsable(data.summary)) return;
+    if (!data?.summary || data?.unavailable || !summaryUsable(data.summary)) {
+      if (modal.isConnected) {
+        text.textContent = fallback;
+        label.textContent = 'Synthèse provisoire';
+      }
+      return;
+    }
     const latest = readJson(V42_SUMMARY_CACHE, {});
     latest[key] = { summary: clean(data.summary), ai: Boolean(data.ai), unavailable: false, savedAt: Date.now() };
     writeJson(V42_SUMMARY_CACHE, Object.fromEntries(Object.entries(latest).slice(-180)));
     if (!modal.isConnected) return;
     text.textContent = clean(data.summary);
     label.textContent = data.ai ? 'Résumé IA' : 'Résumé factuel';
-  } catch {}
+  } catch {
+    if (modal.isConnected) {
+      text.textContent = fallback;
+      label.textContent = 'Synthèse provisoire';
+    }
+  }
 }
 
 function openInstant(card, article) {
@@ -213,12 +261,13 @@ function openInstant(card, article) {
   const feedback = readJson('news-feedback', {});
   const selected = feedback[article.id] || '';
   const cached = readJson(V42_SUMMARY_CACHE, {})[`article:${article.id}`];
+  const factual = articleSummary(article);
   const immediate = cached?.summary && !cached.unavailable && summaryUsable(cached.summary)
     ? clean(cached.summary)
-    : summaryUsable(article.summary) ? clean(article.summary) : 'Résumé IA en cours…';
+    : factual || provisionalSummary(article, card);
   const immediateLabel = cached?.summary && !cached.unavailable && summaryUsable(cached.summary)
     ? (cached.ai ? 'Résumé IA' : 'Résumé factuel')
-    : summaryUsable(article.summary) ? 'Résumé factuel · IA en cours…' : 'Résumé IA en cours…';
+    : factual ? 'Résumé factuel · IA en cours…' : 'Synthèse provisoire · IA en cours…';
 
   const img = card.querySelector('img.article-image');
   const visual = img?.complete && img.naturalWidth > 0 ? (img.currentSrc || img.src) : remembered(article) || likelyDirectImage(article.image || '') || '';
@@ -251,7 +300,7 @@ document.addEventListener('pointerdown', event => {
     }
   }
   const card = event.target.closest('.article-card[data-article]');
-  if (!card || event.target.closest('button, a, input, select, textarea')) { press = null; return; }
+  if (!card || event.target.closest('button, input, select, textarea')) { press = null; return; }
   press = { card, x: event.clientX, y: event.clientY, t: performance.now() };
 }, true);
 
