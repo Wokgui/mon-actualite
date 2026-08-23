@@ -1,36 +1,62 @@
 /* Feedly mobile layout: text on the LEFT, photo on the RIGHT. */
+.page .feed {
+  display: block !important;
+  margin-left: -3px !important;
+  margin-right: -3px !important;
+  background: transparent !important;
+}
 .article-card {
+  display: grid !important;
   grid-template-columns: minmax(0,1fr) 112px !important;
   grid-template-areas: "body image" !important;
-  column-gap: 14px;
-  min-height: 92px !important;
-  padding: 8px 0 !important;
+  column-gap: 14px !important;
+  min-height: 75px !important;
+  margin: 0 0 22px !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  overflow: visible !important;
 }
 .article-card .article-image,
 .article-card .article-placeholder {
   grid-area: image !important;
   justify-self: end;
+  align-self: start;
   width: 112px !important;
-  height: 76px !important;
-  min-height: 76px !important;
+  height: 75px !important;
+  min-height: 75px !important;
   border-radius: 4px !important;
   object-fit: cover !important;
   background: #f0f0f0;
 }
 .article-card .article-body {
   grid-area: body !important;
-  padding: 1px 0 0 0 !important;
+  min-height: 75px !important;
+  padding: 2px 0 0 !important;
+  display: flex !important;
+  flex-direction: column !important;
 }
 .article-card h2 {
+  display: -webkit-box !important;
+  margin: 0 !important;
   font-size: 15.5px !important;
   line-height: 1.22 !important;
-  font-weight: 650 !important;
+  font-weight: 700 !important;
   letter-spacing: -.12px !important;
+  -webkit-line-clamp: 3 !important;
+  -webkit-box-orient: vertical !important;
+  overflow: hidden !important;
 }
 .article-card .meta {
   margin-top: 5px !important;
-  font-size: 11px !important;
+  padding-top: 0 !important;
+  color: #9a9a9a !important;
+  font-size: 11.5px !important;
+  line-height: 1.15 !important;
 }
+.article-card .meta .source { display: none !important; }
 
 /* The brief uses the exact same compact visual language as the article list. */
 .brief-points {
@@ -43,25 +69,25 @@
   grid-template-columns: minmax(0,1fr) 112px;
   grid-template-areas: "content image";
   column-gap: 14px;
-  min-height: 92px;
-  margin: 0 !important;
-  padding: 8px 0 !important;
+  min-height: 75px;
+  margin: 0 0 22px !important;
+  padding: 0 !important;
+  border: 0 !important;
   border-radius: 0 !important;
-  border-bottom: 1px solid #eeeeee;
-  background: #fff !important;
+  background: transparent !important;
   box-shadow: none !important;
 }
-.brief-point.feedly-brief-row:last-child { border-bottom: 0; }
+.brief-point.feedly-brief-row:last-child { margin-bottom: 0 !important; }
 .brief-point.feedly-brief-row::before { display: none !important; }
 .brief-point .brief-thumb,
 .brief-point .brief-thumb.article-image,
 .brief-point .brief-thumb.article-placeholder {
   grid-area: image;
   width: 112px;
-  height: 76px;
-  min-height: 76px;
+  height: 75px;
+  min-height: 75px;
   justify-self: end;
-  align-self: center;
+  align-self: start;
   border-radius: 4px;
   object-fit: cover;
   overflow: hidden;
@@ -72,7 +98,8 @@
 .brief-point .brief-copy {
   grid-area: content;
   min-width: 0;
-  padding-top: 1px;
+  min-height: 75px;
+  padding-top: 2px;
 }
 .brief-point .brief-copy strong {
   display: -webkit-box !important;
@@ -80,7 +107,7 @@
   color: #222;
   font-size: 15.5px !important;
   line-height: 1.22 !important;
-  font-weight: 650 !important;
+  font-weight: 700 !important;
   letter-spacing: -.12px;
   -webkit-line-clamp: 3;
   -webkit-box-orient: vertical;
@@ -90,13 +117,14 @@
 .brief-point .brief-meta {
   display: block !important;
   margin-top: 5px !important;
-  color: #8f8f8f !important;
-  font-size: 11px !important;
-  line-height: 1.2 !important;
+  color: #9a9a9a !important;
+  font-size: 11.5px !important;
+  line-height: 1.15 !important;
   white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
 }
+.brief-point .brief-meta .source { display: none !important; }
 
 /* Redundant UI removed by the runtime, with CSS as a no-flash fallback. */
 .sync-strip,
@@ -297,15 +325,16 @@
 }
 
 @media (max-width: 380px) {
+  /* Keep the same Feedly dimensions on narrow phones instead of shrinking the rows. */
   .article-card,
-  .brief-point.feedly-brief-row { grid-template-columns: minmax(0,1fr) 106px !important; }
+  .brief-point.feedly-brief-row { grid-template-columns: minmax(0,1fr) 112px !important; }
   .article-card .article-image,
   .article-card .article-placeholder,
   .brief-point .brief-thumb,
   .brief-point .brief-thumb.article-image,
-  .brief-point .brief-thumb.article-placeholder { width: 106px !important; height: 72px !important; min-height: 72px !important; }
+  .brief-point .brief-thumb.article-placeholder { width: 112px !important; height: 75px !important; min-height: 75px !important; }
   .article-card h2,
-  .brief-point .brief-copy strong { font-size: 15px !important; }
+  .brief-point .brief-copy strong { font-size: 15.5px !important; }
   .detail-page .detail-content > h1 { font-size: 18.5px !important; }
   .detail-page .runtime-detail-image,
   .detail-page .detail-hero { height: 126px !important; min-height: 126px !important; }
