@@ -1,5 +1,5 @@
-const CACHE = 'mon-actualite-v38-feedly-layout';
-const ASSETS = ['./', './index.html', './styles.css?v=38', './feedly-compact.css?v=38', './feedly-left.css?v=38', './ui-fixes-v2.css?v=38', './article-quickview.css?v=38', './feed-quality.css?v=38', './stable-dom.js?v=38', './app.js?v=38', './feedly-runtime.js?v=38', './summary-fixes.js?v=38', './article-quickview.js?v=38', './feed-quality.js?v=38', './brief-quality.js?v=38', './services/source-connectors.js', './manifest.webmanifest', './assets/app-icon.svg'];
+const CACHE = 'mon-actualite-v39-fast-images-summaries';
+const ASSETS = ['./', './index.html', './styles.css?v=39', './feedly-compact.css?v=39', './feedly-left.css?v=39', './ui-fixes-v2.css?v=39', './article-quickview.css?v=39', './feed-quality.css?v=39', './speed-fixes.css?v=39', './stable-dom.js?v=39', './app.js?v=39', './speed-fixes.js?v=39', './feedly-runtime.js?v=39', './summary-fixes.js?v=39', './article-quickview.js?v=39', './feed-quality.js?v=39', './brief-quality.js?v=39', './services/source-connectors.js', './manifest.webmanifest', './assets/app-icon.svg'];
 
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(ASSETS)).then(() => self.skipWaiting()));
