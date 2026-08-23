@@ -1,4 +1,8 @@
 /* Fast image pipeline: never expose the browser's broken-image glyph. */
+.article-card > img.article-image:not([data-fast-image="1"]) {
+  opacity: 0 !important;
+  visibility: hidden !important;
+}
 .fast-thumb-shell {
   grid-area: image !important;
   display: block !important;
