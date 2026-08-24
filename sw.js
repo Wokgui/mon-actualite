@@ -1,6 +1,6 @@
-const CACHE = 'mon-actualite-v44-2-personnalisation';
-const THUMB_CACHE = 'mon-actualite-thumbnails-v3';
-const ASSETS = ['./', './index.html', './styles.css?v=43', './feedly-compact.css?v=43', './feedly-left.css?v=43', './ui-fixes-v2.css?v=43', './article-quickview.css?v=43', './feed-quality.css?v=43', './performance-v42.css?v=44', './personalization-v44.css?v=44', './bootstrap-v42.js?v=44', './stable-dom.js?v=44', './app.js?v=44', './feedly-runtime.js?v=44', './performance-v42.js?v=44.1', './summary-fixes.js?v=44', './article-quickview.js?v=44', './feed-quality.js?v=44.1', './services/source-connectors.js', './manifest.webmanifest', './assets/app-icon.svg'];
+const CACHE = 'mon-actualite-v44-3-images';
+const THUMB_CACHE = 'mon-actualite-thumbnails-v4';
+const ASSETS = ['./', './index.html', './styles.css?v=43', './feedly-compact.css?v=43', './feedly-left.css?v=43', './ui-fixes-v2.css?v=43', './article-quickview.css?v=43', './feed-quality.css?v=43', './performance-v42.css?v=44', './personalization-v44.css?v=44', './bootstrap-v42.js?v=44', './stable-dom.js?v=44', './app.js?v=44', './feedly-runtime.js?v=44.2', './performance-v42.js?v=44.2', './summary-fixes.js?v=44', './article-quickview.js?v=44', './feed-quality.js?v=44.1', './services/source-connectors.js', './manifest.webmanifest', './assets/app-icon.svg'];
 
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(ASSETS)).then(() => self.skipWaiting()));
@@ -27,9 +27,22 @@ async function staleWhileRevalidate(request, cacheName) {
 
 async function thumbnailResponse(request, event) {
   const cache = await caches.open(THUMB_CACHE);
-  const cached = await cache.match(request);
+  let cached = await cache.match(request);
+  const isFallback = response => {
+    const status = response?.headers?.get('X-Thumbnail-Status') || '';
+    const type = response?.headers?.get('Content-Type') || '';
+    return status === 'fallback' || /image\/svg\+xml/i.test(type);
+  };
+  if (cached && isFallback(cached)) {
+    await cache.delete(request);
+    cached = null;
+  }
   const refresh = fetch(request).then(response => {
-    if (response.ok && response.type !== 'opaque') cache.put(request, response.clone()).catch(() => {});
+    if (response.ok && response.type !== 'opaque' && !isFallback(response)) {
+      cache.put(request, response.clone()).catch(() => {});
+    } else if (isFallback(response)) {
+      cache.delete(request).catch(() => {});
+    }
     return response;
   });
   if (cached) {
@@ -40,7 +53,7 @@ async function thumbnailResponse(request, event) {
   catch {
     return new Response('<svg xmlns="http://www.w3.org/2000/svg" width="640" height="420"><rect width="100%" height="100%" fill="#f1f1f1"/></svg>', {
       status: 200,
-      headers: { 'Content-Type': 'image/svg+xml', 'Cache-Control': 'no-store' }
+      headers: { 'Content-Type': 'image/svg+xml', 'Cache-Control': 'no-store', 'X-Thumbnail-Status': 'fallback' }
     });
   }
 }

@@ -3,8 +3,10 @@ const net = require('node:net');
 const HTML_TIMEOUT_MS = 2600;
 const IMAGE_TIMEOUT_MS = 2400;
 const MAX_HTML_BYTES = 1_800_000;
+const MAX_SEARCH_HTML_BYTES = 2_400_000;
 const MAX_IMAGE_BYTES = 7_000_000;
 const UA = 'Mozilla/5.0 (Linux; Android 16) AppleWebKit/537.36 Chrome/140 Safari/537.36';
+const GOOGLE_NEWS_UA = 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/140 Safari/537.36';
 
 function isPrivateIp(address) {
   if (net.isIP(address) === 4) {
@@ -157,6 +159,76 @@ function decode(value = '') {
     .replace(/&#x([0-9a-f]+);/gi, (_, n) => String.fromCodePoint(parseInt(n, 16)));
 }
 
+function plainText(value = '') {
+  return decode(String(value || ''))
+    .replace(/<[^>]+>/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function titleWords(value = '') {
+  const stop = new Set(['avec', 'dans', 'pour', 'plus', 'apres', 'avant', 'cette', 'sont', 'etre', 'leur', 'leurs', 'tout', 'mais', 'sans', 'vers', 'entre', 'une', 'des', 'les', 'sur', 'qui', 'que', 'aux']);
+  return [...new Set(plainText(value)
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase().replace(/[^a-z0-9]+/g, ' ')
+    .split(/\s+/).filter(word => word.length >= 3 && !stop.has(word)))];
+}
+
+function titleOverlap(candidate, expected) {
+  const wanted = titleWords(expected);
+  const found = new Set(titleWords(candidate));
+  if (!wanted.length || !found.size) return 0;
+  return wanted.filter(word => found.has(word)).length / wanted.length;
+}
+
+async function googleNewsThumbnail(title) {
+  const query = plainText(title).replace(/\s+[-–—]\s+[^-–—]{2,90}$/, '').slice(0, 220);
+  if (titleWords(query).length < 3) return '';
+
+  const searchUrl = new URL('https://news.google.com/search');
+  searchUrl.search = new URLSearchParams({ q: query, hl: 'fr', gl: 'FR', ceid: 'FR:fr', ucbcb: '1' }).toString();
+  const response = await fetch(searchUrl, {
+    redirect: 'follow',
+    signal: AbortSignal.timeout(HTML_TIMEOUT_MS),
+    headers: {
+      'User-Agent': GOOGLE_NEWS_UA,
+      'Accept': 'text/html,application/xhtml+xml',
+      'Accept-Language': 'fr-FR,fr;q=0.9'
+    }
+  });
+  if (!response.ok) throw new Error(`Google image search HTTP ${response.status}`);
+  const type = response.headers.get('content-type') || '';
+  const buffer = Buffer.from(await response.arrayBuffer());
+  if (!buffer.length || buffer.byteLength > MAX_SEARCH_HTML_BYTES) throw new Error('Google image search page too large');
+  const html = decodeBuffer(buffer, type);
+  const resultPattern = /<a\b[^>]*class=["'][^"']*\bJtKRv\b[^"']*["'][^>]*>([\s\S]{1,2200}?)<\/a>/gi;
+  const results = [...html.matchAll(resultPattern)];
+  let best = null;
+  for (let index = 0; index < results.length; index += 1) {
+    const match = results[index];
+    const label = plainText(match[1]);
+    const score = titleOverlap(label, query);
+    const minimumWords = Math.min(4, titleWords(query).length);
+    const hits = Math.round(score * titleWords(query).length);
+    if (score < 0.72 || hits < minimumWords) continue;
+    // Google alternates between image-before-title and image-after-title
+    // layouts. Midpoints between two result titles keep the lookup attached
+    // to this exact story without guessing from keywords.
+    const previous = results[index - 1]?.index;
+    const next = results[index + 1]?.index;
+    const start = previous == null ? Math.max(0, match.index - 12_000) : Math.floor((previous + match.index) / 2);
+    const end = next == null ? Math.min(html.length, match.index + 12_000) : Math.floor((match.index + next) / 2);
+    const resultHtml = html.slice(start, end);
+    const attachments = [...resultHtml.matchAll(/\/api\/attachments\/[^"'\s,]+/g)].map(item => decode(item[0]));
+    if (!attachments.length) continue;
+    const rawAttachment = attachments.find(value => /-w400-h224-/i.test(value)) || attachments[attachments.length - 1];
+    const attachment = rawAttachment.replace(/-w\d+-h\d+-p-df(?:-rw)?$/i, '-w400-h224-p-df');
+    if (!best || score > best.score) best = { score, url: new URL(attachment, searchUrl).href };
+    if (score >= 0.98) break;
+  }
+  return best?.url || '';
+}
+
 function metaContent(html, key) {
   const escaped = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   const a = html.match(new RegExp(`<meta[^>]+(?:property|name)=["']${escaped}["'][^>]+content=["']([^"']+)["'][^>]*>`, 'i'));
@@ -211,6 +283,7 @@ function isGenericImageUrl(rawUrl = '') {
     const url = new URL(rawUrl);
     const host = url.hostname.toLowerCase();
     const haystack = `${host}${url.pathname}${url.search}`.toLowerCase();
+    if (host === 'news.google.com' && url.pathname.startsWith('/api/attachments/')) return false;
     if (url.pathname === '/' && !url.search) return true;
     if (/(favicon|\/logo(?:[._/-]|$)|logo[-_.]|icon[-_.]|\/icon(?:[._/-]|$)|avatar|sprite|wordmark|brandmark|site-logo|google[-_ ]?news|googlenews|google_actualites|google-actualites)/i.test(haystack)) return true;
     if (host === 'news.google.com' || host === 'www.google.com' || host.endsWith('.gstatic.com') || host.endsWith('.googleusercontent.com')) return true;
@@ -270,10 +343,18 @@ function imageLooksUseful(buffer, type) {
 }
 
 async function fetchImage(rawUrl, referer) {
+  const trustedGoogleNewsAttachment = (() => {
+    try {
+      const url = new URL(rawUrl);
+      return url.hostname === 'news.google.com' && url.pathname.startsWith('/api/attachments/');
+    } catch { return false; }
+  })();
   let current = rawUrl;
   for (let i = 0; i < 5; i++) {
     const url = await assertPublicUrl(current);
-    if (isGenericImageUrl(url.href)) throw new Error('generic image blocked');
+    // Exact Google News attachments redirect to a Google image CDN. Keep that
+    // trusted chain, while continuing to reject arbitrary Google logos/icons.
+    if (!trustedGoogleNewsAttachment && isGenericImageUrl(url.href)) throw new Error('generic image blocked');
     const response = await fetch(url, {
       redirect: 'manual',
       signal: AbortSignal.timeout(IMAGE_TIMEOUT_MS),
@@ -311,7 +392,7 @@ function fallback(res) {
   const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="640" height="420" viewBox="0 0 640 420"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#eeeeF1"/><stop offset="1" stop-color="#ddddE3"/></linearGradient></defs><rect width="640" height="420" rx="22" fill="url(#g)"/><path d="M0 330L155 220l105 70 104-105 276 235H0Z" fill="#c9c9d1"/><circle cx="470" cy="120" r="42" fill="#d2d2d9"/></svg>';
   res.statusCode = 200;
   res.setHeader('Content-Type', 'image/svg+xml');
-  res.setHeader('Cache-Control', 'public, max-age=180, s-maxage=300, stale-while-revalidate=1200');
+  res.setHeader('Cache-Control', 'no-store, max-age=0');
   res.setHeader('X-Thumbnail-Status', 'fallback');
   res.end(svg);
 }
@@ -321,6 +402,7 @@ module.exports = async function handler(req, res) {
 
   const rawUrl = String(req.query?.url || '').slice(0, 2000);
   const suppliedImage = String(req.query?.image || '').slice(0, 2000);
+  const title = String(req.query?.title || '').slice(0, 300);
 
   if (suppliedImage && !isGenericImageUrl(suppliedImage)) {
     try {
@@ -328,6 +410,21 @@ module.exports = async function handler(req, res) {
       return sendImage(res, image, 'feed');
     } catch (error) {
       console.warn('feed image unavailable:', String(error?.message || error).slice(0, 120));
+    }
+  }
+
+  // Google Actualités already owns an exact, publisher-linked thumbnail for
+  // most RSS stories. It is small, fast and tied to the precise headline, so
+  // it avoids both publisher hotlink blocks and unrelated keyword photos.
+  if (googleNewsArticleId(rawUrl) && title) {
+    try {
+      const thumbnail = await googleNewsThumbnail(title);
+      if (thumbnail) {
+        const image = await fetchImage(thumbnail, 'https://news.google.com/');
+        return sendImage(res, image, 'google-news');
+      }
+    } catch (error) {
+      console.warn('Google thumbnail unavailable:', String(error?.message || error).slice(0, 140));
     }
   }
 

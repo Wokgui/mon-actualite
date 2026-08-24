@@ -92,8 +92,10 @@ function importanceArticles() {
 }
 
 function validImageUrl(value = '') {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
   try {
-    const url = new URL(value, location.href);
+    const url = new URL(raw, location.href);
     if (!['http:', 'https:'].includes(url.protocol)) return '';
     const host = url.hostname.toLowerCase();
     const haystack = `${host}${url.pathname}${url.search}`.toLowerCase();
@@ -108,7 +110,7 @@ function validImageUrl(value = '') {
 
 function visualUrl(article) {
   const params = new URLSearchParams({
-    v: '11',
+    v: '12',
     url: String(article?.url || '').slice(0, 1900),
     image: validImageUrl(article?.image || ''),
     title: cleanText(article?.title || '').slice(0, 280),

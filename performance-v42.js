@@ -1,5 +1,5 @@
 const V42_SUMMARY_CACHE = 'news-article-summaries-v4';
-const V42_VISUAL_CACHE = 'news-visual-map-v4-trusted';
+const V42_VISUAL_CACHE = 'news-visual-map-v5-trusted';
 const configured = new WeakSet();
 const failedImages = new Set();
 const summaryInflight = new Map();
@@ -70,8 +70,10 @@ function titleFor(article, card) {
 }
 
 function validImage(value = '') {
+  const raw = String(value || '').trim();
+  if (!raw) return '';
   try {
-    const url = new URL(String(value || ''), location.href);
+    const url = new URL(raw, location.href);
     if (!['http:', 'https:'].includes(url.protocol) || failedImages.has(url.href)) return '';
     const host = url.hostname.toLowerCase();
     const hay = `${host}${url.pathname}${url.search}`.toLowerCase();
@@ -83,7 +85,7 @@ function validImage(value = '') {
 }
 function proxyUrl(article) {
   const params = new URLSearchParams({
-    v: '11',
+    v: '12',
     url: String(article?.url || '').slice(0, 1900),
     image: validImage(article?.image || ''),
     title: clean(article?.title || '').slice(0, 280),
@@ -139,8 +141,10 @@ function loadCardImage(card, article, index) {
   img.dataset.v42Loaded = '1';
   img.alt = '';
   img.decoding = 'async';
-  img.loading = index < 4 ? 'eager' : 'lazy';
-  if ('fetchPriority' in img) img.fetchPriority = index < 2 ? 'high' : 'auto';
+  // The IntersectionObserver already decides when an image is useful. Once it
+  // reaches this function, native lazy-loading must not defer it a second time.
+  img.loading = 'eager';
+  if ('fetchPriority' in img) img.fetchPriority = index < 3 ? 'high' : 'auto';
   card.classList.add('v42-image-pending');
 
   const direct = likelyDirectImage(article.image || '');
@@ -182,7 +186,7 @@ const viewportObserver = 'IntersectionObserver' in window ? new IntersectionObse
     viewportObserver.unobserve(entry.target);
     loadCardImage(entry.target, articleById(entry.target.dataset.article), Number(entry.target.dataset.v42Index || 99));
   }
-}, { rootMargin: '360px 0px' }) : null;
+}, { rootMargin: '900px 0px' }) : null;
 
 function configureCards() {
   const cards = [...document.querySelectorAll('.article-card[data-article]')];
@@ -190,7 +194,7 @@ function configureCards() {
     if (configured.has(card)) return;
     configured.add(card);
     card.dataset.v42Index = String(index);
-    if (index < 4 || !viewportObserver) loadCardImage(card, articleById(card.dataset.article), index);
+    if (index < 6 || !viewportObserver) loadCardImage(card, articleById(card.dataset.article), index);
     else viewportObserver.observe(card);
   });
 }
