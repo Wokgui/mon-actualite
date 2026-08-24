@@ -1,4 +1,5 @@
-import { importOpmlPreview, fetchLiveNews } from './services/source-connectors.js';
+import { importOpmlPreview, fetchLiveNews } from './services/source-connectors.js?v=45.3';
+import { articleVisualUrl, hasPreparedVisual, sourceTileUrl } from './services/article-visuals.js?v=45.3';
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const app = $('#app');
@@ -141,9 +142,10 @@ function badgeFor(article) {
   return 'Nouveau';
 }
 
-function articleVisual(article) {
-  const meta = categoryMeta[article.category] || categoryMeta.Société;
-  return `<div class="article-image article-placeholder">${icon(meta.icon)}<span>${escapeHtml(article.category)}</span></div>`;
+function articleVisual(article, index = 0) {
+  const prepared = hasPreparedVisual(article);
+  const tile = sourceTileUrl(article);
+  return `<img class="article-image original-article-image stable-visual ${prepared ? 'prepared-visual' : 'source-tile-visual'}" src="${escapeHtml(articleVisualUrl(article))}" alt="" width="400" height="224" loading="${index < 12 ? 'eager' : 'lazy'}" decoding="async" referrerpolicy="no-referrer" style="background-image:url('${escapeHtml(tile)}');background-size:cover" ${index < 4 ? 'fetchpriority="high"' : ''}>`;
 }
 
 function visibleArticles() {
@@ -167,11 +169,11 @@ function nav(active = state.view) {
   return `<nav class="bottom-nav" aria-label="Navigation principale">${items.map(([view, ic, label]) => `<button class="nav-item ${view === 'sheet' ? 'plus' : ''} ${active === view ? 'active' : ''}" data-view="${view}" aria-label="${label}">${icon(ic)}<span>${label}</span></button>`).join('')}</nav>`;
 }
 
-function articleCard(article) {
+function articleCard(article, index = 0) {
   const saved = state.saved.has(article.id);
   const badge = badgeFor(article);
   return `<article class="article-card" data-article="${escapeHtml(article.id)}" tabindex="0" aria-label="Lire : ${escapeHtml(article.title)}">
-    ${articleVisual(article)}
+    ${articleVisual(article, index)}
     <div class="article-body">
       <button class="save-btn ${saved ? 'saved' : ''}" data-save="${escapeHtml(article.id)}" aria-label="${saved ? 'Retirer des sauvegardes' : 'Sauvegarder l’article'}">${icon('bookmark', saved)}</button>
       <div class="card-top"><span class="badge ${badge === 'Important' ? 'important' : ''}">${badge}</span>${article.sources?.length > 1 ? `<span class="merged-count">${article.sources.length} sources</span>` : ''}</div>

@@ -14,9 +14,12 @@
   touch-action: pan-y;
 }
 .article-card .article-image {
-  opacity: 0 !important;
-  visibility: hidden !important;
-  background: #f1f1f1 !important;
+  display: block !important;
+  opacity: 1 !important;
+  visibility: visible !important;
+  background-color: #f1f1f1 !important;
+  background-size: cover !important;
+  background-position: center !important;
 }
 .article-card.v42-image-loaded .article-image {
   opacity: 1 !important;

@@ -61,6 +61,9 @@ function cleanSummaryText(value = '') {
 function normalizeArticle(article = {}) {
   const summary = cleanSummaryText(article.summary);
   const detail = cleanSummaryText(article.detail);
+  const rawVisual = article.visual && typeof article.visual === 'object' ? article.visual : {};
+  const visualUrl = cleanText(rawVisual.url || article.image || '');
+  const visualStatus = cleanText(rawVisual.status || article.visualStatus || (visualUrl ? 'ready' : 'unavailable'));
   return {
     ...article,
     title: cleanText(article.title),
@@ -70,7 +73,15 @@ function normalizeArticle(article = {}) {
     feedTitle: cleanText(article.feedTitle),
     category: cleanText(article.category),
     tags: Array.isArray(article.tags) ? article.tags.map(cleanText) : article.tags,
-    sources: Array.isArray(article.sources) ? article.sources.map(cleanText) : article.sources
+    sources: Array.isArray(article.sources) ? article.sources.map(cleanText) : article.sources,
+    image: visualUrl,
+    visualStatus,
+    visual: {
+      ...rawVisual,
+      status: visualStatus,
+      url: visualUrl,
+      source: cleanText(rawVisual.source || article.visualSource || '')
+    }
   };
 }
 
@@ -133,23 +144,42 @@ function mergeArticleHistory(fresh) {
   const merged = [];
   const seenUrls = new Set();
   const recentTitles = new Map();
+  const articlesByUrl = new Map();
+  const articlesByTitle = new Map();
   const MAX_SAME_TITLE_AGE = 48 * 60 * 60 * 1000;
+
+  const keepPreparedVisual = (target, candidate) => {
+    if (!target || !candidate) return;
+    const targetReady = target.visual?.status === 'ready' && target.visual?.url;
+    const candidateReady = candidate.visual?.status === 'ready' && candidate.visual?.url;
+    if (!targetReady && candidateReady) {
+      target.image = candidate.visual.url;
+      target.visualStatus = 'ready';
+      target.visual = { ...candidate.visual };
+    }
+  };
 
   for (const rawArticle of [...fresh, ...readArticleHistory()]) {
     const article = normalizeArticle(rawArticle);
     if (!article?.id) continue;
 
     const urlKey = canonicalArticleUrl(article.url);
-    if (urlKey && seenUrls.has(urlKey)) continue;
+    if (urlKey && seenUrls.has(urlKey)) {
+      keepPreparedVisual(articlesByUrl.get(urlKey), article);
+      continue;
+    }
 
     const titleKey = articleTitleKey(article);
     const published = Date.parse(article.publishedAt || 0);
     const previousPublished = titleKey ? recentTitles.get(titleKey) : null;
-    if (titleKey && Number.isFinite(published) && Number.isFinite(previousPublished) && Math.abs(published - previousPublished) <= MAX_SAME_TITLE_AGE) continue;
+    if (titleKey && Number.isFinite(published) && Number.isFinite(previousPublished) && Math.abs(published - previousPublished) <= MAX_SAME_TITLE_AGE) {
+      keepPreparedVisual(articlesByTitle.get(titleKey), article);
+      continue;
+    }
 
     merged.push(article);
-    if (urlKey) seenUrls.add(urlKey);
-    if (titleKey && Number.isFinite(published)) recentTitles.set(titleKey, published);
+    if (urlKey) { seenUrls.add(urlKey); articlesByUrl.set(urlKey, article); }
+    if (titleKey && Number.isFinite(published)) { recentTitles.set(titleKey, published); articlesByTitle.set(titleKey, article); }
   }
 
   const cutoff = Date.now() - 45 * 24 * 60 * 60 * 1000;
@@ -160,7 +190,15 @@ function mergeArticleHistory(fresh) {
 }
 
 export async function fetchLiveNews({ sources = [], keywords = [], preferredCategories = [], webSearch = true, sourcePriority = true } = {}) {
-  const response = await fetch('/api/news', {
+  const useSharedCatalogue = !sources.length && !keywords.length && webSearch && sourcePriority;
+  const interests = [...new Set(preferredCategories.map(cleanText).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'fr'));
+  const endpoint = useSharedCatalogue
+    ? `/api/news?interests=${encodeURIComponent(interests.join(','))}`
+    : '/api/news';
+  const response = await fetch(endpoint, useSharedCatalogue ? {
+    method: 'GET',
+    cache: 'default'
+  } : {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     cache: 'no-store',

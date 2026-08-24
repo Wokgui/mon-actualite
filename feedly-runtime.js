@@ -1,3 +1,5 @@
+import { articleVisualUrl, hasPreparedVisual, preparedVisualUrl, sourceTileUrl } from './services/article-visuals.js?v=45.3';
+
 const GENERAL = ['Politique','International','Économie','Société','Santé','Environnement','Science','Culture','Éducation','Europe'];
 const PERSONAL = ['IA','Tech','Smartphones','VR','Automobile','Énergie'];
 const FRANCE_CATEGORIES = ['Politique','Économie','Société','Santé','Éducation','Environnement','Culture','Tech'];
@@ -8,6 +10,9 @@ let briefMode = 'essential';
 let briefCategory = null;
 let homeLimit = 36;
 const summaryRequests = new Map();
+const warmedVisuals = new Set();
+const pendingVisuals = [];
+let visualWarmScheduled = false;
 
 function readJson(key, fallback) {
   try { return JSON.parse(localStorage.getItem(key) || 'null') ?? fallback; }
@@ -91,37 +96,40 @@ function importanceArticles() {
   });
 }
 
-function validImageUrl(value = '') {
-  const raw = String(value || '').trim();
-  if (!raw) return '';
-  try {
-    const url = new URL(raw, location.href);
-    if (!['http:', 'https:'].includes(url.protocol)) return '';
-    const host = url.hostname.toLowerCase();
-    const haystack = `${host}${url.pathname}${url.search}`.toLowerCase();
-    if (url.origin === location.origin && url.pathname === '/' && !url.search) return '';
-    if (/(favicon|\/logo(?:[._/-]|$)|logo[-_.]|icon[-_.]|\/icon(?:[._/-]|$)|avatar|sprite|wordmark|brandmark|site-logo|google[-_ ]?news|googlenews|google_actualites|google-actualites)/i.test(haystack)) return '';
-    if (host === 'news.google.com' || host === 'www.google.com' || host.endsWith('.gstatic.com') || host.endsWith('.googleusercontent.com')) return '';
-    return url.href;
-  } catch {
-    return '';
-  }
-}
-
-function visualUrl(article) {
-  const params = new URLSearchParams({
-    v: '12',
-    url: String(article?.url || '').slice(0, 1900),
-    image: validImageUrl(article?.image || ''),
-    title: cleanText(article?.title || '').slice(0, 280),
-    category: cleanText(article?.category || '').slice(0, 70)
-  });
-  return `/api/article-thumbnail?${params}`;
-}
-
 function rowImageMarkup(article, index = 0) {
   const priority = index < 8;
-  return `<img class="article-image original-article-image stable-visual" src="${esc(visualUrl(article))}" alt="" loading="${priority ? 'eager' : 'lazy'}" decoding="async" ${index < 4 ? 'fetchpriority="high"' : ''}>`;
+  const prepared = hasPreparedVisual(article);
+  const tile = sourceTileUrl(article);
+  return `<img class="article-image original-article-image stable-visual ${prepared ? 'prepared-visual' : 'source-tile-visual'}" src="${esc(articleVisualUrl(article))}" alt="" width="400" height="224" loading="${priority ? 'eager' : 'lazy'}" decoding="async" referrerpolicy="no-referrer" style="background-image:url('${esc(tile)}');background-size:cover" ${index < 4 ? 'fetchpriority="high"' : ''}>`;
+}
+
+function warmPreparedVisuals(articles) {
+  const urls = articles.map(preparedVisualUrl).filter(url => url && !warmedVisuals.has(url));
+  urls.forEach(url => { warmedVisuals.add(url); pendingVisuals.push(url); });
+  if (!pendingVisuals.length || visualWarmScheduled) return;
+  visualWarmScheduled = true;
+  const run = async () => {
+    const worker = async () => {
+      while (pendingVisuals.length) {
+        const url = pendingVisuals.shift();
+        await new Promise(resolve => {
+          const image = document.createElement('img');
+          const done = () => { image.onload = null; image.onerror = null; resolve(); };
+          const timeout = setTimeout(done, 5000);
+          image.onload = image.onerror = () => { clearTimeout(timeout); done(); };
+          image.decoding = 'async';
+          image.fetchPriority = 'low';
+          image.referrerPolicy = 'no-referrer';
+          image.src = url;
+        });
+      }
+    };
+    await Promise.all(Array.from({ length: Math.min(4, pendingVisuals.length) }, worker));
+    visualWarmScheduled = false;
+    if (pendingVisuals.length) warmPreparedVisuals([]);
+  };
+  if ('requestIdleCallback' in window) requestIdleCallback(run, { timeout: 800 });
+  else setTimeout(run, 120);
 }
 
 function compactRow(article, index = 0) {
@@ -177,6 +185,7 @@ function enhanceHome() {
     const shown = articles.slice(0, homeLimit);
     const remaining = Math.max(0, articles.length - shown.length);
     feed.innerHTML = `${shown.map((article, index) => compactRow(article, index)).join('')}${remaining ? `<button type="button" class="home-more" data-home-more>Afficher ${Math.min(36, remaining)} articles de plus <small>${remaining} encore disponibles</small></button>` : ''}`;
+    warmPreparedVisuals(shown.slice(0, 36));
   }
 }
 
@@ -363,10 +372,14 @@ function enhanceDetail() {
     const image = document.createElement('img');
     image.className = 'detail-hero original-article-image runtime-detail-image stable-visual';
     image.alt = '';
-    image.src = visualUrl(article);
+    image.style.backgroundImage = `url("${sourceTileUrl(article)}")`;
+    image.style.backgroundSize = 'cover';
+    image.onerror = () => { image.onerror = null; image.src = sourceTileUrl(article); };
+    image.src = articleVisualUrl(article);
     image.decoding = 'async';
     image.loading = 'eager';
     image.fetchPriority = 'high';
+    image.referrerPolicy = 'no-referrer';
     hero.replaceWith(image);
   }
 

@@ -5,7 +5,10 @@ const MAX_CUSTOM_SOURCES = 12;
 const MAX_KEYWORDS = 8;
 const MAX_FEEDS = 24;
 const MAX_XML_BYTES = 1_500_000;
+const MAX_VISUAL_HTML_BYTES = 5_000_000;
 const FETCH_TIMEOUT_MS = 8000;
+const VISUAL_TIMEOUT_MS = 5000;
+const GOOGLE_NEWS_UA = 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/140 Safari/537.36';
 
 const DEFAULT_FEEDS = [
   { title: 'Google Actualités', url: 'https://news.google.com/rss?hl=fr&gl=FR&ceid=FR:fr', category: '' },
@@ -44,10 +47,17 @@ function googleSearchUrl(query) {
   return `https://news.google.com/rss/search?q=${encodeURIComponent(query)}&hl=fr&gl=FR&ceid=FR:fr`;
 }
 
-function sendJson(res, status, payload) {
+function sendJson(res, status, payload, { shared = false } = {}) {
   res.statusCode = status;
   res.setHeader('Content-Type', 'application/json; charset=utf-8');
-  res.setHeader('Cache-Control', 'no-store');
+  if (shared && status === 200) {
+    // The browser always revalidates, while Vercel serves the common catalogue
+    // from its regional CDN and refreshes an expired copy in the background.
+    res.setHeader('Cache-Control', 'public, max-age=0, must-revalidate');
+    res.setHeader('CDN-Cache-Control', 'public, s-maxage=300, stale-while-revalidate=3600');
+  } else {
+    res.setHeader('Cache-Control', 'no-store');
+  }
   res.end(JSON.stringify(payload));
 }
 
@@ -71,6 +81,79 @@ function stripHtml(value = '') {
     .replace(/<[^>]+>/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
+}
+
+function googleVisualPageUrl(rawUrl = '') {
+  try {
+    const url = new URL(rawUrl);
+    if (url.hostname !== 'news.google.com') return '';
+    url.pathname = url.pathname.replace(/^\/rss(?=\/|$)/, '') || '/';
+    url.searchParams.delete('oc');
+    url.searchParams.set('hl', 'fr');
+    url.searchParams.set('gl', 'FR');
+    url.searchParams.set('ceid', 'FR:fr');
+    url.searchParams.set('ucbcb', '1');
+    return url.href;
+  } catch {
+    return '';
+  }
+}
+
+function visualTitleWords(value = '') {
+  const stop = new Set(['avec', 'dans', 'pour', 'plus', 'apres', 'avant', 'cette', 'sont', 'etre', 'leur', 'leurs', 'tout', 'mais', 'sans', 'vers', 'entre', 'une', 'des', 'les', 'sur', 'qui', 'que', 'aux']);
+  return [...new Set(stripHtml(String(value || ''))
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase().replace(/[^a-z0-9]+/g, ' ')
+    .split(/\s+/).filter(word => word.length >= 3 && !stop.has(word)))];
+}
+
+function visualTitleAgreement(candidate = '', expected = '') {
+  const wanted = visualTitleWords(expected);
+  const found = new Set(visualTitleWords(candidate));
+  if (!wanted.length || !found.size) return { score: 0, hits: 0 };
+  const hits = wanted.filter(word => found.has(word)).length;
+  return { score: hits / Math.max(wanted.length, found.size), hits };
+}
+
+function parseGoogleVisuals(html = '', pageUrl = '') {
+  const titlePattern = /<a\b[^>]*class=["'][^"']*\bJtKRv\b[^"']*["'][^>]*>([\s\S]{1,2200}?)<\/a>/gi;
+  const matches = [...html.matchAll(titlePattern)];
+  const visuals = [];
+  for (let index = 0; index < matches.length; index += 1) {
+    const match = matches[index];
+    const title = stripHtml(match[1]);
+    if (!title) continue;
+    const previous = matches[index - 1]?.index;
+    const next = matches[index + 1]?.index;
+    const start = previous == null ? Math.max(0, match.index - 12_000) : Math.floor((previous + match.index) / 2);
+    const end = next == null ? Math.min(html.length, match.index + 12_000) : Math.floor((match.index + next) / 2);
+    const resultHtml = html.slice(start, end);
+    const attachments = [...resultHtml.matchAll(/\/api\/attachments\/[^"'\s,]+/g)].map(item => decodeEntities(item[0]));
+    if (!attachments.length) continue;
+    const raw = attachments.find(value => /-w400-h224-/i.test(value)) || attachments[attachments.length - 1];
+    const normalized = raw.replace(/-w\d+-h\d+-p-df(?:-rw)?$/i, '-w400-h224-p-df');
+    try {
+      visuals.push({
+        title,
+        url: new URL(normalized, pageUrl).href,
+        width: 400,
+        height: 224,
+        contentType: 'image/jpeg'
+      });
+    } catch {}
+  }
+  return visuals;
+}
+
+function findGoogleVisual(title, visuals) {
+  let best = null;
+  for (const visual of visuals) {
+    const agreement = visualTitleAgreement(visual.title, title);
+    const minimumHits = Math.min(4, visualTitleWords(title).length);
+    if (agreement.score < 0.72 || agreement.hits < minimumHits) continue;
+    if (!best || agreement.score > best.score) best = { ...visual, score: agreement.score };
+  }
+  return best;
 }
 
 function tag(block, names) {
@@ -138,9 +221,12 @@ function parseFeed(xml, feed) {
       publishedAt,
       source: sourceName(block, feed.title),
       feedTitle: feed.title,
+      feedUrl: feed.url,
       categoryHint: feed.category || '',
       strictCategory: Boolean(feed.strictCategory),
-      image: firstImage(block, rawDescription)
+      image: firstImage(block, rawDescription),
+      visualStatus: 'pending',
+      visualSource: ''
     };
   }).filter(item => item && item.url);
 }
@@ -217,7 +303,14 @@ function mergeDuplicates(items) {
       existing.summary = item.summary;
       existing.detail = item.detail;
     }
-    if (!existing.image && item.image) existing.image = item.image;
+    if ((!existing.image || existing.visualStatus !== 'ready') && item.image && item.visualStatus === 'ready') {
+      existing.image = item.image;
+      existing.visualStatus = 'ready';
+      existing.visualSource = item.visualSource;
+      existing.visualWidth = item.visualWidth;
+      existing.visualHeight = item.visualHeight;
+      existing.visualContentType = item.visualContentType;
+    }
   }
   return merged;
 }
@@ -270,6 +363,66 @@ async function safeFetchText(rawUrl) {
   throw new Error('Trop de redirections');
 }
 
+async function safeFetchVisualPage(rawUrl) {
+  const url = await assertPublicUrl(rawUrl);
+  const response = await fetch(url, {
+    redirect: 'follow',
+    signal: AbortSignal.timeout(VISUAL_TIMEOUT_MS),
+    headers: {
+      'User-Agent': GOOGLE_NEWS_UA,
+      'Accept': 'text/html,application/xhtml+xml',
+      'Accept-Language': 'fr-FR,fr;q=0.9'
+    }
+  });
+  if (!response.ok) throw new Error(`Visuels HTTP ${response.status}`);
+  const length = Number(response.headers.get('content-length') || 0);
+  if (length > MAX_VISUAL_HTML_BYTES) throw new Error('Page de visuels trop volumineuse');
+  const buffer = Buffer.from(await response.arrayBuffer());
+  if (!buffer.length || buffer.byteLength > MAX_VISUAL_HTML_BYTES) throw new Error('Page de visuels trop volumineuse');
+  return buffer.toString('utf8');
+}
+
+async function resolveGoogleVisualUrl(rawUrl) {
+  try {
+    const url = new URL(rawUrl);
+    if (url.hostname !== 'news.google.com' || !url.pathname.startsWith('/api/attachments/')) return '';
+    const response = await fetch(url, {
+      method: 'HEAD',
+      redirect: 'manual',
+      signal: AbortSignal.timeout(3500),
+      headers: { 'User-Agent': GOOGLE_NEWS_UA }
+    });
+    if (response.status < 300 || response.status >= 400) return '';
+    const resolved = new URL(response.headers.get('location') || '', url);
+    if (resolved.protocol !== 'https:' || !/^encrypted-tbn\d+\.gstatic\.com$/i.test(resolved.hostname) || resolved.pathname !== '/images') return '';
+    return resolved.href;
+  } catch {
+    return '';
+  }
+}
+
+async function resolvePreparedVisuals(items) {
+  const pending = items.filter(item => item.visualSource === 'google-news' && item.image);
+  let cursor = 0;
+  const worker = async () => {
+    while (cursor < pending.length) {
+      const item = pending[cursor];
+      cursor += 1;
+      const resolved = await resolveGoogleVisualUrl(item.image);
+      if (resolved) {
+        item.image = resolved;
+        item.visualSource = 'google-news-cdn';
+      } else {
+        item.image = '';
+        item.visualStatus = 'unavailable';
+        item.visualSource = '';
+      }
+    }
+  };
+  await Promise.all(Array.from({ length: Math.min(12, pending.length) }, worker));
+  return items;
+}
+
 function sanitizeSources(sources) {
   if (!Array.isArray(sources)) return [];
   return sources.slice(0, MAX_CUSTOM_SOURCES).map((source, index) => {
@@ -286,12 +439,14 @@ function sanitizeKeywords(keywords) {
 }
 
 module.exports = async function handler(req, res) {
-  if (req.method === 'GET') {
-    return sendJson(res, 200, { ok: true, service: 'mon-actualite-news', now: new Date().toISOString() });
-  }
-  if (req.method !== 'POST') return sendJson(res, 405, { error: 'Méthode non autorisée' });
+  const sharedRequest = req.method === 'GET';
+  if (!sharedRequest && req.method !== 'POST') return sendJson(res, 405, { error: 'Méthode non autorisée' });
 
-  const body = req.body && typeof req.body === 'object' ? req.body : {};
+  const queryInterests = String(req.query?.interests || '')
+    .split(',').map(value => value.trim()).filter(Boolean).slice(0, 30);
+  const body = sharedRequest
+    ? { sources: [], keywords: [], preferredCategories: queryInterests, webSearch: true, sourcePriority: true }
+    : req.body && typeof req.body === 'object' ? req.body : {};
   const customSources = sanitizeSources(body.sources);
   const keywords = sanitizeKeywords(body.keywords);
   const preferredCategories = Array.isArray(body.preferredCategories) ? body.preferredCategories.map(String).slice(0, 30) : [];
@@ -303,13 +458,41 @@ module.exports = async function handler(req, res) {
   const errors = [];
 
   const settled = await Promise.allSettled(feeds.map(async feed => {
-    const xml = await safeFetchText(feed.url);
-    return parseFeed(xml, feed).map(item => ({ ...item, isCustomSource: Boolean(feed.isCustom), keywordSearch: feed.keywordSearch || '' }));
+    const pageUrl = googleVisualPageUrl(feed.url);
+    const [xml, visualResult] = await Promise.all([
+      safeFetchText(feed.url),
+      pageUrl
+        ? safeFetchVisualPage(pageUrl).then(html => ({ html, error: '' })).catch(error => ({ html: '', error: String(error?.message || error).slice(0, 100) }))
+        : Promise.resolve({ html: '', error: '' })
+    ]);
+    const visuals = visualResult.html ? parseGoogleVisuals(visualResult.html, pageUrl) : [];
+    const items = parseFeed(xml, feed).map(item => {
+      const supplied = item.image ? { url: item.image, width: 0, height: 0, contentType: '' } : null;
+      const prepared = supplied || findGoogleVisual(item.title, visuals);
+      return {
+        ...item,
+        isCustomSource: Boolean(feed.isCustom),
+        keywordSearch: feed.keywordSearch || '',
+        image: prepared?.url || '',
+        visualStatus: prepared?.url ? 'ready' : 'unavailable',
+        visualSource: supplied ? 'rss' : prepared ? 'google-news' : '',
+        visualWidth: Number(prepared?.width || 0),
+        visualHeight: Number(prepared?.height || 0),
+        visualContentType: prepared?.contentType || ''
+      };
+    });
+    return { items, pageUrl, visualCount: visuals.length, visualError: visualResult.error };
   }));
 
   const rawItems = [];
+  let visualPagesSucceeded = 0;
+  let visualPagesFailed = 0;
   settled.forEach((result, index) => {
-    if (result.status === 'fulfilled') rawItems.push(...result.value);
+    if (result.status === 'fulfilled') {
+      rawItems.push(...result.value.items);
+      if (result.value.pageUrl && result.value.visualCount) visualPagesSucceeded += 1;
+      else if (result.value.pageUrl && result.value.visualError) visualPagesFailed += 1;
+    }
     else errors.push({ source: feeds[index].title, message: String(result.reason?.message || 'Échec de lecture').slice(0, 120) });
   });
 
@@ -323,10 +506,12 @@ module.exports = async function handler(req, res) {
       return { ...item, category, matches, score };
     });
 
-  const articles = mergeDuplicates(enriched)
+  const selected = mergeDuplicates(enriched)
     .sort((a, b) => (b.score - a.score) || (Date.parse(b.publishedAt) - Date.parse(a.publishedAt)))
-    .slice(0, 90)
-    .map(item => ({
+    .slice(0, 90);
+  await resolvePreparedVisuals(selected);
+
+  const articles = selected.map(item => ({
       id: Buffer.from(`${item.url}|${item.title}`).toString('base64url').slice(0, 48),
       title: item.title,
       url: item.url,
@@ -337,6 +522,15 @@ module.exports = async function handler(req, res) {
       sources: item.sources || [item.source],
       category: item.category,
       image: item.image || '',
+      visual: {
+        status: item.visualStatus === 'ready' && item.image ? 'ready' : 'unavailable',
+        url: item.image || '',
+        width: Number(item.visualWidth || 0),
+        height: Number(item.visualHeight || 0),
+        contentType: item.visualContentType || '',
+        source: item.visualSource || ''
+      },
+      visualStatus: item.visualStatus === 'ready' && item.image ? 'ready' : 'unavailable',
       score: Math.round(item.score),
       tags: [...new Set([item.category, ...item.matches])].slice(0, 5),
       customSource: Boolean(item.isCustomSource)
@@ -345,7 +539,16 @@ module.exports = async function handler(req, res) {
   return sendJson(res, 200, {
     fetchedAt: new Date().toISOString(),
     articles,
-    stats: { feedsRequested: feeds.length, feedsSucceeded: settled.filter(result => result.status === 'fulfilled').length, rawItems: rawItems.length, deduplicatedItems: articles.length },
+    stats: {
+      feedsRequested: feeds.length,
+      feedsSucceeded: settled.filter(result => result.status === 'fulfilled').length,
+      rawItems: rawItems.length,
+      deduplicatedItems: articles.length,
+      visualsReady: articles.filter(article => article.visualStatus === 'ready').length,
+      visualsUnavailable: articles.filter(article => article.visualStatus !== 'ready').length,
+      visualPagesSucceeded,
+      visualPagesFailed
+    },
     errors: errors.slice(0, 10)
-  });
+  }, { shared: sharedRequest });
 };

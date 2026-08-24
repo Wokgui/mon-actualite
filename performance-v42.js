@@ -1,3 +1,5 @@
+import { preparedVisualUrl, sourceTileUrl } from './services/article-visuals.js?v=45.3';
+
 const V42_SUMMARY_CACHE = 'news-article-summaries-v4';
 const V42_VISUAL_CACHE = 'news-visual-map-v5-trusted';
 const configured = new WeakSet();
@@ -147,9 +149,15 @@ function loadCardImage(card, article, index) {
   if ('fetchPriority' in img) img.fetchPriority = index < 3 ? 'high' : 'auto';
   card.classList.add('v42-image-pending');
 
-  const direct = likelyDirectImage(article.image || '');
-  const fallback = img.dataset.perfSrc || proxyUrl(article);
-  const cached = remembered(article);
+  const prepared = preparedVisualUrl(article);
+  const hasVisualState = Boolean(article.visualStatus || article.visual?.status);
+  const direct = prepared || (!hasVisualState ? likelyDirectImage(article.image || '') : '');
+  // Fresh article data has a definitive visual decision. If the exact prepared
+  // image fails, use a stable source tile instead of starting a visible chain
+  // of publisher/search replacements. The proxy remains migration-only for
+  // articles stored before the prepared-visual format existed.
+  const fallback = hasVisualState ? sourceTileUrl(article) : (img.dataset.perfSrc || proxyUrl(article));
+  const cached = hasVisualState ? '' : remembered(article);
   let usedFallback = cached === fallback || (!cached && !direct);
   const first = cached || direct || fallback;
   if (direct) preconnect(direct);
@@ -161,7 +169,7 @@ function loadCardImage(card, article, index) {
     }
     card.classList.remove('v42-image-pending', 'v42-image-failed');
     card.classList.add('v42-image-loaded');
-    remember(article, img.currentSrc || img.src);
+    if (!hasVisualState) remember(article, img.currentSrc || img.src);
   };
   const failed = () => {
     const current = img.currentSrc || img.src;
@@ -289,7 +297,9 @@ function openInstant(card, article) {
     : factual ? 'Résumé factuel · IA en cours…' : 'Synthèse provisoire · IA en cours…';
 
   const img = card.querySelector('img.article-image');
-  const visual = img?.complete && img.naturalWidth > 0 ? (img.currentSrc || img.src) : remembered(article) || likelyDirectImage(article.image || '') || '';
+  const visual = img?.complete && img.naturalWidth > 0
+    ? (img.currentSrc || img.src)
+    : preparedVisualUrl(article) || (!article.visualStatus ? remembered(article) || likelyDirectImage(article.image || '') : sourceTileUrl(article));
   const modal = document.createElement('div');
   modal.className = 'quick-summary-backdrop v42-instant-modal';
   modal.innerHTML = `<section class="quick-summary-sheet" role="dialog" aria-modal="true" aria-label="Résumé de l’article">
