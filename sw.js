@@ -1,6 +1,6 @@
-const CACHE = 'mon-actualite-v44-personnalisation';
+const CACHE = 'mon-actualite-v44-1-personnalisation';
 const THUMB_CACHE = 'mon-actualite-thumbnails-v3';
-const ASSETS = ['./', './index.html', './styles.css?v=43', './feedly-compact.css?v=43', './feedly-left.css?v=43', './ui-fixes-v2.css?v=43', './article-quickview.css?v=43', './feed-quality.css?v=43', './performance-v42.css?v=44', './personalization-v44.css?v=44', './bootstrap-v42.js?v=44', './stable-dom.js?v=44', './app.js?v=44', './feedly-runtime.js?v=44', './performance-v42.js?v=44', './summary-fixes.js?v=44', './article-quickview.js?v=44', './feed-quality.js?v=44', './services/source-connectors.js', './manifest.webmanifest', './assets/app-icon.svg'];
+const ASSETS = ['./', './index.html', './styles.css?v=43', './feedly-compact.css?v=43', './feedly-left.css?v=43', './ui-fixes-v2.css?v=43', './article-quickview.css?v=43', './feed-quality.css?v=43', './performance-v42.css?v=44', './personalization-v44.css?v=44', './bootstrap-v42.js?v=44', './stable-dom.js?v=44', './app.js?v=44', './feedly-runtime.js?v=44', './performance-v42.js?v=44', './summary-fixes.js?v=44', './article-quickview.js?v=44', './feed-quality.js?v=44.1', './services/source-connectors.js', './manifest.webmanifest', './assets/app-icon.svg'];
 
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(ASSETS)).then(() => self.skipWaiting()));
