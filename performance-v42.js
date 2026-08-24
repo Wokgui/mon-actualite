@@ -376,17 +376,27 @@ window.addEventListener('focus', scheduleScan);
 scheduleScan();
 
 let warmScheduled = false;
+let warmAttempts = 0;
 function warmTopSummaries() {
-  if (warmScheduled) return;
+  if (warmScheduled || warmAttempts >= 5) return;
   warmScheduled = true;
   const run = async () => {
-    for (const article of articles().slice(0, 3)) {
+    const visibleIds = [...document.querySelectorAll('.article-card[data-article]')]
+      .slice(0, 3)
+      .map(card => card.dataset.article);
+    const targets = visibleIds.map(articleById).filter(Boolean);
+    if (!targets.length) {
+      warmScheduled = false;
+      warmAttempts += 1;
+      setTimeout(warmTopSummaries, 700);
+      return;
+    }
+    for (const article of targets) {
       const cached = readJson(V42_SUMMARY_CACHE, {})[`article:${article.id}`];
       if (cached?.summary && summaryUsable(cached.summary)) continue;
       await summaryFor(article);
     }
   };
-  if ('requestIdleCallback' in window) requestIdleCallback(run, { timeout: 3500 });
-  else setTimeout(run, 1200);
+  setTimeout(run, 450);
 }
 warmTopSummaries();
