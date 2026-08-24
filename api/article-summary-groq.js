@@ -1,12 +1,12 @@
 const legacyHandler = require('./article-summary.js');
 
 const GROQ_ENDPOINT = 'https://api.groq.com/openai/v1/chat/completions';
+const RETIRED_MODELS = new Set(['llama-3.1-8b-instant', 'llama-3.3-70b-versatile']);
 const GROQ_MODELS = [...new Set([
   process.env.GROQ_MODEL,
   'openai/gpt-oss-20b',
-  'llama-3.3-70b-versatile',
-  'llama-3.1-8b-instant'
-].filter(Boolean).map(value => String(value).trim()).filter(Boolean))];
+  'openai/gpt-oss-120b'
+].filter(Boolean).map(value => String(value).trim()).filter(value => value && !RETIRED_MODELS.has(value)))];
 const GROQ_TIMEOUT_MS = 18000;
 
 const SYSTEM = `Tu es un rédacteur de presse factuel. Résume uniquement les informations fournies. N'invente aucun fait, nom, chiffre, contexte ou conséquence. Commence par le fait principal. Écris un français naturel, précis et neutre. Ignore entièrement les éléments d'interface, appels à se connecter, sauvegarder un article, s'abonner, accepter des cookies, partager, activer des notifications ou toute autre phrase de service du site. N'écris ni titre accrocheur, ni formule promotionnelle, ni invitation à cliquer.`;
