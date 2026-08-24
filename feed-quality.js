@@ -220,6 +220,7 @@ function diversifyHome() {
   const feed = document.querySelector('.page .feed');
   if (!feed) return;
   const cards = [...feed.children].filter(node => node.matches?.('.article-card[data-article]'));
+  const trailingControls = [...feed.children].filter(node => !node.matches?.('.article-card[data-article]'));
   if (cards.length < 3) return;
   const signature = cards.map(card => card.dataset.article).join('|');
   if (feed.dataset.qualityOrder === signature) return;
@@ -246,6 +247,7 @@ function diversifyHome() {
     if (group.cards.length) queue.push(group);
   }
   ordered.forEach(card => feed.appendChild(card));
+  trailingControls.forEach(control => feed.appendChild(control));
   feed.dataset.qualityOrder = ordered.map(card => card.dataset.article).join('|');
 }
 
