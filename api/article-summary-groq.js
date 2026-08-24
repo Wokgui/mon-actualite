@@ -179,11 +179,12 @@ async function generateWithGroq(model, key, prompt, minLength = 60) {
   return text;
 }
 
-async function generateWithFallback(key, prompt) {
+async function generateWithFallback(key, prompt, factual = '') {
   let lastError = '';
   for (const model of GROQ_MODELS) {
     try {
       const text = await generateWithGroq(model, key, prompt);
+      if (factual && !summarySupported(text, factual)) throw new Error(`${model}: résumé insuffisamment étayé par la source`);
       return { text, model };
     } catch (error) {
       lastError = String(error?.message || error).slice(0, 360);
@@ -272,8 +273,7 @@ module.exports = async function handler(req, res) {
   const prompt = promptFor(body, factual);
 
   try {
-    const aiResult = await generateWithFallback(key, prompt);
-    if (!summarySupported(aiResult.text, factual)) throw new Error(`${aiResult.model}: résumé insuffisamment étayé par la source`);
+    const aiResult = await generateWithFallback(key, prompt, factual);
     return send(res, 200, {
       ...base,
       summary: paragraphize(aiResult.text, 2),
