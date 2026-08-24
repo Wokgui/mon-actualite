@@ -6,8 +6,8 @@ const SUMMARY_CACHE_KEY = 'news-article-summaries-v4';
 let scheduled = false;
 let briefMode = 'essential';
 let briefCategory = null;
+let homeLimit = 36;
 const summaryRequests = new Map();
-const warmedVisuals = new Set();
 
 function readJson(key, fallback) {
   try { return JSON.parse(localStorage.getItem(key) || 'null') ?? fallback; }
@@ -49,7 +49,10 @@ function currentSettings() {
   const raw = readJson('news-settings', {});
   return {
     general: Array.isArray(raw.generalCategories) ? raw.generalCategories : GENERAL,
-    interests: Array.isArray(raw.interests) ? raw.interests : PERSONAL
+    interests: Array.isArray(raw.interests) ? raw.interests : PERSONAL,
+    briefEssential: Array.isArray(raw.briefEssentialCategories) ? raw.briefEssentialCategories : GENERAL,
+    briefWatches: Array.isArray(raw.briefWatchTopics) ? raw.briefWatchTopics : ['Innovation', 'IA', 'VR', 'Santé'],
+    topicPreferences: readJson('news-topic-preferences-v1', {})
   };
 }
 
@@ -62,11 +65,20 @@ function visibleArticles() {
   const articles = allCachedArticles();
   const current = currentSettings();
   const feedback = readJson('news-feedback', {});
-  const allowed = new Set([...current.general, ...current.interests, 'À suivre']);
   return articles
-    .filter(article => allowed.has(article.category) && feedback[article.id] !== 'not')
+    .filter(article => feedback[article.id] !== 'not')
     .slice()
-    .sort((a, b) => Date.parse(b.publishedAt || 0) - Date.parse(a.publishedAt || 0));
+    .sort((a, b) => {
+      const score = article => {
+        const topics = [...new Set([article.category, ...(article.tags || []), ...(article.matches || [])].filter(Boolean))];
+        const learned = topics.reduce((total, topic) => total + Number(current.topicPreferences[topic] || 0) * 12, 0);
+        const chosen = current.interests.includes(article.category) ? 22 : current.general.includes(article.category) ? 8 : 0;
+        const articleFeedback = ({ more: 24, less: -20, follow: 38 }[feedback[article.id]] || 0);
+        const recency = Math.max(0, 72 - ((Date.now() - Date.parse(article.publishedAt || 0)) / 3600000));
+        return Number(article.score || 0) + learned + chosen + articleFeedback + recency * .35;
+      };
+      return score(b) - score(a);
+    });
 }
 
 function importanceArticles() {
@@ -85,6 +97,7 @@ function validImageUrl(value = '') {
     if (!['http:', 'https:'].includes(url.protocol)) return '';
     const host = url.hostname.toLowerCase();
     const haystack = `${host}${url.pathname}${url.search}`.toLowerCase();
+    if (url.origin === location.origin && url.pathname === '/' && !url.search) return '';
     if (/(favicon|\/logo(?:[._/-]|$)|logo[-_.]|icon[-_.]|\/icon(?:[._/-]|$)|avatar|sprite|wordmark|brandmark|site-logo|google[-_ ]?news|googlenews|google_actualites|google-actualites)/i.test(haystack)) return '';
     if (host === 'news.google.com' || host === 'www.google.com' || host.endsWith('.gstatic.com') || host.endsWith('.googleusercontent.com')) return '';
     return url.href;
@@ -95,26 +108,13 @@ function validImageUrl(value = '') {
 
 function visualUrl(article) {
   const params = new URLSearchParams({
-    v: '8',
+    v: '11',
     url: String(article?.url || '').slice(0, 1900),
     image: validImageUrl(article?.image || ''),
     title: cleanText(article?.title || '').slice(0, 280),
     category: cleanText(article?.category || '').slice(0, 70)
   });
   return `/api/article-thumbnail?${params}`;
-}
-
-function warmVisuals(articles, limit = 10) {
-  articles.slice(0, limit).forEach((article, index) => {
-    const src = visualUrl(article);
-    if (warmedVisuals.has(src)) return;
-    warmedVisuals.add(src);
-    const image = new Image();
-    image.decoding = 'async';
-    image.loading = 'eager';
-    if ('fetchPriority' in image) image.fetchPriority = index < 4 ? 'high' : 'auto';
-    image.src = src;
-  });
 }
 
 function rowImageMarkup(article, index = 0) {
@@ -161,17 +161,21 @@ function removeRedundantUi() {
 function enhanceHome() {
   if (!document.querySelector('.nav-item.active[data-view="home"]')) return;
   const subtitle = document.querySelector('.hero-header p');
-  if (subtitle) subtitle.textContent = 'Sélection du jour';
+  if (subtitle) subtitle.textContent = 'Tous les articles, personnalisés pour vous';
   const savedButton = document.querySelector('.saved-filter [data-saved-filter]');
   if (savedButton && /voir toute/i.test(savedButton.textContent || '')) return;
   const feed = document.querySelector('.page .feed');
   if (!feed) return;
   const articles = visibleArticles();
-  const signature = articles.map(article => article.id).join('|');
+  const settings = currentSettings();
+  const signature = `${homeLimit}|${JSON.stringify(settings.interests)}|${JSON.stringify(settings.topicPreferences)}|${articles.map(article => article.id).join('|')}`;
   if (feed.dataset.runtimeSignature === signature) return;
-  warmVisuals(articles, 12);
   feed.dataset.runtimeSignature = signature;
-  if (articles.length) feed.innerHTML = articles.map((article, index) => compactRow(article, index)).join('');
+  if (articles.length) {
+    const shown = articles.slice(0, homeLimit);
+    const remaining = Math.max(0, articles.length - shown.length);
+    feed.innerHTML = `${shown.map((article, index) => compactRow(article, index)).join('')}${remaining ? `<button type="button" class="home-more" data-home-more>Afficher ${Math.min(36, remaining)} articles de plus <small>${remaining} encore disponibles</small></button>` : ''}`;
+  }
 }
 
 function pickDiverse(source, categories, limit) {
@@ -191,7 +195,8 @@ function pickDiverse(source, categories, limit) {
 }
 
 function essentialBrief() {
-  const ranked = importanceArticles();
+  const selected = new Set(currentSettings().briefEssential);
+  const ranked = importanceArticles().filter(article => selected.has(article.category));
   const recent = ranked.filter(article => Date.now() - Date.parse(article.publishedAt || 0) <= 72 * 3600000);
   const pool = recent.length >= 6 ? recent : ranked;
   return {
@@ -202,12 +207,27 @@ function essentialBrief() {
 
 function selectedBriefCategories() {
   const current = currentSettings();
-  return [...new Set([...current.general, ...current.interests])];
+  return [...new Set(current.briefWatches)];
+}
+
+function watchItems(topic, limit = 10) {
+  const normalize = value => cleanText(value).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+  const aliases = {
+    innovation: ['innovation', 'start-up', 'startup', 'brevet', 'recherche', 'nouvelle technologie'],
+    vr: ['vr', 'réalité virtuelle', 'virtual reality', 'quest', 'steamvr'],
+    ia: ['intelligence artificielle', ' ia ', 'openai', 'chatgpt', 'gemini', 'anthropic']
+  };
+  const wanted = normalize(topic);
+  const terms = [wanted, ...(aliases[wanted] || [])].map(normalize);
+  return importanceArticles().filter(article => {
+    if (normalize(article.category) === wanted) return true;
+    const text = ` ${normalize([article.title, article.summary, article.category, ...(article.tags || []), ...(article.matches || [])].filter(Boolean).join(' '))} `;
+    return terms.some(term => term.length >= 2 && text.includes(term));
+  }).slice(0, limit);
 }
 
 function renderEssential() {
   const { france, world } = essentialBrief();
-  warmVisuals([...france, ...world], 10);
   const section = (title, items) => `<section class="journal-section"><h2 class="brief-section-title">${title}</h2><div class="feed">${items.length ? items.map((article, index) => compactRow(article, index)).join('') : '<p class="muted-note">Aucune information majeure récente.</p>'}</div></section>`;
   return `${section('France', france)}${section('Monde', world)}`;
 }
@@ -220,7 +240,7 @@ async function requestSummary(key, payload) {
   const cache = readJson(SUMMARY_CACHE_KEY, {});
   if (cache[key]?.summary && !cache[key]?.unavailable && !isUnavailableSummary(cache[key].summary)) return cache[key];
   if (summaryRequests.has(key)) return summaryRequests.get(key);
-  const request = fetch('/api/article-summary?v=4', {
+  const request = fetch('/api/article-summary-groq?v=13', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     cache: 'no-store',
@@ -253,21 +273,20 @@ async function loadCategorySummary(category, items) {
   if (!target.isConnected || target.dataset.summaryKey !== key) return;
   target.textContent = cleanText(result?.summary || 'Résumé indisponible pour cette rubrique.');
   const label = document.querySelector('.runtime-category-summary .brief-label');
-  if (label) label.textContent = result?.ai ? `${category} · Résumé IA` : `${category} · Résumé factuel`;
+  if (label) label.textContent = result?.ai ? `Veille · ${category} · Résumé IA` : `Veille · ${category} · Résumé factuel`;
 }
 
 function renderCategories() {
   const categories = selectedBriefCategories();
-  if (!categories.length) return '<p class="muted-note">Choisissez des rubriques dans Réglages.</p>';
+  if (!categories.length) return '<p class="muted-note">Touchez Personnaliser pour choisir vos veilles.</p>';
   if (!briefCategory || !categories.includes(briefCategory)) briefCategory = categories[0];
-  const items = importanceArticles().filter(article => article.category === briefCategory).slice(0, 8);
-  warmVisuals(items, 8);
+  const items = watchItems(briefCategory, 10);
   const summaryItems = items.slice(0, 4);
   const key = categoryCacheKey(briefCategory, summaryItems);
   const cached = readJson(SUMMARY_CACHE_KEY, {})[key];
   return `<div class="brief-category-tabs">${categories.map(category => `<button class="brief-category-tab ${category === briefCategory ? 'active' : ''}" data-brief-category="${esc(category)}">${esc(category)}</button>`).join('')}</div>
-    <section class="brief-card runtime-category-summary"><span class="brief-label">${esc(briefCategory)}${cached?.ai ? ' · Résumé IA' : ''}</span><h2>En bref</h2><p data-runtime-category-summary data-summary-key="${esc(key)}">${esc(cached?.summary || 'Résumé en cours…')}</p></section>
-    <div class="feed">${items.length ? items.map((article, index) => compactRow(article, index)).join('') : '<p class="muted-note">Aucun article récent dans cette rubrique.</p>'}</div>`;
+    <section class="brief-card runtime-category-summary"><span class="brief-label">Veille · ${esc(briefCategory)}${cached?.ai ? ' · Résumé IA' : ''}</span><h2>Ce qui évolue</h2><p data-runtime-category-summary data-summary-key="${esc(key)}">${esc(cached?.summary || 'Résumé en cours…')}</p></section>
+    <div class="feed">${items.length ? items.map((article, index) => compactRow(article, index)).join('') : '<p class="muted-note">Aucun article récent dans cette veille.</p>'}</div>`;
 }
 
 function enhanceBrief() {
@@ -276,13 +295,14 @@ function enhanceBrief() {
   const topbar = page?.querySelector('.topbar');
   if (!page || !topbar) return;
   const articles = visibleArticles();
-  const signature = `${briefMode}|${briefCategory || ''}|${articles.map(article => article.id).join('|')}`;
+  const settings = currentSettings();
+  const signature = `${briefMode}|${briefCategory || ''}|${JSON.stringify(settings.briefEssential)}|${JSON.stringify(settings.briefWatches)}|${JSON.stringify(settings.topicPreferences)}|${articles.map(article => article.id).join('|')}`;
   if (page.dataset.runtimeBriefSignature === signature) return;
   page.dataset.runtimeBriefSignature = signature;
   [...page.children].forEach(child => { if (child !== topbar) child.remove(); });
-  page.insertAdjacentHTML('beforeend', `<div class="brief-mode-tabs"><button class="brief-mode-tab ${briefMode === 'essential' ? 'active' : ''}" data-brief-mode="essential">Essentiel</button><button class="brief-mode-tab ${briefMode === 'categories' ? 'active' : ''}" data-brief-mode="categories">Mes rubriques</button></div><div class="runtime-brief-content">${briefMode === 'essential' ? renderEssential() : renderCategories()}</div>`);
-  if (briefMode === 'categories' && briefCategory) {
-    const items = importanceArticles().filter(article => article.category === briefCategory).slice(0, 4);
+  page.insertAdjacentHTML('beforeend', `<div class="brief-mode-tabs"><button class="brief-mode-tab ${briefMode === 'essential' ? 'active' : ''}" data-brief-mode="essential">L’essentiel</button><button class="brief-mode-tab ${briefMode === 'watches' ? 'active' : ''}" data-brief-mode="watches">Mes veilles</button></div><div class="runtime-brief-content">${briefMode === 'essential' ? renderEssential() : renderCategories()}</div>`);
+  if (briefMode === 'watches' && briefCategory) {
+    const items = watchItems(briefCategory, 4);
     loadCategorySummary(briefCategory, items);
   }
 }
@@ -366,7 +386,7 @@ function enhanceDetail() {
 
 function enhanceSheet() {
   const sheet = document.querySelector('.sheet');
-  if (!sheet || sheet.querySelector('.runtime-sheet-tabs')) return;
+  if (!sheet || sheet.classList.contains('personalization-sheet') || sheet.querySelector('.runtime-sheet-tabs')) return;
   const handle = sheet.querySelector('.sheet-handle');
   const tabs = document.createElement('div');
   tabs.className = 'runtime-sheet-tabs';
@@ -431,6 +451,16 @@ function openSettingsFromSheet() {
 }
 
 document.addEventListener('click', event => {
+  const more = event.target.closest('[data-home-more]');
+  if (more) {
+    event.preventDefault();
+    event.stopPropagation();
+    homeLimit += 36;
+    const feed = document.querySelector('.page .feed');
+    if (feed) feed.dataset.runtimeSignature = '';
+    scheduleEnhance();
+    return;
+  }
   const deleteFollowed = event.target.closest('[data-runtime-follow-delete]');
   if (deleteFollowed) {
     event.preventDefault();
@@ -470,5 +500,6 @@ document.addEventListener('click', event => {
 const root = document.getElementById('app');
 if (root) new MutationObserver(scheduleEnhance).observe(root, { childList: true, subtree: true });
 window.addEventListener('focus', scheduleEnhance);
+window.addEventListener('news-topic-preferences-changed', scheduleEnhance);
 document.addEventListener('visibilitychange', () => { if (!document.hidden) scheduleEnhance(); });
 scheduleEnhance();

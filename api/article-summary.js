@@ -320,7 +320,7 @@ module.exports = async function handler(req, res) {
     const materials = await Promise.all(articles.map(getArticleMaterial));
     const source = materials.map((item, i) => `ARTICLE ${i + 1} — ${item.title}\n${item.text || item.fallback}`).join('\n\n').slice(0, 30000);
     const prompt = `Fais un vrai résumé journalistique de l'actualité de la rubrique « ${category} » uniquement à partir des articles ci-dessous. Fais 5 à 7 phrases, environ 120 à 180 mots, réparties en 2 ou 3 paragraphes courts séparés par une ligne vide. Commence directement par les faits les plus importants. Regroupe seulement les informations qui concernent réellement le même sujet. Ne rédige ni accroche, ni slogan, ni conseil, ni phrase du type « à retenir ». N'introduis aucun élément extérieur aux textes.\n\n${source}`;
-    const aiResult = source.length >= 120 ? await aiGenerate(SYSTEM, prompt) : { text: '', model: '' };
+    const aiResult = !body.factualOnly && source.length >= 120 ? await aiGenerate(SYSTEM, prompt) : { text: '', model: '' };
     let generated = aiResult.text;
     if (generated && !summarySupported(generated, source)) generated = '';
     const fallback = materials.map(item => sentenceFallback(item.text, item.fallback)).filter(Boolean).slice(0, 3).join('\n\n');
@@ -336,7 +336,7 @@ module.exports = async function handler(req, res) {
   const material = await getArticleMaterial(article);
   const source = material.text || material.fallback;
   const prompt = `Résume cet article en français en 4 à 6 phrases, environ 90 à 140 mots. Fais exactement 2 paragraphes courts séparés par une ligne vide. Commence directement par le fait principal et son contexte immédiat. Le second paragraphe donne uniquement les précisions, conséquences ou chiffres présents dans le texte. Le résultat doit ressembler à un résumé de dépêche ou de journal, pas à une accroche destinée à faire cliquer. Ne parle d'aucun autre sujet, même s'il apparaît dans des recommandations de la page.\n\nTITRE : ${material.title}\n\nTEXTE SOURCE :\n${source}`;
-  const aiResult = source.length >= 120 ? await aiGenerate(SYSTEM, prompt) : { text: '', model: '' };
+  const aiResult = !body.factualOnly && source.length >= 120 ? await aiGenerate(SYSTEM, prompt) : { text: '', model: '' };
   let generated = aiResult.text;
   if (generated && !summarySupported(generated, `${material.title}\n${source}`)) generated = '';
   const summary = paragraphize(generated || sentenceFallback(material.text, material.fallback), 2);

@@ -9,11 +9,11 @@ const FETCH_TIMEOUT_MS = 8000;
 
 const DEFAULT_FEEDS = [
   { title: 'Google Actualités', url: 'https://news.google.com/rss?hl=fr&gl=FR&ceid=FR:fr', category: '' },
-  { title: 'International', url: 'https://news.google.com/rss/headlines/section/topic/WORLD?hl=fr&gl=FR&ceid=FR:fr', category: 'International' },
-  { title: 'Économie', url: 'https://news.google.com/rss/headlines/section/topic/BUSINESS?hl=fr&gl=FR&ceid=FR:fr', category: 'Économie' },
-  { title: 'Science', url: 'https://news.google.com/rss/headlines/section/topic/SCIENCE?hl=fr&gl=FR&ceid=FR:fr', category: 'Science' },
-  { title: 'Santé', url: 'https://news.google.com/rss/headlines/section/topic/HEALTH?hl=fr&gl=FR&ceid=FR:fr', category: 'Santé' },
-  { title: 'Tech', url: 'https://news.google.com/rss/headlines/section/topic/TECHNOLOGY?hl=fr&gl=FR&ceid=FR:fr', category: 'Tech' },
+  { title: 'International', url: 'https://news.google.com/rss/headlines/section/topic/WORLD?hl=fr&gl=FR&ceid=FR:fr', category: 'International', strictCategory: true },
+  { title: 'Économie', url: 'https://news.google.com/rss/headlines/section/topic/BUSINESS?hl=fr&gl=FR&ceid=FR:fr', category: 'Économie', strictCategory: true },
+  { title: 'Science', url: 'https://news.google.com/rss/headlines/section/topic/SCIENCE?hl=fr&gl=FR&ceid=FR:fr', category: 'Science', strictCategory: true },
+  { title: 'Santé', url: 'https://news.google.com/rss/headlines/section/topic/HEALTH?hl=fr&gl=FR&ceid=FR:fr', category: 'Santé', strictCategory: true },
+  { title: 'Tech', url: 'https://news.google.com/rss/headlines/section/topic/TECHNOLOGY?hl=fr&gl=FR&ceid=FR:fr', category: 'Tech', strictCategory: true },
   { title: 'Politique France', url: googleSearchUrl('politique France'), category: 'Politique' },
   { title: 'Europe', url: googleSearchUrl('Union européenne Europe'), category: 'Europe' },
   { title: 'Culture', url: googleSearchUrl('culture cinéma musique livres France'), category: 'Culture' },
@@ -87,7 +87,25 @@ function attrTag(block, name, attr) {
 }
 
 function firstImage(block, description) {
-  return attrTag(block, 'media:content', 'url') || attrTag(block, 'media:thumbnail', 'url') || attrTag(block, 'enclosure', 'url') || ((description || '').match(/<img[^>]+src=["']([^"']+)["']/i) || [])[1] || '';
+  const candidates = [
+    attrTag(block, 'media:content', 'url'),
+    attrTag(block, 'media:thumbnail', 'url'),
+    attrTag(block, 'enclosure', 'url'),
+    ((description || '').match(/<img[^>]+src=["']([^"']+)["']/i) || [])[1] || ''
+  ];
+  for (const raw of candidates) {
+    const value = decodeEntities(String(raw || '')).trim();
+    if (!/^https?:\/\//i.test(value)) continue;
+    try {
+      const url = new URL(value);
+      const haystack = `${url.hostname}${url.pathname}${url.search}`.toLowerCase();
+      if (url.pathname === '/' && !url.search) continue;
+      if (/(favicon|\/logo(?:[._/-]|$)|logo[-_.]|icon[-_.]|\/icon(?:[._/-]|$)|avatar|sprite|wordmark|brandmark|site-logo|google[-_ ]?news|googlenews)/i.test(haystack)) continue;
+      if (url.hostname === 'news.google.com' || url.hostname.endsWith('.gstatic.com')) continue;
+      return url.href;
+    } catch {}
+  }
+  return '';
 }
 
 function sourceName(block, fallback) {
@@ -121,6 +139,7 @@ function parseFeed(xml, feed) {
       source: sourceName(block, feed.title),
       feedTitle: feed.title,
       categoryHint: feed.category || '',
+      strictCategory: Boolean(feed.strictCategory),
       image: firstImage(block, rawDescription)
     };
   }).filter(item => item && item.url);
@@ -152,7 +171,7 @@ function similarity(a, b) {
 }
 
 function classify(item, keywords) {
-  if (item.categoryHint) return item.categoryHint;
+  if (item.strictCategory && item.categoryHint) return item.categoryHint;
   const haystack = ` ${normalizeText(`${item.title} ${item.summary}`)} `;
   for (const [category, terms] of CATEGORY_RULES) {
     if (terms.some(term => haystack.includes(normalizeText(term)))) return category;

@@ -100,7 +100,11 @@ function captureLegacy(req) {
       setHeader(name, value) { headers[String(name).toLowerCase()] = value; },
       end(body = '') { resolve({ statusCode: this.statusCode || 200, headers, body: String(body || '') }); }
     };
-    Promise.resolve(legacyHandler(req, capture)).catch(reject);
+    const factualReq = Object.create(req || null);
+    factualReq.method = 'POST';
+    factualReq.query = req?.query || {};
+    factualReq.body = { ...(req?.body && typeof req.body === 'object' ? req.body : {}), factualOnly: true };
+    Promise.resolve(legacyHandler(factualReq, capture)).catch(reject);
   });
 }
 

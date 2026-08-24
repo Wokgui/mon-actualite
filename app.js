@@ -6,6 +6,7 @@ const toastEl = $('#toast');
 
 const GENERAL_CATEGORIES = ['Politique', 'International', 'Économie', 'Société', 'Santé', 'Environnement', 'Science', 'Culture', 'Éducation', 'Europe'];
 const PERSONAL_THEMES = ['IA', 'Tech', 'Smartphones', 'VR', 'Automobile', 'Énergie'];
+const WATCH_TOPICS = ['Innovation', 'IA', 'VR', 'Santé', 'Science', 'Tech', 'Énergie', 'Environnement', 'Automobile', 'Smartphones'];
 
 const categoryMeta = {
   Politique: { icon: 'landmark', label: 'Politique' },
@@ -34,7 +35,9 @@ const defaultSettings = {
   autoRefresh: true,
   summaryLength: 'court',
   generalCategories: [...GENERAL_CATEGORIES],
-  interests: [...PERSONAL_THEMES]
+  interests: [...PERSONAL_THEMES],
+  briefEssentialCategories: [...GENERAL_CATEGORIES],
+  briefWatchTopics: ['Innovation', 'IA', 'VR', 'Santé']
 };
 
 function safeJson(key, fallback) {
@@ -48,6 +51,7 @@ const state = {
   view: 'home', previous: [], category: 'Politique', categoryTab: 'brief', articleId: null,
   saved: new Set(safeJson('news-saved', [])),
   feedback: safeJson('news-feedback', {}),
+  topicPreferences: safeJson('news-topic-preferences-v1', {}),
   sources: safeJson('news-sources', []),
   keywords: safeJson('news-keywords', []),
   articles: Array.isArray(cache.articles) ? cache.articles : [],
@@ -59,7 +63,9 @@ const state = {
     ...defaultSettings,
     ...savedSettings,
     generalCategories: Array.isArray(savedSettings.generalCategories) ? savedSettings.generalCategories : [...GENERAL_CATEGORIES],
-    interests: Array.isArray(savedSettings.interests) ? savedSettings.interests : [...PERSONAL_THEMES]
+    interests: Array.isArray(savedSettings.interests) ? savedSettings.interests : [...PERSONAL_THEMES],
+    briefEssentialCategories: Array.isArray(savedSettings.briefEssentialCategories) ? savedSettings.briefEssentialCategories : [...GENERAL_CATEGORIES],
+    briefWatchTopics: Array.isArray(savedSettings.briefWatchTopics) ? savedSettings.briefWatchTopics : ['Innovation', 'IA', 'VR', 'Santé']
   }
 };
 
@@ -140,23 +146,24 @@ function articleVisual(article) {
   return `<div class="article-image article-placeholder">${icon(meta.icon)}<span>${escapeHtml(article.category)}</span></div>`;
 }
 
-function allowedCategories() {
-  return new Set([...state.settings.generalCategories, ...state.settings.interests, 'À suivre']);
-}
-
 function visibleArticles() {
-  const allowed = allowedCategories();
   return state.articles
-    .filter(article => allowed.has(article.category) && state.feedback[article.id] !== 'not')
+    .filter(article => state.feedback[article.id] !== 'not')
     .slice()
     .sort((a, b) => {
       const feedbackScore = article => ({ more: 24, less: -20, follow: 38 }[state.feedback[article.id]] || 0);
-      return ((b.score || 0) + feedbackScore(b)) - ((a.score || 0) + feedbackScore(a));
+      const topicScore = article => {
+        const topics = [...new Set([article.category, ...(article.tags || []), ...(article.matches || [])].filter(Boolean))];
+        const learned = topics.reduce((total, topic) => total + Number(state.topicPreferences[topic] || 0) * 12, 0);
+        const chosen = state.settings.interests.includes(article.category) ? 22 : state.settings.generalCategories.includes(article.category) ? 8 : 0;
+        return learned + chosen;
+      };
+      return ((b.score || 0) + feedbackScore(b) + topicScore(b)) - ((a.score || 0) + feedbackScore(a) + topicScore(a));
     });
 }
 
 function nav(active = state.view) {
-  const items = [['home', 'home', 'Accueil'], ['brief', 'brief', 'Brief'], ['sheet', 'plus', 'Ajouter'], ['news', 'calendar', 'Actualité'], ['settings', 'settings', 'Réglages']];
+  const items = [['home', 'home', 'Accueil'], ['sheet', 'plus', 'Personnaliser'], ['brief', 'brief', 'Brief']];
   return `<nav class="bottom-nav" aria-label="Navigation principale">${items.map(([view, ic, label]) => `<button class="nav-item ${view === 'sheet' ? 'plus' : ''} ${active === view ? 'active' : ''}" data-view="${view}" aria-label="${label}">${icon(ic)}<span>${label}</span></button>`).join('')}</nav>`;
 }
 
@@ -188,7 +195,7 @@ function renderHome() {
   const all = visibleArticles();
   const feed = state.savedOnly ? all.filter(article => state.saved.has(article.id)) : all.slice(0, 12);
   return `<main class="page">
-    <header class="hero-header"><div class="hero-mark"></div><span class="eyebrow">${escapeHtml(dateLabel())}</span><h1>Mon actualité</h1><p>L’actualité générale, avec vos sujets favoris mis en avant</p></header>
+    <header class="hero-header"><div class="hero-mark"></div><span class="eyebrow">${escapeHtml(dateLabel())}</span><h1>Mon actualité</h1><p>Tous les articles, classés selon vos centres d’intérêt</p></header>
     ${syncStrip()}
     ${state.saved.size ? `<div class="saved-filter"><button class="text-btn" data-saved-filter>${state.savedOnly ? 'Voir toute l’actualité' : 'Articles sauvegardés'}</button></div>` : ''}
     <section class="feed">${feed.length ? feed.map(articleCard).join('') : emptyState(state.syncStatus === 'error' ? 'Impossible de charger l’actualité' : 'Actualisation en cours', state.syncError || 'Les nouveaux articles apparaîtront ici dès que les sources auront répondu.')}</section>
@@ -319,8 +326,18 @@ function emptyState(title, text) {
 
 function renderSheet() {
   if (!state.sheet) return '';
-  const available = [...GENERAL_CATEGORIES, ...PERSONAL_THEMES].filter(category => allowedCategories().has(category));
-  return `<div class="sheet-backdrop" data-close-sheet><section class="sheet" role="dialog" aria-modal="true" aria-label="Explorer les catégories" data-sheet-panel><div class="sheet-handle"></div><h2>Explorer un sujet</h2><p>Actualité générale et sujets personnels sont réunis ici.</p><div class="category-grid">${available.map(key => { const meta = categoryMeta[key]; return `<button class="category-choice" data-category="${key}">${icon(meta.icon)}<span>${meta.label}</span></button>`; }).join('')}</div></section></div>`;
+  const chips = (items, selected, attribute) => `<div class="personalize-chips">${items.map(item => `<button type="button" class="personalize-chip ${selected.includes(item) ? 'active' : ''}" ${attribute}="${escapeHtml(item)}" aria-pressed="${selected.includes(item)}">${escapeHtml(item)}</button>`).join('')}</div>`;
+  const watchTopics = [...new Set([...WATCH_TOPICS, ...state.keywords])];
+  return `<div class="sheet-backdrop" data-close-sheet><section class="sheet personalization-sheet" role="dialog" aria-modal="true" aria-label="Personnaliser mon actualité" data-sheet-panel>
+    <div class="sheet-handle"></div>
+    <header class="personalize-head"><div><span>Votre sélection</span><h2>Personnaliser</h2></div><button type="button" class="personalize-close" data-dismiss-sheet aria-label="Fermer">×</button></header>
+    <section class="personalize-section"><h3>Accueil</h3><p>Tous les articles restent accessibles. Ces choix déterminent ceux qui remontent en premier.</p>${chips(GENERAL_CATEGORIES, state.settings.generalCategories, 'data-general-category')}${chips(PERSONAL_THEMES, state.settings.interests, 'data-interest')}</section>
+    <section class="personalize-section"><h3>Brief · Essentiel</h3><p>Choisissez les rubriques utilisées pour le point d’actualité France et Monde.</p>${chips(GENERAL_CATEGORIES, state.settings.briefEssentialCategories, 'data-brief-essential')}</section>
+    <section class="personalize-section"><h3>Brief · Mes veilles</h3><p>Innovation, VR, santé… choisissez les sujets suivis séparément de l’actualité générale.</p>${chips(watchTopics, state.settings.briefWatchTopics, 'data-brief-watch')}
+      <div class="inline-form personalize-add"><input id="keyword-input" class="text-input" type="text" maxlength="70" placeholder="Ajouter une veille précise"><button class="small-primary-btn" data-add-keyword>Ajouter</button></div>
+    </section>
+    <button type="button" class="secondary-btn personalize-settings" data-open-settings>Réglages avancés</button>
+  </section></div>`;
 }
 
 function render() {
@@ -351,6 +368,7 @@ function toast(message) {
 function persist() {
   localStorage.setItem('news-saved', JSON.stringify([...state.saved]));
   localStorage.setItem('news-feedback', JSON.stringify(state.feedback));
+  localStorage.setItem('news-topic-preferences-v1', JSON.stringify(state.topicPreferences));
   localStorage.setItem('news-settings', JSON.stringify(state.settings));
   localStorage.setItem('news-sources', JSON.stringify(state.sources));
   localStorage.setItem('news-keywords', JSON.stringify(state.keywords));
@@ -408,6 +426,7 @@ function addKeyword() {
   if (!value) return;
   if (state.keywords.some(keyword => keyword.toLowerCase() === value.toLowerCase())) return toast('Ce mot-clé est déjà suivi');
   state.keywords.push(value);
+  if (!state.settings.briefWatchTopics.includes(value)) state.settings.briefWatchTopics.push(value);
   persist(); render(); toast('Centre d’intérêt ajouté'); syncNews({ silent: true });
 }
 
@@ -435,6 +454,8 @@ app.addEventListener('click', async event => {
     return;
   }
   if (event.target.closest('[data-back]')) { goBack(); return; }
+  if (event.target.closest('[data-dismiss-sheet]')) { state.sheet = false; render(); return; }
+  if (event.target.closest('[data-open-settings]')) { state.sheet = false; navigate('settings', { savedOnly: false }); return; }
   if (event.target.closest('[data-refresh]')) { await syncNews(); return; }
   if (event.target.closest('[data-add-source]')) { addSource(); return; }
   if (event.target.closest('[data-add-keyword]')) { addKeyword(); return; }
@@ -458,8 +479,12 @@ app.addEventListener('click', async event => {
   if (interest) { const name = interest.dataset.interest; const current = new Set(state.settings.interests); current.has(name) ? current.delete(name) : current.add(name); state.settings.interests = [...current]; persist(); render(); syncNews({ silent: true }); return; }
   const general = event.target.closest('[data-general-category]');
   if (general) { const name = general.dataset.generalCategory; const current = new Set(state.settings.generalCategories); current.has(name) ? current.delete(name) : current.add(name); state.settings.generalCategories = [...current]; persist(); render(); return; }
+  const briefEssential = event.target.closest('[data-brief-essential]');
+  if (briefEssential) { const name = briefEssential.dataset.briefEssential; const current = new Set(state.settings.briefEssentialCategories); current.has(name) ? current.delete(name) : current.add(name); state.settings.briefEssentialCategories = [...current]; persist(); render(); return; }
+  const briefWatch = event.target.closest('[data-brief-watch]');
+  if (briefWatch) { const name = briefWatch.dataset.briefWatch; const current = new Set(state.settings.briefWatchTopics); current.has(name) ? current.delete(name) : current.add(name); state.settings.briefWatchTopics = [...current]; persist(); render(); return; }
   if (event.target.closest('[data-saved-filter]')) { state.savedOnly = !state.savedOnly; render(); return; }
-  if (event.target.closest('[data-reset]')) { state.settings = { ...defaultSettings, generalCategories: [...GENERAL_CATEGORIES], interests: [...PERSONAL_THEMES] }; state.keywords = []; persist(); render(); toast('Préférences réinitialisées'); syncNews({ silent: true }); return; }
+  if (event.target.closest('[data-reset]')) { state.settings = { ...defaultSettings, generalCategories: [...GENERAL_CATEGORIES], interests: [...PERSONAL_THEMES], briefEssentialCategories: [...GENERAL_CATEGORIES], briefWatchTopics: ['Innovation', 'IA', 'VR', 'Santé'] }; state.keywords = []; state.topicPreferences = {}; persist(); render(); toast('Préférences réinitialisées'); syncNews({ silent: true }); return; }
   if (event.target.closest('[data-install]')) {
     if (isInstalled) return toast('L’application est déjà installée');
     if (deferredInstallPrompt) { deferredInstallPrompt.prompt(); const choice = await deferredInstallPrompt.userChoice; deferredInstallPrompt = null; toast(choice.outcome === 'accepted' ? 'Installation lancée' : 'Installation annulée'); }
@@ -511,6 +536,11 @@ window.addEventListener('beforeinstallprompt', event => {
 window.addEventListener('appinstalled', () => { deferredInstallPrompt = null; isInstalled = true; render(); toast('Mon actualité est installée'); });
 window.addEventListener('online', () => syncNews({ silent: true }));
 window.addEventListener('focus', () => { if (!state.lastSync || Date.now() - Date.parse(state.lastSync) > 5 * 60 * 1000) syncNews({ silent: true }); });
+window.addEventListener('news-topic-preferences-changed', event => {
+  state.topicPreferences = event.detail && typeof event.detail === 'object'
+    ? { ...event.detail }
+    : safeJson('news-topic-preferences-v1', {});
+});
 document.addEventListener('visibilitychange', () => { if (!document.hidden && (!state.lastSync || Date.now() - Date.parse(state.lastSync) > 5 * 60 * 1000)) syncNews({ silent: true }); });
 
 setInterval(() => { if (state.settings.autoRefresh && !document.hidden && navigator.onLine) syncNews({ silent: true }); }, 15 * 60 * 1000);

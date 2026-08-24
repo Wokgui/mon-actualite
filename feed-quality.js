@@ -269,7 +269,7 @@ function updateManagers() {
 
 function injectManagers() {
   const sheet = document.querySelector('.sheet');
-  if (sheet && !sheet.querySelector('[data-block-manager]')) sheet.insertAdjacentHTML('beforeend', managerMarkup(false));
+  if (sheet && !sheet.classList.contains('personalization-sheet') && !sheet.querySelector('[data-block-manager]')) sheet.insertAdjacentHTML('beforeend', managerMarkup(false));
 
   const page = document.querySelector('.page');
   if (page?.querySelector('.settings-section') && !page.querySelector('.settings-block-section')) {

@@ -142,6 +142,18 @@ function quickFeedbackMarkup(key, selected) {
   </button>`;
 }
 
+function quickTopicFeedbackMarkup(article) {
+  const preferences = quickReadJson('news-topic-preferences-v1', {});
+  const topics = [...new Set([article?.category, ...(article?.tags || []), ...(article?.matches || [])]
+    .map(value => String(value || '').trim())
+    .filter(value => value && value !== 'À suivre'))].slice(0, 3);
+  if (!topics.length) return '';
+  return `<section class="quick-topic-feedback"><strong>Quels thèmes voulez-vous voir davantage ou moins ?</strong><p>L’application apprend thème par thème, pas seulement pour cet article.</p><div class="quick-topic-list">${topics.map(topic => {
+    const value = Number(preferences[topic] || 0);
+    return `<div class="quick-topic-row"><span>${quickEsc(topic)}</span><div><button type="button" class="${value < 0 ? 'selected' : ''}" data-topic-feedback="${quickEsc(topic)}" data-topic-direction="less" aria-label="Moins de ${quickEsc(topic)}">−</button><button type="button" class="${value > 0 ? 'selected' : ''}" data-topic-feedback="${quickEsc(topic)}" data-topic-direction="more" aria-label="Plus de ${quickEsc(topic)}">+</button></div></div>`;
+  }).join('')}</div></section>`;
+}
+
 async function quickLoadSummary(article, modal) {
   const key = `article:${article.id}`;
   const cache = quickReadJson(QUICK_CACHE_KEY, {});
@@ -156,7 +168,7 @@ async function quickLoadSummary(article, modal) {
   }
 
   try {
-    const response = await fetch('/api/article-summary-groq?v=10', {
+    const response = await fetch('/api/article-summary-groq?v=13', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       cache: 'no-store',
@@ -220,8 +232,9 @@ function openQuickSummary(article) {
     <div class="quick-summary-meta"><span>${quickEsc(article.source || '')}</span><span>${quickEsc(quickTime(article.publishedAt))}</span><span>${quickEsc(article.category || '')}</span></div>
     <div class="quick-summary-text" data-quick-summary-text>${quickEsc(immediate)}</div>
     <a class="quick-full-article" href="${quickEsc(article.url || '#')}" target="_blank" rel="noopener noreferrer">Lire l’article complet <span aria-hidden="true">↗</span></a>
-    <div class="quick-feedback-grid" data-quick-feedback-grid>
-      ${['more','less','not','follow'].map(key => quickFeedbackMarkup(key, current)).join('')}
+    ${quickTopicFeedbackMarkup(article)}
+    <div class="quick-feedback-grid quick-feedback-secondary" data-quick-feedback-grid>
+      ${['not','follow'].map(key => quickFeedbackMarkup(key, current)).join('')}
     </div>
   </section>`;
   document.body.appendChild(backdrop);

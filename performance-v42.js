@@ -1,5 +1,5 @@
 const V42_SUMMARY_CACHE = 'news-article-summaries-v4';
-const V42_VISUAL_CACHE = 'news-visual-map-v3';
+const V42_VISUAL_CACHE = 'news-visual-map-v4-trusted';
 const configured = new WeakSet();
 const failedImages = new Set();
 const summaryInflight = new Map();
@@ -75,6 +75,7 @@ function validImage(value = '') {
     if (!['http:', 'https:'].includes(url.protocol) || failedImages.has(url.href)) return '';
     const host = url.hostname.toLowerCase();
     const hay = `${host}${url.pathname}${url.search}`.toLowerCase();
+    if (url.origin === location.origin && url.pathname === '/' && !url.search) return '';
     if (/(favicon|\/logo(?:[._/-]|$)|logo[-_.]|icon[-_.]|\/icon(?:[._/-]|$)|avatar|sprite|wordmark|site-logo|google[-_ ]?news|googlenews)/i.test(hay)) return '';
     if (host === 'news.google.com' || host.endsWith('.gstatic.com') || host.endsWith('.googleusercontent.com')) return '';
     return url.href;
@@ -82,7 +83,7 @@ function validImage(value = '') {
 }
 function proxyUrl(article) {
   const params = new URLSearchParams({
-    v: '10',
+    v: '11',
     url: String(article?.url || '').slice(0, 1900),
     image: validImage(article?.image || ''),
     title: clean(article?.title || '').slice(0, 280),
@@ -205,54 +206,68 @@ function feedbackMarkup(key, selected) {
   return `<button type="button" class="quick-feedback-tile ${selected === key ? 'selected' : ''}" data-quick-feedback="${key}"><span class="quick-feedback-symbol">${symbol}</span><span><strong>${title}</strong><small>${text}</small></span></button>`;
 }
 
+function articleTopics(article = {}) {
+  const raw = [article.category, ...(article.tags || []), ...(article.matches || [])]
+    .map(clean)
+    .filter(topic => topic && topic !== 'À suivre');
+  return [...new Set(raw)].slice(0, 3);
+}
+
+function topicFeedbackMarkup(article) {
+  const preferences = readJson('news-topic-preferences-v1', {});
+  const topics = articleTopics(article);
+  if (!topics.length) return '';
+  return `<section class="quick-topic-feedback"><strong>Quels thèmes voulez-vous voir davantage ou moins ?</strong><p>L’application apprend thème par thème, pas seulement pour cet article.</p><div class="quick-topic-list">${topics.map(topic => {
+    const value = Number(preferences[topic] || 0);
+    return `<div class="quick-topic-row"><span>${esc(topic)}</span><div><button type="button" class="${value < 0 ? 'selected' : ''}" data-topic-feedback="${esc(topic)}" data-topic-direction="less" aria-label="Moins de ${esc(topic)}">−</button><button type="button" class="${value > 0 ? 'selected' : ''}" data-topic-feedback="${esc(topic)}" data-topic-direction="more" aria-label="Plus de ${esc(topic)}">+</button></div></div>`;
+  }).join('')}</div></section>`;
+}
+
 function closeInstant(modal) {
   (modal || document.querySelector('.quick-summary-backdrop'))?.remove();
   document.body.classList.remove('quick-summary-open');
 }
 
-async function updateSummary(article, modal) {
-  if (!article || !modal) return;
+async function summaryFor(article) {
+  if (!article) return null;
   const key = `article:${article.id}`;
   const initial = readJson(V42_SUMMARY_CACHE, {})[key];
-  const text = modal.querySelector('[data-quick-summary-text]');
-  const label = modal.querySelector('[data-quick-summary-label]');
-  const fallback = provisionalSummary(article);
   if (initial?.summary && !initial.unavailable && summaryUsable(initial.summary)) {
-    text.textContent = clean(initial.summary);
-    label.textContent = initial.ai ? 'Résumé IA' : 'Résumé factuel';
-    return;
+    return initial;
   }
 
   const body = JSON.stringify({ mode: 'article', article: { url: article.url, title: clean(article.title), summary: articleSummary(article), source: clean(article.source || '') } });
   const requestKey = `v42|${body}`;
   let request = summaryInflight.get(requestKey);
   if (!request) {
-    request = fetch('/api/article-summary-groq?v=12', { method: 'POST', headers: { 'Content-Type': 'application/json' }, cache: 'no-store', body })
+    request = fetch('/api/article-summary-groq?v=13', { method: 'POST', headers: { 'Content-Type': 'application/json' }, cache: 'no-store', body })
       .then(r => r.ok ? r.json() : null)
       .finally(() => summaryInflight.delete(requestKey));
     summaryInflight.set(requestKey, request);
   }
   try {
     const data = await request;
-    if (!data?.summary || data?.unavailable || !summaryUsable(data.summary)) {
-      if (modal.isConnected) {
-        text.textContent = fallback;
-        label.textContent = 'Synthèse provisoire';
-      }
-      return;
-    }
+    if (!data?.summary || data?.unavailable || !summaryUsable(data.summary)) return null;
     const latest = readJson(V42_SUMMARY_CACHE, {});
     latest[key] = { summary: clean(data.summary), ai: Boolean(data.ai), unavailable: false, savedAt: Date.now() };
     writeJson(V42_SUMMARY_CACHE, Object.fromEntries(Object.entries(latest).slice(-180)));
-    if (!modal.isConnected) return;
-    text.textContent = clean(data.summary);
-    label.textContent = data.ai ? 'Résumé IA' : 'Résumé factuel';
-  } catch {
-    if (modal.isConnected) {
-      text.textContent = fallback;
-      label.textContent = 'Synthèse provisoire';
-    }
+    return latest[key];
+  } catch { return null; }
+}
+
+async function updateSummary(article, modal) {
+  if (!article || !modal) return;
+  const text = modal.querySelector('[data-quick-summary-text]');
+  const label = modal.querySelector('[data-quick-summary-label]');
+  const result = await summaryFor(article);
+  if (!modal.isConnected) return;
+  if (!result) {
+    text.textContent = provisionalSummary(article);
+    label.textContent = 'Synthèse provisoire';
+    return;
   }
+  text.textContent = clean(result.summary);
+  label.textContent = result.ai ? 'Résumé IA' : 'Résumé factuel';
 }
 
 function openInstant(card, article) {
@@ -279,7 +294,8 @@ function openInstant(card, article) {
     ${visual ? `<div class="quick-summary-v42-image"><img src="${esc(visual)}" alt="" decoding="async" fetchpriority="high"></div>` : ''}
     <div class="quick-summary-text" data-quick-summary-text>${esc(immediate)}</div>
     <a class="quick-full-article" href="${esc(article.url || '#')}" target="_blank" rel="noopener noreferrer">Lire l’article complet <span aria-hidden="true">↗</span></a>
-    <div class="quick-feedback-grid" data-quick-feedback-grid>${['more','less','not','follow'].map(k => feedbackMarkup(k, selected)).join('')}</div>
+    ${topicFeedbackMarkup(article)}
+    <div class="quick-feedback-grid quick-feedback-secondary" data-quick-feedback-grid>${['not','follow'].map(k => feedbackMarkup(k, selected)).join('')}</div>
   </section>`;
   document.body.appendChild(modal);
   document.body.classList.add('quick-summary-open');
@@ -322,6 +338,22 @@ document.addEventListener('pointerup', event => {
 // Suppress the synthetic click that follows our pointer-up so article-quickview
 // cannot create a second modal.
 document.addEventListener('click', event => {
+  const topicButton = event.target.closest('[data-topic-feedback]');
+  if (topicButton) {
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    const topic = clean(topicButton.dataset.topicFeedback || '');
+    const direction = topicButton.dataset.topicDirection;
+    if (!topic || !['more', 'less'].includes(direction)) return;
+    const preferences = readJson('news-topic-preferences-v1', {});
+    const current = Number(preferences[topic] || 0);
+    preferences[topic] = direction === 'more' ? Math.min(3, Math.max(1, current + 1)) : Math.max(-3, Math.min(-1, current - 1));
+    writeJson('news-topic-preferences-v1', preferences);
+    window.dispatchEvent(new CustomEvent('news-topic-preferences-changed', { detail: preferences }));
+    const row = topicButton.closest('.quick-topic-row');
+    row?.querySelectorAll('[data-topic-feedback]').forEach(button => button.classList.toggle('selected', button === topicButton));
+    return;
+  }
   const card = event.target.closest('.article-card[data-article]');
   if (card && performance.now() - openedAt < 900) {
     event.preventDefault();
@@ -342,3 +374,19 @@ const root = document.getElementById('app');
 if (root) new MutationObserver(scheduleScan).observe(root, { childList: true, subtree: true });
 window.addEventListener('focus', scheduleScan);
 scheduleScan();
+
+let warmScheduled = false;
+function warmTopSummaries() {
+  if (warmScheduled) return;
+  warmScheduled = true;
+  const run = async () => {
+    for (const article of articles().slice(0, 3)) {
+      const cached = readJson(V42_SUMMARY_CACHE, {})[`article:${article.id}`];
+      if (cached?.summary && summaryUsable(cached.summary)) continue;
+      await summaryFor(article);
+    }
+  };
+  if ('requestIdleCallback' in window) requestIdleCallback(run, { timeout: 3500 });
+  else setTimeout(run, 1200);
+}
+warmTopSummaries();

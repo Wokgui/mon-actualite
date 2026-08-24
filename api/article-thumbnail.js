@@ -1,9 +1,7 @@
 const dns = require('node:dns').promises;
 const net = require('node:net');
-const photoFast = require('./article-photo-fast.js');
-
-const HTML_TIMEOUT_MS = 4200;
-const IMAGE_TIMEOUT_MS = 3800;
+const HTML_TIMEOUT_MS = 2600;
+const IMAGE_TIMEOUT_MS = 2400;
 const MAX_HTML_BYTES = 1_800_000;
 const MAX_IMAGE_BYTES = 7_000_000;
 const UA = 'Mozilla/5.0 (Linux; Android 16) AppleWebKit/537.36 Chrome/140 Safari/537.36';
@@ -213,6 +211,7 @@ function isGenericImageUrl(rawUrl = '') {
     const url = new URL(rawUrl);
     const host = url.hostname.toLowerCase();
     const haystack = `${host}${url.pathname}${url.search}`.toLowerCase();
+    if (url.pathname === '/' && !url.search) return true;
     if (/(favicon|\/logo(?:[._/-]|$)|logo[-_.]|icon[-_.]|\/icon(?:[._/-]|$)|avatar|sprite|wordmark|brandmark|site-logo|google[-_ ]?news|googlenews|google_actualites|google-actualites)/i.test(haystack)) return true;
     if (host === 'news.google.com' || host === 'www.google.com' || host.endsWith('.gstatic.com') || host.endsWith('.googleusercontent.com')) return true;
     return false;
@@ -322,8 +321,6 @@ module.exports = async function handler(req, res) {
 
   const rawUrl = String(req.query?.url || '').slice(0, 2000);
   const suppliedImage = String(req.query?.image || '').slice(0, 2000);
-  const title = String(req.query?.title || '').slice(0, 300);
-  const category = String(req.query?.category || '').slice(0, 80);
 
   if (suppliedImage && !isGenericImageUrl(suppliedImage)) {
     try {
@@ -350,15 +347,7 @@ module.exports = async function handler(req, res) {
     }
   }
 
-  try {
-    const fallbackUrl = await photoFast.chooseImage(title, category);
-    if (fallbackUrl) {
-      const image = await photoFast.fetchImage(fallbackUrl);
-      return sendImage(res, image, 'illustration');
-    }
-  } catch (error) {
-    console.warn('illustration unavailable:', String(error?.message || error).slice(0, 120));
-  }
-
+  // Never invent an illustration from a loose keyword search. A neutral visual
+  // is preferable to a fast but unrelated or uncanny photograph.
   return fallback(res);
 };
