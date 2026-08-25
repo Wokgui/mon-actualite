@@ -1,5 +1,6 @@
 const dns = require('node:dns').promises;
 const net = require('node:net');
+const { createHash } = require('node:crypto');
 
 const MAX_CUSTOM_SOURCES = 12;
 const MAX_KEYWORDS = 8;
@@ -113,6 +114,11 @@ function visualTitleAgreement(candidate = '', expected = '') {
   if (!wanted.length || !found.size) return { score: 0, hits: 0 };
   const hits = wanted.filter(word => found.has(word)).length;
   return { score: hits / Math.max(wanted.length, found.size), hits };
+}
+
+function stableServerArticleId(item = {}) {
+  const key = `${String(item.url || '')}|${String(item.title || '')}`;
+  return `a-${createHash('sha256').update(key).digest('hex').slice(0, 16)}`;
 }
 
 function parseGoogleVisuals(html = '', pageUrl = '') {
@@ -512,7 +518,7 @@ module.exports = async function handler(req, res) {
   await resolvePreparedVisuals(selected);
 
   const articles = selected.map(item => ({
-      id: Buffer.from(`${item.url}|${item.title}`).toString('base64url').slice(0, 48),
+      id: stableServerArticleId(item),
       title: item.title,
       url: item.url,
       summary: item.summary || 'Ouvrez l’article pour consulter les détails publiés par la source.',

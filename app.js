@@ -348,22 +348,30 @@ function renderSheet() {
   </section></div>`;
 }
 
-function render() {
+function render({ resetScroll = false, scrollTop = null } = {}) {
+  const preservedScroll = Number.isFinite(scrollTop) ? scrollTop : (resetScroll ? 0 : window.scrollY);
   const views = { home: renderHome, category: renderCategory, detail: renderDetail, brief: renderBrief, news: renderNews, settings: renderSettings };
   app.innerHTML = (views[state.view] || renderHome)() + renderSheet();
-  window.scrollTo({ top: 0, behavior: 'instant' });
+  window.scrollTo({ top: preservedScroll, behavior: 'instant' });
+  if (preservedScroll > 0) requestAnimationFrame(() => window.scrollTo({ top: preservedScroll, behavior: 'instant' }));
 }
 
 function navigate(view, additions = {}) {
-  if (view !== state.view) state.previous.push({ view: state.view, category: state.category, articleId: state.articleId, categoryTab: state.categoryTab });
+  if (view !== state.view) state.previous.push({ view: state.view, category: state.category, articleId: state.articleId, categoryTab: state.categoryTab, scrollTop: window.scrollY });
   Object.assign(state, { view, ...additions });
-  render();
+  render({ resetScroll: true });
 }
 
 function goBack() {
   const prior = state.previous.pop();
-  if (prior) Object.assign(state, prior); else state.view = 'home';
-  render();
+  if (prior) {
+    const { scrollTop = 0, ...priorState } = prior;
+    Object.assign(state, priorState);
+    render({ scrollTop });
+  } else {
+    state.view = 'home';
+    render({ resetScroll: true });
+  }
 }
 
 function toast(message) {
@@ -481,6 +489,15 @@ function scheduleVisualBackfill() {
   clearTimeout(visualBackfillTimer);
   visualBackfillTimer = setTimeout(() => backfillVisibleVisuals(), 350);
 }
+
+const visualBackfillObserver = new MutationObserver(mutations => {
+  const addedArticleCards = mutations.some(mutation => [...mutation.addedNodes].some(node =>
+    node.nodeType === Node.ELEMENT_NODE
+    && (node.matches?.('.article-card[data-article]') || node.querySelector?.('.article-card[data-article]'))
+  ));
+  if (addedArticleCards) scheduleVisualBackfill();
+});
+visualBackfillObserver.observe(app, { childList: true, subtree: true });
 
 async function syncNews({ silent = false } = {}) {
   if (syncPromise) return syncPromise;
