@@ -8,9 +8,13 @@ const toastEl = $('#toast');
 const GENERAL_CATEGORIES = ['Politique', 'International', 'Économie', 'Société', 'Santé', 'Environnement', 'Science', 'Culture', 'Éducation', 'Europe'];
 const PERSONAL_THEMES = ['IA', 'Tech', 'Smartphones', 'VR', 'Automobile', 'Énergie'];
 const WATCH_TOPICS = ['Innovation', 'IA', 'VR', 'Santé', 'Science', 'Tech', 'Énergie', 'Environnement', 'Automobile', 'Smartphones'];
-const VISUAL_BACKFILL_KEY = 'news-visual-backfill-v2';
+// v3 deliberately drops the old persisted failure markers. A single transient
+// miss used to freeze a source tile for six hours, even when the exact image
+// became available a few seconds later.
+const VISUAL_BACKFILL_KEY = 'news-visual-backfill-v3';
 const VISUAL_BACKFILL_MAX_AGE = 30 * 86400000;
-const VISUAL_BACKFILL_RETRY_DELAY = 6 * 60 * 60 * 1000;
+const VISUAL_BACKFILL_RETRY_DELAY = 90 * 1000;
+const VISUAL_BACKFILL_MAX_ATTEMPTS = 2;
 
 const categoryMeta = {
   Politique: { icon: 'landmark', label: 'Politique' },
@@ -396,7 +400,7 @@ function persistCache() {
 
 function articleThumbnailUrl(article) {
   const params = new URLSearchParams({
-    v: '14',
+    v: '15',
     url: String(article?.url || '').slice(0, 1900),
     title: String(article?.title || '').replace(/\s+/g, ' ').trim().slice(0, 280),
     category: String(article?.category || '').replace(/\s+/g, ' ').trim().slice(0, 70)
@@ -406,7 +410,10 @@ function articleThumbnailUrl(article) {
 
 function saveVisualBackfills() {
   const recent = Object.entries(visualBackfills)
-    .filter(([, item]) => item && Date.now() - Number(item.savedAt || item.attemptedAt || 0) < VISUAL_BACKFILL_MAX_AGE)
+    // Only successful recoveries survive an app restart. Failed attempts are
+    // session-local so a temporary Google/publisher miss never poisons the
+    // next launch on the phone.
+    .filter(([, item]) => item?.url && Date.now() - Number(item.savedAt || 0) < VISUAL_BACKFILL_MAX_AGE)
     .slice(-300);
   try { localStorage.setItem(VISUAL_BACKFILL_KEY, JSON.stringify(Object.fromEntries(recent))); } catch {}
 }
@@ -448,22 +455,50 @@ async function recoverArticleVisual(article) {
     if (!response.ok || status === 'fallback' || /image\/svg\+xml/i.test(type) || bytes.byteLength < 256) throw new Error('visual unavailable');
     installRecoveredVisual(article, endpoint);
   } catch {
-    visualBackfills[String(article.id)] = { attemptedAt: Date.now() };
+    const key = String(article.id);
+    const previous = visualBackfills[key];
+    visualBackfills[key] = {
+      attemptedAt: Date.now(),
+      attempts: Math.min(VISUAL_BACKFILL_MAX_ATTEMPTS, Number(previous?.attempts || 0) + 1)
+    };
   }
+}
+
+function visualCardDistance(card) {
+  const rect = card.getBoundingClientRect();
+  if (rect.bottom >= -120 && rect.top <= window.innerHeight + 120) return 0;
+  if (rect.top > window.innerHeight) return rect.top - window.innerHeight;
+  return Math.abs(rect.bottom);
 }
 
 async function backfillVisibleVisuals() {
   if (visualBackfillRunning || !navigator.onLine || document.hidden) return;
-  const visibleIds = [...document.querySelectorAll('.article-card[data-article]')].map(card => String(card.dataset.article || ''));
-  const candidates = [...new Set(visibleIds)]
+  const visibleIds = [...document.querySelectorAll('.article-card[data-article]')]
+    .map(card => ({ id: String(card.dataset.article || ''), distance: visualCardDistance(card) }))
+    .sort((a, b) => a.distance - b.distance)
+    .map(item => item.id);
+  const orderedArticles = [...new Set(visibleIds)]
     .map(id => state.articles.find(article => String(article?.id || '') === id))
+    .filter(Boolean);
+  const candidates = orderedArticles
     .filter(article => {
-      if (!article || hasPreparedVisual(article)) return false;
+      if (hasPreparedVisual(article)) return false;
       const attempt = visualBackfills[String(article.id)];
-      return !attempt?.attemptedAt || Date.now() - Number(attempt.attemptedAt) >= VISUAL_BACKFILL_RETRY_DELAY;
+      const attempts = Number(attempt?.attempts || 0);
+      return attempts < VISUAL_BACKFILL_MAX_ATTEMPTS
+        && (!attempt?.attemptedAt || Date.now() - Number(attempt.attemptedAt) >= VISUAL_BACKFILL_RETRY_DELAY);
     })
     .slice(0, 12);
-  if (!candidates.length) return;
+  if (!candidates.length) {
+    const retryWaits = orderedArticles
+      .filter(article => !hasPreparedVisual(article))
+      .map(article => visualBackfills[String(article.id)])
+      .filter(attempt => Number(attempt?.attempts || 0) > 0 && Number(attempt.attempts) < VISUAL_BACKFILL_MAX_ATTEMPTS)
+      .map(attempt => VISUAL_BACKFILL_RETRY_DELAY - (Date.now() - Number(attempt.attemptedAt || 0)))
+      .filter(wait => wait > 0);
+    if (retryWaits.length) scheduleVisualBackfill(Math.max(350, Math.min(...retryWaits) + 50));
+    return;
+  }
   visualBackfillRunning = true;
   let cursor = 0;
   const worker = async () => {
@@ -485,9 +520,9 @@ async function backfillVisibleVisuals() {
   }
 }
 
-function scheduleVisualBackfill() {
+function scheduleVisualBackfill(delay = 350) {
   clearTimeout(visualBackfillTimer);
-  visualBackfillTimer = setTimeout(() => backfillVisibleVisuals(), 350);
+  visualBackfillTimer = setTimeout(() => backfillVisibleVisuals(), delay);
 }
 
 const visualBackfillObserver = new MutationObserver(mutations => {
