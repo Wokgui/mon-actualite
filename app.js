@@ -471,6 +471,9 @@ async function backfillVisibleVisuals() {
     saveVisualBackfills();
   } finally {
     visualBackfillRunning = false;
+    // Continue with the next small wave until every card currently rendered
+    // has either received its exact visual or a delayed retry marker.
+    scheduleVisualBackfill();
   }
 }
 
