@@ -400,8 +400,11 @@ function persistCache() {
 
 function articleThumbnailUrl(article) {
   const params = new URLSearchParams({
-    v: '15',
+    v: '16',
     url: String(article?.url || '').slice(0, 1900),
+    // When a Google CDN image works on desktop but is refused on the phone,
+    // let our same-origin endpoint fetch and serve that exact image.
+    image: String(article?.image || '').slice(0, 1900),
     title: String(article?.title || '').replace(/\s+/g, ' ').trim().slice(0, 280),
     category: String(article?.category || '').replace(/\s+/g, ' ').trim().slice(0, 70)
   });
@@ -473,16 +476,27 @@ function visualCardDistance(card) {
 
 async function backfillVisibleVisuals() {
   if (visualBackfillRunning || !navigator.onLine || document.hidden) return;
-  const visibleIds = [...document.querySelectorAll('.article-card[data-article]')]
-    .map(card => ({ id: String(card.dataset.article || ''), distance: visualCardDistance(card) }))
+  const cardEntries = [...document.querySelectorAll('.article-card[data-article]')]
+    .map(card => {
+      const image = card.querySelector('img.article-image');
+      const src = image?.currentSrc || image?.src || '';
+      const needsRecovery = Boolean(image && (
+        image.classList.contains('source-tile-visual')
+        || card.classList.contains('v42-image-failed')
+        || src.startsWith('data:image/svg+xml')
+        || (image.complete && image.naturalWidth < 2)
+      ));
+      return { id: String(card.dataset.article || ''), distance: visualCardDistance(card), needsRecovery };
+    })
     .sort((a, b) => a.distance - b.distance)
-    .map(item => item.id);
+  const recoveryIds = new Set(cardEntries.filter(item => item.needsRecovery).map(item => item.id));
+  const visibleIds = cardEntries.map(item => item.id);
   const orderedArticles = [...new Set(visibleIds)]
     .map(id => state.articles.find(article => String(article?.id || '') === id))
     .filter(Boolean);
   const candidates = orderedArticles
     .filter(article => {
-      if (hasPreparedVisual(article)) return false;
+      if (hasPreparedVisual(article) && !recoveryIds.has(String(article.id))) return false;
       const attempt = visualBackfills[String(article.id)];
       const attempts = Number(attempt?.attempts || 0);
       return attempts < VISUAL_BACKFILL_MAX_ATTEMPTS
@@ -491,7 +505,7 @@ async function backfillVisibleVisuals() {
     .slice(0, 12);
   if (!candidates.length) {
     const retryWaits = orderedArticles
-      .filter(article => !hasPreparedVisual(article))
+      .filter(article => !hasPreparedVisual(article) || recoveryIds.has(String(article.id)))
       .map(article => visualBackfills[String(article.id)])
       .filter(attempt => Number(attempt?.attempts || 0) > 0 && Number(attempt.attempts) < VISUAL_BACKFILL_MAX_ATTEMPTS)
       .map(attempt => VISUAL_BACKFILL_RETRY_DELAY - (Date.now() - Number(attempt.attemptedAt || 0)))
@@ -533,6 +547,16 @@ const visualBackfillObserver = new MutationObserver(mutations => {
   if (addedArticleCards) scheduleVisualBackfill();
 });
 visualBackfillObserver.observe(app, { childList: true, subtree: true });
+
+// Image errors do not add/remove DOM nodes, so the observer above cannot see
+// them. Capture the failure and immediately schedule the same-origin recovery
+// used for articles that arrived without a prepared visual.
+document.addEventListener('error', event => {
+  const image = event.target;
+  if (image instanceof HTMLImageElement && image.closest('.article-card[data-article]')) {
+    scheduleVisualBackfill(100);
+  }
+}, true);
 
 async function syncNews({ silent = false } = {}) {
   if (syncPromise) return syncPromise;

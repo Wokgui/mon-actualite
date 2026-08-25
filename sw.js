@@ -1,6 +1,6 @@
-const CACHE = 'mon-actualite-v48-visual-retry';
+const CACHE = 'mon-actualite-v49-mobile-images';
 const THUMB_CACHE = 'mon-actualite-thumbnails-v5-legacy';
-const ASSETS = ['./', './index.html', './styles.css?v=43', './feedly-compact.css?v=43', './feedly-left.css?v=43', './ui-fixes-v2.css?v=43', './article-quickview.css?v=43', './feed-quality.css?v=43', './performance-v42.css?v=45', './personalization-v44.css?v=44', './bootstrap-v42.js?v=44', './stable-dom.js?v=44', './app.js?v=48', './feedly-runtime.js?v=45.3', './performance-v42.js?v=46', './summary-fixes.js?v=44', './article-quickview.js?v=44', './feed-quality.js?v=44.1', './services/source-connectors.js?v=45.3', './services/article-visuals.js?v=45.3', './manifest.webmanifest', './assets/app-icon.svg'];
+const ASSETS = ['./', './index.html', './styles.css?v=43', './feedly-compact.css?v=43', './feedly-left.css?v=43', './ui-fixes-v2.css?v=43', './article-quickview.css?v=43', './feed-quality.css?v=43', './performance-v42.css?v=45', './personalization-v44.css?v=44', './bootstrap-v42.js?v=44', './stable-dom.js?v=44', './app.js?v=49', './feedly-runtime.js?v=45.3', './performance-v42.js?v=46', './summary-fixes.js?v=44', './article-quickview.js?v=44', './feed-quality.js?v=44.1', './services/source-connectors.js?v=45.3', './services/article-visuals.js?v=45.3', './manifest.webmanifest', './assets/app-icon.svg'];
 
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(ASSETS)).then(() => self.skipWaiting()));
@@ -23,6 +23,20 @@ async function staleWhileRevalidate(request, cacheName) {
   });
   if (cached) return cached;
   return network;
+}
+
+async function networkFirstNavigation(request) {
+  const cache = await caches.open(CACHE);
+  try {
+    const response = await fetch(request, { cache: 'no-store' });
+    if (response.ok && response.type !== 'opaque') {
+      cache.put('./index.html', response.clone()).catch(() => {});
+      cache.put('./', response.clone()).catch(() => {});
+    }
+    return response;
+  } catch {
+    return (await cache.match('./index.html')) || (await cache.match('./'));
+  }
 }
 
 async function thumbnailResponse(request, event) {
@@ -69,7 +83,14 @@ self.addEventListener('fetch', event => {
   }
   if (url.pathname.startsWith('/api/')) return;
 
-  // Static application shell is returned from cache immediately. Refresh in
-  // the background so launching the installed PWA no longer waits on network.
+  // Always ask the network for the application entry page when online. The
+  // previous cache-first launch could keep Android on an old app.js version
+  // even after a successful deployment and service-worker activation.
+  if (event.request.mode === 'navigate' || url.pathname === '/' || url.pathname === '/index.html') {
+    event.respondWith(networkFirstNavigation(event.request));
+    return;
+  }
+
+  // Versioned static assets remain instant and refresh in the background.
   event.respondWith(staleWhileRevalidate(event.request, CACHE).catch(() => caches.match('./index.html')));
 });
