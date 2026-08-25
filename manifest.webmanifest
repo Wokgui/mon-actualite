@@ -3,7 +3,7 @@
   "name": "Mon actualité",
   "short_name": "Actualité",
   "description": "L'essentiel choisi et synthétisé pour vous",
-  "start_url": "/?v=49",
+  "start_url": "/?v=50",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait-primary",

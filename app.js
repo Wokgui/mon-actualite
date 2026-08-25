@@ -4,6 +4,9 @@ import { articleVisualUrl, hasPreparedVisual, sourceTileUrl } from './services/a
 const $ = (selector, root = document) => root.querySelector(selector);
 const app = $('#app');
 const toastEl = $('#toast');
+const APP_VERSION = '50';
+const APP_RELEASE = '25 août 2026';
+document.documentElement.dataset.appVersion = APP_VERSION;
 
 const GENERAL_CATEGORIES = ['Politique', 'International', 'Économie', 'Société', 'Santé', 'Environnement', 'Science', 'Culture', 'Éducation', 'Europe'];
 const PERSONAL_THEMES = ['IA', 'Tech', 'Smartphones', 'VR', 'Automobile', 'Énergie'];
@@ -328,6 +331,7 @@ function renderSettings() {
 
     <section class="settings-section"><h2>Sélection et résumés</h2><div class="setting-row"><div class="setting-label"><strong>Longueur des résumés</strong><span>Format affiché dans les cartes</span></div><select class="select" data-setting-select="summaryLength"><option value="très court" ${state.settings.summaryLength === 'très court' ? 'selected' : ''}>Très court</option><option value="court" ${state.settings.summaryLength === 'court' ? 'selected' : ''}>Court</option><option value="détaillé" ${state.settings.summaryLength === 'détaillé' ? 'selected' : ''}>Détaillé</option></select></div></section>
     <section class="settings-section"><h2>Notifications</h2>${settingRow('Brief du matin', 'Préférence conservée pour les futures notifications push', 'notifications')}</section>
+    <section class="settings-section app-version-section"><h2>Version de l’application</h2><p>Ce numéro permet de vérifier immédiatement que le smartphone utilise bien la dernière publication.</p><div class="app-version-row"><div><strong>Mon actualité · version ${APP_VERSION}</strong><span>Publication du ${APP_RELEASE}</span></div><span class="app-version-badge">v${APP_VERSION}</span></div><button class="secondary-btn compact-btn" data-check-update>${icon('refresh')} Vérifier et mettre à jour</button></section>
     <button class="secondary-btn" data-reset>Réinitialiser les préférences</button>
   </main>${nav('settings')}`;
 }
@@ -611,6 +615,32 @@ function addKeyword() {
   persist(); render(); toast('Centre d’intérêt ajouté'); syncNews({ silent: true });
 }
 
+async function checkAppUpdate({ announce = false } = {}) {
+  try {
+    const versionUrl = new URL('./version.json', location.href);
+    versionUrl.searchParams.set('t', Date.now().toString());
+    const response = await fetch(versionUrl, { cache: 'no-store' });
+    if (!response.ok) throw new Error('version unavailable');
+    const published = await response.json();
+    const publishedVersion = String(published?.version || '').trim();
+    const registration = 'serviceWorker' in navigator ? await navigator.serviceWorker.getRegistration() : null;
+    await registration?.update();
+    if (registration?.waiting) registration.waiting.postMessage({ type: 'SKIP_WAITING' });
+
+    if (publishedVersion && publishedVersion !== APP_VERSION) {
+      if (announce) toast(`Mise à jour vers la version ${publishedVersion}…`);
+      const nextUrl = new URL(location.href);
+      nextUrl.searchParams.set('app-version', publishedVersion);
+      nextUrl.searchParams.set('update', Date.now().toString());
+      window.setTimeout(() => window.location.replace(nextUrl.href), 250);
+      return;
+    }
+    if (announce) toast(`Version ${APP_VERSION} à jour`);
+  } catch {
+    if (announce) toast('Vérification impossible pour le moment');
+  }
+}
+
 app.addEventListener('click', async event => {
   const save = event.target.closest('[data-save]');
   if (save) {
@@ -637,6 +667,7 @@ app.addEventListener('click', async event => {
   if (event.target.closest('[data-back]')) { goBack(); return; }
   if (event.target.closest('[data-dismiss-sheet]')) { state.sheet = false; render(); return; }
   if (event.target.closest('[data-open-settings]')) { state.sheet = false; navigate('settings', { savedOnly: false }); return; }
+  if (event.target.closest('[data-check-update]')) { await checkAppUpdate({ announce: true }); return; }
   if (event.target.closest('[data-refresh]')) { await syncNews(); return; }
   if (event.target.closest('[data-add-source]')) { addSource(); return; }
   if (event.target.closest('[data-add-keyword]')) { addKeyword(); return; }
@@ -729,3 +760,4 @@ setInterval(() => { if (state.settings.autoRefresh && !document.hidden && naviga
 render();
 scheduleVisualBackfill();
 syncNews({ silent: true });
+window.setTimeout(() => checkAppUpdate(), 1200);
