@@ -8,6 +8,9 @@ const toastEl = $('#toast');
 const GENERAL_CATEGORIES = ['Politique', 'International', 'Économie', 'Société', 'Santé', 'Environnement', 'Science', 'Culture', 'Éducation', 'Europe'];
 const PERSONAL_THEMES = ['IA', 'Tech', 'Smartphones', 'VR', 'Automobile', 'Énergie'];
 const WATCH_TOPICS = ['Innovation', 'IA', 'VR', 'Santé', 'Science', 'Tech', 'Énergie', 'Environnement', 'Automobile', 'Smartphones'];
+const VISUAL_BACKFILL_KEY = 'news-visual-backfill-v2';
+const VISUAL_BACKFILL_MAX_AGE = 30 * 86400000;
+const VISUAL_BACKFILL_RETRY_DELAY = 6 * 60 * 60 * 1000;
 
 const categoryMeta = {
   Politique: { icon: 'landmark', label: 'Politique' },
@@ -48,6 +51,7 @@ function safeJson(key, fallback) {
 
 const savedSettings = safeJson('news-settings', {});
 const cache = safeJson('news-live-cache', { articles: [], fetchedAt: null });
+const visualBackfills = safeJson(VISUAL_BACKFILL_KEY, {});
 const state = {
   view: 'home', previous: [], category: 'Politique', categoryTab: 'brief', articleId: null,
   saved: new Set(safeJson('news-saved', [])),
@@ -74,6 +78,8 @@ let deferredInstallPrompt = null;
 let isInstalled = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
 let syncPromise = null;
 let toastTimer;
+let visualBackfillTimer = null;
+let visualBackfillRunning = false;
 
 const iconPaths = {
   home: '<path d="m3 11 9-8 9 8"/><path d="M5 10v10h14V10"/><path d="M9 20v-6h6v6"/>',
@@ -380,6 +386,99 @@ function persistCache() {
   localStorage.setItem('news-live-cache', JSON.stringify({ articles: state.articles, fetchedAt: state.lastSync, stats: state.stats }));
 }
 
+function articleThumbnailUrl(article) {
+  const params = new URLSearchParams({
+    v: '14',
+    url: String(article?.url || '').slice(0, 1900),
+    title: String(article?.title || '').replace(/\s+/g, ' ').trim().slice(0, 280),
+    category: String(article?.category || '').replace(/\s+/g, ' ').trim().slice(0, 70)
+  });
+  return `/api/article-thumbnail?${params}`;
+}
+
+function saveVisualBackfills() {
+  const recent = Object.entries(visualBackfills)
+    .filter(([, item]) => item && Date.now() - Number(item.savedAt || item.attemptedAt || 0) < VISUAL_BACKFILL_MAX_AGE)
+    .slice(-300);
+  try { localStorage.setItem(VISUAL_BACKFILL_KEY, JSON.stringify(Object.fromEntries(recent))); } catch {}
+}
+
+function applyRememberedVisual(article) {
+  const remembered = visualBackfills[String(article?.id || '')];
+  if (!remembered?.url || Date.now() - Number(remembered.savedAt || 0) > VISUAL_BACKFILL_MAX_AGE) return article;
+  article.image = remembered.url;
+  article.visualStatus = 'ready';
+  article.visual = { status: 'ready', url: remembered.url, source: 'article-enrichment' };
+  return article;
+}
+
+function installRecoveredVisual(article, endpoint) {
+  const live = state.articles.find(item => String(item?.id || '') === String(article?.id || ''));
+  if (!live) return;
+  live.image = endpoint;
+  live.visualStatus = 'ready';
+  live.visual = { status: 'ready', url: endpoint, source: 'article-enrichment' };
+  visualBackfills[String(live.id)] = { url: endpoint, savedAt: Date.now() };
+  document.querySelectorAll('.article-card[data-article]').forEach(card => {
+    if (String(card.dataset.article || '') !== String(live.id)) return;
+    const image = card.querySelector('img.article-image');
+    if (!image) return;
+    image.classList.remove('source-tile-visual');
+    image.classList.add('prepared-visual');
+    image.loading = 'eager';
+    image.src = endpoint;
+  });
+}
+
+async function recoverArticleVisual(article) {
+  const endpoint = articleThumbnailUrl(article);
+  try {
+    const response = await fetch(endpoint, { cache: 'force-cache' });
+    const status = response.headers.get('X-Thumbnail-Status') || '';
+    const type = response.headers.get('Content-Type') || '';
+    const bytes = await response.arrayBuffer();
+    if (!response.ok || status === 'fallback' || /image\/svg\+xml/i.test(type) || bytes.byteLength < 256) throw new Error('visual unavailable');
+    installRecoveredVisual(article, endpoint);
+  } catch {
+    visualBackfills[String(article.id)] = { attemptedAt: Date.now() };
+  }
+}
+
+async function backfillVisibleVisuals() {
+  if (visualBackfillRunning || !navigator.onLine || document.hidden) return;
+  const visibleIds = [...document.querySelectorAll('.article-card[data-article]')].map(card => String(card.dataset.article || ''));
+  const candidates = [...new Set(visibleIds)]
+    .map(id => state.articles.find(article => String(article?.id || '') === id))
+    .filter(article => {
+      if (!article || hasPreparedVisual(article)) return false;
+      const attempt = visualBackfills[String(article.id)];
+      return !attempt?.attemptedAt || Date.now() - Number(attempt.attemptedAt) >= VISUAL_BACKFILL_RETRY_DELAY;
+    })
+    .slice(0, 12);
+  if (!candidates.length) return;
+  visualBackfillRunning = true;
+  let cursor = 0;
+  const worker = async () => {
+    while (cursor < candidates.length) {
+      const article = candidates[cursor++];
+      await recoverArticleVisual(article);
+      await new Promise(resolve => setTimeout(resolve, 140));
+    }
+  };
+  try {
+    await Promise.all([worker(), worker()]);
+    persistCache();
+    saveVisualBackfills();
+  } finally {
+    visualBackfillRunning = false;
+  }
+}
+
+function scheduleVisualBackfill() {
+  clearTimeout(visualBackfillTimer);
+  visualBackfillTimer = setTimeout(() => backfillVisibleVisuals(), 350);
+}
+
 async function syncNews({ silent = false } = {}) {
   if (syncPromise) return syncPromise;
   state.syncStatus = 'loading'; state.syncError = '';
@@ -395,12 +494,13 @@ async function syncNews({ silent = false } = {}) {
         webSearch: state.settings.webSearch,
         sourcePriority: state.settings.sourcePriority
       });
-      state.articles = Array.isArray(result.articles) ? result.articles : [];
+      state.articles = Array.isArray(result.articles) ? result.articles.map(applyRememberedVisual) : [];
       state.lastSync = result.fetchedAt || new Date().toISOString();
       state.stats = result.stats || null;
       state.syncStatus = 'idle';
       persistCache();
       render();
+      scheduleVisualBackfill();
       if (!silent) toast(`${state.articles.length} article${state.articles.length > 1 ? 's' : ''} actualisé${state.articles.length > 1 ? 's' : ''}`);
     } catch (error) {
       state.syncStatus = 'error';
@@ -548,4 +648,5 @@ document.addEventListener('visibilitychange', () => { if (!document.hidden && (!
 setInterval(() => { if (state.settings.autoRefresh && !document.hidden && navigator.onLine) syncNews({ silent: true }); }, 15 * 60 * 1000);
 
 render();
+scheduleVisualBackfill();
 syncNews({ silent: true });

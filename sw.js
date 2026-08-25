@@ -1,6 +1,6 @@
-const CACHE = 'mon-actualite-v45-3-prepared-visuals';
+const CACHE = 'mon-actualite-v46-visual-backfill';
 const THUMB_CACHE = 'mon-actualite-thumbnails-v5-legacy';
-const ASSETS = ['./', './index.html', './styles.css?v=43', './feedly-compact.css?v=43', './feedly-left.css?v=43', './ui-fixes-v2.css?v=43', './article-quickview.css?v=43', './feed-quality.css?v=43', './performance-v42.css?v=45', './personalization-v44.css?v=44', './bootstrap-v42.js?v=44', './stable-dom.js?v=44', './app.js?v=45.3', './feedly-runtime.js?v=45.3', './performance-v42.js?v=45.3', './summary-fixes.js?v=44', './article-quickview.js?v=44', './feed-quality.js?v=44.1', './services/source-connectors.js?v=45.3', './services/article-visuals.js?v=45.3', './manifest.webmanifest', './assets/app-icon.svg'];
+const ASSETS = ['./', './index.html', './styles.css?v=43', './feedly-compact.css?v=43', './feedly-left.css?v=43', './ui-fixes-v2.css?v=43', './article-quickview.css?v=43', './feed-quality.css?v=43', './performance-v42.css?v=45', './personalization-v44.css?v=44', './bootstrap-v42.js?v=44', './stable-dom.js?v=44', './app.js?v=46', './feedly-runtime.js?v=45.3', './performance-v42.js?v=46', './summary-fixes.js?v=44', './article-quickview.js?v=44', './feed-quality.js?v=44.1', './services/source-connectors.js?v=45.3', './services/article-visuals.js?v=45.3', './manifest.webmanifest', './assets/app-icon.svg'];
 
 self.addEventListener('install', event => {
   event.waitUntil(caches.open(CACHE).then(cache => cache.addAll(ASSETS)).then(() => self.skipWaiting()));

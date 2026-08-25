@@ -7,6 +7,8 @@ const failedImages = new Set();
 const summaryInflight = new Map();
 let press = null;
 let openedAt = 0;
+let closeGesture = null;
+let closedAt = -Infinity;
 let scanPending = false;
 
 function readJson(key, fallback) {
@@ -317,7 +319,9 @@ function openInstant(card, article) {
   updateSummary(article, modal);
 }
 
-// Instant close on finger-down, before any asynchronous work or click handler.
+// Capture the close gesture without removing the sheet yet. On Android, if the
+// DOM disappears during pointerdown, the following synthetic click can be
+// retargeted to the article that has just appeared underneath the finger.
 document.addEventListener('pointerdown', event => {
   const close = event.target.closest('[data-quick-close]');
   if (close) {
@@ -325,7 +329,8 @@ document.addEventListener('pointerdown', event => {
     if (modal) {
       event.preventDefault();
       event.stopImmediatePropagation();
-      closeInstant(modal);
+      press = null;
+      closeGesture = { pointerId: event.pointerId, modal };
       return;
     }
   }
@@ -337,6 +342,15 @@ document.addEventListener('pointerdown', event => {
 // Open immediately on pointer-up after a normal tap. This bypasses the slower
 // legacy click path but does not open while the user is scrolling.
 document.addEventListener('pointerup', event => {
+  if (closeGesture && closeGesture.pointerId === event.pointerId) {
+    const { modal } = closeGesture;
+    closeGesture = null;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    closeInstant(modal);
+    closedAt = performance.now();
+    return;
+  }
   if (!press) return;
   const { card, x, y, t } = press;
   press = null;
@@ -349,9 +363,19 @@ document.addEventListener('pointerup', event => {
   openInstant(card, article);
 }, true);
 
+document.addEventListener('pointercancel', event => {
+  if (closeGesture?.pointerId === event.pointerId) closeGesture = null;
+  press = null;
+}, true);
+
 // Suppress the synthetic click that follows our pointer-up so article-quickview
 // cannot create a second modal.
 document.addEventListener('click', event => {
+  if (performance.now() - closedAt < 900) {
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    return;
+  }
   const topicButton = event.target.closest('[data-topic-feedback]');
   if (topicButton) {
     event.preventDefault();
