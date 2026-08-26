@@ -397,12 +397,20 @@ function fallback(res) {
   res.end(svg);
 }
 
+function exactImageUnavailable(res) {
+  res.statusCode = 404;
+  res.setHeader('Cache-Control', 'no-store, max-age=0');
+  res.setHeader('X-Thumbnail-Status', 'fallback');
+  res.end();
+}
+
 module.exports = async function handler(req, res) {
   if (req.method !== 'GET') { res.statusCode = 405; return res.end(); }
 
   const rawUrl = String(req.query?.url || '').slice(0, 2000);
   const suppliedImage = String(req.query?.image || '').slice(0, 2000);
   const title = String(req.query?.title || '').slice(0, 300);
+  const exactImageOnly = String(req.query?.exact || '') === '1';
 
   if (suppliedImage && !isGenericImageUrl(suppliedImage)) {
     try {
@@ -412,6 +420,11 @@ module.exports = async function handler(req, res) {
       console.warn('feed image unavailable:', String(error?.message || error).slice(0, 120));
     }
   }
+
+  // Prepared feed visuals already carry the exact Google News attachment.
+  // If that one URL is temporarily unavailable, fail the image request so the
+  // card keeps its branded source tile instead of starting another search.
+  if (exactImageOnly) return exactImageUnavailable(res);
 
   // Google Actualités already owns an exact, publisher-linked thumbnail for
   // most RSS stories. It is small, fast and tied to the precise headline, so

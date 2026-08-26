@@ -4,8 +4,8 @@ import { articleVisualUrl, hasPreparedVisual, sourceTileUrl } from './services/a
 const $ = (selector, root = document) => root.querySelector(selector);
 const app = $('#app');
 const toastEl = $('#toast');
-const APP_VERSION = '50';
-const APP_RELEASE = '25 août 2026';
+const APP_VERSION = '51';
+const APP_RELEASE = '26 août 2026';
 document.documentElement.dataset.appVersion = APP_VERSION;
 
 const GENERAL_CATEGORIES = ['Politique', 'International', 'Économie', 'Société', 'Santé', 'Environnement', 'Science', 'Culture', 'Éducation', 'Europe'];
@@ -404,7 +404,7 @@ function persistCache() {
 
 function articleThumbnailUrl(article) {
   const params = new URLSearchParams({
-    v: '16',
+    v: '18',
     url: String(article?.url || '').slice(0, 1900),
     // When a Google CDN image works on desktop but is refused on the phone,
     // let our same-origin endpoint fetch and serve that exact image.
@@ -493,8 +493,12 @@ async function backfillVisibleVisuals() {
       return { id: String(card.dataset.article || ''), distance: visualCardDistance(card), needsRecovery };
     })
     .sort((a, b) => a.distance - b.distance)
-  const recoveryIds = new Set(cardEntries.filter(item => item.needsRecovery).map(item => item.id));
-  const visibleIds = cardEntries.map(item => item.id);
+  // Only recover cards close to the Android viewport. Processing every card
+  // already rendered (including hundreds below the fold) flooded Google and
+  // turned otherwise valid Parisien images into HTTP 429 fallbacks.
+  const nearbyEntries = cardEntries.filter(item => item.distance <= Math.max(1400, window.innerHeight * 1.5));
+  const recoveryIds = new Set(nearbyEntries.filter(item => item.needsRecovery).map(item => item.id));
+  const visibleIds = nearbyEntries.map(item => item.id);
   const orderedArticles = [...new Set(visibleIds)]
     .map(id => state.articles.find(article => String(article?.id || '') === id))
     .filter(Boolean);
@@ -506,7 +510,7 @@ async function backfillVisibleVisuals() {
       return attempts < VISUAL_BACKFILL_MAX_ATTEMPTS
         && (!attempt?.attemptedAt || Date.now() - Number(attempt.attemptedAt) >= VISUAL_BACKFILL_RETRY_DELAY);
     })
-    .slice(0, 12);
+    .slice(0, 2);
   if (!candidates.length) {
     const retryWaits = orderedArticles
       .filter(article => !hasPreparedVisual(article) || recoveryIds.has(String(article.id)))
@@ -523,18 +527,18 @@ async function backfillVisibleVisuals() {
     while (cursor < candidates.length) {
       const article = candidates[cursor++];
       await recoverArticleVisual(article);
-      await new Promise(resolve => setTimeout(resolve, 140));
+      await new Promise(resolve => setTimeout(resolve, 900));
     }
   };
   try {
-    await Promise.all([worker(), worker()]);
+    await worker();
     persistCache();
     saveVisualBackfills();
   } finally {
     visualBackfillRunning = false;
-    // Continue with the next small wave until every card currently rendered
-    // has either received its exact visual or a delayed retry marker.
-    scheduleVisualBackfill();
+    // Continue gently for the few cards near the viewport; scrolling schedules
+    // another pass for newly visible rows.
+    scheduleVisualBackfill(1200);
   }
 }
 

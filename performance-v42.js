@@ -371,6 +371,15 @@ document.addEventListener('pointercancel', event => {
 // Suppress the synthetic click that follows our pointer-up so article-quickview
 // cannot create a second modal.
 document.addEventListener('click', event => {
+  // Android dispatches a synthetic click immediately after pointerup. The
+  // summary sheet is inserted during pointerup, so that click can be retargeted
+  // to the newly appeared “Lire l’article complet” link and leave the app.
+  // Swallow the complete synthetic click, wherever it was retargeted.
+  if (openedAt > 0 && performance.now() - openedAt < 700 && document.querySelector('.v42-instant-modal')) {
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    return;
+  }
   if (performance.now() - closedAt < 900) {
     event.preventDefault();
     event.stopImmediatePropagation();
@@ -391,11 +400,6 @@ document.addEventListener('click', event => {
     const row = topicButton.closest('.quick-topic-row');
     row?.querySelectorAll('[data-topic-feedback]').forEach(button => button.classList.toggle('selected', button === topicButton));
     return;
-  }
-  const card = event.target.closest('.article-card[data-article]');
-  if (card && performance.now() - openedAt < 900) {
-    event.preventDefault();
-    event.stopImmediatePropagation();
   }
 }, true);
 

@@ -388,44 +388,34 @@ async function safeFetchVisualPage(rawUrl) {
   return buffer.toString('utf8');
 }
 
-async function resolveGoogleVisualUrl(rawUrl) {
+function googleVisualProxyUrl(rawUrl = '') {
   try {
     const url = new URL(rawUrl);
     if (url.hostname !== 'news.google.com' || !url.pathname.startsWith('/api/attachments/')) return '';
-    const response = await fetch(url, {
-      method: 'HEAD',
-      redirect: 'manual',
-      signal: AbortSignal.timeout(3500),
-      headers: { 'User-Agent': GOOGLE_NEWS_UA }
-    });
-    if (response.status < 300 || response.status >= 400) return '';
-    const resolved = new URL(response.headers.get('location') || '', url);
-    if (resolved.protocol !== 'https:' || !/^encrypted-tbn\d+\.gstatic\.com$/i.test(resolved.hostname) || resolved.pathname !== '/images') return '';
-    return resolved.href;
+    return `/api/article-thumbnail?${new URLSearchParams({ v: '18', image: url.href, exact: '1' })}`;
   } catch {
     return '';
   }
 }
 
-async function resolvePreparedVisuals(items) {
-  const pending = items.filter(item => item.visualSource === 'google-news' && item.image);
-  let cursor = 0;
-  const worker = async () => {
-    while (cursor < pending.length) {
-      const item = pending[cursor];
-      cursor += 1;
-      const resolved = await resolveGoogleVisualUrl(item.image);
-      if (resolved) {
-        item.image = resolved;
-        item.visualSource = 'google-news-cdn';
-      } else {
-        item.image = '';
-        item.visualStatus = 'unavailable';
-        item.visualSource = '';
-      }
+function prepareGoogleVisuals(items) {
+  for (const item of items) {
+    if (item.visualSource !== 'google-news' || !item.image) continue;
+    const proxy = googleVisualProxyUrl(item.image);
+    if (proxy) {
+      // Keep the exact attachment found while reading the feed page and let
+      // our cached same-origin endpoint fetch it only when the card is near
+      // the viewport. Resolving every attachment here produced bursts of up
+      // to 90 Google requests and made later Parisien images hit HTTP 429.
+      item.image = proxy;
+      item.visualSource = 'google-news-proxy';
+      item.visualStatus = 'ready';
+    } else {
+      item.image = '';
+      item.visualStatus = 'unavailable';
+      item.visualSource = '';
     }
-  };
-  await Promise.all(Array.from({ length: Math.min(12, pending.length) }, worker));
+  }
   return items;
 }
 
@@ -515,7 +505,7 @@ module.exports = async function handler(req, res) {
   const selected = mergeDuplicates(enriched)
     .sort((a, b) => (b.score - a.score) || (Date.parse(b.publishedAt) - Date.parse(a.publishedAt)))
     .slice(0, 90);
-  await resolvePreparedVisuals(selected);
+  prepareGoogleVisuals(selected);
 
   const articles = selected.map(item => ({
       id: stableServerArticleId(item),
