@@ -1,12 +1,10 @@
-const CACHE = 'mon-actualite-v51-android-images';
+const CACHE = 'mon-actualite-v52-recovered-images';
 const THUMB_CACHE = 'mon-actualite-thumbnails-v5-legacy';
-const ASSETS = ['./', './index.html', './styles.css?v=51', './feedly-compact.css?v=43', './feedly-left.css?v=43', './ui-fixes-v2.css?v=43', './article-quickview.css?v=43', './feed-quality.css?v=43', './performance-v42.css?v=45', './personalization-v44.css?v=44', './bootstrap-v42.js?v=44', './stable-dom.js?v=44', './app.js?v=51', './feedly-runtime.js?v=45.3', './performance-v42.js?v=47', './summary-fixes.js?v=44', './article-quickview.js?v=44', './feed-quality.js?v=44.1', './services/source-connectors.js?v=45.3', './services/article-visuals.js?v=45.3', './manifest.webmanifest', './version.json', './assets/app-icon.svg'];
+const ASSETS = ['./', './index.html', './styles.css?v=51', './feedly-compact.css?v=43', './feedly-left.css?v=43', './ui-fixes-v2.css?v=43', './article-quickview.css?v=43', './feed-quality.css?v=43', './performance-v42.css?v=45', './personalization-v44.css?v=44', './bootstrap-v42.js?v=44', './stable-dom.js?v=44', './app.js?v=51', './feedly-runtime.js?v=45.3', './summary-fixes.js?v=44', './article-quickview.js?v=52', './feed-quality.js?v=44.1', './services/source-connectors.js?v=45.3', './services/article-visuals.js?v=45.3', './manifest.webmanifest', './version.json', './assets/app-icon.svg'];
 
 self.addEventListener('install', event => {
   event.waitUntil((async () => {
     const cache = await caches.open(CACHE);
-    // A single transient request must never block the whole Android update.
-    // Missing assets will simply be obtained from the network when requested.
     await Promise.allSettled(ASSETS.map(asset => cache.add(new Request(asset, { cache: 'reload' }))));
     await self.skipWaiting();
   })());
@@ -98,14 +96,10 @@ self.addEventListener('fetch', event => {
     return;
   }
 
-  // Always ask the network for the application entry page when online. The
-  // previous cache-first launch could keep Android on an old app.js version
-  // even after a successful deployment and service-worker activation.
   if (event.request.mode === 'navigate' || url.pathname === '/' || url.pathname === '/index.html') {
     event.respondWith(networkFirstNavigation(event.request));
     return;
   }
 
-  // Versioned static assets remain instant and refresh in the background.
   event.respondWith(staleWhileRevalidate(event.request, CACHE).catch(() => caches.match('./index.html')));
 });
