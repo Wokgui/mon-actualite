@@ -12,8 +12,6 @@ function trustedPreparedUrl(raw = '', source = '') {
     const haystack = `${host}${url.pathname}${url.search}`.toLowerCase();
     if (url.origin === location.origin && url.pathname === '/' && !url.search) return '';
     if (/(favicon|\/logo(?:[._/-]|$)|logo[-_.]|icon[-_.]|\/icon(?:[._/-]|$)|avatar|sprite|wordmark|brandmark|site-logo|google[-_ ]?news|googlenews)/i.test(haystack)) return '';
-    // Google News attachment URLs redirect through a same-site-only response.
-    // Only the resolved gstatic CDN destination is safe to embed in the app.
     if (host === 'news.google.com') return '';
     if (host === 'www.google.com' || host.endsWith('.gstatic.com') || host.endsWith('.googleusercontent.com')) {
       return source.startsWith('google-news') ? url.href : '';
@@ -22,6 +20,19 @@ function trustedPreparedUrl(raw = '', source = '') {
   } catch {
     return '';
   }
+}
+
+function recoveryVisualUrl(article = {}) {
+  const url = clean(article.url || '');
+  const title = clean(article.title || '');
+  if (!/^https?:\/\//i.test(url) || !title) return '';
+  const params = new URLSearchParams({
+    v: '20',
+    url: url.slice(0, 1900),
+    title: title.slice(0, 280),
+    category: clean(article.category || '').slice(0, 70)
+  });
+  return `/api/article-thumbnail?${params}`;
 }
 
 function xml(value = '') {
@@ -70,7 +81,7 @@ export function sourceTileUrl(article = {}) {
 }
 
 export function articleVisualUrl(article = {}) {
-  return preparedVisualUrl(article) || sourceTileUrl(article);
+  return preparedVisualUrl(article) || recoveryVisualUrl(article) || sourceTileUrl(article);
 }
 
 export function hasPreparedVisual(article = {}) {
