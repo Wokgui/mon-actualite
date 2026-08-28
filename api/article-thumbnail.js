@@ -478,16 +478,16 @@ module.exports = async function handler(req, res) {
     }
   }
 
-  // Le Parisien often blocks direct hotlinking in personal RSS feeds. If both
-  // its Google thumbnail and page metadata fail, use a topic-related Commons
-  // image. The final publisher tile guarantees that these rows never regress
-  // to an anonymous grey rectangle.
+  // Some publishers block direct hotlinking or hide image metadata in their
+  // feeds. For every source added manually, use a topic-related Commons image
+  // as a safe last resort. The branded publisher tile guarantees that these
+  // rows never regress to an anonymous grey rectangle.
   if (needsPersonalFallback && title) {
     try {
       const editorialUrl = await chooseImage(title, category);
       if (editorialUrl) {
         const image = await fetchEditorialImage(editorialUrl);
-        return sendImage(res, image, 'le-parisien-editorial-fallback');
+        return sendImage(res, image, 'personal-source-editorial-fallback');
       }
     } catch (error) {
       console.warn('Personal source editorial fallback unavailable:', String(error?.message || error).slice(0, 140));
