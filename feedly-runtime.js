@@ -1,4 +1,4 @@
-import { articleVisualUrl, hasPreparedVisual, preparedVisualUrl, sourceTileUrl } from './services/article-visuals.js?v=45.3';
+import { articleVisualUrl, hasPreparedVisual, preparedVisualUrl, sourceTileUrl } from './services/article-visuals.js?v=56';
 
 const GENERAL = ['Politique','International','Économie','Société','Santé','Environnement','Science','Culture','Éducation','Europe'];
 const PERSONAL = ['IA','Tech','Smartphones','VR','Automobile','Énergie'];
