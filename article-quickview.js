@@ -132,8 +132,8 @@ function quickFeedbackMarkup(key, selected) {
   const map = {
     more: ['+', 'Plus comme ça', 'Davantage de sujets similaires'],
     less: ['−', 'Moins comme ça', 'Réduire ce type de sujets'],
-    not: ['×', 'Pas intéressé', 'Masquer ce type de sujets'],
-    follow: ['☆', 'Sujet à suivre', 'Faire remonter ce sujet']
+    not: ['×', 'Pas intéressé', 'Masquer cet article et ses sujets proches'],
+    follow: ['☆', 'Sujet à suivre', 'Suivre précisément le sujet de cet article']
   };
   const [symbol, title, text] = map[key];
   return `<button type="button" class="quick-feedback-tile ${selected === key ? 'selected' : ''}" data-quick-feedback="${key}">
@@ -148,7 +148,7 @@ function quickTopicFeedbackMarkup(article) {
     .map(value => String(value || '').trim())
     .filter(value => value && value !== 'À suivre'))].slice(0, 3);
   if (!topics.length) return '';
-  return `<section class="quick-topic-feedback"><strong>Quels thèmes voulez-vous voir davantage ou moins ?</strong><p>L’application apprend thème par thème, pas seulement pour cet article.</p><div class="quick-topic-list">${topics.map(topic => {
+  return `<section class="quick-topic-feedback"><strong>Réglage général des thèmes</strong><p>Les boutons − / + modifient toute une catégorie (par exemple Politique), dans tous les articles. Ils ne concernent pas uniquement cet article.</p><div class="quick-topic-list">${topics.map(topic => {
     const value = Number(preferences[topic] || 0);
     return `<div class="quick-topic-row"><span>${quickEsc(topic)}</span><div><button type="button" class="${value < 0 ? 'selected' : ''}" data-topic-feedback="${quickEsc(topic)}" data-topic-direction="less" aria-label="Moins de ${quickEsc(topic)}">−</button><button type="button" class="${value > 0 ? 'selected' : ''}" data-topic-feedback="${quickEsc(topic)}" data-topic-direction="more" aria-label="Plus de ${quickEsc(topic)}">+</button></div></div>`;
   }).join('')}</div></section>`;
@@ -158,12 +158,10 @@ async function quickLoadSummary(article, modal) {
   const key = `article:${article.id}`;
   const cache = quickReadJson(QUICK_CACHE_KEY, {});
   const text = modal.querySelector('[data-quick-summary-text]');
-  const label = modal.querySelector('[data-quick-summary-label]');
   const fallback = quickProvisionalSummary(article);
   const cached = cache[key];
   if (cached?.summary && !cached.unavailable && !quickUnavailable(cached.summary)) {
     text.textContent = quickClean(cached.summary);
-    label.textContent = cached.ai ? 'Résumé IA' : 'Résumé factuel';
     return;
   }
 
@@ -187,26 +185,22 @@ async function quickLoadSummary(article, modal) {
 
     if (data?.unavailable || quickUnavailable(data?.summary)) {
       text.textContent = fallback;
-      label.textContent = 'Synthèse provisoire';
       return;
     }
 
     const summary = quickClean(data?.summary || '');
     if (!summary) {
       text.textContent = fallback;
-      label.textContent = 'Synthèse provisoire';
       return;
     }
 
     text.textContent = summary;
-    label.textContent = data?.ai ? 'Résumé IA' : 'Résumé factuel';
     const latest = quickReadJson(QUICK_CACHE_KEY, {});
     latest[key] = { summary, ai: Boolean(data.ai), unavailable: false, savedAt: Date.now() };
     quickWriteJson(QUICK_CACHE_KEY, Object.fromEntries(Object.entries(latest).slice(-180)));
   } catch {
     if (modal.isConnected) {
       text.textContent = fallback;
-      label.textContent = 'Synthèse provisoire';
     }
   }
 }
@@ -222,17 +216,20 @@ function openQuickSummary(article) {
   const current = feedback[article.id] || '';
   const cleanTitle = titleWithoutSource(article.title, article.source);
   const immediate = quickProvisionalSummary(article);
+  const visualUrl = quickClean(article.quickVisualUrl || article.visual?.url || article.image || '');
   const backdrop = document.createElement('div');
   backdrop.className = 'quick-summary-backdrop';
   backdrop.innerHTML = `<section class="quick-summary-sheet" role="dialog" aria-modal="true" aria-label="Résumé de l’article">
     <header class="quick-summary-head">
-      <div><span class="quick-summary-kicker" data-quick-summary-label>Synthèse provisoire · IA en cours…</span><h2>${quickEsc(cleanTitle)}</h2></div>
+      <h2>${quickEsc(cleanTitle)}</h2>
       <button type="button" class="quick-summary-close" data-quick-close aria-label="Fermer">×</button>
     </header>
+    ${visualUrl ? `<img class="quick-summary-image" src="${quickEsc(visualUrl)}" alt="" referrerpolicy="no-referrer" decoding="async">` : ''}
     <div class="quick-summary-meta"><span>${quickEsc(article.source || '')}</span><span>${quickEsc(quickTime(article.publishedAt))}</span><span>${quickEsc(article.category || '')}</span></div>
     <div class="quick-summary-text" data-quick-summary-text>${quickEsc(immediate)}</div>
     <a class="quick-full-article" href="${quickEsc(article.url || '#')}" target="_blank" rel="noopener noreferrer">Lire l’article complet <span aria-hidden="true">↗</span></a>
     ${quickTopicFeedbackMarkup(article)}
+    <p class="quick-feedback-help"><strong>Choix sur cet article</strong> « Pas intéressé » réduit les sujets semblables ; « Sujet à suivre » surveille au contraire ce sujet précis.</p>
     <div class="quick-feedback-grid quick-feedback-secondary" data-quick-feedback-grid>
       ${['not','follow'].map(key => quickFeedbackMarkup(key, current)).join('')}
     </div>
@@ -264,13 +261,30 @@ document.addEventListener('click', event => {
     return;
   }
 
+  const topicButton = event.target.closest('[data-topic-feedback]');
+  if (topicButton) {
+    event.preventDefault();
+    const topic = quickClean(topicButton.dataset.topicFeedback || '');
+    const direction = topicButton.dataset.topicDirection;
+    if (!topic || !['less', 'more'].includes(direction)) return;
+    const preferences = quickReadJson('news-topic-preferences-v1', {});
+    const next = direction === 'more' ? 1 : -1;
+    preferences[topic] = Number(preferences[topic] || 0) === next ? 0 : next;
+    quickWriteJson('news-topic-preferences-v1', preferences);
+    const row = topicButton.closest('.quick-topic-row');
+    row?.querySelectorAll('[data-topic-feedback]').forEach(button => button.classList.toggle('selected', Number(preferences[topic] || 0) === (button.dataset.topicDirection === 'more' ? 1 : -1)));
+    window.dispatchEvent(new CustomEvent('news-topic-preferences-changed', { detail: preferences }));
+    return;
+  }
+
   const card = event.target.closest('[data-article]');
   if (card && !event.target.closest('button, input, select, textarea')) {
     const article = quickArticle(card.dataset.article);
     if (!article) return;
     event.preventDefault();
     event.stopPropagation();
-    openQuickSummary(article);
+    const renderedImage = card.querySelector('img.article-image');
+    openQuickSummary({ ...article, quickVisualUrl: renderedImage?.currentSrc || renderedImage?.getAttribute('src') || '' });
   }
 }, true);
 
@@ -291,3 +305,4 @@ const quickRoot = document.getElementById('app');
 if (quickRoot) new MutationObserver(scheduleQuickEnhance).observe(quickRoot, { childList: true, subtree: true });
 window.addEventListener('focus', scheduleQuickEnhance);
 scheduleQuickEnhance();
+
