@@ -262,7 +262,7 @@ function renderDetail() {
 }
 
 function renderBrief() {
-  const majorTerms = /guerre|attaque|cessez-le-feu|élection|gouvernement|président|premier ministre|attentat|catastrophe|séisme|inondation|incendie|disparu|crise|accord|sommet|justice|condamn|cour des comptes|budget|retraite|déficit|croissance|inflation|chômage|épidémie|climat|diplomatie|nucléaire|union européenne/i;
+  const majorTerms = /guerre|attaque|cessez-le-feu|élection|gouvernement|président|premier ministre|attentat|catastrophe|séisme|inondation|incendie|disparu|crise|accord|sommet|justice|condamn|cour des comptes|budget|retraite|déficit|croissance|inflation|chômage|épidémie|climat|diplomatie|nucléaire/i;
   const lowPriorityTerms = /\bpsg\b|ligue 1|football|match|composition|mercato|tennis|formule 1|prix en chute|promotion|bon plan|console|smartphone|windows|gta|jeu vidéo|montre connectée|audiences? télé|people|célébrité|télé-réalité|pyramide des présidents|classement.{0,30}président|réseau social.{0,80}président/i;
   const worldTerms = /ukraine|russie|népal|tibet|gaza|israël|iran|chine|états[- ]unis|donald trump|fed\b|otan|onu\b|royaume-uni|allemagne|italie|espagne|autriche|grèce|inde|pakistan|japon|corée|afrique|moyen-orient|amérique|brésil|canada/i;
   const editorialCategories = new Set(['Politique', 'International', 'Europe', 'Économie', 'Société', 'Santé', 'Environnement']);
