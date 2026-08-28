@@ -4,13 +4,14 @@ import { articleVisualUrl, hasPreparedVisual, sourceTileUrl } from './services/a
 const $ = (selector, root = document) => root.querySelector(selector);
 const app = $('#app');
 const toastEl = $('#toast');
-const APP_VERSION = '51';
-const APP_RELEASE = '26 août 2026';
+const APP_VERSION = '53';
+const APP_RELEASE = '28 août 2026';
 document.documentElement.dataset.appVersion = APP_VERSION;
 
 const GENERAL_CATEGORIES = ['Politique', 'International', 'Économie', 'Société', 'Santé', 'Environnement', 'Science', 'Culture', 'Éducation', 'Europe'];
 const PERSONAL_THEMES = ['IA', 'Tech', 'Smartphones', 'VR', 'Automobile', 'Énergie'];
-const WATCH_TOPICS = ['Innovation', 'IA', 'VR', 'Santé', 'Science', 'Tech', 'Énergie', 'Environnement', 'Automobile', 'Smartphones'];
+const WATCH_TOPICS = ['Recherche scientifique', 'Innovations', 'Progrès humains', 'Médecine', 'Espace', 'IA', 'VR', 'Tech', 'Énergie', 'Environnement', 'Mobilité', 'Éducation'];
+const DEFAULT_WATCH_TOPICS = ['Recherche scientifique', 'Innovations', 'Progrès humains', 'Médecine', 'Espace', 'IA', 'Énergie', 'Environnement', 'Éducation'];
 // v3 deliberately drops the old persisted failure markers. A single transient
 // miss used to freeze a source tile for six hours, even when the exact image
 // became available a few seconds later.
@@ -48,7 +49,7 @@ const defaultSettings = {
   generalCategories: [...GENERAL_CATEGORIES],
   interests: [...PERSONAL_THEMES],
   briefEssentialCategories: [...GENERAL_CATEGORIES],
-  briefWatchTopics: ['Innovation', 'IA', 'VR', 'Santé']
+  briefWatchTopics: [...DEFAULT_WATCH_TOPICS]
 };
 
 function safeJson(key, fallback) {
@@ -77,7 +78,7 @@ const state = {
     generalCategories: Array.isArray(savedSettings.generalCategories) ? savedSettings.generalCategories : [...GENERAL_CATEGORIES],
     interests: Array.isArray(savedSettings.interests) ? savedSettings.interests : [...PERSONAL_THEMES],
     briefEssentialCategories: Array.isArray(savedSettings.briefEssentialCategories) ? savedSettings.briefEssentialCategories : [...GENERAL_CATEGORIES],
-    briefWatchTopics: Array.isArray(savedSettings.briefWatchTopics) ? savedSettings.briefWatchTopics : ['Innovation', 'IA', 'VR', 'Santé']
+    briefWatchTopics: Array.isArray(savedSettings.briefWatchTopics) ? savedSettings.briefWatchTopics : [...DEFAULT_WATCH_TOPICS]
   }
 };
 
@@ -261,13 +262,30 @@ function renderDetail() {
 }
 
 function renderBrief() {
-  const picks = visibleArticles().slice(0, 6);
-  const categories = [...new Set(picks.map(article => article.category))].slice(0, 4);
-  const global = picks.length ? `Les sujets les plus présents actuellement concernent ${categories.join(', ')}. Les doublons provenant de plusieurs médias sont regroupés dans une seule fiche.` : 'Le brief se construira après la première synchronisation.';
+  const majorTerms = /guerre|cessez-le-feu|élection|gouvernement|président|premier ministre|attentat|catastrophe|séisme|inondation|incendie|crise|accord|sommet|justice|condamn|budget|économie|inflation|chômage|santé|épidémie|climat|diplomatie|nucléaire/i;
+  const franceTerms = /france|français|française|paris|elysée|matignon|assemblée nationale|sénat|hexagone/i;
+  const ranked = visibleArticles().map(article => {
+    const haystack = `${article.title || ''} ${article.summary || ''}`;
+    const age = Math.max(0, (Date.now() - Date.parse(article.publishedAt || 0)) / 3600000);
+    const editorial = ['Politique', 'International', 'Économie', 'Société', 'Santé', 'Environnement'].includes(article.category) ? 34 : 0;
+    const corroboration = Math.max(0, (article.sources?.length || 1) - 1) * 28;
+    const headline = majorTerms.test(haystack) ? 38 : 0;
+    return { article, score: Number(article.score || 0) + editorial + corroboration + headline - Math.min(age, 48), scope: franceTerms.test(haystack) ? 'France' : 'Monde' };
+  }).sort((a, b) => b.score - a.score);
+  const picks = [];
+  for (const scope of ['France', 'Monde']) {
+    const candidate = ranked.find(item => item.scope === scope && !picks.includes(item));
+    if (candidate) picks.push(candidate);
+  }
+  for (const candidate of ranked) {
+    if (picks.length >= 5) break;
+    if (!picks.includes(candidate)) picks.push(candidate);
+  }
+  const global = picks.length ? `Ces cinq événements sont retenus pour leur portée nationale ou internationale, leur gravité, leur actualité et leur confirmation par les sources disponibles.` : 'Le brief se construira après la première synchronisation.';
   return `<main class="page">${topbar('Brief du jour', false)}${syncStrip()}
-    <section class="date-card"><span class="date">${escapeHtml(dateLabel())}</span><h2>L’essentiel en quelques minutes</h2></section>
-    <ol class="brief-points">${picks.map((article, index) => `<li class="brief-point" data-article="${escapeHtml(article.id)}" data-index="${index + 1}"><strong>${escapeHtml(article.title)}</strong><span>${escapeHtml(article.summary)}</span></li>`).join('')}</ol>
-    <section class="brief-card"><span class="brief-label">Lecture globale</span><h2>Ce qui ressort du flux</h2><p>${escapeHtml(global)}</p><div class="source-list"><span class="source-chip">${state.stats?.feedsSucceeded ?? '—'} flux lus</span><span class="source-chip">Doublons fusionnés</span></div></section>
+    <section class="date-card"><span class="date">${escapeHtml(dateLabel())}</span><h2>Les 5 événements majeurs France & Monde</h2></section>
+    <ol class="brief-points">${picks.map(({ article, scope }, index) => `<li class="brief-point" data-article="${escapeHtml(article.id)}" data-index="${index + 1}"><small class="brief-scope">${scope}</small><strong>${escapeHtml(article.title)}</strong><span>${escapeHtml(article.summary)}</span></li>`).join('')}</ol>
+    <section class="brief-card"><span class="brief-label">Sélection éditoriale</span><h2>À la une d’un journal télévisé</h2><p>${escapeHtml(global)}</p><div class="source-list"><span class="source-chip">${state.stats?.feedsSucceeded ?? '—'} flux lus</span><span class="source-chip">5 faits maximum</span><span class="source-chip">France + Monde</span></div></section>
   </main>${nav('brief')}`;
 }
 
@@ -349,7 +367,7 @@ function renderSheet() {
     <header class="personalize-head"><div><span>Votre sélection</span><h2>Personnaliser</h2></div><button type="button" class="personalize-close" data-dismiss-sheet aria-label="Fermer">×</button></header>
     <section class="personalize-section"><h3>Accueil</h3><p>Tous les articles restent accessibles. Ces choix déterminent ceux qui remontent en premier.</p>${chips(GENERAL_CATEGORIES, state.settings.generalCategories, 'data-general-category')}${chips(PERSONAL_THEMES, state.settings.interests, 'data-interest')}</section>
     <section class="personalize-section"><h3>Brief · Essentiel</h3><p>Choisissez les rubriques utilisées pour le point d’actualité France et Monde.</p>${chips(GENERAL_CATEGORIES, state.settings.briefEssentialCategories, 'data-brief-essential')}</section>
-    <section class="personalize-section"><h3>Brief · Mes veilles</h3><p>Innovation, VR, santé… choisissez les sujets suivis séparément de l’actualité générale.</p>${chips(watchTopics, state.settings.briefWatchTopics, 'data-brief-watch')}
+    <section class="personalize-section"><h3>Brief · Mes veilles</h3><p>Une veille large sur toute la recherche, les innovations de tous domaines et les progrès humains. Affinez librement les thèmes suivis.</p>${chips(watchTopics, state.settings.briefWatchTopics, 'data-brief-watch')}
       <div class="inline-form personalize-add"><input id="keyword-input" class="text-input" type="text" maxlength="70" placeholder="Ajouter une veille précise"><button class="small-primary-btn" data-add-keyword>Ajouter</button></div>
     </section>
     <button type="button" class="secondary-btn personalize-settings" data-open-settings>Réglages avancés</button>
@@ -700,7 +718,7 @@ app.addEventListener('click', async event => {
   const briefWatch = event.target.closest('[data-brief-watch]');
   if (briefWatch) { const name = briefWatch.dataset.briefWatch; const current = new Set(state.settings.briefWatchTopics); current.has(name) ? current.delete(name) : current.add(name); state.settings.briefWatchTopics = [...current]; persist(); render(); return; }
   if (event.target.closest('[data-saved-filter]')) { state.savedOnly = !state.savedOnly; render(); return; }
-  if (event.target.closest('[data-reset]')) { state.settings = { ...defaultSettings, generalCategories: [...GENERAL_CATEGORIES], interests: [...PERSONAL_THEMES], briefEssentialCategories: [...GENERAL_CATEGORIES], briefWatchTopics: ['Innovation', 'IA', 'VR', 'Santé'] }; state.keywords = []; state.topicPreferences = {}; persist(); render(); toast('Préférences réinitialisées'); syncNews({ silent: true }); return; }
+  if (event.target.closest('[data-reset]')) { state.settings = { ...defaultSettings, generalCategories: [...GENERAL_CATEGORIES], interests: [...PERSONAL_THEMES], briefEssentialCategories: [...GENERAL_CATEGORIES], briefWatchTopics: [...DEFAULT_WATCH_TOPICS] }; state.keywords = []; state.topicPreferences = {}; persist(); render(); toast('Préférences réinitialisées'); syncNews({ silent: true }); return; }
   if (event.target.closest('[data-install]')) {
     if (isInstalled) return toast('L’application est déjà installée');
     if (deferredInstallPrompt) { deferredInstallPrompt.prompt(); const choice = await deferredInstallPrompt.userChoice; deferredInstallPrompt = null; toast(choice.outcome === 'accepted' ? 'Installation lancée' : 'Installation annulée'); }
@@ -765,3 +783,4 @@ render();
 scheduleVisualBackfill();
 syncNews({ silent: true });
 window.setTimeout(() => checkAppUpdate(), 1200);
+
