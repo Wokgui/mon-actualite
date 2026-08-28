@@ -1,6 +1,8 @@
 {
   "functions": {
-    "api/news.js": { "maxDuration": 30 }
+    "api/news.js": { "maxDuration": 30 },
+    "api/article-thumbnail.js": { "maxDuration": 30 },
+    "api/article-photo-fast.js": { "maxDuration": 30 }
   },
   "headers": [
     {
@@ -37,3 +39,4 @@
     }
   ]
 }
+
