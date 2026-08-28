@@ -216,7 +216,9 @@ function essentialBrief() {
       const headline = majorTerms.test(text) ? 55 : 0;
       const corroboration = Math.max(0, (article.sources?.length || 1) - 1) * 30;
       const age = Math.max(0, (Date.now() - Date.parse(article.publishedAt || 0)) / 3600000);
-      return Number(article.score || 0) + editorial + headline + corroboration - Math.min(age, 48);
+      // Deliberately ignore article.score here: that score contains personal
+      // source and interest boosts. L’essentiel must be publisher-neutral.
+      return 100 + editorial + headline + corroboration - Math.min(age, 72);
     };
     return score(b) - score(a);
   });
@@ -228,6 +230,14 @@ function essentialBrief() {
   if (france[0]) selectedItems.push({ article: france[0], scope: 'France' });
   if (world[0]) selectedItems.push({ article: world[0], scope: 'Monde' });
   const candidates = pool.map(article => ({ article, scope: WORLD_CATEGORIES.includes(article.category) ? 'Monde' : 'France' }));
+  const sourceCounts = new Map(selectedItems.map(item => [item.article.source || 'Source', 1]));
+  for (const candidate of candidates) {
+    if (selectedItems.length >= 5) break;
+    const source = candidate.article.source || 'Source';
+    if (selectedItems.some(item => item.article.id === candidate.article.id) || Number(sourceCounts.get(source) || 0) >= 2) continue;
+    selectedItems.push(candidate);
+    sourceCounts.set(source, Number(sourceCounts.get(source) || 0) + 1);
+  }
   for (const candidate of candidates) {
     if (selectedItems.length >= 5) break;
     if (!selectedItems.some(item => item.article.id === candidate.article.id)) selectedItems.push(candidate);
