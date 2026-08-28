@@ -2,8 +2,6 @@ import { articleVisualUrl, hasPreparedVisual, preparedVisualUrl, sourceTileUrl }
 
 const GENERAL = ['Politique','International','Économie','Société','Santé','Environnement','Science','Culture','Éducation','Europe'];
 const PERSONAL = ['IA','Tech','Smartphones','VR','Automobile','Énergie'];
-const FRANCE_CATEGORIES = ['Politique','Économie','Société','Santé','Éducation','Environnement','Culture','Tech'];
-const WORLD_CATEGORIES = ['International','Europe'];
 const SUMMARY_CACHE_KEY = 'news-article-summaries-v4';
 let scheduled = false;
 let briefMode = 'essential';
@@ -189,48 +187,45 @@ function enhanceHome() {
   }
 }
 
-function pickDiverse(source, categories, limit) {
-  const selected = [];
-  const used = new Set();
-  for (const category of categories) {
-    const article = source.find(item => item.category === category && !used.has(item.id));
-    if (article) { selected.push(article); used.add(article.id); }
-    if (selected.length >= limit) return selected;
-  }
-  for (const article of source) {
-    if (!categories.includes(article.category) || used.has(article.id)) continue;
-    selected.push(article); used.add(article.id);
-    if (selected.length >= limit) break;
-  }
-  return selected;
-}
-
 function essentialBrief() {
   const selected = new Set(currentSettings().briefEssential);
   const majorTerms = /guerre|attaque|cessez-le-feu|élection|gouvernement|président|premier ministre|attentat|catastrophe|séisme|inondation|incendie|disparu|crise|accord|sommet|justice|condamn|budget|déficit|croissance|inflation|chômage|épidémie|climat|diplomatie|nucléaire|union européenne/i;
+  const lowPriorityTerms = /\bpsg\b|ligue 1|football|match|composition|mercato|tennis|formule 1|prix en chute|promotion|bon plan|console|smartphone|windows|gta|jeu vidéo|montre connectée|audiences? télé|people|célébrité|télé-réalité/i;
+  const worldTerms = /ukraine|russie|népal|tibet|gaza|israël|iran|chine|états[- ]unis|donald trump|fed\b|otan|onu\b|royaume-uni|allemagne|italie|espagne|autriche|grèce|inde|pakistan|japon|corée|afrique|moyen-orient|amérique|brésil|canada/i;
   const editorialCategories = new Set(['Politique', 'International', 'Europe', 'Économie', 'Société', 'Santé', 'Environnement']);
+  const scopeOf = article => {
+    const title = String(article.title || '');
+    if (worldTerms.test(title) || article.category === 'International' || article.category === 'Europe') return 'Monde';
+    return 'France';
+  };
   const ranked = importanceArticles().filter(article => selected.has(article.category)).sort((a, b) => {
     const score = article => {
       const text = `${article.title || ''} ${article.summary || ''}`;
       const editorial = editorialCategories.has(article.category) ? 70 : -35;
       const headline = majorTerms.test(text) ? 55 : 0;
       const corroboration = Math.max(0, (article.sources?.length || 1) - 1) * 30;
+      const lightweight = lowPriorityTerms.test(text) ? -220 : 0;
+      const weakSignal = !majorTerms.test(text) && corroboration === 0 ? -65 : 0;
       const age = Math.max(0, (Date.now() - Date.parse(article.publishedAt || 0)) / 3600000);
       // Deliberately ignore article.score here: that score contains personal
       // source and interest boosts. L’essentiel must be publisher-neutral.
-      return 100 + editorial + headline + corroboration - Math.min(age, 72);
+      return 100 + editorial + headline + corroboration + lightweight + weakSignal - Math.min(age, 72);
     };
     return score(b) - score(a);
   });
   const recent = ranked.filter(article => Date.now() - Date.parse(article.publishedAt || 0) <= 72 * 3600000);
   const pool = recent.length >= 6 ? recent : ranked;
-  const france = pickDiverse(pool, FRANCE_CATEGORIES, 5);
-  const world = pickDiverse(pool, WORLD_CATEGORIES, 5);
+  const candidates = pool.map(article => ({ article, scope: scopeOf(article) }));
   const selectedItems = [];
-  if (france[0]) selectedItems.push({ article: france[0], scope: 'France' });
-  if (world[0]) selectedItems.push({ article: world[0], scope: 'Monde' });
-  const candidates = pool.map(article => ({ article, scope: WORLD_CATEGORIES.includes(article.category) ? 'Monde' : 'France' }));
-  const sourceCounts = new Map(selectedItems.map(item => [item.article.source || 'Source', 1]));
+  const firstFrance = candidates.find(item => item.scope === 'France');
+  const firstWorld = candidates.find(item => item.scope === 'Monde');
+  if (firstFrance) selectedItems.push(firstFrance);
+  if (firstWorld && firstWorld.article.id !== firstFrance?.article.id) selectedItems.push(firstWorld);
+  const sourceCounts = new Map();
+  selectedItems.forEach(item => {
+    const source = item.article.source || 'Source';
+    sourceCounts.set(source, Number(sourceCounts.get(source) || 0) + 1);
+  });
   for (const candidate of candidates) {
     if (selectedItems.length >= 5) break;
     const source = candidate.article.source || 'Source';
