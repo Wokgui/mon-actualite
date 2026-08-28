@@ -7,6 +7,7 @@ const MAX_SEARCH_HTML_BYTES = 2_400_000;
 const MAX_IMAGE_BYTES = 7_000_000;
 const UA = 'Mozilla/5.0 (Linux; Android 16) AppleWebKit/537.36 Chrome/140 Safari/537.36';
 const GOOGLE_NEWS_UA = 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/140 Safari/537.36';
+const { chooseImage, fetchImage: fetchEditorialImage } = require('./article-photo-fast');
 
 function isPrivateIp(address) {
   if (net.isIP(address) === 4) {
@@ -397,6 +398,21 @@ function fallback(res) {
   res.end(svg);
 }
 
+function xmlText(value = '') {
+  return String(value || '').replace(/[&<>"']/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&apos;' }[character]));
+}
+
+function personalSourceFallback(res, source) {
+  const label = String(source || 'Source suivie').replace(/\s+/g, ' ').trim().slice(0, 28) || 'Source suivie';
+  const initials = label.split(/\s+/).filter(Boolean).slice(0, 2).map(word => word[0]).join('').toUpperCase() || 'S';
+  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="640" height="420" viewBox="0 0 640 420"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#e7f4ff"/><stop offset="1" stop-color="#b9c9ff"/></linearGradient></defs><rect width="640" height="420" rx="22" fill="url(#g)"/><circle cx="320" cy="178" r="92" fill="#fff" fill-opacity=".82"/><text x="320" y="198" text-anchor="middle" font-family="Arial,sans-serif" font-size="62" font-weight="800" fill="#3156a8">${xmlText(initials)}</text><text x="320" y="315" text-anchor="middle" font-family="Arial,sans-serif" font-size="34" font-weight="700" fill="#294789">${xmlText(label)}</text></svg>`;
+  res.statusCode = 200;
+  res.setHeader('Content-Type', 'image/svg+xml; charset=utf-8');
+  res.setHeader('Cache-Control', 'public, max-age=3600, s-maxage=86400');
+  res.setHeader('X-Thumbnail-Status', 'publisher-tile');
+  return res.end(svg);
+}
+
 function exactImageUnavailable(res) {
   res.statusCode = 404;
   res.setHeader('Cache-Control', 'no-store, max-age=0');
@@ -410,7 +426,12 @@ module.exports = async function handler(req, res) {
   const rawUrl = String(req.query?.url || '').slice(0, 2000);
   const suppliedImage = String(req.query?.image || '').slice(0, 2000);
   const title = String(req.query?.title || '').slice(0, 300);
+  const source = String(req.query?.source || '').slice(0, 100);
+  const category = String(req.query?.category || '').slice(0, 80);
+  const customSource = String(req.query?.custom || '') === '1';
   const exactImageOnly = String(req.query?.exact || '') === '1';
+  const isLeParisien = /(?:^|\b)le\s+parisien(?:\b|$)/i.test(`${source} ${title}`) || /(?:^|\.)leparisien\.fr$/i.test((() => { try { return new URL(rawUrl).hostname; } catch { return ''; } })());
+  const needsPersonalFallback = customSource || isLeParisien;
 
   if (suppliedImage && !isGenericImageUrl(suppliedImage)) {
     try {
@@ -457,7 +478,25 @@ module.exports = async function handler(req, res) {
     }
   }
 
-  // Never invent an illustration from a loose keyword search. A neutral visual
-  // is preferable to a fast but unrelated or uncanny photograph.
+  // Some publishers block direct hotlinking or hide image metadata in their
+  // feeds. For every source added manually, use a topic-related Commons image
+  // as a safe last resort. The branded publisher tile guarantees that these
+  // rows never regress to an anonymous grey rectangle.
+  if (needsPersonalFallback && title) {
+    try {
+      const editorialUrl = await chooseImage(title, category);
+      if (editorialUrl) {
+        const image = await fetchEditorialImage(editorialUrl);
+        return sendImage(res, image, 'personal-source-editorial-fallback');
+      }
+    } catch (error) {
+      console.warn('Personal source editorial fallback unavailable:', String(error?.message || error).slice(0, 140));
+    }
+    return personalSourceFallback(res, source);
+  }
+
+  // Never invent an illustration from a loose keyword search for other
+  // publishers. A neutral visual is preferable to an unrelated photograph.
   return fallback(res);
 };
+

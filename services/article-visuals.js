@@ -27,10 +27,13 @@ function recoveryVisualUrl(article = {}) {
   const title = clean(article.title || '');
   if (!/^https?:\/\//i.test(url) || !title) return '';
   const params = new URLSearchParams({
-    v: '20',
+    v: '21',
     url: url.slice(0, 1900),
+    image: clean(article.visual?.url || article.image || '').slice(0, 1900),
     title: title.slice(0, 280),
-    category: clean(article.category || '').slice(0, 70)
+    category: clean(article.category || '').slice(0, 70),
+    source: clean(article.source || '').slice(0, 100),
+    custom: article.customSource ? '1' : '0'
   });
   return `/api/article-thumbnail?${params}`;
 }
@@ -81,9 +84,13 @@ export function sourceTileUrl(article = {}) {
 }
 
 export function articleVisualUrl(article = {}) {
+  // Personal feeds may expose publisher images that reject browser hotlinking
+  // on Android. Always route them through our same-origin recovery endpoint.
+  if (article.customSource) return recoveryVisualUrl(article) || sourceTileUrl(article);
   return preparedVisualUrl(article) || recoveryVisualUrl(article) || sourceTileUrl(article);
 }
 
 export function hasPreparedVisual(article = {}) {
   return Boolean(preparedVisualUrl(article));
 }
+
