@@ -1,10 +1,10 @@
 import { importOpmlPreview, fetchLiveNews } from './services/source-connectors.js?v=45.3';
-import { articleVisualUrl, hasPreparedVisual, sourceTileUrl } from './services/article-visuals.js?v=45.3';
+import { articleVisualUrl, hasPreparedVisual, sourceTileUrl } from './services/article-visuals.js?v=56';
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const app = $('#app');
 const toastEl = $('#toast');
-const APP_VERSION = '55';
+const APP_VERSION = '56';
 const APP_RELEASE = '28 août 2026';
 document.documentElement.dataset.appVersion = APP_VERSION;
 
