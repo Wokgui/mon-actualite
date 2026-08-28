@@ -207,7 +207,19 @@ function pickDiverse(source, categories, limit) {
 
 function essentialBrief() {
   const selected = new Set(currentSettings().briefEssential);
-  const ranked = importanceArticles().filter(article => selected.has(article.category));
+  const majorTerms = /guerre|attaque|cessez-le-feu|élection|gouvernement|président|premier ministre|attentat|catastrophe|séisme|inondation|incendie|disparu|crise|accord|sommet|justice|condamn|budget|déficit|croissance|inflation|chômage|épidémie|climat|diplomatie|nucléaire|union européenne/i;
+  const editorialCategories = new Set(['Politique', 'International', 'Europe', 'Économie', 'Société', 'Santé', 'Environnement']);
+  const ranked = importanceArticles().filter(article => selected.has(article.category)).sort((a, b) => {
+    const score = article => {
+      const text = `${article.title || ''} ${article.summary || ''}`;
+      const editorial = editorialCategories.has(article.category) ? 70 : -35;
+      const headline = majorTerms.test(text) ? 55 : 0;
+      const corroboration = Math.max(0, (article.sources?.length || 1) - 1) * 30;
+      const age = Math.max(0, (Date.now() - Date.parse(article.publishedAt || 0)) / 3600000);
+      return Number(article.score || 0) + editorial + headline + corroboration - Math.min(age, 48);
+    };
+    return score(b) - score(a);
+  });
   const recent = ranked.filter(article => Date.now() - Date.parse(article.publishedAt || 0) <= 72 * 3600000);
   const pool = recent.length >= 6 ? recent : ranked;
   const france = pickDiverse(pool, FRANCE_CATEGORIES, 5);
@@ -215,7 +227,7 @@ function essentialBrief() {
   const selectedItems = [];
   if (france[0]) selectedItems.push({ article: france[0], scope: 'France' });
   if (world[0]) selectedItems.push({ article: world[0], scope: 'Monde' });
-  const candidates = importanceArticles().map(article => ({ article, scope: WORLD_CATEGORIES.includes(article.category) ? 'Monde' : 'France' }));
+  const candidates = pool.map(article => ({ article, scope: WORLD_CATEGORIES.includes(article.category) ? 'Monde' : 'France' }));
   for (const candidate of candidates) {
     if (selectedItems.length >= 5) break;
     if (!selectedItems.some(item => item.article.id === candidate.article.id)) selectedItems.push(candidate);
