@@ -262,22 +262,59 @@ function renderDetail() {
 }
 
 function renderBrief() {
-  const majorTerms = /guerre|cessez-le-feu|élection|gouvernement|président|premier ministre|attentat|catastrophe|séisme|inondation|incendie|crise|accord|sommet|justice|condamn|budget|économie|inflation|chômage|santé|épidémie|climat|diplomatie|nucléaire/i;
-  const franceTerms = /france|français|française|paris|elysée|matignon|assemblée nationale|sénat|hexagone/i;
+  const majorTerms = /guerre|attaque|cessez-le-feu|élection|gouvernement|président|premier ministre|attentat|catastrophe|séisme|inondation|incendie|disparu|crise|accord|sommet|justice|condamn|cour des comptes|budget|retraite|déficit|croissance|inflation|chômage|épidémie|climat|diplomatie|nucléaire|union européenne/i;
+  const lowPriorityTerms = /\bpsg\b|ligue 1|football|match|composition|mercato|tennis|formule 1|prix en chute|promotion|bon plan|console|smartphone|windows|gta|jeu vidéo|montre connectée|audiences? télé|people|célébrité|télé-réalité|pyramide des présidents|classement.{0,30}président|réseau social.{0,80}président/i;
+  const worldTerms = /ukraine|russie|népal|tibet|gaza|israël|iran|chine|états[- ]unis|donald trump|fed\b|otan|onu\b|royaume-uni|allemagne|italie|espagne|autriche|grèce|inde|pakistan|japon|corée|afrique|moyen-orient|amérique|brésil|canada/i;
+  const editorialCategories = new Set(['Politique', 'International', 'Europe', 'Économie', 'Société', 'Santé', 'Environnement']);
+  const scopeOf = article => worldTerms.test(String(article.title || '')) || ['International', 'Europe'].includes(article.category) ? 'Monde' : 'France';
+  const topicWords = article => new Set(String(article.title || '')
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+    .match(/[a-z0-9]{4,}/g)?.filter(word => !/^(avec|apres|avant|dans|depuis|direct|entre|leurs|nouveau|nouvelle|pour|plus|selon|sont|cette|comme|tout|tous|toute|vers)$/.test(word)) || []);
+  const sameEvent = (left, right) => {
+    const a = topicWords(left);
+    const b = topicWords(right);
+    const shared = [...a].filter(word => b.has(word)).length;
+    return shared >= 2 && shared / Math.max(1, Math.min(a.size, b.size)) >= .38;
+  };
   const ranked = visibleArticles().map(article => {
     const haystack = `${article.title || ''} ${article.summary || ''}`;
     const age = Math.max(0, (Date.now() - Date.parse(article.publishedAt || 0)) / 3600000);
-    const editorial = ['Politique', 'International', 'Économie', 'Société', 'Santé', 'Environnement'].includes(article.category) ? 34 : 0;
-    const corroboration = Math.max(0, (article.sources?.length || 1) - 1) * 28;
-    const headline = majorTerms.test(haystack) ? 38 : 0;
-    return { article, score: Number(article.score || 0) + editorial + corroboration + headline - Math.min(age, 48), scope: franceTerms.test(haystack) ? 'France' : 'Monde' };
+    const editorial = editorialCategories.has(article.category) ? 70 : -35;
+    const corroboration = Math.max(0, (article.sources?.length || 1) - 1) * 30;
+    const headline = majorTerms.test(haystack) ? 55 : 0;
+    const lightweight = lowPriorityTerms.test(haystack) ? -220 : 0;
+    const weakSignal = !majorTerms.test(haystack) && corroboration === 0 ? -65 : 0;
+    // Do not use article.score: it includes personal-source and interest
+    // boosts, while L’essentiel must remain publisher-neutral.
+    return { article, score: 100 + editorial + corroboration + headline + lightweight + weakSignal - Math.min(age, 72), scope: scopeOf(article) };
   }).sort((a, b) => b.score - a.score);
+  const recent = ranked.filter(item => Date.now() - Date.parse(item.article.publishedAt || 0) <= 72 * 3600000);
+  const candidates = recent.length >= 6 ? recent : ranked;
   const picks = [];
   for (const scope of ['France', 'Monde']) {
-    const candidate = ranked.find(item => item.scope === scope && !picks.includes(item));
+    const candidate = candidates.find(item => item.scope === scope && !picks.includes(item));
     if (candidate) picks.push(candidate);
   }
-  for (const candidate of ranked) {
+  const sourceCounts = new Map();
+  picks.forEach(item => {
+    const source = item.article.source || 'Source';
+    sourceCounts.set(source, Number(sourceCounts.get(source) || 0) + 1);
+  });
+  for (const candidate of candidates) {
+    if (picks.length >= 5) break;
+    const source = candidate.article.source || 'Source';
+    if (picks.includes(candidate) || Number(sourceCounts.get(source) || 0) >= 2 || picks.some(item => sameEvent(item.article, candidate.article))) continue;
+    picks.push(candidate);
+    sourceCounts.set(source, Number(sourceCounts.get(source) || 0) + 1);
+  }
+  for (const candidate of candidates) {
+    if (picks.length >= 5) break;
+    const source = candidate.article.source || 'Source';
+    if (picks.includes(candidate) || Number(sourceCounts.get(source) || 0) >= 2) continue;
+    picks.push(candidate);
+    sourceCounts.set(source, Number(sourceCounts.get(source) || 0) + 1);
+  }
+  for (const candidate of candidates) {
     if (picks.length >= 5) break;
     if (!picks.includes(candidate)) picks.push(candidate);
   }
