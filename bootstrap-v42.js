@@ -24,23 +24,10 @@
   };
   window.Image.prototype = NativeImage.prototype;
 
-  // Prevent proxy URLs embedded in feed.innerHTML from being requested before
-  // the lazy loader has decided whether the row is even near the viewport.
-  const innerHTML = Object.getOwnPropertyDescriptor(Element.prototype, 'innerHTML');
-  if (innerHTML?.set && innerHTML?.get) {
-    Object.defineProperty(Element.prototype, 'innerHTML', {
-      configurable: true,
-      enumerable: innerHTML.enumerable,
-      get() { return innerHTML.get.call(this); },
-      set(value) {
-        let html = value;
-        if (typeof html === 'string' && html.includes('article-image') && html.includes('/api/article-thumbnail')) {
-          html = html.replace(/src=(['"])(\/api\/article-thumbnail\?[^'"]+)\1/g, (_match, quote, src) => `data-perf-src=${quote}${src}${quote} src=${quote}${PLACEHOLDER}${quote}`);
-        }
-        return innerHTML.set.call(this, html);
-      }
-    });
-  }
-
+  // Visible rows now rely on the browser's native loading="lazy" behavior.
+  // An earlier bootstrap replaced their proxy URL with PLACEHOLDER and stored
+  // it in data-perf-src for performance-v42. That loader is no longer part of
+  // the page, so those rows remained grey forever.
   window.__NEWS_IMAGE_PLACEHOLDER__ = PLACEHOLDER;
 })();
+
