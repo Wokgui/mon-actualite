@@ -4,7 +4,7 @@ import { articleVisualUrl, hasPreparedVisual, sourceTileUrl } from './services/a
 const $ = (selector, root = document) => root.querySelector(selector);
 const app = $('#app');
 const toastEl = $('#toast');
-const APP_VERSION = '54';
+const APP_VERSION = '55';
 const APP_RELEASE = '28 août 2026';
 document.documentElement.dataset.appVersion = APP_VERSION;
 
@@ -422,13 +422,15 @@ function persistCache() {
 
 function articleThumbnailUrl(article) {
   const params = new URLSearchParams({
-    v: '18',
+    v: '19',
     url: String(article?.url || '').slice(0, 1900),
     // When a Google CDN image works on desktop but is refused on the phone,
     // let our same-origin endpoint fetch and serve that exact image.
     image: String(article?.image || '').slice(0, 1900),
     title: String(article?.title || '').replace(/\s+/g, ' ').trim().slice(0, 280),
-    category: String(article?.category || '').replace(/\s+/g, ' ').trim().slice(0, 70)
+    category: String(article?.category || '').replace(/\s+/g, ' ').trim().slice(0, 70),
+    source: String(article?.source || '').replace(/\s+/g, ' ').trim().slice(0, 100),
+    custom: article?.customSource ? '1' : '0'
   });
   return `/api/article-thumbnail?${params}`;
 }
