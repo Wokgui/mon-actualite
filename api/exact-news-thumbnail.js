@@ -1,5 +1,6 @@
 const HTML_TIMEOUT_MS = 3200;
 const IMAGE_TIMEOUT_MS = 3000;
+const RELATED_TIMEOUT_MS = 7000;
 const MAX_SEARCH_HTML_BYTES = 2_400_000;
 const MAX_IMAGE_BYTES = 7_000_000;
 const GOOGLE_NEWS_UA = 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/140 Safari/537.36';
@@ -13,7 +14,7 @@ function decode(value = '') {
 }
 
 function plainText(value = '') {
-  return decode(value).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+  return decode(value).replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1').replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
 }
 
 function titleWords(value = '') {
@@ -37,6 +38,13 @@ function titleAgreement(candidate, expected) {
   };
 }
 
+function sameEvent(candidate, expected) {
+  const agreement = titleAgreement(candidate, expected);
+  return (agreement.score >= 0.72 && agreement.hits >= Math.min(4, titleWords(expected).length))
+    || (agreement.hits >= 5 && agreement.shorterCoverage >= 0.55)
+    || (agreement.hits >= 4 && agreement.shorterCoverage >= 0.68);
+}
+
 function decodeBuffer(buffer, contentType = '') {
   const probe = buffer.subarray(0, Math.min(buffer.length, 4096)).toString('latin1');
   const declared = (contentType.match(/charset\s*=\s*["']?([^;"'\s]+)/i) || [])[1]
@@ -50,17 +58,12 @@ function decodeBuffer(buffer, contentType = '') {
 async function searchGoogleNewsThumbnail(searchQuery, expectedTitle, source) {
   const wantedWords = titleWords(expectedTitle);
   if (wantedWords.length < 3) return null;
-
   const searchUrl = new URL('https://news.google.com/search');
   searchUrl.search = new URLSearchParams({ q: searchQuery, hl: 'fr', gl: 'FR', ceid: 'FR:fr', ucbcb: '1' }).toString();
   const response = await fetch(searchUrl, {
     redirect: 'follow',
     signal: AbortSignal.timeout(HTML_TIMEOUT_MS),
-    headers: {
-      'User-Agent': GOOGLE_NEWS_UA,
-      'Accept': 'text/html,application/xhtml+xml',
-      'Accept-Language': 'fr-FR,fr;q=0.9'
-    }
+    headers: { 'User-Agent': GOOGLE_NEWS_UA, 'Accept': 'text/html,application/xhtml+xml', 'Accept-Language': 'fr-FR,fr;q=0.9' }
   });
   if (!response.ok) throw new Error(`Google search HTTP ${response.status}`);
   const type = response.headers.get('content-type') || '';
@@ -74,11 +77,8 @@ async function searchGoogleNewsThumbnail(searchQuery, expectedTitle, source) {
   for (let index = 0; index < results.length; index += 1) {
     const match = results[index];
     const label = plainText(match[1]);
+    if (!sameEvent(label, expectedTitle)) continue;
     const agreement = titleAgreement(label, expectedTitle);
-    const exactEnough = agreement.score >= 0.72 && agreement.hits >= Math.min(4, wantedWords.length);
-    const sameEvent = agreement.hits >= 5 && agreement.shorterCoverage >= 0.55;
-    if (!exactEnough && !sameEvent) continue;
-
     const previous = results[index - 1]?.index;
     const next = results[index + 1]?.index;
     const start = previous == null ? Math.max(0, match.index - 12_000) : Math.floor((previous + match.index) / 2);
@@ -102,13 +102,87 @@ async function googleNewsThumbnail(title, source) {
   const query = plainText(title).replace(/\s+[-–—]\s+[^-–—]{2,90}$/, '').slice(0, 220);
   const words = titleWords(query);
   if (words.length < 3) return '';
-
   let best = await searchGoogleNewsThumbnail(query, query, source);
   if (!best) {
     const coreQuery = words.filter(word => word.length >= 4).slice(0, 9).join(' ');
     if (coreQuery && coreQuery !== query) best = await searchGoogleNewsThumbnail(coreQuery, query, source);
   }
   return best?.url || '';
+}
+
+function xmlTag(block = '', name = '') {
+  const match = block.match(new RegExp(`<${name}(?:\\s[^>]*)?>([\\s\\S]*?)<\\/${name}>`, 'i'));
+  return match ? plainText(match[1]) : '';
+}
+
+async function relatedGoogleNewsItems(title, source) {
+  const expected = plainText(title).replace(/\s+[-–—]\s+[^-–—]{2,90}$/, '').slice(0, 240);
+  const words = titleWords(expected);
+  if (words.length < 3) return [];
+  const queries = [expected, words.filter(word => word.length >= 4).slice(0, 9).join(' ')].filter(Boolean);
+  const seen = new Set();
+  const items = [];
+
+  for (const query of [...new Set(queries)]) {
+    try {
+      const url = new URL('https://news.google.com/rss/search');
+      url.search = new URLSearchParams({ q: query, hl: 'fr', gl: 'FR', ceid: 'FR:fr' }).toString();
+      const response = await fetch(url, {
+        redirect: 'follow',
+        signal: AbortSignal.timeout(HTML_TIMEOUT_MS),
+        headers: { 'User-Agent': GOOGLE_NEWS_UA, 'Accept': 'application/rss+xml,application/xml,text/xml' }
+      });
+      if (!response.ok) continue;
+      const xml = await response.text();
+      for (const block of (xml.match(/<item\b[\s\S]*?<\/item>/gi) || []).slice(0, 24)) {
+        const headline = xmlTag(block, 'title');
+        const link = xmlTag(block, 'link') || xmlTag(block, 'guid');
+        const publisher = xmlTag(block, 'source');
+        if (!headline || !/^https?:\/\//i.test(link) || !sameEvent(headline, expected)) continue;
+        const key = headline.toLowerCase();
+        if (seen.has(key)) continue;
+        seen.add(key);
+        const agreement = titleAgreement(headline, expected);
+        const differentSource = publisher && source && publisher.toLowerCase() !== source.toLowerCase();
+        items.push({ headline, link, publisher, confidence: Math.max(agreement.score, agreement.shorterCoverage) + (differentSource ? 0.06 : 0) });
+      }
+      if (items.length >= 6) break;
+    } catch {}
+  }
+  return items.sort((a, b) => b.confidence - a.confidence).slice(0, 6);
+}
+
+async function fetchRelatedPublisherImage(req, title, source) {
+  const items = await relatedGoogleNewsItems(title, source);
+  if (!items.length) return null;
+  const protocol = String(req.headers?.['x-forwarded-proto'] || 'https').split(',')[0].trim() || 'https';
+  const host = String(req.headers?.host || '').trim();
+  if (!host) return null;
+  const origin = `${protocol}://${host}`;
+
+  for (const item of items) {
+    try {
+      const params = new URLSearchParams({
+        v: '25',
+        url: item.link,
+        image: '',
+        title: item.headline.slice(0, 280),
+        source: item.publisher.slice(0, 100),
+        custom: '0'
+      });
+      const response = await fetch(`${origin}/api/article-thumbnail?${params}`, {
+        signal: AbortSignal.timeout(RELATED_TIMEOUT_MS),
+        headers: { 'User-Agent': GOOGLE_NEWS_UA }
+      });
+      const type = response.headers.get('content-type') || '';
+      const status = response.headers.get('x-thumbnail-status') || '';
+      if (!response.ok || !type.startsWith('image/') || /svg/i.test(type) || /fallback|tile/i.test(status)) continue;
+      const buffer = Buffer.from(await response.arrayBuffer());
+      if (!buffer.length || buffer.byteLength > MAX_IMAGE_BYTES) continue;
+      return { buffer, type, status: 'same-event-publisher' };
+    } catch {}
+  }
+  return null;
 }
 
 function googleImageHost(hostname = '') {
@@ -124,11 +198,7 @@ async function fetchImage(rawUrl) {
     const response = await fetch(url, {
       redirect: 'manual',
       signal: AbortSignal.timeout(IMAGE_TIMEOUT_MS),
-      headers: {
-        'User-Agent': GOOGLE_NEWS_UA,
-        'Accept': 'image/avif,image/webp,image/apng,image/jpeg,image/png,image/*,*/*;q=0.8',
-        'Referer': 'https://news.google.com/'
-      }
+      headers: { 'User-Agent': GOOGLE_NEWS_UA, 'Accept': 'image/avif,image/webp,image/apng,image/jpeg,image/png,image/*,*/*;q=0.8', 'Referer': 'https://news.google.com/' }
     });
     if (response.status >= 300 && response.status < 400 && response.headers.get('location')) {
       current = new URL(response.headers.get('location'), url).href;
@@ -142,6 +212,15 @@ async function fetchImage(rawUrl) {
     return { buffer, type };
   }
   throw new Error('too many image redirects');
+}
+
+function sendImage(res, image, status) {
+  res.statusCode = 200;
+  res.setHeader('Content-Type', image.type);
+  res.setHeader('Content-Length', String(image.buffer.byteLength));
+  res.setHeader('Cache-Control', 'public, max-age=86400, s-maxage=604800, stale-while-revalidate=2592000');
+  res.setHeader('X-Thumbnail-Status', status);
+  return res.end(image.buffer);
 }
 
 function xmlText(value = '') {
@@ -163,18 +242,20 @@ module.exports = async function handler(req, res) {
   if (req.method !== 'GET') { res.statusCode = 405; return res.end(); }
   const title = String(req.query?.title || '').slice(0, 300);
   const source = String(req.query?.source || 'Le Parisien').slice(0, 100);
+
   try {
     const thumbnail = await googleNewsThumbnail(title, source);
-    if (!thumbnail) return sourceTile(res, source);
-    const image = await fetchImage(thumbnail);
-    res.statusCode = 200;
-    res.setHeader('Content-Type', image.type);
-    res.setHeader('Content-Length', String(image.buffer.byteLength));
-    res.setHeader('Cache-Control', 'public, max-age=86400, s-maxage=604800, stale-while-revalidate=2592000');
-    res.setHeader('X-Thumbnail-Status', 'google-news-related');
-    return res.end(image.buffer);
+    if (thumbnail) {
+      try {
+        const image = await fetchImage(thumbnail);
+        return sendImage(res, image, 'google-news-related');
+      } catch {}
+    }
+
+    const related = await fetchRelatedPublisherImage(req, title, source);
+    if (related) return sendImage(res, related, related.status);
   } catch (error) {
     console.warn('exact Google News thumbnail unavailable:', String(error?.message || error).slice(0, 140));
-    return sourceTile(res, source);
   }
+  return sourceTile(res, source);
 };
