@@ -2,6 +2,7 @@
   "name": "mon-actualite",
   "private": true,
   "dependencies": {
-    "@google/genai": "^2.17.1"
+    "@google/genai": "^2.17.1",
+    "@vercel/functions": "latest"
   }
 }
