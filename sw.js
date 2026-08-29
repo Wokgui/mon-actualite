@@ -1,6 +1,6 @@
-const CACHE = 'mon-actualite-v72-prewarmed-images';
+const CACHE = 'mon-actualite-v73-parallel-images';
 const THUMB_CACHE = 'mon-actualite-thumbnails-v6-feedly';
-const ASSETS = ['./', './index.html', './styles.css?v=53', './feedly-compact.css?v=43', './feedly-left.css?v=43', './ui-fixes-v2.css?v=43', './article-quickview.css?v=53', './feed-quality.css?v=43', './performance-v42.css?v=45', './personalization-v44.css?v=53', './bootstrap-v42.js?v=54', './stable-dom.js?v=44', './app.js?v=61', './feedly-runtime.js?v=61', './image-prewarm-v72.js?v=72', './summary-fixes.js?v=44', './article-quickview.js?v=56', './feed-quality.js?v=45', './source-discovery-ui.js?v=3', './services/source-connectors.js?v=45.3', './services/article-visuals.js?v=71', './manifest.webmanifest?v=60', './version.json', './assets/app-icon-192.png', './assets/app-icon-512.png', './assets/app-icon-maskable-512.png', './assets/apple-touch-icon-180.png'];
+const ASSETS = ['./', './index.html', './styles.css?v=53', './feedly-compact.css?v=43', './feedly-left.css?v=43', './ui-fixes-v2.css?v=43', './article-quickview.css?v=53', './feed-quality.css?v=43', './performance-v42.css?v=45', './personalization-v44.css?v=53', './bootstrap-v42.js?v=54', './stable-dom.js?v=44', './app.js?v=61', './feedly-runtime.js?v=61', './image-prewarm-v72.js?v=73', './summary-fixes.js?v=44', './article-quickview.js?v=56', './feed-quality.js?v=45', './source-discovery-ui.js?v=3', './services/source-connectors.js?v=45.3', './services/article-visuals.js?v=73', './manifest.webmanifest?v=60', './version.json', './assets/app-icon-192.png', './assets/app-icon-512.png', './assets/app-icon-maskable-512.png', './assets/apple-touch-icon-180.png'];
 
 self.addEventListener('install', event => {
   event.waitUntil((async () => {
@@ -116,7 +116,7 @@ self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);
   if (url.origin !== self.location.origin) return;
 
-  if (url.pathname === '/api/article-thumbnail' || url.pathname === '/api/exact-news-thumbnail') {
+  if (url.pathname === '/api/article-thumbnail' || url.pathname === '/api/exact-news-thumbnail' || url.pathname === '/api/article-photo-fast') {
     event.respondWith(thumbnailResponse(event.request, event));
     return;
   }
