@@ -39,6 +39,10 @@ function factualSearchTitle(title = '') {
   if (parts.length > 1) {
     const tail = parts[parts.length - 1];
     const words = tail.split(/\s+/).filter(Boolean);
+    // Long Le Parisien headlines often append contextual details that make an
+    // exact Google News lookup too restrictive. The first seven words of the
+    // factual clause are normally enough to identify the event unambiguously.
+    if (words.length >= 10) return words.slice(0, 7).join(' ');
     if (words.length >= 6 && tail.length >= 45) return tail;
   }
   return cleanTitle;
@@ -56,7 +60,7 @@ function recoveryVisualUrl(article = {}) {
     if (prepared.origin === location.origin && ['/api/article-thumbnail', '/api/exact-news-thumbnail'].includes(prepared.pathname)) suppliedImage = '';
   } catch {}
   const params = new URLSearchParams({
-    v: '30',
+    v: '32',
     url: url.slice(0, 1900),
     image: suppliedImage,
     title: lookupTitle.slice(0, 280),
