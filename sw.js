@@ -1,4 +1,4 @@
-const CACHE = 'mon-actualite-v63-factual-image-title';
+const CACHE = 'mon-actualite-v64-sparse-article-fix';
 const THUMB_CACHE = 'mon-actualite-thumbnails-v5-legacy';
 const ASSETS = ['./', './index.html', './styles.css?v=53', './feedly-compact.css?v=43', './feedly-left.css?v=43', './ui-fixes-v2.css?v=43', './article-quickview.css?v=53', './feed-quality.css?v=43', './performance-v42.css?v=45', './personalization-v44.css?v=53', './bootstrap-v42.js?v=54', './stable-dom.js?v=44', './app.js?v=60', './feedly-runtime.js?v=60', './summary-fixes.js?v=44', './article-quickview.js?v=54', './feed-quality.js?v=44.1', './services/source-connectors.js?v=45.3', './services/article-visuals.js?v=56', './manifest.webmanifest?v=60', './version.json', './assets/app-icon-192.png', './assets/app-icon-512.png', './assets/app-icon-maskable-512.png', './assets/apple-touch-icon-180.png'];
 
