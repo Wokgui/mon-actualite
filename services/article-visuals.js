@@ -16,6 +16,13 @@ function trustedPreparedUrl(raw = '', source = '') {
     if (host === 'www.google.com' || host.endsWith('.gstatic.com') || host.endsWith('.googleusercontent.com')) {
       return source.startsWith('google-news') ? url.href : '';
     }
+    // Old article records may keep a previously cached exact-thumbnail URL.
+    // Always move those URLs to the current resolver generation so a former
+    // publisher-tile result can never remain frozen in local history.
+    if (url.origin === location.origin && url.pathname === '/api/exact-news-thumbnail') {
+      url.searchParams.set('v', '35');
+      return url.href;
+    }
     return url.href;
   } catch {
     return '';
@@ -56,7 +63,7 @@ function recoveryVisualUrl(article = {}) {
     if (prepared.origin === location.origin && ['/api/article-thumbnail', '/api/exact-news-thumbnail'].includes(prepared.pathname)) suppliedImage = '';
   } catch {}
   const params = new URLSearchParams({
-    v: '34',
+    v: parisien ? '35' : '34',
     url: url.slice(0, 1900),
     image: suppliedImage,
     title: title.slice(0, 280),
@@ -66,25 +73,6 @@ function recoveryVisualUrl(article = {}) {
   });
   const endpoint = parisien ? '/api/exact-news-thumbnail' : '/api/article-thumbnail';
   return `${endpoint}?${params}`;
-}
-
-function xml(value = '') {
-  return clean(value).replace(/[&<>"']/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&apos;' }[character]));
-}
-
-function hash(value = '') {
-  let result = 2166136261;
-  for (const character of clean(value)) {
-    result ^= character.charCodeAt(0);
-    result = Math.imul(result, 16777619);
-  }
-  return result >>> 0;
-}
-
-function initials(value = '') {
-  const words = clean(value).replace(/[^\p{L}\p{N}]+/gu, ' ').split(/\s+/).filter(Boolean);
-  if (!words.length) return 'A';
-  return (words.length === 1 ? words[0].slice(0, 2) : `${words[0][0]}${words[1][0]}`).toUpperCase();
 }
 
 export function preparedVisualUrl(article = {}) {
@@ -102,18 +90,11 @@ export function preparedVisualUrl(article = {}) {
   return trustedPreparedUrl(raw, source);
 }
 
-export function sourceTileUrl(article = {}) {
-  const label = clean(article.source || article.feedTitle || article.category || 'Actualité');
-  const category = clean(article.category || 'Actualité');
-  const palettes = [
-    ['#e8e2ff', '#c9bdf7', '#51419d'],
-    ['#dff4ef', '#addfd1', '#236d5c'],
-    ['#e2efff', '#b7d6fb', '#285f9f'],
-    ['#fff0da', '#f4cf9b', '#89551f'],
-    ['#f7e3ef', '#e9b8d4', '#873b66']
-  ];
-  const [start, end, ink] = palettes[hash(`${label}|${category}`) % palettes.length];
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="400" height="224" viewBox="0 0 400 224"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop stop-color="${start}"/><stop offset="1" stop-color="${end}"/></linearGradient></defs><rect width="400" height="224" rx="18" fill="url(#g)"/><circle cx="200" cy="92" r="54" fill="#fff" fill-opacity=".72"/><text x="200" y="111" text-anchor="middle" font-family="Arial,sans-serif" font-size="54" font-weight="700" fill="${ink}">${xml(initials(label))}</text><text x="200" y="178" text-anchor="middle" font-family="Arial,sans-serif" font-size="22" font-weight="600" fill="${ink}">${xml(label.slice(0, 24))}</text></svg>`;
+export function sourceTileUrl() {
+  // A publisher logo looked like an article photo and hid image-recovery bugs.
+  // The last-resort visual is intentionally neutral and carries no publisher
+  // branding; exact article photos are always attempted before this is used.
+  const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="400" height="224" viewBox="0 0 400 224"><rect width="400" height="224" rx="18" fill="#f1f1f4"/><path d="M0 181 91 119l64 43 66-67 179 129H0Z" fill="#d7d7de"/><circle cx="307" cy="64" r="25" fill="#dedee4"/></svg>';
   return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
 }
 
@@ -130,8 +111,8 @@ export function articleVisualUrl(article = {}) {
 
 export function hasPreparedVisual(article = {}) {
   if (preparedVisualUrl(article)) return true;
-  // Le Parisien must stay on its dedicated recovery endpoint instead of being
-  // overwritten by the generic backfill worker when its page returns 403.
+  // Le Parisien uses a dedicated exact-title resolver. Mark it prepared so
+  // generic background workers cannot replace it with a guessed illustration.
   if (isLeParisienArticle(article)) return true;
   return false;
 }
