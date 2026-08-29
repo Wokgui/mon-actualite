@@ -66,6 +66,8 @@
     else if (article.noveltyStateV78 === 'new') value += 15;
     else if (article.noveltyStateV78 === 'minor-update') value += 8;
     if (article.corroboratedV79 || Number(article.mergedCount || 0) >= 2) value += 7;
+    if (Number(article.informationValueV89 || 0) >= 75) value += 8;
+    if (article.lowInformationV89) value -= 18;
     return value;
   }
 
@@ -85,6 +87,7 @@
     const pool = articles
       .filter(article => !article.seenHidden)
       .filter(article => article.noveltyStateV78 !== 'repeat')
+      .filter(article => !article.lowInformationV89 || article.essential)
       .map(article => {
         const entry = snapshotEntry(article);
         const old = previousMap.get(entry.key);
@@ -124,15 +127,19 @@
 
   function render() {
     queued = false;
-    const isBrief = currentView() === 'brief';
+    const page = document.querySelector('.page');
+    const originalList = page?.querySelector('.brief-points');
+    // The actual Brief DOM is more reliable than the nav class. Navigation
+    // cache layers can toggle .active a frame before/after the page swap.
+    const isBrief = Boolean(originalList) || currentView() === 'brief';
     if (!isBrief) {
       active = false;
       return;
     }
-
-    const page = document.querySelector('.page');
-    const originalList = page?.querySelector('.brief-points');
-    if (!page || !originalList) return;
+    if (!page || !originalList) {
+      active = false;
+      return;
+    }
 
     if (active && page.querySelector('.brief-smart-v87')) return;
     active = true;
