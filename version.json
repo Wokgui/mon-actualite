@@ -1,5 +1,5 @@
 {
   "version": "60",
   "release": "2026-08-29",
-  "label": "v79 : doublons fusionnés par événement, navigation Accueil/Brief plus fluide et mode depuis la dernière visite"
+  "label": "v80 : Brief différentiel, synthèse multi-sources et actualisation silencieuse avec nouvelles informations en attente"
 }
