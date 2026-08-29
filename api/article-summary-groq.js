@@ -8,6 +8,8 @@ const GROQ_MODELS = [...new Set([
   'openai/gpt-oss-120b'
 ].filter(Boolean).map(value => String(value).trim()).filter(value => value && !RETIRED_MODELS.has(value)))];
 const GROQ_TIMEOUT_MS = 18000;
+const NEWS_TIMEOUT_MS = 5000;
+const NEWS_UA = 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/140 Safari/537.36';
 
 const SYSTEM = `Tu es un rédacteur de presse factuel. Résume uniquement les informations fournies. N'invente aucun fait, nom, chiffre, contexte ou conséquence. Commence par le fait principal. Écris un français naturel, précis et neutre. Ignore entièrement les éléments d'interface, appels à se connecter, sauvegarder un article, s'abonner, accepter des cookies, partager, activer des notifications ou toute autre phrase de service du site. N'écris ni titre accrocheur, ni formule promotionnelle, ni invitation à cliquer.`;
 
@@ -31,16 +33,17 @@ function decodeEntities(value = '') {
   for (let pass = 0; pass < 4; pass++) {
     const before = text;
     text = text
-      .replace(/&#(\d+);/g, (full, n) => {
-        try { return String.fromCodePoint(Number(n)); } catch { return full; }
-      })
-      .replace(/&#x([0-9a-f]+);/gi, (full, n) => {
-        try { return String.fromCodePoint(parseInt(n, 16)); } catch { return full; }
-      })
+      .replace(/&#(\d+);/g, (full, n) => { try { return String.fromCodePoint(Number(n)); } catch { return full; } })
+      .replace(/&#x([0-9a-f]+);/gi, (full, n) => { try { return String.fromCodePoint(parseInt(n, 16)); } catch { return full; } })
       .replace(/&([A-Za-z]+);/g, (full, name) => ENTITY_MAP.has(name) ? ENTITY_MAP.get(name) : full);
     if (text === before) break;
   }
   return text.replace(/\uFFFD+/g, '').replace(/[ \t]+/g, ' ').replace(/ *\n */g, '\n').trim();
+}
+
+function stripHtml(value = '') {
+  return decodeEntities(String(value || '').replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1').replace(/<[^>]+>/g, ' '))
+    .replace(/\s+/g, ' ').trim();
 }
 
 function sentences(text = '') {
@@ -79,10 +82,8 @@ function sanitizeFactual(value = '') {
     if (useful.length) kept.push(useful.join(' '));
   }
   let result = kept.join('\n\n').trim();
-  if (!result) {
-    result = sentences(decoded).filter(sentence => sentence.length >= 30 && !isBoilerplate(sentence)).slice(0, 6).join(' ');
-  }
-  return result.slice(0, 4200).trim();
+  if (!result) result = sentences(decoded).filter(sentence => sentence.length >= 30 && !isBoilerplate(sentence)).slice(0, 8).join(' ');
+  return result.slice(0, 5200).trim();
 }
 
 function groqKey() {
@@ -184,16 +185,10 @@ function summarySupported(summary, source) {
   if (generated.length < 5 || sourceTokens.length < 2) return false;
 
   const normalizedSource = normalizeSupport(source);
-
-  // Numeric and calendar claims are high-risk facts: every one introduced in
-  // the summary must already exist in the verified material.
   const sourceNumbers = new Set(numericClaims(source));
   if (numericClaims(summary).some(number => !sourceNumbers.has(number))) return false;
   if (unsupportedNumberWords(summary, source)) return false;
   if (dateClaims(summary).some(term => !normalizedSource.includes(term))) return false;
-
-  // Proper nouns are checked independently from ordinary lexical overlap so a
-  // fluent paraphrase is accepted, while an invented person or place is not.
   if (entityClaims(summary).some(entity => !normalizedSource.includes(entity))) return false;
 
   const sourceExact = new Set(sourceTokens);
@@ -202,10 +197,77 @@ function summarySupported(summary, source) {
   const fuzzy = generated.filter(token => sourceFuzzy.has(fuzzyToken(token))).length;
   const exactRatio = exact / generated.length;
   const fuzzyRatio = fuzzy / generated.length;
-
-  // The old validator required 12% exact word identity. That rejected valid
-  // journalistic reformulations. Keep a small semantic anchor instead.
   return exact >= 2 || fuzzy >= 3 || exactRatio >= 0.06 || fuzzyRatio >= 0.12;
+}
+
+function newsTokens(value = '') {
+  const stop = new Set(['avec','dans','pour','plus','apres','avant','cette','sont','etre','leur','leurs','tout','mais','sans','vers','entre','une','des','les','sur','qui','que','aux','par','ses','son','ont','est','aux','etats','unis','article','direct']);
+  return [...new Set(normalizeSupport(value).replace(/[^a-z0-9]+/g, ' ').split(/\s+/)
+    .filter(word => word.length >= 3 && !stop.has(word)))];
+}
+
+function headlineAgreement(candidate = '', expected = '') {
+  const wanted = newsTokens(expected);
+  const found = newsTokens(candidate);
+  if (!wanted.length || !found.length) return { hits: 0, shorterCoverage: 0, expectedCoverage: 0 };
+  const foundSet = new Set(found);
+  const hits = wanted.filter(word => foundSet.has(word)).length;
+  return {
+    hits,
+    shorterCoverage: hits / Math.max(1, Math.min(wanted.length, found.length)),
+    expectedCoverage: hits / wanted.length
+  };
+}
+
+function xmlTag(block = '', name = '') {
+  const match = block.match(new RegExp(`<${name}(?:\\s[^>]*)?>([\\s\\S]*?)<\\/${name}>`, 'i'));
+  return match ? stripHtml(match[1]) : '';
+}
+
+async function fetchGoogleNewsHeadlines(title = '', source = '') {
+  const expected = stripHtml(title).replace(/\s+[-–—]\s+[^-–—]{2,90}$/, '').slice(0, 240);
+  const words = newsTokens(expected);
+  if (words.length < 3) return [];
+  const queries = [expected, words.filter(word => word.length >= 4).slice(0, 9).join(' ')].filter(Boolean);
+  const seen = new Set();
+  const results = [];
+
+  for (const query of [...new Set(queries)]) {
+    try {
+      const url = new URL('https://news.google.com/rss/search');
+      url.search = new URLSearchParams({ q: query, hl: 'fr', gl: 'FR', ceid: 'FR:fr' }).toString();
+      const response = await fetch(url, {
+        redirect: 'follow',
+        signal: AbortSignal.timeout(NEWS_TIMEOUT_MS),
+        headers: { 'User-Agent': NEWS_UA, 'Accept': 'application/rss+xml,application/xml,text/xml' }
+      });
+      if (!response.ok) continue;
+      const xml = await response.text();
+      const items = xml.match(/<item\b[\s\S]*?<\/item>/gi) || [];
+      for (const item of items.slice(0, 24)) {
+        const headline = xmlTag(item, 'title');
+        if (!headline) continue;
+        const normalized = normalizeSupport(headline).replace(/[^a-z0-9]+/g, ' ').trim();
+        const expectedNormalized = normalizeSupport(expected).replace(/[^a-z0-9]+/g, ' ').trim();
+        if (!normalized || normalized === expectedNormalized || seen.has(normalized)) continue;
+        const agreement = headlineAgreement(headline, expected);
+        const sameEvent = (agreement.hits >= 3 && agreement.shorterCoverage >= 0.5)
+          || (agreement.hits >= 5 && agreement.expectedCoverage >= 0.28);
+        if (!sameEvent) continue;
+        const publisher = xmlTag(item, 'source');
+        const sourcePenalty = publisher && source && normalizeSupport(publisher) === normalizeSupport(source) ? 0.04 : 0;
+        const confidence = Math.max(agreement.shorterCoverage, agreement.expectedCoverage) - sourcePenalty;
+        seen.add(normalized);
+        results.push({ headline, confidence });
+      }
+      if (results.length >= 5) break;
+    } catch {}
+  }
+
+  return results
+    .sort((a, b) => b.confidence - a.confidence)
+    .slice(0, 6)
+    .map(item => item.headline);
 }
 
 function paragraphize(value = '', wanted = 2) {
@@ -221,7 +283,7 @@ function paragraphize(value = '', wanted = 2) {
   return groups.join('\n\n');
 }
 
-function promptFor(body, factual) {
+function promptFor(body, factual, corroborated = false) {
   const mode = body?.mode === 'category' ? 'category' : 'article';
   if (mode === 'category') {
     const category = decodeEntities(body?.category || 'cette rubrique').slice(0, 80);
@@ -231,8 +293,8 @@ function promptFor(body, factual) {
   if (factual.length < 250) {
     return `Résume cet article en français en 1 ou 2 phrases très factuelles. Le texte disponible est court : n'ajoute aucun contexte, détail, lieu, nom, date, nombre, cause ou conséquence qui n'y figure pas explicitement. Si le texte ne permet qu'une phrase, fais une seule phrase. Reformule sans développer artificiellement.\n\nTITRE : ${title}\n\nTEXTE FACTUEL :\n${factual}`;
   }
-  if (factual.length < 650) {
-    return `Résume cet article en français en 2 à 4 phrases, environ 45 à 85 mots. Commence par le fait principal. Utilise uniquement les informations explicitement présentes ci-dessous et n'ajoute aucun contexte extérieur. Ne recopie pas de longues citations : reformule.\n\nTITRE : ${title}\n\nTEXTE FACTUEL :\n${factual}`;
+  if (factual.length < 700) {
+    return `Résume cet événement en français en 2 à 4 phrases, environ 55 à 95 mots. Commence par le fait principal. ${corroborated ? 'Une partie du matériau provient de titres concordants de plusieurs médias : ne retiens que les informations explicitement présentes dans ces titres et cohérentes entre elles.' : ''} N'ajoute aucun contexte extérieur et ne recopie pas de longues citations.\n\nTITRE : ${title}\n\nTEXTE FACTUEL :\n${factual}`;
   }
   return `Résume cet article en français en 4 à 6 phrases, environ 90 à 140 mots, en exactement 2 paragraphes courts. Commence directement par le fait principal et son contexte immédiat. Le second paragraphe donne les précisions, chiffres ou conséquences présents dans le texte. Supprime mentalement toute phrase de connexion, abonnement, sauvegarde d'article, cookies, partage ou navigation si elle subsiste. Ne complète avec aucune connaissance extérieure. Ne recopie pas de longues citations : reformule.\n\nTITRE : ${title}\n\nTEXTE FACTUEL :\n${factual}`;
 }
@@ -251,21 +313,14 @@ async function generateWithGroq(model, key, prompt, minLength = 60) {
     body.include_reasoning = false;
     body.reasoning_effort = 'low';
   }
-
   const response = await fetch(GROQ_ENDPOINT, {
     method: 'POST',
     signal: AbortSignal.timeout(GROQ_TIMEOUT_MS),
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${key}`
-    },
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
     body: JSON.stringify(body)
   });
   const payload = await response.json().catch(() => ({}));
-  if (!response.ok) {
-    const message = payload?.error?.message || `HTTP ${response.status}`;
-    throw new Error(`${model}: ${message}`);
-  }
+  if (!response.ok) throw new Error(`${model}: ${payload?.error?.message || `HTTP ${response.status}`}`);
   const text = decodeEntities(payload?.choices?.[0]?.message?.content || '');
   if (text.length < minLength) throw new Error(`${model}: réponse trop courte`);
   return text;
@@ -301,20 +356,11 @@ async function probeGroq(key) {
 
 module.exports = async function handler(req, res) {
   const key = groqKey();
-
   if (req.method === 'GET' && req.query?.status) {
-    const payload = {
-      ok: true,
-      provider: 'groq',
-      model: GROQ_MODELS[0],
-      models: GROQ_MODELS,
-      hasGroqKey: Boolean(key),
-      gatewayDisabled: true
-    };
+    const payload = { ok: true, provider: 'groq', model: GROQ_MODELS[0], models: GROQ_MODELS, hasGroqKey: Boolean(key), gatewayDisabled: true };
     if (String(req.query?.probe || '') === '1' && key) payload.probe = await probeGroq(key);
     return send(res, 200, payload);
   }
-
   if (req.method !== 'POST') return send(res, 405, { error: 'Méthode non autorisée' });
 
   let legacy;
@@ -332,12 +378,19 @@ module.exports = async function handler(req, res) {
   const body = req.body && typeof req.body === 'object' ? req.body : {};
   const mode = body?.mode === 'category' ? 'category' : 'article';
   let factual = sanitizeFactual(base?.summary || '');
-  // Some publishers expose only a headline through Google News or block the
-  // server-side article fetch. The verified title is still a factual fallback
-  // and prevents an empty summary while keeping the response honest.
   if (mode === 'article' && factual.length < 80) {
     factual = sanitizeFactual([body?.article?.summary, body?.article?.title].filter(Boolean).join('\n'));
   }
+
+  let corroboratingHeadlines = [];
+  if (mode === 'article' && factual.length < 300 && body?.article?.title) {
+    corroboratingHeadlines = await fetchGoogleNewsHeadlines(body.article.title, body.article.source).catch(() => []);
+    if (corroboratingHeadlines.length) {
+      const headlineFacts = corroboratingHeadlines.map(headline => /[.!?]$/.test(headline) ? headline : `${headline}.`).join('\n');
+      factual = sanitizeFactual([factual, headlineFacts].filter(Boolean).join('\n'));
+    }
+  }
+
   if (factual.length < (mode === 'article' ? 30 : 80)) {
     return send(res, 200, {
       ...base,
@@ -345,12 +398,12 @@ module.exports = async function handler(req, res) {
       ai: false,
       unavailable: true,
       provider: 'unavailable',
-      model: ''
+      model: '',
+      corroborated: false
     });
   }
 
   const safeFallback = paragraphize(factual, 2);
-
   if (!key) {
     return send(res, 200, {
       ...base,
@@ -358,11 +411,12 @@ module.exports = async function handler(req, res) {
       ai: false,
       unavailable: false,
       provider: 'factual',
-      model: ''
+      model: '',
+      corroborated: corroboratingHeadlines.length > 0
     });
   }
 
-  const prompt = promptFor(body, factual);
+  const prompt = promptFor(body, factual, corroboratingHeadlines.length > 0);
   const validationSource = [
     factual,
     mode === 'article' ? body?.article?.title : body?.category,
@@ -378,7 +432,8 @@ module.exports = async function handler(req, res) {
       ai: true,
       unavailable: false,
       provider: 'groq',
-      model: aiResult.model
+      model: aiResult.model,
+      corroborated: corroboratingHeadlines.length > 0
     });
   } catch (error) {
     const message = String(error?.message || error).replace(/gsk_[A-Za-z0-9_-]+/g, '[clé masquée]').slice(0, 420);
@@ -389,7 +444,8 @@ module.exports = async function handler(req, res) {
       ai: false,
       unavailable: false,
       provider: 'factual',
-      model: ''
+      model: '',
+      corroborated: corroboratingHeadlines.length > 0
     });
   }
 };
