@@ -3,6 +3,8 @@
 
   const CACHE_KEY = 'news-live-cache';
   const INTEL_KEY = 'news-story-intelligence-cache-v81';
+  const MAX_STORY_GAP = 72 * 60 * 60 * 1000;
+  const TITLE_MARK_RE = /\s*\[v86b\d+\]\s*$/i;
   const upstreamFetch = window.fetch.bind(window);
   const STOP = new Set('avec dans pour plus apres avant cette cet ces sont etre leur leurs tout tous mais sans vers entre une des les sur qui que aux par son ses est fait font comme dont elle elles ils nous vous notre votre aussi encore deja tres moins depuis alors chez contre lors peut peuvent avait avoir sera un le la du de au en et ou ce se sa ne pas actualite direct video photos photo selon annonce nouvelle nouveau nouvelles nouveaux article'.split(' '));
   const SENSATIONAL = /vous ne (?:croirez|devinerez)|incroyable|hallucinant|coup de tonnerre|coup de théâtre|scandale|choc|fait polémique|la raison va vous|voici pourquoi|ce qui va changer|tout ce qu['’]il faut savoir|personne ne s['’]y attendait/i;
@@ -22,7 +24,60 @@
   }
 
   function normalize(value = '') {
-    return clean(value).normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[’']/g, ' ').toLowerCase().replace(/[^a-z0-9]+/g, ' ').replace(/\s+/g, ' ').trim();
+    return clean(value).replace(TITLE_MARK_RE, '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[’']/g, ' ').toLowerCase().replace(/[^a-z0-9]+/g, ' ').replace(/\s+/g, ' ').trim();
+  }
+
+  function publishedAt(article = {}) {
+    const value = Date.parse(article.publishedAt || article.date || '');
+    return Number.isFinite(value) ? value : 0;
+  }
+
+  function storyBucket(value) {
+    return Math.floor(Number(value || 0) / MAX_STORY_GAP);
+  }
+
+  function prepareStoryBoundaries(articles) {
+    const prepared = (Array.isArray(articles) ? articles : []).map(article => {
+      const copy = { ...article };
+      const at = publishedAt(copy);
+      const rawKey = clean(copy.eventKeyV78OriginalV86 || copy.eventKeyV78 || '').replace(/:v86b\d+$/i, '');
+      if (rawKey && at) {
+        copy.eventKeyV78OriginalV86 = rawKey;
+        copy.eventKeyV78 = `${rawKey}:v86b${storyBucket(at)}`.slice(0, 300);
+      }
+      if (copy.titleOriginalV86) copy.title = copy.titleOriginalV86;
+      else copy.title = clean(copy.title || '').replace(TITLE_MARK_RE, '');
+      return copy;
+    });
+
+    const byTitle = new Map();
+    for (const article of prepared) {
+      const key = normalize(article.title || '');
+      if (!key) continue;
+      const list = byTitle.get(key) || [];
+      list.push(article);
+      byTitle.set(key, list);
+    }
+
+    let markedTitles = 0;
+    for (const group of byTitle.values()) {
+      const times = group.map(publishedAt).filter(Boolean);
+      if (times.length < 2 || Math.max(...times) - Math.min(...times) <= MAX_STORY_GAP) continue;
+      for (const article of group) {
+        const at = publishedAt(article);
+        if (!at) continue;
+        const original = clean(article.title || '').replace(TITLE_MARK_RE, '');
+        article.titleOriginalV86 = original;
+        article.title = `${original} [v86b${storyBucket(at)}]`;
+        markedTitles += 1;
+      }
+    }
+
+    return {
+      articles: prepared,
+      boundedKeys: prepared.filter(article => article.eventKeyV78OriginalV86).length,
+      markedTitles
+    };
   }
 
   function tokens(value = '', source = '') {
@@ -31,7 +86,7 @@
   }
 
   function titleSupport(article = {}) {
-    const title = clean(article.title || '');
+    const title = clean(article.titleOriginalV86 || article.title || '').replace(TITLE_MARK_RE, '');
     const summary = clean(article.summary || article.detail || '');
     const titleTokens = tokens(title, article.source || '');
     if (summary.length < 120 || titleTokens.length < 4) {
@@ -73,13 +128,21 @@
 
   function transformPayload(payload) {
     if (!payload || !Array.isArray(payload.articles)) return payload;
+    const prepared = prepareStoryBoundaries(payload.articles);
     let weak = 0;
-    payload.articles = payload.articles.map(article => {
+    payload.articles = prepared.articles.map(article => {
       const next = transformArticle(article);
       if (next.titleSupportV83 === 'weak') weak += 1;
       return next;
     });
-    payload.stats = { ...(payload.stats || {}), contentTrustV83: true, weakTitlesV83: weak };
+    payload.stats = {
+      ...(payload.stats || {}),
+      contentTrustV83: true,
+      weakTitlesV83: weak,
+      storyBoundaryPrepareV86: true,
+      boundedEventKeysV86: prepared.boundedKeys,
+      markedDuplicateTitlesV86: prepared.markedTitles
+    };
     return payload;
   }
 
@@ -117,7 +180,7 @@
     const item = cache[id];
     if (item) return item;
     const url = clean(article.url || '');
-    const title = normalize(article.title || '');
+    const title = normalize(article.titleOriginalV86 || article.title || '');
     return Object.values(cache).find(value => value && ((url && clean(value.url || '') === url) || (title && normalize(value.title || '') === title))) || null;
   }
 
@@ -160,8 +223,8 @@
     const map = articleMap();
     const title = normalize(modal.querySelector('.quick-summary-head h2')?.textContent || '');
     const source = normalize(modal.querySelector('.quick-summary-meta span')?.textContent || '');
-    const article = [...map.values()].find(item => normalize(item.title || '').includes(title) && (!source || normalize(item.source || '') === source))
-      || [...map.values()].find(item => normalize(item.title || '').includes(title));
+    const article = [...map.values()].find(item => normalize(item.titleOriginalV86 || item.title || '').includes(title) && (!source || normalize(item.source || '') === source))
+      || [...map.values()].find(item => normalize(item.titleOriginalV86 || item.title || '').includes(title));
     if (!article) return;
     const verify = verification(article);
     let note = modal.querySelector('.verification-note-v83');

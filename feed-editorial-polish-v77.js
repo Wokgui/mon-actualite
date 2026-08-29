@@ -31,12 +31,19 @@
 
   function seenIds() { return new Set(Object.keys(readJson(SEEN_KEY, {}))); }
 
+  function annotateSemanticOrigin(article = {}) {
+    const copy = { ...article };
+    if (!copy.semanticOriginalCategoryV87) copy.semanticOriginalCategoryV87 = String(copy.category || '').trim();
+    return copy;
+  }
+
   function applySeenToArticles(articles) {
     if (!Array.isArray(articles)) return articles;
     const seen = seenIds();
     return articles.map(article => {
-      if (!seen.has(String(article?.id || ''))) return article;
-      return { ...article, score: -1000000, seenHidden: true, essential: false, essentialRank: 0 };
+      const copy = annotateSemanticOrigin(article || {});
+      if (!seen.has(String(copy?.id || ''))) return copy;
+      return { ...copy, score: -1000000, seenHidden: true, essential: false, essentialRank: 0 };
     });
   }
 
@@ -44,11 +51,15 @@
     const cache = readJson(CACHE_KEY, null);
     if (!cache || !Array.isArray(cache.articles)) return;
     cache.articles = applySeenToArticles(cache.articles);
+    cache.stats = { ...(cache.stats || {}), semanticOriginV87: true };
     writeJson(CACHE_KEY, cache);
   }
 
   function transformedResponse(response, payload) {
-    if (payload && Array.isArray(payload.articles)) payload.articles = applySeenToArticles(payload.articles);
+    if (payload && Array.isArray(payload.articles)) {
+      payload.articles = applySeenToArticles(payload.articles);
+      payload.stats = { ...(payload.stats || {}), semanticOriginV87: true };
+    }
     const headers = new Headers(response.headers);
     headers.delete('content-length');
     headers.delete('content-encoding');

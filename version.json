@@ -1,5 +1,5 @@
 {
   "version": "60",
   "release": "2026-08-29",
-  "label": "v88 : pipeline client consolidé, tests automatiques, diagnostic exportable, chronologie d’événement et provenance des synthèses"
+  "label": "v89 : tests navigateur Android/PWA, valeur informationnelle, détection des modifications depuis lecture et consolidation du socle v88"
 }
