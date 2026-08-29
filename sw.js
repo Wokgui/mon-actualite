@@ -1,5 +1,7 @@
-const CACHE = 'mon-actualite-v77-editorial-feed-r3';
+const CACHE = 'mon-actualite-v77-editorial-feed-r4';
 const THUMB_CACHE = 'mon-actualite-thumbnails-v6-feedly';
+const THUMB_NEGATIVE_TTL_MS = 15 * 60 * 1000;
+const thumbnailInflight = new Map();
 const ASSETS = ['./', './index.html', './styles.css?v=53', './feedly-compact.css?v=44', './feed-editorial-v77.css?v=77.2', './feedly-left.css?v=43', './ui-fixes-v2.css?v=43', './article-quickview.css?v=53', './feed-quality.css?v=43', './performance-v42.css?v=45', './personalization-v44.css?v=53', './bootstrap-v42.js?v=54', './stable-dom.js?v=44', './content-intelligence-v76.js?v=76', './feed-editorial-v77.js?v=77', './feed-editorial-polish-v77.js?v=77.2', './app.js?v=61', './feedly-runtime.js?v=61', './image-prewarm-v72.js?v=73', './summary-fixes.js?v=44', './article-quickview.js?v=56', './feed-quality.js?v=45', './source-discovery-ui.js?v=3', './services/source-connectors.js?v=45.3', './services/article-visuals.js?v=56', './manifest.webmanifest?v=60', './version.json', './assets/app-icon-192.png', './assets/app-icon-512.png', './assets/app-icon-maskable-512.png', './assets/apple-touch-icon-180.png'];
 
 self.addEventListener('install', event => {
@@ -50,7 +52,12 @@ async function networkFirstNavigation(request) {
 function neutralThumbnailResponse() {
   return new Response('<svg xmlns="http://www.w3.org/2000/svg" width="640" height="420" viewBox="0 0 640 420"><rect width="640" height="420" rx="22" fill="#f1f1f4"/><path d="M0 340 150 225l64 43 66-67 179 129H0Z" fill="#d7d7de"/><circle cx="490" cy="115" r="39" fill="#dedee4"/></svg>', {
     status: 200,
-    headers: { 'Content-Type': 'image/svg+xml', 'Cache-Control': 'no-store', 'X-Thumbnail-Status': 'neutral-fallback' }
+    headers: {
+      'Content-Type': 'image/svg+xml',
+      'Cache-Control': 'public, max-age=900',
+      'X-Thumbnail-Status': 'neutral-fallback',
+      'X-Thumbnail-Cached-At': String(Date.now())
+    }
   });
 }
 
@@ -71,7 +78,19 @@ function thumbnailCacheKey(request) {
   }
 }
 
-async function thumbnailResponse(request, event) {
+function isFallbackThumbnail(response) {
+  const status = response?.headers?.get('X-Thumbnail-Status') || '';
+  const type = response?.headers?.get('Content-Type') || '';
+  return status === 'fallback' || status === 'publisher-tile' || status === 'neutral-fallback' || /image\/svg\+xml/i.test(type);
+}
+
+async function cacheThumbnail(cache, request, canonicalKey, response) {
+  if (!response) return;
+  await cache.put(request, response.clone()).catch(() => {});
+  if (canonicalKey.url !== request.url) await cache.put(canonicalKey, response.clone()).catch(() => {});
+}
+
+async function thumbnailResponse(request) {
   const cache = await caches.open(THUMB_CACHE);
   const canonicalKey = thumbnailCacheKey(request);
   let cached = await cache.match(canonicalKey);
@@ -80,35 +99,45 @@ async function thumbnailResponse(request, event) {
     if (cached && canonicalKey.url !== request.url) cache.put(canonicalKey, cached.clone()).catch(() => {});
   }
 
-  const isFallback = response => {
-    const status = response?.headers?.get('X-Thumbnail-Status') || '';
-    const type = response?.headers?.get('Content-Type') || '';
-    return status === 'fallback' || status === 'publisher-tile' || status === 'neutral-fallback' || /image\/svg\+xml/i.test(type);
-  };
-
-  if (cached && isFallback(cached)) {
-    await Promise.allSettled([cache.delete(request), cache.delete(canonicalKey)]);
-    cached = null;
-  }
-
-  const refresh = fetch(request, { cache: 'no-store' }).then(response => {
-    if (response.ok && response.type !== 'opaque' && !isFallback(response)) {
-      cache.put(request, response.clone()).catch(() => {});
-      if (canonicalKey.url !== request.url) cache.put(canonicalKey, response.clone()).catch(() => {});
-      return response;
-    }
-    cache.delete(request).catch(() => {});
-    if (canonicalKey.url !== request.url) cache.delete(canonicalKey).catch(() => {});
-    if (response.status === 404 || isFallback(response)) return neutralThumbnailResponse();
-    return response;
-  });
-
   if (cached) {
-    event.waitUntil(refresh.catch(() => {}));
-    return cached;
+    if (!isFallbackThumbnail(cached)) return cached;
+    const cachedAt = Number(cached.headers.get('X-Thumbnail-Cached-At') || 0);
+    if (cachedAt && Date.now() - cachedAt < THUMB_NEGATIVE_TTL_MS) return cached;
+    await Promise.allSettled([cache.delete(request), cache.delete(canonicalKey)]);
   }
-  try { return await refresh; }
-  catch { return neutralThumbnailResponse(); }
+
+  const inflightKey = canonicalKey.url;
+  const existing = thumbnailInflight.get(inflightKey);
+  if (existing) {
+    try { return (await existing).clone(); }
+    catch {}
+  }
+
+  const job = (async () => {
+    try {
+      const response = await fetch(request, { cache: 'no-store' });
+      if (response.ok && response.type !== 'opaque' && !isFallbackThumbnail(response)) {
+        await cacheThumbnail(cache, request, canonicalKey, response);
+        return response;
+      }
+
+      await Promise.allSettled([cache.delete(request), cache.delete(canonicalKey)]);
+      if (response.status === 404 || isFallbackThumbnail(response)) {
+        const fallback = neutralThumbnailResponse();
+        await cacheThumbnail(cache, request, canonicalKey, fallback);
+        return fallback;
+      }
+      return response;
+    } catch {
+      const fallback = neutralThumbnailResponse();
+      await cacheThumbnail(cache, request, canonicalKey, fallback);
+      return fallback;
+    }
+  })();
+
+  thumbnailInflight.set(inflightKey, job);
+  try { return (await job).clone(); }
+  finally { thumbnailInflight.delete(inflightKey); }
 }
 
 self.addEventListener('fetch', event => {
@@ -117,7 +146,7 @@ self.addEventListener('fetch', event => {
   if (url.origin !== self.location.origin) return;
 
   if (url.pathname === '/api/article-thumbnail' || url.pathname === '/api/exact-news-thumbnail' || url.pathname === '/api/article-photo-fast') {
-    event.respondWith(thumbnailResponse(event.request, event));
+    event.respondWith(thumbnailResponse(event.request));
     return;
   }
   if (url.pathname.startsWith('/api/')) return;
