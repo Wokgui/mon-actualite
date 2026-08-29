@@ -1,0 +1,22 @@
+name: Regression checks
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  static-regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: JavaScript syntax
+        shell: bash
+        run: |
+          set -euo pipefail
+          while IFS= read -r -d '' file; do node --check "$file"; done < <(find . -type f -name '*.js' -not -path './node_modules/*' -print0)
+      - name: v88 static regression suite
+        run: node tests/v88-static-check.mjs

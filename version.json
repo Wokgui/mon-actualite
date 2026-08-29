@@ -1,5 +1,5 @@
 {
   "version": "60",
   "release": "2026-08-29",
-  "label": "v87 : Brief 5 à 8 faits nouveaux, diversité éditoriale anti-filtre-bulle, catégorie d’origine conservée et cache PWA complet"
+  "label": "v88 : pipeline client consolidé, tests automatiques, diagnostic exportable, chronologie d’événement et provenance des synthèses"
 }
