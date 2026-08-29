@@ -17,18 +17,24 @@ function plainText(value = '') {
 }
 
 function titleWords(value = '') {
-  const stop = new Set(['avec', 'dans', 'pour', 'plus', 'apres', 'avant', 'cette', 'sont', 'etre', 'leur', 'leurs', 'tout', 'mais', 'sans', 'vers', 'entre', 'une', 'des', 'les', 'sur', 'qui', 'que', 'aux']);
+  const stop = new Set(['avec', 'dans', 'pour', 'plus', 'apres', 'avant', 'cette', 'sont', 'etre', 'leur', 'leurs', 'tout', 'mais', 'sans', 'vers', 'entre', 'une', 'des', 'les', 'sur', 'qui', 'que', 'aux', 'par', 'ses', 'son', 'ont', 'est', 'etats', 'unis']);
   return [...new Set(plainText(value)
     .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
     .toLowerCase().replace(/[^a-z0-9]+/g, ' ')
     .split(/\s+/).filter(word => word.length >= 3 && !stop.has(word)))];
 }
 
-function titleOverlap(candidate, expected) {
+function titleAgreement(candidate, expected) {
   const wanted = titleWords(expected);
-  const found = new Set(titleWords(candidate));
-  if (!wanted.length || !found.size) return 0;
-  return wanted.filter(word => found.has(word)).length / wanted.length;
+  const found = titleWords(candidate);
+  if (!wanted.length || !found.length) return { score: 0, hits: 0, shorterCoverage: 0 };
+  const foundSet = new Set(found);
+  const hits = wanted.filter(word => foundSet.has(word)).length;
+  return {
+    score: hits / wanted.length,
+    hits,
+    shorterCoverage: hits / Math.max(1, Math.min(wanted.length, found.length))
+  };
 }
 
 function decodeBuffer(buffer, contentType = '') {
@@ -41,13 +47,12 @@ function decodeBuffer(buffer, contentType = '') {
   catch { return buffer.toString('utf8'); }
 }
 
-async function googleNewsThumbnail(title, source) {
-  const query = plainText(title).replace(/\s+[-–—]\s+[^-–—]{2,90}$/, '').slice(0, 220);
-  const wantedWords = titleWords(query);
-  if (wantedWords.length < 3) return '';
+async function searchGoogleNewsThumbnail(searchQuery, expectedTitle, source) {
+  const wantedWords = titleWords(expectedTitle);
+  if (wantedWords.length < 3) return null;
 
   const searchUrl = new URL('https://news.google.com/search');
-  searchUrl.search = new URLSearchParams({ q: query, hl: 'fr', gl: 'FR', ceid: 'FR:fr', ucbcb: '1' }).toString();
+  searchUrl.search = new URLSearchParams({ q: searchQuery, hl: 'fr', gl: 'FR', ceid: 'FR:fr', ucbcb: '1' }).toString();
   const response = await fetch(searchUrl, {
     redirect: 'follow',
     signal: AbortSignal.timeout(HTML_TIMEOUT_MS),
@@ -69,9 +74,10 @@ async function googleNewsThumbnail(title, source) {
   for (let index = 0; index < results.length; index += 1) {
     const match = results[index];
     const label = plainText(match[1]);
-    const score = titleOverlap(label, query);
-    const hits = Math.round(score * wantedWords.length);
-    if (score < 0.72 || hits < Math.min(4, wantedWords.length)) continue;
+    const agreement = titleAgreement(label, expectedTitle);
+    const exactEnough = agreement.score >= 0.72 && agreement.hits >= Math.min(4, wantedWords.length);
+    const sameEvent = agreement.hits >= 5 && agreement.shorterCoverage >= 0.55;
+    if (!exactEnough && !sameEvent) continue;
 
     const previous = results[index - 1]?.index;
     const next = results[index + 1]?.index;
@@ -85,9 +91,22 @@ async function googleNewsThumbnail(title, source) {
     if (!attachments.length) continue;
     const rawAttachment = attachments.find(value => /-w400-h224-/i.test(value)) || attachments[attachments.length - 1];
     const attachment = rawAttachment.replace(/-w\d+-h\d+-p-df(?:-rw)?$/i, '-w400-h224-p-df');
-    const adjustedScore = Math.min(1, score + sourceBonus);
-    if (!best || adjustedScore > best.score) best = { score: adjustedScore, url: new URL(attachment, searchUrl).href };
-    if (adjustedScore >= 0.99) break;
+    const confidence = Math.min(1, Math.max(agreement.score, agreement.shorterCoverage * 0.88) + sourceBonus);
+    if (!best || confidence > best.score) best = { score: confidence, url: new URL(attachment, searchUrl).href };
+    if (confidence >= 0.99) break;
+  }
+  return best;
+}
+
+async function googleNewsThumbnail(title, source) {
+  const query = plainText(title).replace(/\s+[-–—]\s+[^-–—]{2,90}$/, '').slice(0, 220);
+  const words = titleWords(query);
+  if (words.length < 3) return '';
+
+  let best = await searchGoogleNewsThumbnail(query, query, source);
+  if (!best) {
+    const coreQuery = words.filter(word => word.length >= 4).slice(0, 9).join(' ');
+    if (coreQuery && coreQuery !== query) best = await searchGoogleNewsThumbnail(coreQuery, query, source);
   }
   return best?.url || '';
 }
@@ -152,7 +171,7 @@ module.exports = async function handler(req, res) {
     res.setHeader('Content-Type', image.type);
     res.setHeader('Content-Length', String(image.buffer.byteLength));
     res.setHeader('Cache-Control', 'public, max-age=86400, s-maxage=604800, stale-while-revalidate=2592000');
-    res.setHeader('X-Thumbnail-Status', 'google-news-exact');
+    res.setHeader('X-Thumbnail-Status', 'google-news-related');
     return res.end(image.buffer);
   } catch (error) {
     console.warn('exact Google News thumbnail unavailable:', String(error?.message || error).slice(0, 140));
