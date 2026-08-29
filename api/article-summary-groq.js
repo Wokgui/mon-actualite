@@ -108,18 +108,104 @@ function captureLegacy(req) {
   });
 }
 
+function normalizeSupport(value = '') {
+  return decodeEntities(value)
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[’']/g, ' ')
+    .toLowerCase();
+}
+
 function meaningfulTokens(value = '') {
   const stop = new Set(['alors','après','avant','avec','avoir','cette','comme','dans','depuis','devrait','elles','entre','étaient','faire','leurs','mais','même','moins','notamment','nous','plus','pour','sans','selon','sont','sous','tout','toute','toutes','tous','très','vers','votre','ainsi','cela','celui','celle','être','fait','faits']);
-  return decodeEntities(value).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().match(/[a-z0-9]{5,}/g)?.filter(t => !stop.has(t)) || [];
+  return normalizeSupport(value).match(/[a-z0-9]{5,}/g)?.filter(t => !stop.has(t)) || [];
+}
+
+function fuzzyToken(token = '') {
+  if (/^\d+$/.test(token)) return token;
+  if (token.length <= 6) return token;
+  return token.slice(0, token.length >= 10 ? 6 : 5);
+}
+
+function numericClaims(value = '') {
+  const text = normalizeSupport(value).replace(/[\u202f\u00a0]/g, ' ');
+  const claims = text.match(/\b\d{1,3}(?:[ .]\d{3})*(?:[,.]\d+)?\b|\b\d{4}\b/g) || [];
+  return [...new Set(claims.map(number => number.replace(/[ .]/g, '').replace(',', '.')))];
+}
+
+const SMALL_NUMBER_WORDS = new Map([
+  ['deux','2'], ['trois','3'], ['quatre','4'], ['cinq','5'], ['six','6'], ['sept','7'], ['huit','8'], ['neuf','9'],
+  ['dix','10'], ['onze','11'], ['douze','12'], ['treize','13'], ['quatorze','14'], ['quinze','15'], ['seize','16'],
+  ['vingt','20'], ['trente','30'], ['quarante','40'], ['cinquante','50'], ['soixante','60'], ['cent','100'], ['mille','1000']
+]);
+
+function unsupportedNumberWords(summary = '', source = '') {
+  const generated = normalizeSupport(summary);
+  const original = normalizeSupport(source);
+  const sourceNumbers = new Set(numericClaims(source));
+  for (const [word, numeric] of SMALL_NUMBER_WORDS) {
+    const rx = new RegExp(`(?<!-)\\b${word}\\b(?!-)`, 'g');
+    if (!rx.test(generated)) continue;
+    rx.lastIndex = 0;
+    if (rx.test(original) || sourceNumbers.has(numeric)) continue;
+    return true;
+  }
+  return false;
+}
+
+const DATE_TERMS = new Set([
+  'lundi','mardi','mercredi','jeudi','vendredi','samedi','dimanche',
+  'janvier','fevrier','mars','avril','mai','juin','juillet','aout','septembre','octobre','novembre','decembre',
+  'hier','aujourdhui','demain'
+]);
+
+function dateClaims(value = '') {
+  const words = normalizeSupport(value).match(/[a-z]{3,}/g) || [];
+  return [...new Set(words.filter(word => DATE_TERMS.has(word)))];
+}
+
+const ENTITY_STOP = new Set([
+  'Le','La','Les','Un','Une','Des','Ce','Cet','Cette','Ces','Il','Ils','Elle','Elles','On','Nous','Vous',
+  'Son','Sa','Ses','Selon','Apres','Avant','Dans','Pour','Par','En','Au','Aux','De','Du','Mais','Plus','Lors',
+  'Alors','Pourtant','Ainsi','Cette','Comme','Quand','Si','Or','Et','A','À'
+]);
+
+function entityClaims(value = '') {
+  const decoded = decodeEntities(value);
+  const matches = decoded.match(/\b\p{Lu}[\p{L}’'-]{2,}\b/gu) || [];
+  return [...new Set(matches
+    .filter(token => !ENTITY_STOP.has(token))
+    .map(token => normalizeSupport(token).replace(/\s+/g, ''))
+    .filter(token => token.length >= 3))];
 }
 
 function summarySupported(summary, source) {
   const generated = meaningfulTokens(summary);
-  if (generated.length < 8) return false;
-  const sourceSet = new Set(meaningfulTokens(source));
-  if (!sourceSet.size) return false;
-  const supported = generated.filter(token => sourceSet.has(token)).length;
-  return supported / generated.length >= 0.12;
+  const sourceTokens = meaningfulTokens(source);
+  if (generated.length < 5 || sourceTokens.length < 2) return false;
+
+  const normalizedSource = normalizeSupport(source);
+
+  // Numeric and calendar claims are high-risk facts: every one introduced in
+  // the summary must already exist in the verified material.
+  const sourceNumbers = new Set(numericClaims(source));
+  if (numericClaims(summary).some(number => !sourceNumbers.has(number))) return false;
+  if (unsupportedNumberWords(summary, source)) return false;
+  if (dateClaims(summary).some(term => !normalizedSource.includes(term))) return false;
+
+  // Proper nouns are checked independently from ordinary lexical overlap so a
+  // fluent paraphrase is accepted, while an invented person or place is not.
+  if (entityClaims(summary).some(entity => !normalizedSource.includes(entity))) return false;
+
+  const sourceExact = new Set(sourceTokens);
+  const sourceFuzzy = new Set(sourceTokens.map(fuzzyToken));
+  const exact = generated.filter(token => sourceExact.has(token)).length;
+  const fuzzy = generated.filter(token => sourceFuzzy.has(fuzzyToken(token))).length;
+  const exactRatio = exact / generated.length;
+  const fuzzyRatio = fuzzy / generated.length;
+
+  // The old validator required 12% exact word identity. That rejected valid
+  // journalistic reformulations. Keep a small semantic anchor instead.
+  return exact >= 2 || fuzzy >= 3 || exactRatio >= 0.06 || fuzzyRatio >= 0.12;
 }
 
 function paragraphize(value = '', wanted = 2) {
@@ -142,6 +228,12 @@ function promptFor(body, factual) {
     return `Synthétise l'actualité de la rubrique « ${category} » uniquement à partir du texte factuel ci-dessous. Fais 5 à 7 phrases, environ 120 à 180 mots, en 2 ou 3 paragraphes courts. Commence directement par les faits les plus importants. Supprime mentalement toute phrase de connexion, abonnement, sauvegarde d'article, cookies, partage ou navigation si elle subsiste. N'ajoute aucune information extérieure.\n\nTEXTE FACTUEL :\n${factual}`;
   }
   const title = decodeEntities(body?.article?.title || '');
+  if (factual.length < 250) {
+    return `Résume cet article en français en 1 ou 2 phrases très factuelles. Le texte disponible est court : n'ajoute aucun contexte, détail, lieu, nom, date, nombre, cause ou conséquence qui n'y figure pas explicitement. Si le texte ne permet qu'une phrase, fais une seule phrase. Reformule sans développer artificiellement.\n\nTITRE : ${title}\n\nTEXTE FACTUEL :\n${factual}`;
+  }
+  if (factual.length < 650) {
+    return `Résume cet article en français en 2 à 4 phrases, environ 45 à 85 mots. Commence par le fait principal. Utilise uniquement les informations explicitement présentes ci-dessous et n'ajoute aucun contexte extérieur. Ne recopie pas de longues citations : reformule.\n\nTITRE : ${title}\n\nTEXTE FACTUEL :\n${factual}`;
+  }
   return `Résume cet article en français en 4 à 6 phrases, environ 90 à 140 mots, en exactement 2 paragraphes courts. Commence directement par le fait principal et son contexte immédiat. Le second paragraphe donne les précisions, chiffres ou conséquences présents dans le texte. Supprime mentalement toute phrase de connexion, abonnement, sauvegarde d'article, cookies, partage ou navigation si elle subsiste. Ne complète avec aucune connaissance extérieure. Ne recopie pas de longues citations : reformule.\n\nTITRE : ${title}\n\nTEXTE FACTUEL :\n${factual}`;
 }
 
@@ -179,11 +271,11 @@ async function generateWithGroq(model, key, prompt, minLength = 60) {
   return text;
 }
 
-async function generateWithFallback(key, prompt, factual = '') {
+async function generateWithFallback(key, prompt, factual = '', minLength = 60) {
   let lastError = '';
   for (const model of GROQ_MODELS) {
     try {
-      const text = await generateWithGroq(model, key, prompt);
+      const text = await generateWithGroq(model, key, prompt, minLength);
       if (factual && !summarySupported(text, factual)) throw new Error(`${model}: résumé insuffisamment étayé par la source`);
       return { text, model };
     } catch (error) {
@@ -271,9 +363,15 @@ module.exports = async function handler(req, res) {
   }
 
   const prompt = promptFor(body, factual);
+  const validationSource = [
+    factual,
+    mode === 'article' ? body?.article?.title : body?.category,
+    mode === 'article' ? body?.article?.source : ''
+  ].filter(Boolean).join('\n');
+  const minLength = mode === 'article' && factual.length < 250 ? 35 : 60;
 
   try {
-    const aiResult = await generateWithFallback(key, prompt, factual);
+    const aiResult = await generateWithFallback(key, prompt, validationSource, minLength);
     return send(res, 200, {
       ...base,
       summary: paragraphize(aiResult.text, 2),
