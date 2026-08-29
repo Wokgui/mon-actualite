@@ -112,23 +112,44 @@ page.on('console', message => {
   if (message.type() === 'error') console.error('browser console:', message.text());
 });
 
+function cachePair() {
+  const cache = JSON.parse(localStorage.getItem('news-live-cache') || '{}');
+  const articles = cache.articles || [];
+  const reaction = articles.find(article => String(article.url || '').includes('/reaction'));
+  const factual = articles.find(article => String(article.url || '').includes('/artemis'));
+  return { articles, reaction, factual };
+}
+
 try {
   await page.goto(baseUrl, { waitUntil: 'domcontentloaded' });
   await page.waitForFunction(() => document.documentElement.dataset.pipelineVersion === '89', null, { timeout: 15000 });
   await page.waitForSelector('.article-card[data-article]', { timeout: 15000 });
+  await page.waitForFunction(() => {
+    const cache = JSON.parse(localStorage.getItem('news-live-cache') || '{}');
+    const articles = cache.articles || [];
+    const reaction = articles.find(article => String(article.url || '').includes('/reaction'));
+    const factual = articles.find(article => String(article.url || '').includes('/artemis'));
+    return Number.isFinite(Number(reaction?.informationValueV89)) && Number.isFinite(Number(factual?.informationValueV89));
+  }, null, { timeout: 10000 });
 
   const initial = await page.evaluate(() => {
     const cache = JSON.parse(localStorage.getItem('news-live-cache') || '{}');
-    const byId = Object.fromEntries((cache.articles || []).map(article => [String(article.id), article]));
+    const articles = cache.articles || [];
+    const reaction = articles.find(article => String(article.url || '').includes('/reaction'));
+    const factual = articles.find(article => String(article.url || '').includes('/artemis'));
     return {
-      reaction: byId.reaction,
-      factual: byId.factual,
+      ids: articles.map(article => ({ id: article.id, url: article.url, value: article.informationValueV89, essential: article.essential, novelty: article.noveltyStateV78 })),
+      reaction,
+      factual,
       cardCount: document.querySelectorAll('.article-card[data-article]').length,
       overflow: document.documentElement.scrollWidth - window.innerWidth
     };
   });
+  console.log('v89 information values:', JSON.stringify(initial.ids));
   assert.ok(initial.cardCount >= 3, `expected at least 3 cards, got ${initial.cardCount}`);
-  assert.ok(initial.factual?.informationValueV89 > initial.reaction?.informationValueV89, 'factual article should have higher information value than reaction article');
+  assert.ok(initial.factual && initial.reaction, `expected factual and reaction articles in cache; got ${JSON.stringify(initial.ids)}`);
+  assert.ok(Number(initial.factual.informationValueV89) > Number(initial.reaction.informationValueV89), `factual value ${initial.factual.informationValueV89} should exceed reaction value ${initial.reaction.informationValueV89}`);
+  assert.ok(Number(initial.reaction.informationValueV89) <= 40, `pure reaction article should stay low-value, got ${initial.reaction.informationValueV89}`);
   assert.ok(initial.overflow <= 2, `mobile layout overflows horizontally by ${initial.overflow}px`);
 
   await page.locator('.bottom-nav [data-view="brief"]').click();
@@ -138,7 +159,8 @@ try {
   await page.locator('.bottom-nav [data-view="home"]').click();
   await page.waitForSelector('.bottom-nav [data-view="home"].active', { timeout: 5000 });
 
-  const factualCard = page.locator('.article-card[data-article="factual"]');
+  const factualId = String(initial.factual.id || 'factual');
+  const factualCard = page.locator(`.article-card[data-article="${factualId}"]`);
   await factualCard.scrollIntoViewIfNeeded();
   await factualCard.click();
   await page.waitForTimeout(250);
@@ -150,12 +172,12 @@ try {
   await page.evaluate(() => window.dispatchEvent(new Event('online')));
   await page.waitForFunction(() => {
     const cache = JSON.parse(localStorage.getItem('news-live-cache') || '{}');
-    return (cache.articles || []).some(article => article.id === 'factual' && article.revisionSinceReadV89 === true);
+    return (cache.articles || []).some(article => String(article.url || '').includes('/artemis') && article.revisionSinceReadV89 === true);
   }, null, { timeout: 10000 });
 
   const revisionState = await page.evaluate(() => {
     const cache = JSON.parse(localStorage.getItem('news-live-cache') || '{}');
-    return (cache.articles || []).find(article => article.id === 'factual')?.revisionTypeV89 || '';
+    return (cache.articles || []).find(article => String(article.url || '').includes('/artemis'))?.revisionTypeV89 || '';
   });
   assert.ok(['correction', 'updated'].includes(revisionState), `unexpected revision state: ${revisionState}`);
 

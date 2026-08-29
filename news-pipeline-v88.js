@@ -117,6 +117,7 @@
     const numbers = numericClaims(text);
     const sources = sourceCount(article);
     const hasAction = ACTION_RX.test(text);
+    const reactional = LOW_VALUE_RX.test(text);
     let value = 42;
     const reasons = [];
 
@@ -138,11 +139,20 @@
     if (article.titleSupportV83 === 'weak') value -= 8;
     if (/\?$/.test(title)) value -= 4;
 
-    if (LOW_VALUE_RX.test(text)) {
-      const penalty = numbers.length || hasAction ? 9 : 21;
+    if (reactional) {
+      const penalty = numbers.length || hasAction ? 12 : 24;
       value -= penalty;
       reasons.push('contenu surtout réactionnel');
+      // An upstream "Essentiel" flag must never make a pure reaction outrank
+      // a concrete factual item. Without a number or a verifiable action,
+      // reaction/commentary content is deliberately capped.
+      if (!numbers.length && !hasAction) value = Math.min(value, 34);
     }
+
+    // Conversely, a corroborated item that carries both concrete figures and
+    // an identifiable action keeps a factual floor even if another layer has
+    // slightly reduced its editorial score.
+    if (!reactional && sources >= 2 && numbers.length && hasAction) value = Math.max(value, 68);
 
     value = Math.max(0, Math.min(100, Math.round(value)));
     return { value, reasons: reasons.slice(0, 5) };
