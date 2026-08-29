@@ -1,5 +1,5 @@
 {
   "version": "60",
   "release": "2026-08-29",
-  "label": "v80 : Brief différentiel, synthèse multi-sources et actualisation silencieuse avec nouvelles informations en attente"
+  "label": "v81 : mémoire d’événements sur 14 jours, résumé de ce qui a changé, détection des désaccords entre sources et diagnostic de performances"
 }
