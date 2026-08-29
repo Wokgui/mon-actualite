@@ -118,7 +118,7 @@ function normalizeSupport(value = '') {
 
 function meaningfulTokens(value = '') {
   const stop = new Set(['alors','après','avant','avec','avoir','cette','comme','dans','depuis','devrait','elles','entre','étaient','faire','leurs','mais','même','moins','notamment','nous','plus','pour','sans','selon','sont','sous','tout','toute','toutes','tous','très','vers','votre','ainsi','cela','celui','celle','être','fait','faits']);
-  return normalizeSupport(value).match(/[a-z0-9]{5,}/g]?.filter(t => !stop.has(t)) || [];
+  return normalizeSupport(value).match(/[a-z0-9]{5,}/g)?.filter(t => !stop.has(t)) || [];
 }
 
 function fuzzyToken(token = '') {
