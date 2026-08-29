@@ -3,6 +3,7 @@
 
   const SEEN_KEY = 'news-seen-v77';
   const CACHE_KEY = 'news-live-cache';
+  const READING_ANCHOR_KEY = 'news-reading-anchor-v85';
   const upstreamFetch = window.fetch.bind(window);
   const openedThisSession = new Set();
   let scheduled = false;
@@ -16,22 +17,26 @@
     try { localStorage.setItem(key, JSON.stringify(value)); } catch {}
   }
 
-  function seenIds() {
-    return new Set(Object.keys(readJson(SEEN_KEY, {})));
+  function readAnchor() {
+    try { return JSON.parse(sessionStorage.getItem(READING_ANCHOR_KEY) || 'null'); }
+    catch { return null; }
   }
+
+  function writeAnchor(value) {
+    try {
+      if (value) sessionStorage.setItem(READING_ANCHOR_KEY, JSON.stringify(value));
+      else sessionStorage.removeItem(READING_ANCHOR_KEY);
+    } catch {}
+  }
+
+  function seenIds() { return new Set(Object.keys(readJson(SEEN_KEY, {}))); }
 
   function applySeenToArticles(articles) {
     if (!Array.isArray(articles)) return articles;
     const seen = seenIds();
     return articles.map(article => {
       if (!seen.has(String(article?.id || ''))) return article;
-      return {
-        ...article,
-        score: -1000000,
-        seenHidden: true,
-        essential: false,
-        essentialRank: 0
-      };
+      return { ...article, score: -1000000, seenHidden: true, essential: false, essentialRank: 0 };
     });
   }
 
@@ -47,11 +52,7 @@
     const headers = new Headers(response.headers);
     headers.delete('content-length');
     headers.delete('content-encoding');
-    return new Response(JSON.stringify(payload), {
-      status: response.status,
-      statusText: response.statusText,
-      headers
-    });
+    return new Response(JSON.stringify(payload), { status: response.status, statusText: response.statusText, headers });
   }
 
   window.fetch = async function seenAwareFetch(input, init) {
@@ -67,10 +68,7 @@
     return response;
   };
 
-  function isHomeView() {
-    return Boolean(document.querySelector('.nav-item.active[data-view="home"]'));
-  }
-
+  function isHomeView() { return Boolean(document.querySelector('.nav-item.active[data-view="home"]')); }
   function savedOnlyActive() {
     const button = document.querySelector('.saved-filter [data-saved-filter]');
     return /voir toute l.actualit/i.test(String(button?.textContent || ''));
@@ -99,6 +97,20 @@
     top.prepend(badge);
   }
 
+  function removeWithStablePosition(card, id, anchor) {
+    const next = card.nextElementSibling?.matches?.('.article-card[data-article]') ? card.nextElementSibling : null;
+    const previous = card.previousElementSibling?.matches?.('.article-card[data-article]') ? card.previousElementSibling : null;
+    const reference = next || previous;
+    const before = reference?.getBoundingClientRect().top;
+    card.remove();
+    if (anchor?.id === id && reference && Number.isFinite(before)) {
+      const after = reference.getBoundingClientRect().top;
+      const delta = after - before;
+      if (Math.abs(delta) > 1) window.scrollBy(0, delta);
+      writeAnchor(null);
+    }
+  }
+
   function cleanHomeFeed() {
     scheduled = false;
     if (!isHomeView()) return;
@@ -108,16 +120,18 @@
     const savedOnly = savedOnlyActive();
     const map = articleMap();
     const currentSeen = seenIds();
+    const anchor = readAnchor();
+    const modalOpen = Boolean(document.querySelector('.quick-summary-backdrop'));
 
     for (const card of [...feed.querySelectorAll(':scope > .article-card[data-article]')]) {
       const id = String(card.dataset.article || '');
       const article = map.get(id);
-
-      if (!savedOnly && (currentSeen.has(id) || openedThisSession.has(id))) {
-        card.remove();
+      const shouldHide = !savedOnly && (currentSeen.has(id) || openedThisSession.has(id));
+      if (shouldHide) {
+        if (modalOpen && anchor?.id === id) continue;
+        removeWithStablePosition(card, id, anchor);
         continue;
       }
-
       if (article?.essential || card.classList.contains('essential-v77')) beautifyEssentialCard(card);
     }
 
@@ -133,9 +147,11 @@
   document.addEventListener('click', event => {
     const card = event.target.closest?.('.article-card[data-article]');
     if (!card || !isHomeView()) return;
-    if (event.target.closest?.('.save-btn, .category-link, [data-save]')) return;
+    if (event.target.closest?.('.save-btn, .category-link, [data-save], [data-why-v85], [data-why-panel-v85]')) return;
     const id = String(card.dataset.article || '');
     if (!id) return;
+    const next = card.nextElementSibling?.matches?.('.article-card[data-article]') ? String(card.nextElementSibling.dataset.article || '') : '';
+    writeAnchor({ id, nextId: next, cardTop: card.getBoundingClientRect().top, scrollY: window.scrollY, openedAt: Date.now() });
     openedThisSession.add(id);
     setTimeout(scheduleClean, 120);
   }, true);
