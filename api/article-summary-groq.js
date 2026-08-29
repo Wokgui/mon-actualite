@@ -118,7 +118,7 @@ function normalizeSupport(value = '') {
 
 function meaningfulTokens(value = '') {
   const stop = new Set(['alors','après','avant','avec','avoir','cette','comme','dans','depuis','devrait','elles','entre','étaient','faire','leurs','mais','même','moins','notamment','nous','plus','pour','sans','selon','sont','sous','tout','toute','toutes','tous','très','vers','votre','ainsi','cela','celui','celle','être','fait','faits']);
-  return normalizeSupport(value).match(/[a-z0-9]{5,}/g)?.filter(t => !stop.has(t)) || [];
+  return normalizeSupport(value).match(/[a-z0-9]{5,}/g]?.filter(t => !stop.has(t)) || [];
 }
 
 function fuzzyToken(token = '') {
@@ -224,15 +224,35 @@ function xmlTag(block = '', name = '') {
   return match ? stripHtml(match[1]) : '';
 }
 
+function summarySearchSubject(title = '') {
+  const clean = stripHtml(title).replace(/\s+[-–—]\s+[^-–—]{2,90}$/, '').slice(0, 240);
+  const parts = clean.split(/\s*[:：]\s*/).map(part => part.trim()).filter(Boolean);
+  const tail = parts.length > 1 ? parts[parts.length - 1] : clean;
+  return tail.split(/\s+/).filter(Boolean).length >= 6 ? tail : clean;
+}
+
+function summaryQueryVariants(title = '') {
+  const subject = summarySearchSubject(title);
+  const displayWords = subject.split(/\s+/).filter(Boolean);
+  const tokens = newsTokens(subject).filter(word => word.length >= 4);
+  return [...new Set([
+    subject,
+    displayWords.length >= 10 ? displayWords.slice(0, 7).join(' ') : '',
+    displayWords.length >= 12 ? displayWords.slice(0, 9).join(' ') : '',
+    tokens.slice(0, 8).join(' '),
+    tokens.slice(0, 6).join(' ')
+  ].filter(value => value && newsTokens(value).length >= 3))];
+}
+
 async function fetchGoogleNewsHeadlines(title = '', source = '') {
-  const expected = stripHtml(title).replace(/\s+[-–—]\s+[^-–—]{2,90}$/, '').slice(0, 240);
+  const expected = summarySearchSubject(title);
   const words = newsTokens(expected);
   if (words.length < 3) return [];
-  const queries = [expected, words.filter(word => word.length >= 4).slice(0, 9).join(' ')].filter(Boolean);
+  const queries = summaryQueryVariants(title);
   const seen = new Set();
   const results = [];
 
-  for (const query of [...new Set(queries)]) {
+  for (const query of queries) {
     try {
       const url = new URL('https://news.google.com/rss/search');
       url.search = new URLSearchParams({ q: query, hl: 'fr', gl: 'FR', ceid: 'FR:fr' }).toString();
@@ -244,7 +264,7 @@ async function fetchGoogleNewsHeadlines(title = '', source = '') {
       if (!response.ok) continue;
       const xml = await response.text();
       const items = xml.match(/<item\b[\s\S]*?<\/item>/gi) || [];
-      for (const item of items.slice(0, 24)) {
+      for (const item of items.slice(0, 30)) {
         const headline = xmlTag(item, 'title');
         if (!headline) continue;
         const normalized = normalizeSupport(headline).replace(/[^a-z0-9]+/g, ' ').trim();
@@ -252,6 +272,7 @@ async function fetchGoogleNewsHeadlines(title = '', source = '') {
         if (!normalized || normalized === expectedNormalized || seen.has(normalized)) continue;
         const agreement = headlineAgreement(headline, expected);
         const sameEvent = (agreement.hits >= 3 && agreement.shorterCoverage >= 0.5)
+          || (agreement.hits >= 4 && agreement.shorterCoverage >= 0.42)
           || (agreement.hits >= 5 && agreement.expectedCoverage >= 0.28);
         if (!sameEvent) continue;
         const publisher = xmlTag(item, 'source');
