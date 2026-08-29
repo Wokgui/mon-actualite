@@ -1,21 +1,47 @@
 const dns = require('node:dns').promises;
 const net = require('node:net');
-const HTML_TIMEOUT_MS = 2600;
-const IMAGE_TIMEOUT_MS = 2400;
-const MAX_HTML_BYTES = 1_800_000;
-const MAX_SEARCH_HTML_BYTES = 2_400_000;
+
+const HTML_TIMEOUT_MS = 3200;
+const IMAGE_TIMEOUT_MS = 2600;
+const SEARCH_TIMEOUT_MS = 3200;
+const MAX_HTML_BYTES = 2_200_000;
+const MAX_SEARCH_BYTES = 2_500_000;
 const MAX_IMAGE_BYTES = 7_000_000;
 const UA = 'Mozilla/5.0 (Linux; Android 16) AppleWebKit/537.36 Chrome/140 Safari/537.36';
-const GOOGLE_NEWS_UA = 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/140 Safari/537.36';
+const GOOGLE_UA = 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/140 Safari/537.36';
+
+function decode(value = '') {
+  return String(value || '')
+    .replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1')
+    .replace(/&nbsp;/gi, ' ')
+    .replace(/&amp;/gi, '&')
+    .replace(/&quot;/gi, '"')
+    .replace(/&#39;|&apos;/gi, "'")
+    .replace(/&lt;/gi, '<')
+    .replace(/&gt;/gi, '>')
+    .replace(/&#(\d+);/g, (_, n) => { try { return String.fromCodePoint(Number(n)); } catch { return _; } })
+    .replace(/&#x([0-9a-f]+);/gi, (_, n) => { try { return String.fromCodePoint(parseInt(n, 16)); } catch { return _; } });
+}
+
+function plain(value = '') {
+  return decode(value).replace(/<[^>]+>/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+function normalize(value = '') {
+  return plain(value).normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase();
+}
 
 function isPrivateIp(address) {
   if (net.isIP(address) === 4) {
     const p = address.split('.').map(Number);
-    return p[0] === 10 || p[0] === 127 || p[0] === 0 || (p[0] === 169 && p[1] === 254) || (p[0] === 172 && p[1] >= 16 && p[1] <= 31) || (p[0] === 192 && p[1] === 168);
+    return p[0] === 10 || p[0] === 127 || p[0] === 0
+      || (p[0] === 169 && p[1] === 254)
+      || (p[0] === 172 && p[1] >= 16 && p[1] <= 31)
+      || (p[0] === 192 && p[1] === 168);
   }
   if (net.isIP(address) === 6) {
-    const n = address.toLowerCase();
-    return n === '::1' || n === '::' || n.startsWith('fc') || n.startsWith('fd') || n.startsWith('fe80:');
+    const value = address.toLowerCase();
+    return value === '::1' || value === '::' || value.startsWith('fc') || value.startsWith('fd') || value.startsWith('fe80:');
   }
   return true;
 }
@@ -23,14 +49,150 @@ function isPrivateIp(address) {
 async function assertPublicUrl(raw) {
   const url = new URL(raw);
   if (!['http:', 'https:'].includes(url.protocol)) throw new Error('unsupported protocol');
-  if (url.hostname === 'localhost' || url.hostname.endsWith('.local')) throw new Error('local host blocked');
-  if (net.isIP(url.hostname)) {
-    if (isPrivateIp(url.hostname)) throw new Error('private address blocked');
+  const host = url.hostname.toLowerCase();
+  if (host === 'localhost' || host.endsWith('.local')) throw new Error('local host blocked');
+  if (net.isIP(host)) {
+    if (isPrivateIp(host)) throw new Error('private address blocked');
   } else {
-    const records = await dns.lookup(url.hostname, { all: true });
-    if (!records.length || records.some(r => isPrivateIp(r.address))) throw new Error('private address blocked');
+    const records = await dns.lookup(host, { all: true });
+    if (!records.length || records.some(record => isPrivateIp(record.address))) throw new Error('private address blocked');
   }
   return url;
+}
+
+function isBadImageUrl(raw = '') {
+  try {
+    const url = new URL(raw);
+    const text = `${url.hostname}${url.pathname}${url.search}`.toLowerCase();
+    if (/\/api\/(?:article-thumbnail|exact-news-thumbnail)(?:\?|$)/i.test(text)) return true;
+    return /(favicon|(?:^|[\/_\-.])logo(?:[\/_\-.]|$)|avatar|sprite|wordmark|brandmark|site-logo|tracking|pixel|badge|emoji|author[-_]?photo|profile[-_]?photo)/i.test(text);
+  } catch {
+    return true;
+  }
+}
+
+async function fetchWithRedirects(rawUrl, options = {}, maxRedirects = 5) {
+  let current = rawUrl;
+  for (let step = 0; step <= maxRedirects; step += 1) {
+    const url = await assertPublicUrl(current);
+    const response = await fetch(url, { ...options, redirect: 'manual' });
+    if (response.status >= 300 && response.status < 400 && response.headers.get('location')) {
+      current = new URL(response.headers.get('location'), url).href;
+      continue;
+    }
+    return { response, finalUrl: url.href };
+  }
+  throw new Error('too many redirects');
+}
+
+function imageDimensions(buffer, type = '') {
+  try {
+    if (/png/i.test(type) && buffer.length >= 24 && buffer.toString('ascii', 1, 4) === 'PNG') {
+      return { width: buffer.readUInt32BE(16), height: buffer.readUInt32BE(20) };
+    }
+    if (/gif/i.test(type) && buffer.length >= 10) {
+      return { width: buffer.readUInt16LE(6), height: buffer.readUInt16LE(8) };
+    }
+    if (/jpe?g/i.test(type) || (buffer[0] === 0xff && buffer[1] === 0xd8)) {
+      let offset = 2;
+      while (offset + 9 < buffer.length) {
+        if (buffer[offset] !== 0xff) { offset += 1; continue; }
+        const marker = buffer[offset + 1];
+        if ([0xc0,0xc1,0xc2,0xc3,0xc5,0xc6,0xc7,0xc9,0xca,0xcb,0xcd,0xce,0xcf].includes(marker)) {
+          return { height: buffer.readUInt16BE(offset + 5), width: buffer.readUInt16BE(offset + 7) };
+        }
+        if (offset + 4 >= buffer.length) break;
+        const length = buffer.readUInt16BE(offset + 2);
+        if (!length) break;
+        offset += 2 + length;
+      }
+    }
+  } catch {}
+  return { width: 0, height: 0 };
+}
+
+function imageLooksUseful(buffer, type = '') {
+  if (!type.startsWith('image/') || /svg/i.test(type)) return false;
+  if (buffer.byteLength < 3500 || buffer.byteLength > MAX_IMAGE_BYTES) return false;
+  const { width, height } = imageDimensions(buffer, type);
+  if (width && height) {
+    if (width < 180 || height < 100) return false;
+    if (width * height < 45_000) return false;
+    if (width <= 260 && height <= 260 && Math.abs(width - height) < 25) return false;
+  }
+  return true;
+}
+
+async function fetchImage(rawUrl, referer = '') {
+  if (!rawUrl || isBadImageUrl(rawUrl)) throw new Error('bad image url');
+  const { response } = await fetchWithRedirects(rawUrl, {
+    signal: AbortSignal.timeout(IMAGE_TIMEOUT_MS),
+    headers: {
+      'User-Agent': UA,
+      'Accept': 'image/avif,image/webp,image/apng,image/jpeg,image/png,image/*,*/*;q=0.8',
+      ...(referer ? { 'Referer': referer } : {})
+    }
+  });
+  if (!response.ok) throw new Error(`image HTTP ${response.status}`);
+  const type = String(response.headers.get('content-type') || '').split(';')[0].trim().toLowerCase();
+  const length = Number(response.headers.get('content-length') || 0);
+  if (length > MAX_IMAGE_BYTES) throw new Error('image too large');
+  const buffer = Buffer.from(await response.arrayBuffer());
+  if (!imageLooksUseful(buffer, type)) throw new Error('weak image');
+  return { buffer, type };
+}
+
+function sendImage(res, image, status) {
+  res.statusCode = 200;
+  res.setHeader('Content-Type', image.type);
+  res.setHeader('Content-Length', String(image.buffer.byteLength));
+  res.setHeader('Cache-Control', 'public, max-age=604800, s-maxage=31536000, stale-while-revalidate=2592000');
+  res.setHeader('X-Thumbnail-Status', status);
+  res.setHeader('X-Content-Type-Options', 'nosniff');
+  return res.end(image.buffer);
+}
+
+function neutral(res, exactOnly = false) {
+  if (exactOnly) {
+    res.statusCode = 404;
+    res.setHeader('Cache-Control', 'no-store');
+    return res.end();
+  }
+  const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="640" height="420" viewBox="0 0 640 420"><rect width="640" height="420" rx="22" fill="#f1f1f4"/><path d="M0 340 150 225l105 74 108-111 277 232H0Z" fill="#d7d7de"/><circle cx="490" cy="115" r="39" fill="#dedee4"/></svg>';
+  res.statusCode = 200;
+  res.setHeader('Content-Type', 'image/svg+xml; charset=utf-8');
+  res.setHeader('Cache-Control', 'no-store');
+  res.setHeader('X-Thumbnail-Status', 'neutral-fallback');
+  return res.end(svg);
+}
+
+function decodeBuffer(buffer, contentType = '') {
+  const probe = buffer.subarray(0, Math.min(buffer.length, 4096)).toString('latin1');
+  const declared = (contentType.match(/charset\s*=\s*["']?([^;"'\s]+)/i) || [])[1]
+    || (probe.match(/<meta[^>]+charset\s*=\s*["']?([^"'\s/>]+)/i) || [])[1]
+    || 'utf-8';
+  const charset = /^(iso-8859-1|latin1|windows-1252|cp1252)$/i.test(declared) ? 'windows-1252' : 'utf-8';
+  try { return new TextDecoder(charset).decode(buffer); }
+  catch { return buffer.toString('utf8'); }
+}
+
+async function fetchHtml(rawUrl) {
+  const { response, finalUrl } = await fetchWithRedirects(rawUrl, {
+    signal: AbortSignal.timeout(HTML_TIMEOUT_MS),
+    headers: {
+      'User-Agent': UA,
+      'Accept': 'text/html,application/xhtml+xml',
+      'Accept-Language': 'fr-FR,fr;q=0.9'
+    }
+  });
+  if (!response.ok) throw new Error(`page HTTP ${response.status}`);
+  const type = response.headers.get('content-type') || '';
+  if (!/text\/html|application\/xhtml\+xml/i.test(type)) throw new Error('not html');
+  const length = Number(response.headers.get('content-length') || 0);
+  if (length > MAX_HTML_BYTES) throw new Error('page too large');
+  const buffer = Buffer.from(await response.arrayBuffer());
+  if (!buffer.length || buffer.byteLength > MAX_HTML_BYTES) throw new Error('page too large');
+  return { html: decodeBuffer(buffer, type), finalUrl };
 }
 
 function googleNewsArticleId(rawUrl) {
@@ -40,40 +202,18 @@ function googleNewsArticleId(rawUrl) {
     const parts = url.pathname.split('/').filter(Boolean);
     const marker = Math.max(parts.lastIndexOf('articles'), parts.lastIndexOf('read'));
     return marker >= 0 && parts[marker + 1] ? parts[marker + 1] : '';
-  } catch {
-    return '';
-  }
+  } catch { return ''; }
 }
 
 function tryLegacyGoogleDecode(id) {
   try {
     const text = Buffer.from(id.replace(/-/g, '+').replace(/_/g, '/'), 'base64').toString('utf8');
     return (text.match(/https?:\/\/[^\u0000-\u001f\s]+/i) || [])[0] || '';
-  } catch {
-    return '';
-  }
-}
-
-async function fetchGoogleParams(id) {
-  for (const url of [`https://news.google.com/articles/${id}`, `https://news.google.com/rss/articles/${id}`]) {
-    try {
-      const response = await fetch(url, {
-        redirect: 'follow',
-        signal: AbortSignal.timeout(HTML_TIMEOUT_MS),
-        headers: { 'User-Agent': UA, 'Accept': 'text/html' }
-      });
-      if (!response.ok) continue;
-      const html = await response.text();
-      const signature = (html.match(/data-n-a-sg=["']([^"']+)["']/i) || [])[1] || '';
-      const timestamp = (html.match(/data-n-a-ts=["']([^"']+)["']/i) || [])[1] || '';
-      if (signature && timestamp) return { signature, timestamp };
-    } catch {}
-  }
-  throw new Error('Google params unavailable');
+  } catch { return ''; }
 }
 
 function extractDecodedUrl(text) {
-  for (const chunk of text.split('\n\n')) {
+  for (const chunk of String(text || '').split('\n\n')) {
     const trimmed = chunk.trim();
     if (!trimmed.startsWith('[')) continue;
     try {
@@ -96,155 +236,98 @@ async function decodeGoogleNewsUrl(rawUrl) {
   const legacy = tryLegacyGoogleDecode(id);
   if (/^https?:\/\//i.test(legacy)) return legacy;
 
-  const { signature, timestamp } = await fetchGoogleParams(id);
-  const innerRequest = `["garturlreq",[["X","X",["X","X"],null,null,1,1,"US:en",null,1,null,null,null,null,null,0,1],"X","X",1,[1,1,1],1,1,null,0,0,null,0],"${id}",${timestamp},"${signature}"]`;
-  const response = await fetch('https://news.google.com/_/DotsSplashUi/data/batchexecute', {
-    method: 'POST',
-    signal: AbortSignal.timeout(HTML_TIMEOUT_MS),
-    headers: {
-      'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
-      'User-Agent': UA,
-      'Referer': 'https://news.google.com/'
-    },
-    body: 'f.req=' + encodeURIComponent(JSON.stringify([[['Fbv4je', innerRequest]]]))
-  });
-  if (!response.ok) throw new Error(`Google decode HTTP ${response.status}`);
-  const decoded = extractDecodedUrl(await response.text());
-  if (!decoded) throw new Error('Google decode result missing');
-  return decoded;
-}
+  let signature = '';
+  let timestamp = '';
+  for (const url of [`https://news.google.com/articles/${id}`, `https://news.google.com/rss/articles/${id}`]) {
+    try {
+      const { response } = await fetchWithRedirects(url, {
+        signal: AbortSignal.timeout(HTML_TIMEOUT_MS),
+        headers: { 'User-Agent': GOOGLE_UA, 'Accept': 'text/html' }
+      }, 3);
+      if (!response.ok) continue;
+      const html = await response.text();
+      signature = (html.match(/data-n-a-sg=["']([^"']+)["']/i) || [])[1] || '';
+      timestamp = (html.match(/data-n-a-ts=["']([^"']+)["']/i) || [])[1] || '';
+      if (signature && timestamp) break;
+    } catch {}
+  }
+  if (!signature || !timestamp) return rawUrl;
 
-function decodeBuffer(buffer, contentType = '') {
-  const probe = buffer.subarray(0, Math.min(buffer.length, 4096)).toString('latin1');
-  const declared = (contentType.match(/charset\s*=\s*["']?([^;"'\s]+)/i) || [])[1]
-    || (probe.match(/<meta[^>]+charset\s*=\s*["']?([^"'\s/>]+)/i) || [])[1]
-    || 'utf-8';
-  const charset = /^(iso-8859-1|latin1|windows-1252|cp1252)$/i.test(declared) ? 'windows-1252' : 'utf-8';
-  try { return new TextDecoder(charset).decode(buffer); }
-  catch { return buffer.toString('utf8'); }
-}
-
-async function fetchHtml(rawUrl) {
-  let current = rawUrl;
-  for (let i = 0; i < 6; i++) {
-    const url = await assertPublicUrl(current);
-    const response = await fetch(url, {
-      redirect: 'manual',
+  try {
+    const innerRequest = `["garturlreq",[["X","X",["X","X"],null,null,1,1,"US:en",null,1,null,null,null,null,null,0,1],"X","X",1,[1,1,1],1,1,null,0,0,null,0],"${id}",${timestamp},"${signature}"]`;
+    const response = await fetch('https://news.google.com/_/DotsSplashUi/data/batchexecute', {
+      method: 'POST',
       signal: AbortSignal.timeout(HTML_TIMEOUT_MS),
       headers: {
-        'User-Agent': UA,
-        'Accept': 'text/html,application/xhtml+xml',
-        'Accept-Language': 'fr-FR,fr;q=0.9'
-      }
+        'Content-Type': 'application/x-www-form-urlencoded;charset=UTF-8',
+        'User-Agent': GOOGLE_UA,
+        'Referer': 'https://news.google.com/'
+      },
+      body: 'f.req=' + encodeURIComponent(JSON.stringify([[['Fbv4je', innerRequest]]]))
     });
-    if (response.status >= 300 && response.status < 400 && response.headers.get('location')) {
-      current = new URL(response.headers.get('location'), url).href;
-      continue;
-    }
-    if (!response.ok) throw new Error(`HTTP ${response.status}`);
-    const type = response.headers.get('content-type') || '';
-    if (!type.includes('text/html') && !type.includes('application/xhtml+xml')) throw new Error('not html');
-    const buffer = Buffer.from(await response.arrayBuffer());
-    if (buffer.byteLength > MAX_HTML_BYTES) throw new Error('page too large');
-    return { html: decodeBuffer(buffer, type), finalUrl: url.href };
-  }
-  throw new Error('too many redirects');
-}
-
-function decode(value = '') {
-  return value
-    .replace(/&amp;/gi, '&').replace(/&quot;/gi, '"').replace(/&#39;|&apos;/gi, "'")
-    .replace(/&lt;/gi, '<').replace(/&gt;/gi, '>')
-    .replace(/&#(\d+);/g, (_, n) => String.fromCodePoint(Number(n)))
-    .replace(/&#x([0-9a-f]+);/gi, (_, n) => String.fromCodePoint(parseInt(n, 16)));
-}
-
-function plainText(value = '') {
-  return decode(String(value || ''))
-    .replace(/<[^>]+>/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
-}
-
-function titleWords(value = '') {
-  const stop = new Set(['avec', 'dans', 'pour', 'plus', 'apres', 'avant', 'cette', 'sont', 'etre', 'leur', 'leurs', 'tout', 'mais', 'sans', 'vers', 'entre', 'une', 'des', 'les', 'sur', 'qui', 'que', 'aux']);
-  return [...new Set(plainText(value)
-    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-    .toLowerCase().replace(/[^a-z0-9]+/g, ' ')
-    .split(/\s+/).filter(word => word.length >= 3 && !stop.has(word)))];
-}
-
-function titleOverlap(candidate, expected) {
-  const wanted = titleWords(expected);
-  const found = new Set(titleWords(candidate));
-  if (!wanted.length || !found.size) return 0;
-  return wanted.filter(word => found.has(word)).length / wanted.length;
-}
-
-async function googleNewsThumbnail(title) {
-  const query = plainText(title).replace(/\s+[-–—]\s+[^-–—]{2,90}$/, '').slice(0, 220);
-  if (titleWords(query).length < 3) return '';
-
-  const searchUrl = new URL('https://news.google.com/search');
-  searchUrl.search = new URLSearchParams({ q: query, hl: 'fr', gl: 'FR', ceid: 'FR:fr', ucbcb: '1' }).toString();
-  const response = await fetch(searchUrl, {
-    redirect: 'follow',
-    signal: AbortSignal.timeout(HTML_TIMEOUT_MS),
-    headers: {
-      'User-Agent': GOOGLE_NEWS_UA,
-      'Accept': 'text/html,application/xhtml+xml',
-      'Accept-Language': 'fr-FR,fr;q=0.9'
-    }
-  });
-  if (!response.ok) throw new Error(`Google image search HTTP ${response.status}`);
-  const type = response.headers.get('content-type') || '';
-  const buffer = Buffer.from(await response.arrayBuffer());
-  if (!buffer.length || buffer.byteLength > MAX_SEARCH_HTML_BYTES) throw new Error('Google image search page too large');
-  const html = decodeBuffer(buffer, type);
-  const resultPattern = /<a\b[^>]*class=["'][^"']*\bJtKRv\b[^"']*["'][^>]*>([\s\S]{1,2200}?)<\/a>/gi;
-  const results = [...html.matchAll(resultPattern)];
-  let best = null;
-  for (let index = 0; index < results.length; index += 1) {
-    const match = results[index];
-    const label = plainText(match[1]);
-    const score = titleOverlap(label, query);
-    const minimumWords = Math.min(4, titleWords(query).length);
-    const hits = Math.round(score * titleWords(query).length);
-    if (score < 0.72 || hits < minimumWords) continue;
-    // Google alternates between image-before-title and image-after-title
-    // layouts. Midpoints between two result titles keep the lookup attached
-    // to this exact story without guessing from keywords.
-    const previous = results[index - 1]?.index;
-    const next = results[index + 1]?.index;
-    const start = previous == null ? Math.max(0, match.index - 12_000) : Math.floor((previous + match.index) / 2);
-    const end = next == null ? Math.min(html.length, match.index + 12_000) : Math.floor((match.index + next) / 2);
-    const resultHtml = html.slice(start, end);
-    const attachments = [...resultHtml.matchAll(/\/api\/attachments\/[^"'\s,]+/g)].map(item => decode(item[0]));
-    if (!attachments.length) continue;
-    const rawAttachment = attachments.find(value => /-w400-h224-/i.test(value)) || attachments[attachments.length - 1];
-    const attachment = rawAttachment.replace(/-w\d+-h\d+-p-df(?:-rw)?$/i, '-w400-h224-p-df');
-    if (!best || score > best.score) best = { score, url: new URL(attachment, searchUrl).href };
-    if (score >= 0.98) break;
-  }
-  return best?.url || '';
+    if (!response.ok) return rawUrl;
+    return extractDecodedUrl(await response.text()) || rawUrl;
+  } catch { return rawUrl; }
 }
 
 function metaContent(html, key) {
   const escaped = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const a = html.match(new RegExp(`<meta[^>]+(?:property|name)=["']${escaped}["'][^>]+content=["']([^"']+)["'][^>]*>`, 'i'));
-  if (a) return decode(a[1]);
-  const b = html.match(new RegExp(`<meta[^>]+content=["']([^"']+)["'][^>]+(?:property|name)=["']${escaped}["'][^>]*>`, 'i'));
-  return b ? decode(b[1]) : '';
+  const first = html.match(new RegExp(`<meta[^>]+(?:property|name|itemprop)=["']${escaped}["'][^>]+content=["']([^"']+)["'][^>]*>`, 'i'));
+  if (first) return decode(first[1]);
+  const second = html.match(new RegExp(`<meta[^>]+content=["']([^"']+)["'][^>]+(?:property|name|itemprop)=["']${escaped}["'][^>]*>`, 'i'));
+  return second ? decode(second[1]) : '';
 }
 
-function inlineImageCandidates(html) {
-  const articleMatch = [...html.matchAll(/<article\b[^>]*>([\s\S]*?)<\/article>/gi)].sort((a, b) => b[1].length - a[1].length)[0];
-  const region = articleMatch?.[1] || html;
-  const candidates = [];
-  for (const match of region.matchAll(/<img\b([^>]+)>/gi)) {
+function linkImage(html) {
+  const match = html.match(/<link[^>]+rel=["'][^"']*image_src[^"']*["'][^>]+href=["']([^"']+)["']/i)
+    || html.match(/<link[^>]+href=["']([^"']+)["'][^>]+rel=["'][^"']*image_src[^"']*["']/i);
+  return match ? decode(match[1]) : '';
+}
+
+function collectJsonLdImages(value, out, depth = 0) {
+  if (depth > 7 || out.length >= 24 || value == null) return;
+  if (typeof value === 'string') return;
+  if (Array.isArray(value)) {
+    value.forEach(item => collectJsonLdImages(item, out, depth + 1));
+    return;
+  }
+  if (typeof value !== 'object') return;
+  for (const [key, item] of Object.entries(value)) {
+    if (/^(image|thumbnailUrl|contentUrl)$/i.test(key)) {
+      if (typeof item === 'string') out.push(item);
+      else if (Array.isArray(item)) item.forEach(v => typeof v === 'string' && out.push(v));
+      else if (item && typeof item === 'object') {
+        if (typeof item.url === 'string') out.push(item.url);
+        if (typeof item.contentUrl === 'string') out.push(item.contentUrl);
+      }
+    }
+    collectJsonLdImages(item, out, depth + 1);
+  }
+}
+
+function jsonLdImages(html) {
+  const out = [];
+  for (const match of html.matchAll(/<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi)) {
+    try { collectJsonLdImages(JSON.parse(match[1].trim()), out); } catch {}
+    if (out.length >= 24) break;
+  }
+  return out;
+}
+
+function inlineImages(html) {
+  const article = [...html.matchAll(/<(?:article|main)\b[^>]*>([\s\S]*?)<\/(?:article|main)>/gi)]
+    .sort((a, b) => b[1].length - a[1].length)[0]?.[1] || html;
+  const scored = [];
+  for (const match of article.matchAll(/<(?:img|source)\b([^>]+)>/gi)) {
     const attrs = match[1];
-    const descriptive = `${attrs} ${(attrs.match(/\balt=["']([^"']*)["']/i) || [])[1] || ''}`;
-    if (/logo|avatar|icon|emoji|badge|author|profil|pixel|tracking|advert|publicit|sprite|brand|wordmark|favicon/i.test(descriptive)) continue;
+    if (/logo|avatar|icon|emoji|badge|author|profil|pixel|tracking|advert|publicit|sprite|brand|wordmark|favicon/i.test(attrs)) continue;
+    const width = Number((attrs.match(/\bwidth=["']?(\d+)/i) || [])[1] || 0);
+    const height = Number((attrs.match(/\bheight=["']?(\d+)/i) || [])[1] || 0);
+    let score = 0;
+    if (/hero|lead|main|featured|article|cover|story/i.test(attrs)) score += 8;
+    if (width >= 500) score += 4;
+    if (height >= 250) score += 3;
+    const candidates = [];
     for (const attr of ['src', 'data-src', 'data-original', 'data-lazy-src', 'data-image']) {
       const value = (attrs.match(new RegExp(`\\b${attr}=["']([^"']+)["']`, 'i')) || [])[1] || '';
       if (value && !/^data:/i.test(value)) candidates.push(value);
@@ -252,171 +335,150 @@ function inlineImageCandidates(html) {
     const srcset = (attrs.match(/\bsrcset=["']([^"']+)["']/i) || [])[1] || '';
     if (srcset) {
       const values = srcset.split(',').map(part => part.trim().split(/\s+/)[0]).filter(Boolean);
-      if (values.length) candidates.push(values[values.length - 1]);
+      if (values.length) candidates.unshift(values[values.length - 1]);
     }
-    if (candidates.length >= 18) break;
+    candidates.forEach((url, i) => scored.push({ url: decode(url), score: score - i }));
+    if (scored.length >= 36) break;
   }
-  return candidates;
+  return scored.sort((a, b) => b.score - a.score).map(item => item.url);
 }
 
-function jsonLdCandidates(html) {
-  const out = [];
-  for (const match of html.matchAll(/<script[^>]+type=["']application\/ld\+json["'][^>]*>([\s\S]*?)<\/script>/gi)) {
+function uniqueCandidates(values, baseUrl) {
+  const result = [];
+  const seen = new Set();
+  for (const raw of values) {
     try {
-      const parsed = JSON.parse(match[1].trim());
-      const queue = Array.isArray(parsed) ? [...parsed] : [parsed];
-      for (const item of queue) {
-        const image = item?.image;
-        if (typeof image === 'string') out.push(image);
-        else if (Array.isArray(image)) out.push(...image.filter(v => typeof v === 'string'));
-        else if (image?.url) out.push(image.url);
-        if (item?.thumbnailUrl) out.push(item.thumbnailUrl);
-      }
-    } catch {}
-    if (out.length >= 10) break;
-  }
-  return out;
-}
-
-function isGenericImageUrl(rawUrl = '') {
-  try {
-    const url = new URL(rawUrl);
-    const host = url.hostname.toLowerCase();
-    const haystack = `${host}${url.pathname}${url.search}`.toLowerCase();
-    if (host === 'news.google.com' && url.pathname.startsWith('/api/attachments/')) return false;
-    if (url.pathname === '/' && !url.search) return true;
-    if (/(favicon|\/logo(?:[._/-]|$)|logo[-_.]|icon[-_.]|\/icon(?:[._/-]|$)|avatar|sprite|wordmark|brandmark|site-logo|google[-_ ]?news|googlenews|google_actualites|google-actualites)/i.test(haystack)) return true;
-    if (host === 'news.google.com' || host === 'www.google.com' || host.endsWith('.gstatic.com') || host.endsWith('.googleusercontent.com')) return true;
-    return false;
-  } catch { return true; }
-}
-
-function findImage(html, finalUrl) {
-  const candidates = [
-    metaContent(html, 'og:image:secure_url'),
-    metaContent(html, 'og:image'),
-    metaContent(html, 'og:image:url'),
-    metaContent(html, 'twitter:image'),
-    metaContent(html, 'twitter:image:src'),
-    ((html.match(/<link[^>]+rel=["']image_src["'][^>]+href=["']([^"']+)["']/i) || [])[1] || ''),
-    ...jsonLdCandidates(html),
-    ...inlineImageCandidates(html)
-  ].filter(Boolean);
-  for (const candidate of candidates) {
-    try {
-      const url = new URL(decode(candidate), finalUrl);
-      if (!['http:', 'https:'].includes(url.protocol)) continue;
-      if (isGenericImageUrl(url.href)) continue;
-      return url.href;
+      const url = new URL(decode(String(raw || '')), baseUrl).href;
+      if (isBadImageUrl(url) || seen.has(url)) continue;
+      seen.add(url);
+      result.push(url);
     } catch {}
   }
-  return '';
+  return result.slice(0, 18);
 }
 
-function pngDimensions(buffer) {
-  if (buffer.length < 24 || buffer.toString('ascii', 1, 4) !== 'PNG') return null;
-  return { width: buffer.readUInt32BE(16), height: buffer.readUInt32BE(20) };
-}
-
-function jpegDimensions(buffer) {
-  if (buffer.length < 4 || buffer[0] !== 0xff || buffer[1] !== 0xd8) return null;
-  let offset = 2;
-  while (offset + 9 < buffer.length) {
-    if (buffer[offset] !== 0xff) { offset++; continue; }
-    const marker = buffer[offset + 1];
-    if ([0xc0, 0xc1, 0xc2, 0xc3, 0xc5, 0xc6, 0xc7, 0xc9, 0xca, 0xcb, 0xcd, 0xce, 0xcf].includes(marker)) {
-      return { height: buffer.readUInt16BE(offset + 5), width: buffer.readUInt16BE(offset + 7) };
+async function firstValidImage(candidates, referer, status) {
+  for (let i = 0; i < candidates.length; i += 3) {
+    const batch = candidates.slice(i, i + 3);
+    const settled = await Promise.allSettled(batch.map(url => fetchImage(url, referer)));
+    for (let j = 0; j < settled.length; j += 1) {
+      if (settled[j].status === 'fulfilled') return { image: settled[j].value, status };
     }
-    if (marker === 0xd8 || marker === 0xd9) { offset += 2; continue; }
-    const size = buffer.readUInt16BE(offset + 2);
-    if (!size || size < 2) break;
-    offset += 2 + size;
   }
   return null;
 }
 
-function imageLooksUseful(buffer, type) {
-  if (/svg/i.test(type)) return false;
-  const dimensions = pngDimensions(buffer) || jpegDimensions(buffer);
-  if (!dimensions) return true;
-  return dimensions.width >= 240 && dimensions.height >= 120;
+function titleWords(value = '') {
+  const stop = new Set(['avec','dans','pour','plus','apres','avant','cette','sont','etre','leur','leurs','tout','mais','sans','vers','entre','une','des','les','sur','qui','que','aux','par','ses','son','ont','est','fait','article','parisien']);
+  return [...new Set(normalize(value).replace(/[^a-z0-9]+/g, ' ').split(/\s+/).filter(word => word.length >= 3 && !stop.has(word)))];
 }
 
-async function fetchImage(rawUrl, referer) {
-  const trustedGoogleNewsAttachment = (() => {
+function titleAgreement(candidate = '', expected = '') {
+  const wanted = titleWords(expected);
+  const found = titleWords(candidate);
+  if (!wanted.length || !found.length) return { score: 0, hits: 0, shorterCoverage: 0 };
+  const set = new Set(found);
+  const hits = wanted.filter(word => set.has(word)).length;
+  return { score: hits / wanted.length, hits, shorterCoverage: hits / Math.max(1, Math.min(wanted.length, found.length)) };
+}
+
+function sameEvent(candidate = '', expected = '') {
+  const a = titleAgreement(candidate, expected);
+  const wantedLength = titleWords(expected).length;
+  return (a.score >= 0.68 && a.hits >= Math.min(4, wantedLength))
+    || (a.hits >= 5 && a.shorterCoverage >= 0.52)
+    || (a.hits >= 4 && a.shorterCoverage >= 0.66);
+}
+
+function queryVariants(title = '') {
+  const clean = plain(title).replace(/\s+[-–—]\s+[^-–—]{2,90}$/, '').slice(0, 240);
+  const variants = [clean];
+  const afterColon = clean.split(/\s*[:：]\s*/).filter(Boolean).pop();
+  if (afterColon && afterColon !== clean && titleWords(afterColon).length >= 4) variants.push(afterColon);
+  const words = titleWords(clean).filter(word => word.length >= 4);
+  if (words.length >= 5) variants.push(words.slice(-10).join(' '));
+  return [...new Set(variants.filter(Boolean))].slice(0, 3);
+}
+
+async function googleNewsImage(title) {
+  for (const query of queryVariants(title)) {
     try {
-      const url = new URL(rawUrl);
-      return url.hostname === 'news.google.com' && url.pathname.startsWith('/api/attachments/');
-    } catch { return false; }
-  })();
-  let current = rawUrl;
-  for (let i = 0; i < 5; i++) {
-    const url = await assertPublicUrl(current);
-    // Exact Google News attachments redirect to a Google image CDN. Keep that
-    // trusted chain, while continuing to reject arbitrary Google logos/icons.
-    if (!trustedGoogleNewsAttachment && isGenericImageUrl(url.href)) throw new Error('generic image blocked');
-    const response = await fetch(url, {
-      redirect: 'manual',
-      signal: AbortSignal.timeout(IMAGE_TIMEOUT_MS),
-      headers: {
-        'User-Agent': UA,
-        'Accept': 'image/avif,image/webp,image/apng,image/jpeg,image/png,image/*,*/*;q=0.8',
-        'Referer': referer || url.origin + '/'
+      const searchUrl = new URL('https://news.google.com/search');
+      searchUrl.search = new URLSearchParams({ q: query, hl: 'fr', gl: 'FR', ceid: 'FR:fr', ucbcb: '1' }).toString();
+      const response = await fetch(searchUrl, {
+        redirect: 'follow',
+        signal: AbortSignal.timeout(SEARCH_TIMEOUT_MS),
+        headers: { 'User-Agent': GOOGLE_UA, 'Accept': 'text/html,application/xhtml+xml', 'Accept-Language': 'fr-FR,fr;q=0.9' }
+      });
+      if (!response.ok) continue;
+      const buffer = Buffer.from(await response.arrayBuffer());
+      if (!buffer.length || buffer.byteLength > MAX_SEARCH_BYTES) continue;
+      const html = decodeBuffer(buffer, response.headers.get('content-type') || '');
+      const titlePattern = /<a\b[^>]*class=["'][^"']*\bJtKRv\b[^"']*["'][^>]*>([\s\S]{1,2200}?)<\/a>/gi;
+      const matches = [...html.matchAll(titlePattern)];
+      let best = null;
+      for (let index = 0; index < matches.length; index += 1) {
+        const label = plain(matches[index][1]);
+        if (!sameEvent(label, title)) continue;
+        const agreement = titleAgreement(label, title);
+        const previous = matches[index - 1]?.index;
+        const next = matches[index + 1]?.index;
+        const start = previous == null ? Math.max(0, matches[index].index - 12000) : Math.floor((previous + matches[index].index) / 2);
+        const end = next == null ? Math.min(html.length, matches[index].index + 12000) : Math.floor((matches[index].index + next) / 2);
+        const chunk = html.slice(start, end);
+        const attachments = [...chunk.matchAll(/\/api\/attachments\/[^"'\s,]+/g)].map(item => decode(item[0]));
+        if (!attachments.length) continue;
+        const raw = attachments.find(value => /-w400-h224-/i.test(value)) || attachments[attachments.length - 1];
+        const url = new URL(raw.replace(/-w\d+-h\d+-p-df(?:-rw)?$/i, '-w600-h338-p-df'), searchUrl).href;
+        const confidence = Math.max(agreement.score, agreement.shorterCoverage);
+        if (!best || confidence > best.confidence) best = { url, confidence };
       }
-    });
-    if (response.status >= 300 && response.status < 400 && response.headers.get('location')) {
-      current = new URL(response.headers.get('location'), url).href;
-      continue;
-    }
-    if (!response.ok) throw new Error(`image HTTP ${response.status}`);
-    const type = response.headers.get('content-type') || '';
-    if (!type.startsWith('image/')) throw new Error('not image');
-    const buffer = Buffer.from(await response.arrayBuffer());
-    if (!buffer.length || buffer.byteLength > MAX_IMAGE_BYTES) throw new Error('image too large');
-    if (!imageLooksUseful(buffer, type)) throw new Error('generic or too small image');
-    return { buffer, type };
+      if (best?.url) {
+        try { return await fetchImage(best.url, 'https://news.google.com/'); } catch {}
+      }
+    } catch {}
   }
-  throw new Error('too many image redirects');
+  return null;
 }
 
-function sendImage(res, image, source) {
-  res.statusCode = 200;
-  res.setHeader('Content-Type', image.type);
-  res.setHeader('Content-Length', String(image.buffer.byteLength));
-  res.setHeader('Cache-Control', 'public, max-age=86400, s-maxage=604800, stale-while-revalidate=2592000');
-  res.setHeader('X-Thumbnail-Status', source);
-  return res.end(image.buffer);
+function xmlTag(block = '', name = '') {
+  const escaped = name.replace(':', '\\:');
+  const match = block.match(new RegExp(`<${escaped}(?:\\s[^>]*)?>([\\s\\S]*?)<\\/${escaped}>`, 'i'));
+  return match ? plain(match[1]) : '';
 }
 
-function fallback(res) {
-  const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="640" height="420" viewBox="0 0 640 420"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#eeeeF1"/><stop offset="1" stop-color="#ddddE3"/></linearGradient></defs><rect width="640" height="420" rx="22" fill="url(#g)"/><path d="M0 330L155 220l105 70 104-105 276 235H0Z" fill="#c9c9d1"/><circle cx="470" cy="120" r="42" fill="#d2d2d9"/></svg>';
-  res.statusCode = 200;
-  res.setHeader('Content-Type', 'image/svg+xml');
-  res.setHeader('Cache-Control', 'no-store, max-age=0');
-  res.setHeader('X-Thumbnail-Status', 'fallback');
-  res.end(svg);
-}
-
-function xmlText(value = '') {
-  return String(value || '').replace(/[&<>"']/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&apos;' }[character]));
-}
-
-function personalSourceFallback(res, source) {
-  const label = String(source || 'Source suivie').replace(/\s+/g, ' ').trim().slice(0, 28) || 'Source suivie';
-  const initials = label.split(/\s+/).filter(Boolean).slice(0, 2).map(word => word[0]).join('').toUpperCase() || 'S';
-  const svg = `<svg xmlns="http://www.w3.org/2000/svg" width="640" height="420" viewBox="0 0 640 420"><defs><linearGradient id="g" x1="0" y1="0" x2="1" y2="1"><stop stop-color="#e7f4ff"/><stop offset="1" stop-color="#b9c9ff"/></linearGradient></defs><rect width="640" height="420" rx="22" fill="url(#g)"/><circle cx="320" cy="178" r="92" fill="#fff" fill-opacity=".82"/><text x="320" y="198" text-anchor="middle" font-family="Arial,sans-serif" font-size="62" font-weight="800" fill="#3156a8">${xmlText(initials)}</text><text x="320" y="315" text-anchor="middle" font-family="Arial,sans-serif" font-size="34" font-weight="700" fill="#294789">${xmlText(label)}</text></svg>`;
-  res.statusCode = 200;
-  res.setHeader('Content-Type', 'image/svg+xml; charset=utf-8');
-  res.setHeader('Cache-Control', 'public, max-age=3600, s-maxage=86400');
-  res.setHeader('X-Thumbnail-Status', 'publisher-tile');
-  return res.end(svg);
-}
-
-function exactImageUnavailable(res) {
-  res.statusCode = 404;
-  res.setHeader('Cache-Control', 'no-store, max-age=0');
-  res.setHeader('X-Thumbnail-Status', 'fallback');
-  res.end();
+async function bingNewsImage(title, source = '') {
+  for (const query of queryVariants(title)) {
+    try {
+      const searchUrl = new URL('https://www.bing.com/news/search');
+      searchUrl.search = new URLSearchParams({ q: query, format: 'RSS', setmkt: 'fr-FR', qft: 'sortbydate="1"' }).toString();
+      const response = await fetch(searchUrl, {
+        redirect: 'follow',
+        signal: AbortSignal.timeout(SEARCH_TIMEOUT_MS),
+        headers: { 'User-Agent': UA, 'Accept': 'application/rss+xml,application/xml,text/xml,*/*;q=0.5', 'Accept-Language': 'fr-FR,fr;q=0.9' }
+      });
+      if (!response.ok) continue;
+      const buffer = Buffer.from(await response.arrayBuffer());
+      if (!buffer.length || buffer.byteLength > MAX_SEARCH_BYTES) continue;
+      const xml = buffer.toString('utf8');
+      let best = null;
+      for (const block of (xml.match(/<item\b[\s\S]*?<\/item>/gi) || []).slice(0, 30)) {
+        const headline = xmlTag(block, 'title');
+        if (!headline || !sameEvent(headline, title)) continue;
+        const image = xmlTag(block, 'News:Image');
+        if (!/^https?:\/\//i.test(image) || isBadImageUrl(image)) continue;
+        const publisher = xmlTag(block, 'News:Source');
+        const agreement = titleAgreement(headline, title);
+        const sameSource = publisher && source && normalize(publisher).includes(normalize(source));
+        const confidence = Math.max(agreement.score, agreement.shorterCoverage) + (sameSource ? 0.08 : 0);
+        if (!best || confidence > best.confidence) best = { url: image, confidence };
+      }
+      if (best?.url) {
+        try { return await fetchImage(best.url, 'https://www.bing.com/news/'); } catch {}
+      }
+    } catch {}
+  }
+  return null;
 }
 
 module.exports = async function handler(req, res) {
@@ -424,65 +486,49 @@ module.exports = async function handler(req, res) {
 
   const rawUrl = String(req.query?.url || '').slice(0, 2000);
   const suppliedImage = String(req.query?.image || '').slice(0, 2000);
-  const title = String(req.query?.title || '').slice(0, 300);
-  const source = String(req.query?.source || '').slice(0, 100);
-  const customSource = String(req.query?.custom || '') === '1';
-  const exactImageOnly = String(req.query?.exact || '') === '1';
-  const isLeParisien = /(?:^|\b)le\s+parisien(?:\b|$)/i.test(`${source} ${title}`) || /(?:^|\.)leparisien\.fr$/i.test((() => { try { return new URL(rawUrl).hostname; } catch { return ''; } })());
-  const needsPersonalFallback = customSource || isLeParisien;
+  const title = plain(String(req.query?.title || '')).slice(0, 300);
+  const source = plain(String(req.query?.source || '')).slice(0, 120);
+  const exactOnly = String(req.query?.exact || '') === '1';
 
-  if (suppliedImage && !isGenericImageUrl(suppliedImage)) {
+  if (suppliedImage && !isBadImageUrl(suppliedImage)) {
+    try { return sendImage(res, await fetchImage(suppliedImage, rawUrl || ''), 'feed-image'); }
+    catch {}
+  }
+
+  let publisherUrl = rawUrl;
+  if (/^https?:\/\//i.test(rawUrl)) {
+    try { publisherUrl = await decodeGoogleNewsUrl(rawUrl); } catch {}
     try {
-      const image = await fetchImage(suppliedImage, rawUrl || undefined);
-      return sendImage(res, image, 'feed');
+      const { html, finalUrl } = await fetchHtml(publisherUrl);
+      const metadata = uniqueCandidates([
+        metaContent(html, 'og:image:secure_url'),
+        metaContent(html, 'og:image'),
+        metaContent(html, 'twitter:image:src'),
+        metaContent(html, 'twitter:image'),
+        metaContent(html, 'thumbnail'),
+        metaContent(html, 'thumbnailUrl'),
+        linkImage(html),
+        ...jsonLdImages(html)
+      ], finalUrl);
+      const metaImage = await firstValidImage(metadata, finalUrl, 'publisher-metadata');
+      if (metaImage) return sendImage(res, metaImage.image, metaImage.status);
+
+      const content = uniqueCandidates(inlineImages(html), finalUrl);
+      const contentImage = await firstValidImage(content, finalUrl, 'publisher-content');
+      if (contentImage) return sendImage(res, contentImage.image, contentImage.status);
     } catch (error) {
-      console.warn('feed image unavailable:', String(error?.message || error).slice(0, 120));
+      console.warn('publisher image extraction unavailable:', String(error?.message || error).slice(0, 120));
     }
   }
 
-  // Prepared feed visuals already carry the exact Google News attachment.
-  // If that one URL is temporarily unavailable, fail the image request so the
-  // card keeps its branded source tile instead of starting another search.
-  if (exactImageOnly) return exactImageUnavailable(res);
-
-  // Google Actualités already owns an exact, publisher-linked thumbnail for
-  // most RSS stories. It is small, fast and tied to the precise headline, so
-  // it avoids both publisher hotlink blocks and unrelated keyword photos.
-  if (googleNewsArticleId(rawUrl) && title) {
-    try {
-      const thumbnail = await googleNewsThumbnail(title);
-      if (thumbnail) {
-        const image = await fetchImage(thumbnail, 'https://news.google.com/');
-        return sendImage(res, image, 'google-news');
-      }
-    } catch (error) {
-      console.warn('Google thumbnail unavailable:', String(error?.message || error).slice(0, 140));
-    }
+  if (title) {
+    const [googleResult, bingResult] = await Promise.allSettled([
+      googleNewsImage(title),
+      bingNewsImage(title, source)
+    ]);
+    if (googleResult.status === 'fulfilled' && googleResult.value) return sendImage(res, googleResult.value, 'google-news-exact');
+    if (bingResult.status === 'fulfilled' && bingResult.value) return sendImage(res, bingResult.value, 'bing-news-exact');
   }
 
-  if (rawUrl) {
-    try {
-      const articleUrl = googleNewsArticleId(rawUrl) ? await decodeGoogleNewsUrl(rawUrl) : rawUrl;
-      const decodedHost = new URL(articleUrl).hostname.toLowerCase();
-      if (decodedHost === 'news.google.com' || decodedHost.endsWith('.google.com')) throw new Error('Google wrapper not decoded');
-      const { html, finalUrl } = await fetchHtml(articleUrl);
-      const imageUrl = findImage(html, finalUrl);
-      if (imageUrl) {
-        const image = await fetchImage(imageUrl, finalUrl);
-        return sendImage(res, image, 'publisher');
-      }
-    } catch (error) {
-      console.warn('publisher image unavailable:', String(error?.message || error).slice(0, 140));
-    }
-  }
-
-  // Never invent a photo from keywords: it can be plausible but unrelated to
-  // the story. For every source added manually, fall back to a clearly branded
-  // source tile when no exact feed, Google News or publisher image is verified.
-  if (needsPersonalFallback) return personalSourceFallback(res, source);
-
-  // Never invent an illustration from a loose keyword search for other
-  // publishers. A neutral visual is preferable to an unrelated photograph.
-  return fallback(res);
+  return neutral(res, exactOnly);
 };
-
