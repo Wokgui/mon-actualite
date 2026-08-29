@@ -145,7 +145,13 @@ self.addEventListener('fetch', event => {
   const url = new URL(event.request.url);
   if (url.origin !== self.location.origin) return;
 
-  if (url.pathname === '/api/article-thumbnail' || url.pathname === '/api/exact-news-thumbnail' || url.pathname === '/api/article-photo-fast') {
+  if (url.pathname === '/api/exact-news-thumbnail') {
+    const replacement = new URL('/api/article-thumbnail', url.origin);
+    replacement.search = url.search;
+    event.respondWith(thumbnailResponse(new Request(replacement.href)));
+    return;
+  }
+  if (url.pathname === '/api/article-thumbnail' || url.pathname === '/api/article-photo-fast') {
     event.respondWith(thumbnailResponse(event.request));
     return;
   }
