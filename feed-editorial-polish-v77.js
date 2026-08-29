@@ -4,7 +4,6 @@
   const SEEN_KEY = 'news-seen-v77';
   const CACHE_KEY = 'news-live-cache';
   const upstreamFetch = window.fetch.bind(window);
-  const initialSeen = new Set(Object.keys(readJson(SEEN_KEY, {})));
   const openedThisSession = new Set();
   let scheduled = false;
 
@@ -108,12 +107,13 @@
     const page = feed.closest('.page');
     const savedOnly = savedOnlyActive();
     const map = articleMap();
+    const currentSeen = seenIds();
 
     for (const card of [...feed.querySelectorAll(':scope > .article-card[data-article]')]) {
       const id = String(card.dataset.article || '');
       const article = map.get(id);
 
-      if (!savedOnly && (initialSeen.has(id) || openedThisSession.has(id))) {
+      if (!savedOnly && (currentSeen.has(id) || openedThisSession.has(id))) {
         card.remove();
         continue;
       }
