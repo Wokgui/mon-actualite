@@ -4,7 +4,7 @@ import { articleVisualUrl, hasPreparedVisual, sourceTileUrl } from './services/a
 const $ = (selector, root = document) => root.querySelector(selector);
 const app = $('#app');
 const toastEl = $('#toast');
-const APP_VERSION = '59';
+const APP_VERSION = '60';
 const APP_RELEASE = '29 août 2026';
 document.documentElement.dataset.appVersion = APP_VERSION;
 
@@ -274,7 +274,8 @@ function renderBrief() {
     const a = topicWords(left);
     const b = topicWords(right);
     const shared = [...a].filter(word => b.has(word)).length;
-    return shared >= 2 && shared / Math.max(1, Math.min(a.size, b.size)) >= .38;
+    const overlap = shared / Math.max(1, Math.min(a.size, b.size));
+    return (shared >= 2 && overlap >= .38) || (shared >= 3 && overlap >= .24);
   };
   const ranked = visibleArticles().map(article => {
     const haystack = `${article.title || ''} ${article.summary || ''}`;
