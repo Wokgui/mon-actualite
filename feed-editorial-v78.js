@@ -4,7 +4,9 @@
   const CACHE_KEY = 'news-live-cache';
   const MAX_AGE_HOURS = 40;
   const MAX_ESSENTIAL = 6;
+  const BASE_ESSENTIAL_THRESHOLD = 42;
   const upstreamFetch = window.fetch.bind(window);
+  let decorateScheduled = false;
 
   const CATEGORY_IMPORTANCE = {
     International: 28, Politique: 25, 'Économie': 21, 'Santé': 20,
@@ -61,6 +63,13 @@
     return Number(article.editorialImportance || 0) + categoryCorrection + noveltyDelta(article) + corroboration;
   }
 
+  function qualifiesAsEssential(article, rank) {
+    if (rank >= BASE_ESSENTIAL_THRESHOLD) return true;
+    if (article.noveltyStateV78 === 'development' && rank >= 34) return true;
+    if (sourceCount(article) >= 3 && rank >= 36) return true;
+    return false;
+  }
+
   function fallbackWhy(article = {}) {
     if (article.noveltyStateV78 === 'development') return 'Nouveau développement';
     if (article.noveltyStateV78 === 'minor-update') return 'Nouvel élément';
@@ -75,6 +84,7 @@
       .filter(item => !item.article.seenHidden)
       .filter(item => item.article.noveltyStateV78 !== 'repeat')
       .filter(item => ageHours(item.article) <= MAX_AGE_HOURS)
+      .filter(item => qualifiesAsEssential(item.article, item.rank))
       .sort((a, b) => b.rank - a.rank);
 
     const selected = [];
@@ -87,18 +97,9 @@
       const source = normalize(item.article.source || 'source');
       if (Number(categoryCounts.get(category) || 0) >= 2) continue;
       if (Number(sourceCounts.get(source) || 0) >= 2) continue;
-      if (selected.length >= 4 && item.rank < 20) continue;
       selected.push(item);
       categoryCounts.set(category, Number(categoryCounts.get(category) || 0) + 1);
       sourceCounts.set(source, Number(sourceCounts.get(source) || 0) + 1);
-    }
-
-    if (selected.length < Math.min(4, ranked.length)) {
-      for (const item of ranked) {
-        if (selected.includes(item)) continue;
-        selected.push(item);
-        if (selected.length >= Math.min(MAX_ESSENTIAL, ranked.length, 4)) break;
-      }
     }
 
     const selectedIds = new Map(selected.map((item, index) => [String(item.article.id || ''), index + 1]));
@@ -125,7 +126,8 @@
     payload.stats = {
       ...(payload.stats || {}),
       essentialCount: payload.articles.filter(article => article.essential).length,
-      intelligenceV78Final: true
+      intelligenceV78Final: true,
+      essentialVariableV78: true
     };
     return payload;
   }
@@ -154,10 +156,72 @@
     return response;
   };
 
+  function cachedArticleMap() {
+    const cache = readJson(CACHE_KEY, {});
+    const articles = Array.isArray(cache.articles) ? cache.articles : [];
+    return new Map(articles.map(article => [String(article.id || ''), article]));
+  }
+
+  function decorateEssentialBoundary() {
+    decorateScheduled = false;
+    const articleMap = cachedArticleMap();
+
+    document.querySelectorAll('.feed').forEach(feed => {
+      const cards = [...feed.querySelectorAll(':scope > .article-card[data-article]')];
+      if (!cards.length) {
+        feed.querySelector(':scope > .essential-separator-v78')?.remove();
+        return;
+      }
+
+      for (const card of cards) {
+        const article = articleMap.get(String(card.dataset.article || ''));
+        if (article) card.classList.toggle('essential-v77', Boolean(article.essential));
+      }
+
+      const essentialCount = cards.filter(card => card.classList.contains('essential-v77')).length;
+      let separator = feed.querySelector(':scope > .essential-separator-v78');
+      const shouldShow = essentialCount > 0 && essentialCount < cards.length;
+
+      if (!shouldShow) {
+        separator?.remove();
+        return;
+      }
+
+      if (!separator) {
+        separator = document.createElement('div');
+        separator.className = 'essential-separator-v78';
+        separator.setAttribute('aria-label', 'Toute l’actualité');
+        separator.innerHTML = '<span>Toute l’actualité</span>';
+      }
+
+      if (feed.firstElementChild !== separator) feed.insertBefore(separator, feed.firstElementChild);
+    });
+  }
+
+  function scheduleBoundary() {
+    if (decorateScheduled) return;
+    decorateScheduled = true;
+    requestAnimationFrame(decorateEssentialBoundary);
+  }
+
   const cache = readJson(CACHE_KEY, null);
   if (cache && Array.isArray(cache.articles) && cache.articles.some(article => article?.noveltyStateV78)) {
     cache.articles = recomputeEssential(cache.articles);
-    cache.stats = { ...(cache.stats || {}), intelligenceV78Final: true };
+    cache.stats = { ...(cache.stats || {}), intelligenceV78Final: true, essentialVariableV78: true };
     writeJson(CACHE_KEY, cache);
   }
+
+  document.addEventListener('DOMContentLoaded', () => {
+    const root = document.getElementById('app');
+    if (root) new MutationObserver(scheduleBoundary).observe(root, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['class']
+    });
+    scheduleBoundary();
+  }, { once: true });
+
+  window.addEventListener('focus', scheduleBoundary);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) scheduleBoundary(); });
 })();
