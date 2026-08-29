@@ -43,7 +43,7 @@ function recoveryVisualUrl(article = {}) {
     if (prepared.origin === location.origin && prepared.pathname === '/api/article-thumbnail') suppliedImage = '';
   } catch {}
   const params = new URLSearchParams({
-    v: '23',
+    v: '24',
     url: url.slice(0, 1900),
     image: suppliedImage,
     title: title.slice(0, 280),
@@ -108,12 +108,16 @@ function isPersonalSourceArticle(article = {}) {
 export function articleVisualUrl(article = {}) {
   // Personal feeds may expose publisher images that reject browser hotlinking
   // on Android. Always route them through our same-origin recovery endpoint.
-  // Le Parisien gets a dedicated exact-title Google News lookup because its
-  // direct article pages frequently refuse server-side image extraction.
+  // Le Parisien gets a dedicated exact-title / same-event Google News lookup
+  // because its direct article pages frequently refuse server-side extraction.
   if (isPersonalSourceArticle(article)) return recoveryVisualUrl(article) || sourceTileUrl(article);
   return preparedVisualUrl(article) || recoveryVisualUrl(article) || sourceTileUrl(article);
 }
 
 export function hasPreparedVisual(article = {}) {
+  // Le Parisien must stay on its dedicated recovery endpoint. Marking it as
+  // handled prevents the generic backfill worker from replacing a recovered
+  // Google News photo with a publisher-logo tile after Le Parisien returns 403.
+  if (isLeParisienArticle(article)) return true;
   return Boolean(preparedVisualUrl(article));
 }
