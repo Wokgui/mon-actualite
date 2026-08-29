@@ -33,19 +33,16 @@ function isLeParisienArticle(article = {}) {
   }
 }
 
-function factualSearchTitle(title = '') {
-  const cleanTitle = clean(title);
-  const parts = cleanTitle.split(/\s*[:：]\s*/).map(clean).filter(Boolean);
-  if (parts.length > 1) {
-    const tail = parts[parts.length - 1];
-    const words = tail.split(/\s+/).filter(Boolean);
-    // Long Le Parisien headlines often append contextual details that make an
-    // exact Google News lookup too restrictive. The first seven words of the
-    // factual clause are normally enough to identify the event unambiguously.
-    if (words.length >= 10) return words.slice(0, 7).join(' ');
-    if (words.length >= 6 && tail.length >= 45) return tail;
+function isSameOriginImageProxy(raw = '') {
+  const value = clean(raw);
+  if (!value) return false;
+  try {
+    const url = new URL(value, location.href);
+    return url.origin === location.origin
+      && ['/api/article-thumbnail', '/api/exact-news-thumbnail', '/api/image-proxy'].includes(url.pathname);
+  } catch {
+    return false;
   }
-  return cleanTitle;
 }
 
 function recoveryVisualUrl(article = {}) {
@@ -53,17 +50,16 @@ function recoveryVisualUrl(article = {}) {
   const title = clean(article.title || '');
   if (!/^https?:\/\//i.test(url) || !title) return '';
   const parisien = isLeParisienArticle(article);
-  const lookupTitle = parisien ? factualSearchTitle(title) : title;
   let suppliedImage = clean(article.visual?.url || article.image || '').slice(0, 1900);
   try {
     const prepared = new URL(suppliedImage, location.href);
     if (prepared.origin === location.origin && ['/api/article-thumbnail', '/api/exact-news-thumbnail'].includes(prepared.pathname)) suppliedImage = '';
   } catch {}
   const params = new URLSearchParams({
-    v: '32',
+    v: '33',
     url: url.slice(0, 1900),
     image: suppliedImage,
-    title: lookupTitle.slice(0, 280),
+    title: title.slice(0, 280),
     category: clean(article.category || '').slice(0, 70),
     source: clean(article.source || '').slice(0, 100),
     custom: article.customSource ? '1' : '0'
@@ -92,15 +88,18 @@ function initials(value = '') {
 }
 
 export function preparedVisualUrl(article = {}) {
-  if (isPersonalSourceArticle(article)) return '';
   const visual = article.visual && typeof article.visual === 'object' ? article.visual : {};
   const source = clean(visual.source || article.visualSource || '');
+  const raw = visual.url || article.image || '';
   const explicitlyUnavailable = visual.status === 'unavailable' || article.visualStatus === 'unavailable';
-  if (!explicitlyUnavailable) {
-    const prepared = trustedPreparedUrl(visual.url || article.image || '', source);
-    if (prepared) return prepared;
-  }
-  return '';
+  if (explicitlyUnavailable) return '';
+
+  // Personal feeds can expose publisher URLs that reject hotlinking on Android.
+  // Same-origin proxy images, however, have already been fetched and validated
+  // by our server and must take priority, including for Le Parisien.
+  if (article.customSource && !isSameOriginImageProxy(raw) && !source.startsWith('google-news')) return '';
+
+  return trustedPreparedUrl(raw, source);
 }
 
 export function sourceTileUrl(article = {}) {
@@ -123,18 +122,16 @@ function isPersonalSourceArticle(article = {}) {
 }
 
 export function articleVisualUrl(article = {}) {
-  // Personal feeds may expose publisher images that reject browser hotlinking
-  // on Android. Always route them through our same-origin recovery endpoint.
-  // Le Parisien gets a dedicated factual-title / same-event Google News lookup
-  // because its direct article pages frequently refuse server-side extraction.
+  const prepared = preparedVisualUrl(article);
+  if (prepared) return prepared;
   if (isPersonalSourceArticle(article)) return recoveryVisualUrl(article) || sourceTileUrl(article);
-  return preparedVisualUrl(article) || recoveryVisualUrl(article) || sourceTileUrl(article);
+  return recoveryVisualUrl(article) || sourceTileUrl(article);
 }
 
 export function hasPreparedVisual(article = {}) {
-  // Le Parisien must stay on its dedicated recovery endpoint. Marking it as
-  // handled prevents the generic backfill worker from replacing a recovered
-  // Google News photo with a publisher-logo tile after Le Parisien returns 403.
+  if (preparedVisualUrl(article)) return true;
+  // Le Parisien must stay on its dedicated recovery endpoint instead of being
+  // overwritten by the generic backfill worker when its page returns 403.
   if (isLeParisienArticle(article)) return true;
-  return Boolean(preparedVisualUrl(article));
+  return false;
 }
