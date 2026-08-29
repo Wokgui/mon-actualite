@@ -1,4 +1,4 @@
-const QUICK_CACHE_KEY = 'news-article-summaries-v7';
+const QUICK_CACHE_KEY = 'news-article-summaries-v8';
 let quickScheduled = false;
 
 function quickReadJson(key, fallback) {
@@ -31,6 +31,7 @@ function quickUnavailable(value = '') {
   const text = quickClean(value).toLowerCase();
   return !text
     || /résumé indisponible/.test(text)
+    || /résumé détaillé momentanément indisponible/.test(text)
     || /ouvrez?\s+l[’']article/.test(text)
     || /consultez?\s+(?:les?\s+)?détails/.test(text)
     || /détails publiés par la source/.test(text)
@@ -49,14 +50,53 @@ function quickArticleSummary(article = {}) {
   return value;
 }
 
-function quickProvisionalSummary(article = {}) {
-  const factual = quickArticleSummary(article);
-  if (factual) return factual;
+function quickIsLeParisien(article = {}) {
+  if (/\ble\s+parisien\b/i.test(`${quickClean(article.source)} ${quickClean(article.title)}`)) return true;
+  try {
+    const host = new URL(String(article.url || ''), location.href).hostname.toLowerCase();
+    return host === 'leparisien.fr' || host.endsWith('.leparisien.fr');
+  } catch { return false; }
+}
+
+function quickNormalize(value = '') {
+  return quickClean(value)
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .replace(/[’']/g, ' ')
+    .toLowerCase()
+    .replace(/[^a-z0-9]+/g, ' ')
+    .replace(/\s+/g, ' ')
+    .trim();
+}
+
+function quickInfoTokens(value = '') {
+  const stop = new Set(['avec','dans','pour','plus','apres','avant','cette','sont','etre','leur','leurs','tout','mais','sans','vers','entre','une','des','les','sur','qui','que','aux','par','son','ses','est','fait','article','parisien','sujet','principal','porte']);
+  return [...new Set(quickNormalize(value).split(' ').filter(word => word.length >= 3 && !stop.has(word)))];
+}
+
+function quickLooksLikeTitleRestatement(value = '', article = {}) {
+  const text = quickClean(value);
+  if (!text) return true;
+  if (/^(?:cet article .* porte sur|le sujet principal de cet article est)/i.test(text)) return true;
   const title = titleWithoutSource(article.title, article.source);
-  const source = quickClean(article.source || '');
-  if (title && source) return `Cet article de ${source} porte sur : ${title}.`;
-  if (title) return `Le sujet principal de cet article est : ${title}.`;
-  return 'La synthèse détaillée de cet article est en cours de préparation.';
+  const wanted = quickInfoTokens(title);
+  const found = new Set(quickInfoTokens(text));
+  if (!wanted.length || !found.size) return false;
+  const hits = wanted.filter(word => found.has(word)).length;
+  const coverage = hits / wanted.length;
+  return text.length <= Math.max(180, title.length * 1.55) && coverage >= 0.85;
+}
+
+function quickGoodSummary(value = '', article = {}) {
+  const text = quickClean(value);
+  return text.length >= 55 && !quickUnavailable(text) && !quickLooksLikeTitleRestatement(text, article);
+}
+
+function quickProvisionalSummary(article = {}) {
+  return quickArticleSummary(article) || 'Résumé en cours de préparation…';
+}
+
+function quickUnavailableSummary() {
+  return 'Résumé détaillé momentanément indisponible pour cet article.';
 }
 
 function escapeRegExp(value = '') {
@@ -154,60 +194,80 @@ function quickTopicFeedbackMarkup(article) {
   }).join('')}</div></section>`;
 }
 
+async function quickFetchJson(url, options) {
+  try {
+    const response = await fetch(url, options);
+    return response.ok ? await response.json() : null;
+  } catch { return null; }
+}
+
+function quickCacheSummary(key, summary, data = {}) {
+  const latest = quickReadJson(QUICK_CACHE_KEY, {});
+  latest[key] = { summary, ai: Boolean(data.ai || data.grounded), unavailable: false, savedAt: Date.now() };
+  quickWriteJson(QUICK_CACHE_KEY, Object.fromEntries(Object.entries(latest).slice(-180)));
+}
+
 async function quickLoadSummary(article, modal) {
   const key = `article:${article.id}`;
   const cache = quickReadJson(QUICK_CACHE_KEY, {});
   const text = modal.querySelector('[data-quick-summary-text]');
-  const fallback = quickProvisionalSummary(article);
   const cached = cache[key];
-  if (cached?.summary && !cached.unavailable && !quickUnavailable(cached.summary)) {
+  if (cached?.summary && !cached.unavailable && quickGoodSummary(cached.summary, article)) {
     text.textContent = quickClean(cached.summary);
     return;
   }
 
-  try {
-    const response = await fetch('/api/article-summary-groq?v=16', {
+  const articlePayload = {
+    url: article.url,
+    title: quickClean(article.title),
+    summary: quickArticleSummary(article),
+    source: quickClean(article.source || '')
+  };
+
+  const groqPromise = quickFetchJson('/api/article-summary-groq?v=17', {
+    method: 'POST',
+    headers: { 'Content-Type': 'application/json' },
+    cache: 'no-store',
+    body: JSON.stringify({ mode: 'article', article: articlePayload })
+  });
+
+  if (quickIsLeParisien(article)) {
+    const smart = await quickFetchJson('/api/article-summary-smart?v=3', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       cache: 'no-store',
-      body: JSON.stringify({
-        mode: 'article',
-        article: {
-          url: article.url,
-          title: quickClean(article.title),
-          summary: quickArticleSummary(article),
-          source: quickClean(article.source || '')
-        }
-      })
+      body: JSON.stringify({ article: articlePayload })
     });
-    const data = response.ok ? await response.json() : null;
     if (!modal.isConnected) return;
-
-    if (data?.unavailable || quickUnavailable(data?.summary)) {
-      text.textContent = fallback;
+    const smartSummary = quickClean(smart?.text || '');
+    if (smart?.ok && quickGoodSummary(smartSummary, article)) {
+      text.textContent = smartSummary;
+      quickCacheSummary(key, smartSummary, smart);
       return;
-    }
-
-    const summary = quickClean(data?.summary || '');
-    if (!summary) {
-      text.textContent = fallback;
-      return;
-    }
-
-    text.textContent = summary;
-    const latest = quickReadJson(QUICK_CACHE_KEY, {});
-    latest[key] = { summary, ai: Boolean(data.ai), unavailable: false, savedAt: Date.now() };
-    quickWriteJson(QUICK_CACHE_KEY, Object.fromEntries(Object.entries(latest).slice(-180)));
-  } catch {
-    if (modal.isConnected) {
-      text.textContent = fallback;
     }
   }
+
+  const data = await groqPromise;
+  if (!modal.isConnected) return;
+  const summary = quickClean(data?.summary || '');
+  if (!data?.unavailable && quickGoodSummary(summary, article)) {
+    text.textContent = summary;
+    quickCacheSummary(key, summary, data || {});
+    return;
+  }
+
+  text.textContent = quickUnavailableSummary();
 }
 
 function closeQuickSummary() {
   document.querySelector('.quick-summary-backdrop')?.remove();
   document.body.classList.remove('quick-summary-open');
+}
+
+function quickUsefulVisualUrl(raw = '') {
+  const value = quickClean(raw);
+  if (!value || /^data:image\/svg\+xml/i.test(value)) return '';
+  return value;
 }
 
 function openQuickSummary(article) {
@@ -216,7 +276,9 @@ function openQuickSummary(article) {
   const current = feedback[article.id] || '';
   const cleanTitle = titleWithoutSource(article.title, article.source);
   const immediate = quickProvisionalSummary(article);
-  const visualUrl = quickClean(article.quickVisualUrl || article.visual?.url || article.image || '');
+  const visualUrl = quickUsefulVisualUrl(article.visual?.url)
+    || quickUsefulVisualUrl(article.image)
+    || quickUsefulVisualUrl(article.quickVisualUrl);
   const backdrop = document.createElement('div');
   backdrop.className = 'quick-summary-backdrop';
   backdrop.innerHTML = `<section class="quick-summary-sheet" role="dialog" aria-modal="true" aria-label="Résumé de l’article">
