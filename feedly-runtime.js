@@ -198,6 +198,15 @@ function essentialBrief() {
     if (worldTerms.test(title) || article.category === 'International' || article.category === 'Europe') return 'Monde';
     return 'France';
   };
+  const topicWords = article => new Set(String(article.title || '')
+    .normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
+    .match(/[a-z0-9]{4,}/g)?.filter(word => !/^(avec|apres|avant|dans|depuis|direct|entre|leurs|nouveau|nouvelle|pour|plus|selon|sont|cette|comme|tout|tous|toute|vers)$/.test(word)) || []);
+  const sameEvent = (left, right) => {
+    const a = topicWords(left);
+    const b = topicWords(right);
+    const shared = [...a].filter(word => b.has(word)).length;
+    return shared >= 2 && shared / Math.max(1, Math.min(a.size, b.size)) >= .38;
+  };
   const scoreOf = article => {
     const text = `${article.title || ''} ${article.summary || ''}`;
     const editorial = editorialCategories.has(article.category) ? 70 : -35;
@@ -233,9 +242,13 @@ function essentialBrief() {
   for (const candidate of candidates) {
     if (selectedItems.length >= 5) break;
     const source = candidate.article.source || 'Source';
-    if (selectedItems.some(item => item.article.id === candidate.article.id) || Number(sourceCounts.get(source) || 0) >= 2) continue;
+    if (selectedItems.some(item => item.article.id === candidate.article.id || sameEvent(item.article, candidate.article)) || Number(sourceCounts.get(source) || 0) >= 2) continue;
     selectedItems.push(candidate);
     sourceCounts.set(source, Number(sourceCounts.get(source) || 0) + 1);
+  }
+  for (const candidate of fallbackCandidates) {
+    if (selectedItems.length >= 5) break;
+    if (!selectedItems.some(item => item.article.id === candidate.article.id || sameEvent(item.article, candidate.article))) selectedItems.push(candidate);
   }
   for (const candidate of fallbackCandidates) {
     if (selectedItems.length >= 5) break;
