@@ -56,7 +56,7 @@ function recoveryVisualUrl(article = {}) {
     if (prepared.origin === location.origin && ['/api/article-thumbnail', '/api/exact-news-thumbnail'].includes(prepared.pathname)) suppliedImage = '';
   } catch {}
   const params = new URLSearchParams({
-    v: '33',
+    v: '34',
     url: url.slice(0, 1900),
     image: suppliedImage,
     title: title.slice(0, 280),
