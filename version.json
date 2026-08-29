@@ -1,5 +1,5 @@
 {
   "version": "60",
   "release": "2026-08-29",
-  "label": "v82 : meilleure source principale, préférences séparées article/sujet/source et ordre du fil plus varié"
+  "label": "v83 : titres mieux contrôlés, niveau de vérification par sources croisées et préchargement adaptatif des images et résumés"
 }
