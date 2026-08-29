@@ -14,19 +14,51 @@ function isSameOriginImageProxy(raw = '') {
   }
 }
 
+function extractPreparedImage(raw = '') {
+  const value = clean(raw);
+  if (!value) return '';
+  try {
+    const url = new URL(value, location.href);
+    if (url.origin !== location.origin) {
+      return ['http:', 'https:'].includes(url.protocol) ? url.href : '';
+    }
+
+    if (url.pathname === '/api/article-thumbnail' || url.pathname === '/api/exact-news-thumbnail') {
+      const image = clean(url.searchParams.get('image') || '');
+      if (!image) return '';
+      const parsed = new URL(image, location.href);
+      if (parsed.origin === location.origin || !['http:', 'https:'].includes(parsed.protocol)) return '';
+      return parsed.href;
+    }
+
+    if (url.pathname === '/api/image-proxy') {
+      const image = clean(url.searchParams.get('url') || '');
+      if (!image) return '';
+      const parsed = new URL(image, location.href);
+      if (parsed.origin === location.origin || !['http:', 'https:'].includes(parsed.protocol)) return '';
+      return parsed.href;
+    }
+  } catch {}
+  return '';
+}
+
 function feedlyProxyUrl(article = {}) {
   const articleUrl = clean(article.url || '');
   const title = clean(article.title || '');
-  let suppliedImage = clean(article.visual?.url || article.image || '');
+  const rawVisual = clean(article.visual?.url || article.image || '');
+  let suppliedImage = extractPreparedImage(rawVisual);
 
-  // Old records can contain an earlier same-origin resolver URL. Feeding that
-  // URL back into the resolver would recurse, so only preserve the underlying
-  // publisher/RSS image when it is a genuine external image.
-  if (isSameOriginImageProxy(suppliedImage)) suppliedImage = '';
+  // A visual already resolved by the feed API often arrives as a local
+  // /api/article-thumbnail URL containing the real publisher/Google image in
+  // its `image` parameter. Reuse that underlying image instead of throwing it
+  // away and repeating the slower article-page/news-search discovery chain.
+  if (!suppliedImage && rawVisual && !isSameOriginImageProxy(rawVisual)) {
+    suppliedImage = rawVisual;
+  }
 
   if (!articleUrl && !title && !suppliedImage) return '';
   const params = new URLSearchParams({
-    v: '70',
+    v: '71',
     url: articleUrl.slice(0, 1900),
     image: suppliedImage.slice(0, 1900),
     title: title.slice(0, 280),
