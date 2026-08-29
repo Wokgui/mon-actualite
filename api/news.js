@@ -9,6 +9,9 @@ const MAX_XML_BYTES = 1_500_000;
 const MAX_VISUAL_HTML_BYTES = 5_000_000;
 const FETCH_TIMEOUT_MS = 8000;
 const VISUAL_TIMEOUT_MS = 5000;
+const PREWARM_LIMIT = 16;
+const PREWARM_CONCURRENCY = 4;
+const PREWARM_TIMEOUT_MS = 6000;
 const GOOGLE_NEWS_UA = 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/140 Safari/537.36';
 
 const DEFAULT_FEEDS = [
@@ -434,6 +437,100 @@ function sanitizeKeywords(keywords) {
   return [...new Set(keywords.map(value => String(value || '').trim()).filter(value => value.length >= 2 && value.length <= 70))].slice(0, MAX_KEYWORDS);
 }
 
+function requestOrigin(req) {
+  const rawHost = String(req.headers?.['x-forwarded-host'] || req.headers?.host || '').split(',')[0].trim();
+  if (!rawHost || !/^[a-z0-9.-]+(?::\d+)?$/i.test(rawHost)) return '';
+  const rawProto = String(req.headers?.['x-forwarded-proto'] || 'https').split(',')[0].trim().toLowerCase();
+  const protocol = rawProto === 'http' ? 'http' : 'https';
+  return `${protocol}://${rawHost}`;
+}
+
+function unwrapPreparedVisual(raw = '', origin = '') {
+  if (!raw || !origin) return '';
+  try {
+    const url = new URL(raw, origin);
+    if (url.origin !== origin) return ['http:', 'https:'].includes(url.protocol) ? url.href : '';
+
+    if (['/api/article-thumbnail', '/api/exact-news-thumbnail', '/api/article-photo-fast'].includes(url.pathname)) {
+      const nested = String(url.searchParams.get('image') || '').trim();
+      if (/^https?:\/\//i.test(nested)) return nested.slice(0, 1900);
+      return '';
+    }
+    if (url.pathname === '/api/image-proxy') {
+      const nested = String(url.searchParams.get('url') || '').trim();
+      if (/^https?:\/\//i.test(nested)) return nested.slice(0, 1900);
+    }
+  } catch {}
+  return '';
+}
+
+function prewarmPhotoUrl(origin, article = {}) {
+  if (!origin || !article?.title) return '';
+  const suppliedImage = unwrapPreparedVisual(article.visual?.url || article.image || '', origin);
+  const params = new URLSearchParams({
+    v: '74',
+    url: String(article.url || '').slice(0, 1900),
+    image: suppliedImage.slice(0, 1900),
+    title: String(article.title || '').slice(0, 280),
+    category: String(article.category || '').slice(0, 70),
+    source: String(article.source || '').slice(0, 100)
+  });
+  return `${origin}/api/article-photo-fast?${params}`;
+}
+
+async function warmPhoto(url) {
+  if (!url) return false;
+  try {
+    const response = await fetch(url, {
+      redirect: 'follow',
+      signal: AbortSignal.timeout(PREWARM_TIMEOUT_MS),
+      headers: {
+        'User-Agent': 'MonActualite-ImagePrewarm/1.0',
+        'Accept': 'image/avif,image/webp,image/jpeg,image/png,image/*,*/*;q=0.6'
+      }
+    });
+    if (!response.ok) return false;
+    const type = String(response.headers.get('content-type') || '').toLowerCase();
+    if (!type.startsWith('image/') || type.includes('svg')) return false;
+    await response.arrayBuffer();
+    return true;
+  } catch {
+    return false;
+  }
+}
+
+async function prewarmTopArticleImages(req, articles) {
+  const origin = requestOrigin(req);
+  if (!origin || !Array.isArray(articles) || !articles.length) return 0;
+  const urls = [...new Set(articles.slice(0, PREWARM_LIMIT).map(article => prewarmPhotoUrl(origin, article)).filter(Boolean))];
+  let cursor = 0;
+  let warmed = 0;
+
+  async function worker() {
+    while (cursor < urls.length) {
+      const index = cursor++;
+      if (await warmPhoto(urls[index])) warmed += 1;
+    }
+  }
+
+  await Promise.all(Array.from({ length: Math.min(PREWARM_CONCURRENCY, urls.length) }, () => worker()));
+  if (warmed) console.log(`image prewarm: ${warmed}/${urls.length}`);
+  return warmed;
+}
+
+async function scheduleImagePrewarm(req, articles) {
+  try {
+    const { waitUntil } = await import('@vercel/functions');
+    waitUntil(prewarmTopArticleImages(req, articles).catch(error => {
+      console.warn('image prewarm unavailable:', String(error?.message || error).slice(0, 120));
+    }));
+    return Math.min(PREWARM_LIMIT, Array.isArray(articles) ? articles.length : 0);
+  } catch (error) {
+    console.warn('waitUntil unavailable:', String(error?.message || error).slice(0, 120));
+    return 0;
+  }
+}
+
 module.exports = async function handler(req, res) {
   const sharedRequest = req.method === 'GET';
   if (!sharedRequest && req.method !== 'POST') return sendJson(res, 405, { error: 'Méthode non autorisée' });
@@ -532,6 +629,8 @@ module.exports = async function handler(req, res) {
       customSource: Boolean(item.isCustomSource)
     }));
 
+  const prewarmScheduled = await scheduleImagePrewarm(req, articles);
+
   return sendJson(res, 200, {
     fetchedAt: new Date().toISOString(),
     articles,
@@ -543,7 +642,8 @@ module.exports = async function handler(req, res) {
       visualsReady: articles.filter(article => article.visualStatus === 'ready').length,
       visualsUnavailable: articles.filter(article => article.visualStatus !== 'ready').length,
       visualPagesSucceeded,
-      visualPagesFailed
+      visualPagesFailed,
+      prewarmScheduled
     },
     errors: errors.slice(0, 10)
   }, { shared: sharedRequest });
