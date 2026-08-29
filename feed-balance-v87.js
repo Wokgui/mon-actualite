@@ -40,14 +40,18 @@
     const prefs = readJson(TOPIC_PREF_KEY, {});
     const labels = [article.category, ...(Array.isArray(article.tags) ? article.tags : []), ...(Array.isArray(article.matches) ? article.matches : [])]
       .map(clean).filter(Boolean);
-    let best = 0;
+    let positive = 0;
+    let negative = 0;
     for (const label of labels) {
       const direct = Number(prefs[label] || 0);
       const normalized = normalize(label);
       const fuzzy = Object.entries(prefs).find(([key]) => normalize(key) === normalized);
-      best = Math.max(best, direct, Number(fuzzy?.[1] || 0));
+      for (const value of [direct, Number(fuzzy?.[1] || 0)]) {
+        if (value > positive) positive = value;
+        if (value < negative) negative = value;
+      }
     }
-    return best;
+    return positive > 0 ? positive : negative;
   }
 
   function category(article = {}) {
