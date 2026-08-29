@@ -16,7 +16,7 @@ function usableUrl(img) {
   try {
     const url = new URL(raw, location.href);
     if (url.origin !== location.origin) return '';
-    if (url.pathname !== '/api/article-thumbnail' && url.pathname !== '/api/exact-news-thumbnail') return '';
+    if (!['/api/article-thumbnail', '/api/exact-news-thumbnail', '/api/article-photo-fast'].includes(url.pathname)) return '';
     return url.href;
   } catch {
     return '';
@@ -69,9 +69,6 @@ function schedule(limit = INITIAL_LIMIT, delay = 90) {
   }, delay);
 }
 
-// The first cards already load eagerly. Resolve the next cards just after the
-// first paint, so scrolling normally reaches an image that is already in the
-// service-worker/CDN cache.
 if (document.readyState === 'loading') {
   document.addEventListener('DOMContentLoaded', () => schedule(INITIAL_LIMIT, 120), { once: true });
 } else {
