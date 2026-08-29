@@ -205,7 +205,8 @@ function essentialBrief() {
     const a = topicWords(left);
     const b = topicWords(right);
     const shared = [...a].filter(word => b.has(word)).length;
-    return shared >= 2 && shared / Math.max(1, Math.min(a.size, b.size)) >= .38;
+    const overlap = shared / Math.max(1, Math.min(a.size, b.size));
+    return (shared >= 2 && overlap >= .38) || (shared >= 3 && overlap >= .24);
   };
   const scoreOf = article => {
     const text = `${article.title || ''} ${article.summary || ''}`;
