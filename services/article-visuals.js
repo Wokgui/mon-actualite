@@ -22,6 +22,17 @@ function trustedPreparedUrl(raw = '', source = '') {
   }
 }
 
+function isLeParisienArticle(article = {}) {
+  const sourceAndTitle = `${clean(article.source)} ${clean(article.title)}`;
+  if (/(?:^|\b)le\s+parisien(?:\b|$)/i.test(sourceAndTitle)) return true;
+  try {
+    const host = new URL(clean(article.url || '')).hostname.toLowerCase();
+    return host === 'leparisien.fr' || host.endsWith('.leparisien.fr');
+  } catch {
+    return false;
+  }
+}
+
 function recoveryVisualUrl(article = {}) {
   const url = clean(article.url || '');
   const title = clean(article.title || '');
@@ -32,7 +43,7 @@ function recoveryVisualUrl(article = {}) {
     if (prepared.origin === location.origin && prepared.pathname === '/api/article-thumbnail') suppliedImage = '';
   } catch {}
   const params = new URLSearchParams({
-    v: '22',
+    v: '23',
     url: url.slice(0, 1900),
     image: suppliedImage,
     title: title.slice(0, 280),
@@ -40,7 +51,8 @@ function recoveryVisualUrl(article = {}) {
     source: clean(article.source || '').slice(0, 100),
     custom: article.customSource ? '1' : '0'
   });
-  return `/api/article-thumbnail?${params}`;
+  const endpoint = isLeParisienArticle(article) ? '/api/exact-news-thumbnail' : '/api/article-thumbnail';
+  return `${endpoint}?${params}`;
 }
 
 function xml(value = '') {
@@ -90,13 +102,14 @@ export function sourceTileUrl(article = {}) {
 }
 
 function isPersonalSourceArticle(article = {}) {
-  return Boolean(article.customSource) || /(?:^|\b)le\s+parisien(?:\b|$)/i.test(`${clean(article.source)} ${clean(article.title)}`);
+  return Boolean(article.customSource) || isLeParisienArticle(article);
 }
 
 export function articleVisualUrl(article = {}) {
   // Personal feeds may expose publisher images that reject browser hotlinking
-  // on Android. Always route them through our same-origin recovery endpoint,
-  // including stale Le Parisien cards cached before customSource was recorded.
+  // on Android. Always route them through our same-origin recovery endpoint.
+  // Le Parisien gets a dedicated exact-title Google News lookup because its
+  // direct article pages frequently refuse server-side image extraction.
   if (isPersonalSourceArticle(article)) return recoveryVisualUrl(article) || sourceTileUrl(article);
   return preparedVisualUrl(article) || recoveryVisualUrl(article) || sourceTileUrl(article);
 }
@@ -104,4 +117,3 @@ export function articleVisualUrl(article = {}) {
 export function hasPreparedVisual(article = {}) {
   return Boolean(preparedVisualUrl(article));
 }
-
