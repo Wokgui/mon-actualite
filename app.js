@@ -4,7 +4,7 @@ import { articleVisualUrl, hasPreparedVisual, sourceTileUrl } from './services/a
 const $ = (selector, root = document) => root.querySelector(selector);
 const app = $('#app');
 const toastEl = $('#toast');
-const APP_VERSION = '56';
+const APP_VERSION = '57';
 const APP_RELEASE = '28 août 2026';
 document.documentElement.dataset.appVersion = APP_VERSION;
 
