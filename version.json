@@ -1,5 +1,5 @@
 {
   "version": "60",
   "release": "2026-08-29",
-  "label": "v81 : mémoire d’événements sur 14 jours, résumé de ce qui a changé, détection des désaccords entre sources et diagnostic de performances"
+  "label": "v82 : meilleure source principale, préférences séparées article/sujet/source et ordre du fil plus varié"
 }
