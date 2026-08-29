@@ -33,25 +33,38 @@ function isLeParisienArticle(article = {}) {
   }
 }
 
+function factualSearchTitle(title = '') {
+  const cleanTitle = clean(title);
+  const parts = cleanTitle.split(/\s*[:：]\s*/).map(clean).filter(Boolean);
+  if (parts.length > 1) {
+    const tail = parts[parts.length - 1];
+    const words = tail.split(/\s+/).filter(Boolean);
+    if (words.length >= 6 && tail.length >= 45) return tail;
+  }
+  return cleanTitle;
+}
+
 function recoveryVisualUrl(article = {}) {
   const url = clean(article.url || '');
   const title = clean(article.title || '');
   if (!/^https?:\/\//i.test(url) || !title) return '';
+  const parisien = isLeParisienArticle(article);
+  const lookupTitle = parisien ? factualSearchTitle(title) : title;
   let suppliedImage = clean(article.visual?.url || article.image || '').slice(0, 1900);
   try {
     const prepared = new URL(suppliedImage, location.href);
-    if (prepared.origin === location.origin && prepared.pathname === '/api/article-thumbnail') suppliedImage = '';
+    if (prepared.origin === location.origin && ['/api/article-thumbnail', '/api/exact-news-thumbnail'].includes(prepared.pathname)) suppliedImage = '';
   } catch {}
   const params = new URLSearchParams({
-    v: '24',
+    v: '30',
     url: url.slice(0, 1900),
     image: suppliedImage,
-    title: title.slice(0, 280),
+    title: lookupTitle.slice(0, 280),
     category: clean(article.category || '').slice(0, 70),
     source: clean(article.source || '').slice(0, 100),
     custom: article.customSource ? '1' : '0'
   });
-  const endpoint = isLeParisienArticle(article) ? '/api/exact-news-thumbnail' : '/api/article-thumbnail';
+  const endpoint = parisien ? '/api/exact-news-thumbnail' : '/api/article-thumbnail';
   return `${endpoint}?${params}`;
 }
 
@@ -108,7 +121,7 @@ function isPersonalSourceArticle(article = {}) {
 export function articleVisualUrl(article = {}) {
   // Personal feeds may expose publisher images that reject browser hotlinking
   // on Android. Always route them through our same-origin recovery endpoint.
-  // Le Parisien gets a dedicated exact-title / same-event Google News lookup
+  // Le Parisien gets a dedicated factual-title / same-event Google News lookup
   // because its direct article pages frequently refuse server-side extraction.
   if (isPersonalSourceArticle(article)) return recoveryVisualUrl(article) || sourceTileUrl(article);
   return preparedVisualUrl(article) || recoveryVisualUrl(article) || sourceTileUrl(article);
