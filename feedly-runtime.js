@@ -190,7 +190,7 @@ function enhanceHome() {
 function essentialBrief() {
   const selected = new Set(currentSettings().briefEssential);
   const majorTerms = /guerre|attaque|cessez-le-feu|élection|gouvernement|président|premier ministre|attentat|catastrophe|séisme|inondation|incendie|disparu|crise|accord|sommet|justice|condamn|budget|déficit|croissance|inflation|chômage|épidémie|climat|diplomatie|nucléaire/i;
-  const lowPriorityTerms = /\bpsg\b|ligue 1|football|match|composition|mercato|tennis|formule 1|prix en chute|promotion|bon plan|console|smartphone|windows|gta|jeu vidéo|montre connectée|audiences? télé|people|célébrité|télé-réalité/i;
+  const lowPriorityTerms = /\bpsg\b|ligue 1|football|match|composition|mercato|tennis|formule 1|prix en chute|promotion|bon plan|soldes?|réduction|stations?-service|carburant|diesel|essence à \d|console|smartphone|windows|gta|jeu vidéo|montre connectée|audiences? télé|people|célébrité|télé-réalité/i;
   const worldTerms = /ukraine|russie|népal|tibet|gaza|israël|iran|chine|états[- ]unis|donald trump|fed\b|otan|onu\b|royaume-uni|allemagne|italie|espagne|autriche|grèce|inde|pakistan|japon|corée|afrique|moyen-orient|amérique|brésil|canada/i;
   const editorialCategories = new Set(['Politique', 'International', 'Europe', 'Économie', 'Société', 'Santé', 'Environnement']);
   const scopeOf = article => {
@@ -198,24 +198,28 @@ function essentialBrief() {
     if (worldTerms.test(title) || article.category === 'International' || article.category === 'Europe') return 'Monde';
     return 'France';
   };
-  const ranked = importanceArticles().filter(article => selected.has(article.category)).sort((a, b) => {
-    const score = article => {
-      const text = `${article.title || ''} ${article.summary || ''}`;
-      const editorial = editorialCategories.has(article.category) ? 70 : -35;
-      const headline = majorTerms.test(text) ? 55 : 0;
-      const corroboration = Math.max(0, (article.sources?.length || 1) - 1) * 30;
-      const lightweight = lowPriorityTerms.test(text) ? -220 : 0;
-      const weakSignal = !majorTerms.test(text) && corroboration === 0 ? -65 : 0;
-      const age = Math.max(0, (Date.now() - Date.parse(article.publishedAt || 0)) / 3600000);
-      // Deliberately ignore article.score here: that score contains personal
-      // source and interest boosts. L’essentiel must be publisher-neutral.
-      return 100 + editorial + headline + corroboration + lightweight + weakSignal - Math.min(age, 72);
-    };
-    return score(b) - score(a);
-  });
+  const scoreOf = article => {
+    const text = `${article.title || ''} ${article.summary || ''}`;
+    const editorial = editorialCategories.has(article.category) ? 70 : -35;
+    const headline = majorTerms.test(text) ? 55 : 0;
+    const corroboration = Math.max(0, (article.sources?.length || 1) - 1) * 30;
+    const lightweight = lowPriorityTerms.test(text) ? -220 : 0;
+    const weakSignal = !majorTerms.test(text) && corroboration === 0 ? -65 : 0;
+    const age = Math.max(0, (Date.now() - Date.parse(article.publishedAt || 0)) / 3600000);
+    // Deliberately ignore article.score here: that score contains personal
+    // source and interest boosts. L’essentiel must be publisher-neutral.
+    return 100 + editorial + headline + corroboration + lightweight + weakSignal - Math.min(age, 72);
+  };
+  const ranked = importanceArticles().filter(article => selected.has(article.category)).sort((a, b) => scoreOf(b) - scoreOf(a));
   const recent = ranked.filter(article => Date.now() - Date.parse(article.publishedAt || 0) <= 72 * 3600000);
   const pool = recent.length >= 6 ? recent : ranked;
-  const candidates = pool.map(article => ({ article, scope: scopeOf(article) }));
+  const headlinePool = pool.filter(article => {
+    const text = `${article.title || ''} ${article.summary || ''}`;
+    return (majorTerms.test(text) || (article.sources?.length || 1) > 1) && scoreOf(article) >= 150;
+  });
+  const primaryPool = headlinePool.length >= 5 ? headlinePool : pool;
+  const candidates = primaryPool.map(article => ({ article, scope: scopeOf(article) }));
+  const fallbackCandidates = pool.map(article => ({ article, scope: scopeOf(article) }));
   const selectedItems = [];
   const firstFrance = candidates.find(item => item.scope === 'France');
   const firstWorld = candidates.find(item => item.scope === 'Monde');
@@ -233,7 +237,7 @@ function essentialBrief() {
     selectedItems.push(candidate);
     sourceCounts.set(source, Number(sourceCounts.get(source) || 0) + 1);
   }
-  for (const candidate of candidates) {
+  for (const candidate of fallbackCandidates) {
     if (selectedItems.length >= 5) break;
     if (!selectedItems.some(item => item.article.id === candidate.article.id)) selectedItems.push(candidate);
   }

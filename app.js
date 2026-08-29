@@ -4,7 +4,7 @@ import { articleVisualUrl, hasPreparedVisual, sourceTileUrl } from './services/a
 const $ = (selector, root = document) => root.querySelector(selector);
 const app = $('#app');
 const toastEl = $('#toast');
-const APP_VERSION = '57';
+const APP_VERSION = '58';
 const APP_RELEASE = '29 août 2026';
 document.documentElement.dataset.appVersion = APP_VERSION;
 
@@ -263,7 +263,7 @@ function renderDetail() {
 
 function renderBrief() {
   const majorTerms = /guerre|attaque|cessez-le-feu|élection|gouvernement|président|premier ministre|attentat|catastrophe|séisme|inondation|incendie|disparu|crise|accord|sommet|justice|condamn|cour des comptes|budget|retraite|déficit|croissance|inflation|chômage|épidémie|climat|diplomatie|nucléaire/i;
-  const lowPriorityTerms = /\bpsg\b|ligue 1|football|match|composition|mercato|tennis|formule 1|prix en chute|promotion|bon plan|console|smartphone|windows|gta|jeu vidéo|montre connectée|audiences? télé|people|célébrité|télé-réalité|pyramide des présidents|classement.{0,30}président|réseau social.{0,80}président/i;
+  const lowPriorityTerms = /\bpsg\b|ligue 1|football|match|composition|mercato|tennis|formule 1|prix en chute|promotion|bon plan|soldes?|réduction|stations?-service|carburant|diesel|essence à \d|console|smartphone|windows|gta|jeu vidéo|montre connectée|audiences? télé|people|célébrité|télé-réalité|pyramide des présidents|classement.{0,30}président|réseau social.{0,80}président/i;
   const worldTerms = /ukraine|russie|népal|tibet|gaza|israël|iran|chine|états[- ]unis|donald trump|fed\b|otan|onu\b|royaume-uni|allemagne|italie|espagne|autriche|grèce|inde|pakistan|japon|corée|afrique|moyen-orient|amérique|brésil|canada/i;
   const editorialCategories = new Set(['Politique', 'International', 'Europe', 'Économie', 'Société', 'Santé', 'Environnement']);
   const scopeOf = article => worldTerms.test(String(article.title || '')) || ['International', 'Europe'].includes(article.category) ? 'Monde' : 'France';
@@ -286,13 +286,15 @@ function renderBrief() {
     const weakSignal = !majorTerms.test(haystack) && corroboration === 0 ? -65 : 0;
     // Do not use article.score: it includes personal-source and interest
     // boosts, while L’essentiel must remain publisher-neutral.
-    return { article, score: 100 + editorial + corroboration + headline + lightweight + weakSignal - Math.min(age, 72), scope: scopeOf(article) };
+    return { article, score: 100 + editorial + corroboration + headline + lightweight + weakSignal - Math.min(age, 72), scope: scopeOf(article), newsworthy: headline > 0 || corroboration > 0 };
   }).sort((a, b) => b.score - a.score);
   const recent = ranked.filter(item => Date.now() - Date.parse(item.article.publishedAt || 0) <= 72 * 3600000);
   const candidates = recent.length >= 6 ? recent : ranked;
+  const headlineCandidates = candidates.filter(item => item.newsworthy && item.score >= 150);
+  const primaryCandidates = headlineCandidates.length >= 5 ? headlineCandidates : candidates;
   const picks = [];
   for (const scope of ['France', 'Monde']) {
-    const candidate = candidates.find(item => item.scope === scope && !picks.includes(item));
+    const candidate = primaryCandidates.find(item => item.scope === scope && !picks.includes(item));
     if (candidate) picks.push(candidate);
   }
   const sourceCounts = new Map();
@@ -300,7 +302,7 @@ function renderBrief() {
     const source = item.article.source || 'Source';
     sourceCounts.set(source, Number(sourceCounts.get(source) || 0) + 1);
   });
-  for (const candidate of candidates) {
+  for (const candidate of primaryCandidates) {
     if (picks.length >= 5) break;
     const source = candidate.article.source || 'Source';
     if (picks.includes(candidate) || Number(sourceCounts.get(source) || 0) >= 2 || picks.some(item => sameEvent(item.article, candidate.article))) continue;
