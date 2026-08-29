@@ -192,5 +192,9 @@ module.exports = async function handler(req, res) {
     }
   }
 
+  // The generic resolver may still have an exact feed/Google image. Force its
+  // exact-only mode so it returns 404 instead of a publisher logo/tile when
+  // no verified photo exists.
+  req.query = { ...(req.query || {}), exact: '1' };
   return genericThumbnail(req, res);
 };
