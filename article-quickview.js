@@ -1,4 +1,4 @@
-const QUICK_CACHE_KEY = 'news-article-summaries-v5';
+const QUICK_CACHE_KEY = 'news-article-summaries-v6';
 let quickScheduled = false;
 
 function quickReadJson(key, fallback) {
@@ -166,7 +166,7 @@ async function quickLoadSummary(article, modal) {
   }
 
   try {
-    const response = await fetch('/api/article-summary-groq?v=14', {
+    const response = await fetch('/api/article-summary-groq?v=15', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       cache: 'no-store',
