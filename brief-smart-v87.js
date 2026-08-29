@@ -129,8 +129,6 @@
     queued = false;
     const page = document.querySelector('.page');
     const originalList = page?.querySelector('.brief-points');
-    // The actual Brief DOM is more reliable than the nav class. Navigation
-    // cache layers can toggle .active a frame before/after the page swap.
     const isBrief = Boolean(originalList) || currentView() === 'brief';
     if (!isBrief) {
       active = false;
@@ -189,6 +187,15 @@
   }
 
   document.addEventListener('click', event => {
+    const navBrief = event.target.closest?.('.bottom-nav [data-view="brief"]');
+    if (navBrief) {
+      // The capture handler runs before app.js navigates. Run again just after
+      // the bubbling handler has swapped the page, then once more after the
+      // navigation cache has settled.
+      setTimeout(schedule, 0);
+      setTimeout(schedule, 120);
+    }
+
     const button = event.target.closest?.('[data-brief-full-v87]');
     if (!button) return;
     event.preventDefault();
