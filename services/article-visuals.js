@@ -42,7 +42,21 @@ function extractPreparedImage(raw = '') {
   return '';
 }
 
+function pinnedProxyUrl(article = {}) {
+  const raw = clean(article.pinnedVisualV85 || '');
+  if (!raw) return '';
+  try {
+    const url = new URL(raw, location.href);
+    if (url.origin !== location.origin) return '';
+    if (!['/api/article-thumbnail', '/api/exact-news-thumbnail', '/api/article-photo-fast'].includes(url.pathname)) return '';
+    return `${url.pathname}${url.search}`;
+  } catch { return ''; }
+}
+
 function feedlyProxyUrl(article = {}) {
+  const pinned = pinnedProxyUrl(article);
+  if (pinned) return pinned;
+
   const articleUrl = clean(article.url || '');
   const title = clean(article.title || '');
   const rawVisual = clean(article.visual?.url || article.image || '');
@@ -54,7 +68,7 @@ function feedlyProxyUrl(article = {}) {
 
   if (!articleUrl && !title && !suppliedImage) return '';
   const params = new URLSearchParams({
-    v: '74',
+    v: '85',
     url: articleUrl.slice(0, 1900),
     image: suppliedImage.slice(0, 1900),
     title: title.slice(0, 280),
