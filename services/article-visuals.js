@@ -26,10 +26,15 @@ function recoveryVisualUrl(article = {}) {
   const url = clean(article.url || '');
   const title = clean(article.title || '');
   if (!/^https?:\/\//i.test(url) || !title) return '';
+  let suppliedImage = clean(article.visual?.url || article.image || '').slice(0, 1900);
+  try {
+    const prepared = new URL(suppliedImage, location.href);
+    if (prepared.origin === location.origin && prepared.pathname === '/api/article-thumbnail') suppliedImage = '';
+  } catch {}
   const params = new URLSearchParams({
-    v: '21',
+    v: '22',
     url: url.slice(0, 1900),
-    image: clean(article.visual?.url || article.image || '').slice(0, 1900),
+    image: suppliedImage,
     title: title.slice(0, 280),
     category: clean(article.category || '').slice(0, 70),
     source: clean(article.source || '').slice(0, 100),
@@ -58,6 +63,7 @@ function initials(value = '') {
 }
 
 export function preparedVisualUrl(article = {}) {
+  if (isPersonalSourceArticle(article)) return '';
   const visual = article.visual && typeof article.visual === 'object' ? article.visual : {};
   const source = clean(visual.source || article.visualSource || '');
   const explicitlyUnavailable = visual.status === 'unavailable' || article.visualStatus === 'unavailable';
@@ -83,10 +89,15 @@ export function sourceTileUrl(article = {}) {
   return `data:image/svg+xml;charset=UTF-8,${encodeURIComponent(svg)}`;
 }
 
+function isPersonalSourceArticle(article = {}) {
+  return Boolean(article.customSource) || /(?:^|\b)le\s+parisien(?:\b|$)/i.test(`${clean(article.source)} ${clean(article.title)}`);
+}
+
 export function articleVisualUrl(article = {}) {
   // Personal feeds may expose publisher images that reject browser hotlinking
-  // on Android. Always route them through our same-origin recovery endpoint.
-  if (article.customSource) return recoveryVisualUrl(article) || sourceTileUrl(article);
+  // on Android. Always route them through our same-origin recovery endpoint,
+  // including stale Le Parisien cards cached before customSource was recorded.
+  if (isPersonalSourceArticle(article)) return recoveryVisualUrl(article) || sourceTileUrl(article);
   return preparedVisualUrl(article) || recoveryVisualUrl(article) || sourceTileUrl(article);
 }
 

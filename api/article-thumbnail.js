@@ -7,7 +7,6 @@ const MAX_SEARCH_HTML_BYTES = 2_400_000;
 const MAX_IMAGE_BYTES = 7_000_000;
 const UA = 'Mozilla/5.0 (Linux; Android 16) AppleWebKit/537.36 Chrome/140 Safari/537.36';
 const GOOGLE_NEWS_UA = 'Mozilla/5.0 (X11; Linux x86_64) AppleWebKit/537.36 Chrome/140 Safari/537.36';
-const { chooseImage, fetchImage: fetchEditorialImage } = require('./article-photo-fast');
 
 function isPrivateIp(address) {
   if (net.isIP(address) === 4) {
@@ -427,7 +426,6 @@ module.exports = async function handler(req, res) {
   const suppliedImage = String(req.query?.image || '').slice(0, 2000);
   const title = String(req.query?.title || '').slice(0, 300);
   const source = String(req.query?.source || '').slice(0, 100);
-  const category = String(req.query?.category || '').slice(0, 80);
   const customSource = String(req.query?.custom || '') === '1';
   const exactImageOnly = String(req.query?.exact || '') === '1';
   const isLeParisien = /(?:^|\b)le\s+parisien(?:\b|$)/i.test(`${source} ${title}`) || /(?:^|\.)leparisien\.fr$/i.test((() => { try { return new URL(rawUrl).hostname; } catch { return ''; } })());
@@ -478,22 +476,10 @@ module.exports = async function handler(req, res) {
     }
   }
 
-  // Some publishers block direct hotlinking or hide image metadata in their
-  // feeds. For every source added manually, use a topic-related Commons image
-  // as a safe last resort. The branded publisher tile guarantees that these
-  // rows never regress to an anonymous grey rectangle.
-  if (needsPersonalFallback && title) {
-    try {
-      const editorialUrl = await chooseImage(title, category);
-      if (editorialUrl) {
-        const image = await fetchEditorialImage(editorialUrl);
-        return sendImage(res, image, 'personal-source-editorial-fallback');
-      }
-    } catch (error) {
-      console.warn('Personal source editorial fallback unavailable:', String(error?.message || error).slice(0, 140));
-    }
-    return personalSourceFallback(res, source);
-  }
+  // Never invent a photo from keywords: it can be plausible but unrelated to
+  // the story. For every source added manually, fall back to a clearly branded
+  // source tile when no exact feed, Google News or publisher image is verified.
+  if (needsPersonalFallback) return personalSourceFallback(res, source);
 
   // Never invent an illustration from a loose keyword search for other
   // publishers. A neutral visual is preferable to an unrelated photograph.
