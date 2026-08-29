@@ -21,6 +21,7 @@
 }
 .article-card.essential-v77 {
   position: relative;
+  order: -1;
 }
 .article-card.essential-v77::before {
   content: '';
