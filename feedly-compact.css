@@ -39,13 +39,14 @@
 .article-card h2 {
   margin: 0;
   padding: 0;
-  font-size: 15.5px;
-  line-height: 1.22;
+  font-size: 14.6px;
+  line-height: 1.18;
   letter-spacing: -.12px;
   font-weight: 650;
   color: #222;
   display: -webkit-box;
   -webkit-line-clamp: 3;
+  line-clamp: 3;
   -webkit-box-orient: vertical;
   overflow: hidden;
 }
@@ -81,6 +82,6 @@
   .article-card { grid-template-columns: minmax(0,1fr) 106px; min-height: 88px; }
   .article-card .article-image,
   .article-card .article-placeholder { width: 106px; height: 72px; min-height: 72px; }
-  .article-card h2 { font-size: 15px; }
+  .article-card h2 { font-size: 14.2px; line-height: 1.17; }
   .article-card .meta { font-size: 10.7px; }
 }
