@@ -122,6 +122,43 @@ async function fetchRssText(title = '') {
     .sort((a, b) => (b.text?.length || 0) - (a.text?.length || 0))[0] || null;
 }
 
+async function fetchBingNewsText(title = '') {
+  const cleanTitle = clean(title).replace(/\s+[-–—]\s+Le Parisien\s*$/i, '').slice(0, 220);
+  const queryVariants = [
+    `"${cleanTitle}"`,
+    cleanTitle,
+    `${cleanTitle} Le Parisien`
+  ];
+  for (const query of queryVariants) {
+    try {
+      const url = new URL('https://www.bing.com/news/search');
+      url.search = new URLSearchParams({ q: query, format: 'RSS', qft: 'sortbydate="1"' }).toString();
+      const response = await fetch(url, {
+        redirect: 'follow',
+        signal: AbortSignal.timeout(TIMEOUT_MS),
+        headers: {
+          'User-Agent': UA,
+          'Accept': 'application/rss+xml,application/xml,text/xml,*/*;q=0.5',
+          'Accept-Language': 'fr-FR,fr;q=0.9'
+        }
+      });
+      if (!response.ok) continue;
+      const xml = await response.text();
+      const items = xml.match(/<item\b[\s\S]*?<\/item>/gi) || [];
+      for (const item of items.slice(0, 20)) {
+        const itemTitle = clean(xmlTag(item, 'title'));
+        if (!sameTitle(itemTitle, title)) continue;
+        const description = informativeText(xmlTag(item, 'description'), title);
+        const snippet = informativeText(xmlTag(item, 'News:Description'), title) || description;
+        if (!snippet) continue;
+        const link = clean(xmlTag(item, 'link'));
+        return { text: snippet, url: link, title: itemTitle };
+      }
+    } catch {}
+  }
+  return null;
+}
+
 function geminiKey() {
   return String(process.env.GEMINI_API_KEY || process.env.GOOGLE_GENERATIVE_AI_API_KEY || '').trim();
 }
@@ -181,6 +218,18 @@ async function recover(article = {}) {
       origin: 'publisher-rss',
       grounded: false,
       sources: []
+    };
+  }
+
+  const bing = await fetchBingNewsText(title).catch(() => null);
+  if (bing?.text) {
+    return {
+      ok: true,
+      text: bing.text.slice(0, 1200),
+      articleUrl: bing.url || String(article.url || ''),
+      origin: 'bing-news-rss',
+      grounded: true,
+      sources: bing.url ? [bing.url] : []
     };
   }
 
