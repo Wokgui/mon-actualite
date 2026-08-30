@@ -18,7 +18,7 @@
     vingt: 20, trente: 30, quarante: 40, cinquante: 50, soixante: 60, cent: 100
   }));
   const HUMAN_TOLL_RX = /\b(?:au moins\s+)?(\d{1,4}|un|une|deux|trois|quatre|cinq|six|sept|huit|neuf|dix|onze|douze|treize|quatorze|quinze|seize|vingt|trente|quarante|cinquante|soixante|cent)\s+(?:morts?|décès|victimes?|blessés?|disparus?)\b/i;
-  const MAJOR_EVENT_RX = /\b(inondations?|séisme|tremblement de terre|ouragan|cyclone|incendie majeur|naufrage|catastrophe|guerre|invasion|frappes?|missiles?|cessez[- ]le[- ]feu|attentat|fusillade|coups? de feu|tirs? mortels?|référendum|élections?|scrutin|vote|adopte|rejette|condamne|démissionne|sanctions?|accord de paix|état d['’]urgence)\b/i;
+  const MAJOR_EVENT_RX = /\b(inondations?|crues?|séisme|tremblement de terre|ouragan|cyclone|incendie majeur|naufrage|chavir(?:e|é|ent|ement)|coule au large|catastrophe|guerre|invasion|frappes?|missiles?|cessez[- ]le[- ]feu|attentat|fusillade|coups? de feu|tirs? mortels?|référendum|élections?|scrutin|vote|adopte|rejette|condamne|démissionne|sanctions?|accord de paix|état d['’]urgence)\b/i;
   const PUBLIC_DECISION_RX = /\b(loi|réforme|gouvernement|parlement|cour suprême|conseil constitutionnel|commission européenne|union européenne|banque centrale|bce|fed|interdit|autorise|valide|annule|officialise)\b/i;
   const SCIENCE_BREAKTHROUGH_RX = /\b(découverte|découvre|démontre|première mondiale|essai clinique|traitement|vaccin|mission spatiale|lancement spatial|télescope|nasa|esa)\b/i;
   const upstreamFetch = window.fetch.bind(window);
