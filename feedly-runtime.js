@@ -1,4 +1,4 @@
-import { articleVisualUrl, hasPreparedVisual, preparedVisualUrl, sourceTileUrl } from './services/article-visuals.js?v=56';
+import { articleVisualUrl, hasPreparedVisual, preparedVisualUrl, sourceTileUrl } from './services/article-visuals.js?v=57';
 
 const GENERAL = ['Politique','International','Économie','Société','Santé','Environnement','Science','Culture','Éducation','Europe'];
 const PERSONAL = ['IA','Tech','Smartphones','VR','Automobile','Énergie'];
@@ -567,4 +567,3 @@ window.addEventListener('focus', scheduleEnhance);
 window.addEventListener('news-topic-preferences-changed', scheduleEnhance);
 document.addEventListener('visibilitychange', () => { if (!document.hidden) scheduleEnhance(); });
 scheduleEnhance();
-
