@@ -23,6 +23,7 @@ jobs:
           node tests/v89-static-check.mjs
           node tests/v91-lead-choice.mjs
           node tests/v91-ai-request-control.mjs
+          node tests/v914-release-watch.mjs
 
   mobile-browser:
     needs: static-regression
