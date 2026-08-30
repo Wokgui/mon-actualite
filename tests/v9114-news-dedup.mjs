@@ -46,6 +46,18 @@ const ukraineA = art('Guerre en Ukraine : incendie dans une raffinerie russe apr
 const ukraineB = art('Ukraine : de nouvelles sanctions européennes contre la Russie entrent en vigueur', 'Franceinfo');
 assert.equal(sameNewsEvent(ukraineA, ukraineB), false, 'deux développements Ukraine distincts doivent rester séparés');
 
+const icelandReactionA = art("L'UE respecte pleinement le choix démocratique du peuple islandais, déclare Antonio Costa après le référendum", 'Le Figaro');
+const icelandReactionB = art("L'Islande reste un partenaire proche : réaction mesurée de l'UE après le référendum islandais", 'Euronews');
+assert.equal(sameNewsEvent(icelandReactionA, icelandReactionB), true, 'deux réécritures de la même réaction européenne doivent fusionner');
+assert.equal(sameNewsEvent(island[12], icelandReactionA), false, 'la réaction européenne doit rester distincte du résultat initial du référendum');
+
+const earlyToll = { ...art('Naufrage au large de Chypre : sept morts et 12 disparus', 'Agence'), publishedAt: '2026-08-30T10:00:00.000Z' };
+const laterToll = { ...art('Naufrage au large de Chypre : douze morts et 8 disparus', 'Agence'), publishedAt: '2026-08-30T14:00:00.000Z' };
+assert.equal(sameNewsEvent(earlyToll, laterToll), false, 'un bilan chiffré réellement mis à jour plusieurs heures plus tard doit rester visible');
+
+const simultaneousToll = { ...laterToll, publishedAt: earlyToll.publishedAt };
+assert.equal(sameNewsEvent(earlyToll, simultaneousToll), true, 'des chiffres concurrents publiés simultanément restent des variantes du même événement');
+
 assert.ok(
   representativeQuality(art('Référendum islandais sur l’UE : le non s’impose avec 52,5 % des voix', 'Euronews'))
     > representativeQuality(art('Les Islandais ont rejeté la reprise des négociations', 'facebook.com')),
