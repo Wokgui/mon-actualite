@@ -6,7 +6,7 @@ const code = fs.readFileSync('lead-choice-v91.js', 'utf8');
 const index = fs.readFileSync('index.html', 'utf8');
 const version = JSON.parse(fs.readFileSync('version.json', 'utf8'));
 const sourcePos = index.indexOf('source-quality-v82.js?v=82');
-const leadPos = index.indexOf('lead-choice-v91.js?v=91.2');
+const leadPos = index.indexOf('lead-choice-v91.js?v=91.3');
 const mergePos = index.indexOf('feed-experience-v79.js?v=79');
 assert.ok(sourcePos >= 0 && leadPos > sourcePos && mergePos > leadPos, 'v91 must load after source quality and before v79 fusion');
 assert.ok(String(version.label || '').includes('v91'), 'version label must mention v91');
@@ -87,17 +87,66 @@ const payload = {
       url: 'https://example.test/einstein',
       eventKeyV78: 'einstein:v86b100',
       score: 72
+    },
+    {
+      id: 'iceland',
+      title: 'Référendum sur l’UE en Islande : le non en passe de l’emporter',
+      summary: 'Le dépouillement du référendum islandais sur les discussions d’adhésion à l’Union européenne se poursuit.',
+      source: 'Source Europe',
+      category: 'Société',
+      publishedAt: now,
+      url: 'https://example.test/iceland',
+      eventKeyV78: 'iceland-eu:v86b100',
+      score: 73
+    },
+    {
+      id: 'movie',
+      title: 'Chez nous sur France 4 : une infirmière happée par la politique dans le film de Lucas Belvaux',
+      summary: 'France 4 diffuse le film de Lucas Belvaux avec Émilie Dequenne.',
+      source: 'Source TV',
+      category: 'Politique',
+      publishedAt: now,
+      url: 'https://example.test/movie',
+      eventKeyV78: 'movie:v86b100',
+      score: 68
+    },
+    {
+      id: 'printer',
+      title: 'Cette imprimante sans cartouches veut changer la donne',
+      summary: 'Le constructeur présente une nouvelle imprimante destinée au grand public.',
+      source: 'Source Tech',
+      category: 'Société',
+      publishedAt: now,
+      url: 'https://example.test/printer',
+      eventKeyV78: 'printer:v86b100',
+      score: 67
+    },
+    {
+      id: 'economy-safe',
+      title: 'Le prix des légumes progresse après la canicule',
+      summary: 'Les distributeurs constatent une hausse des prix de plusieurs légumes.',
+      source: 'Source Économie',
+      category: 'Économie',
+      publishedAt: now,
+      url: 'https://example.test/economy-safe',
+      eventKeyV78: 'economy-safe:v86b100',
+      score: 66
     }
   ],
   stats: {}
 };
 
 const transformed = api.transformPayload(payload);
-const aggregator = transformed.articles.find(article => article.id === 'aggregator');
-const publisher = transformed.articles.find(article => article.id === 'publisher');
-const unrelated = transformed.articles.find(article => article.id === 'unrelated');
-const rave = transformed.articles.find(article => article.id === 'rave');
-const einstein = transformed.articles.find(article => article.id === 'einstein');
+const byId = id => transformed.articles.find(article => article.id === id);
+const aggregator = byId('aggregator');
+const publisher = byId('publisher');
+const unrelated = byId('unrelated');
+const rave = byId('rave');
+const einstein = byId('einstein');
+const iceland = byId('iceland');
+const movie = byId('movie');
+const printer = byId('printer');
+const economySafe = byId('economy-safe');
 
 assert.equal(transformed.stats.leadChoiceV91, true, 'v91 stats marker missing');
 assert.equal(transformed.stats.leadComparedGroupsV91, 1, 'expected exactly one duplicate group');
@@ -112,9 +161,13 @@ assert.equal(publisher.noveltyStateV78, 'development', 'publisher should keep st
 assert.equal(unrelated.score, 91, 'unrelated story score must not be changed');
 assert.equal(unrelated.category, 'Énergie', 'clear energy story must stay in Énergie');
 assert.equal(rave.category, 'Société', 'obvious shooting story must not remain in Science');
-assert.equal(rave.categoryOriginalV912, 'Science', 'corrected category should retain provenance');
+assert.equal(rave.categoryOriginalV913, 'Science', 'corrected category should retain provenance');
 assert.equal(einstein.category, 'Science', 'obvious physics story must not remain in Énergie');
-assert.equal(transformed.stats.categoryGuardV912, true, 'v91.2 category guard marker missing');
-assert.equal(transformed.stats.categoryCorrectionsV912, 2, 'expected two targeted category corrections');
+assert.equal(iceland.category, 'Europe', 'EU referendum in Iceland must not remain in Société');
+assert.equal(movie.category, 'Culture', 'an explicit film story must not remain in Politique');
+assert.equal(printer.category, 'Tech', 'an explicit printer story must not remain in Société');
+assert.equal(economySafe.category, 'Économie', 'ordinary economic story must not be over-corrected');
+assert.equal(transformed.stats.categoryGuardV913, true, 'v91.3 category guard marker missing');
+assert.equal(transformed.stats.categoryCorrectionsV913, 5, 'expected five targeted category corrections');
 
-console.log('All v91/v91.2 lead-choice checks passed.');
+console.log('All v91/v91.3 lead-choice checks passed.');
