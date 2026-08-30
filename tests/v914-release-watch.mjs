@@ -21,6 +21,10 @@ assert.ok(watcher.includes(`const PAGE_RELEASE = '${release}'`), 'release watche
 assert.ok(watcher.includes("window.addEventListener('focus'"), 'release watcher must check when the PWA regains focus');
 assert.ok(watcher.includes("document.addEventListener('visibilitychange'"), 'release watcher must check when the PWA becomes visible');
 assert.ok(watcher.includes('location.replace(next.href)'), 'release watcher must reload when a newer code release is published');
+assert.ok(watcher.includes("document.querySelector('.app-version-section')"), 'release watcher must patch the visible settings version');
+assert.ok(watcher.includes('Mon actualité · version ${PAGE_RELEASE}'), 'settings version text must use codeRelease');
+assert.ok(watcher.includes("event.target.closest?.('[data-check-update]')"), 'manual update button must be handled by the release watcher');
+assert.ok(watcher.includes('checkRelease({ force: true, announce: true })'), 'manual update button must force an announced release check');
 assert.ok(sw.includes(`const CACHE = 'mon-actualite-v${slug}-core-r1'`), 'service worker core cache must rotate with codeRelease');
 
 const criticalScripts = [...index.matchAll(/<script[^>]+src="([^"]+)"/g)]
