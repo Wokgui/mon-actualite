@@ -6,7 +6,7 @@ const code = fs.readFileSync('lead-choice-v91.js', 'utf8');
 const index = fs.readFileSync('index.html', 'utf8');
 const version = JSON.parse(fs.readFileSync('version.json', 'utf8'));
 const sourcePos = index.indexOf('source-quality-v82.js?v=82');
-const leadPos = index.indexOf('lead-choice-v91.js?v=91');
+const leadPos = index.indexOf('lead-choice-v91.js?v=91.2');
 const mergePos = index.indexOf('feed-experience-v79.js?v=79');
 assert.ok(sourcePos >= 0 && leadPos > sourcePos && mergePos > leadPos, 'v91 must load after source quality and before v79 fusion');
 assert.ok(String(version.label || '').includes('v91'), 'version label must mention v91');
@@ -65,6 +65,28 @@ const payload = {
       noveltyStateV78: 'new',
       sourceQualityV82: 20,
       titleSupportV83: 'strong'
+    },
+    {
+      id: 'rave',
+      title: 'En Suisse, des coups de feu en marge d’une rave-party',
+      summary: 'Plusieurs personnes ont été prises en charge après des tirs survenus en marge du rassemblement.',
+      source: 'Source locale',
+      category: 'Science',
+      publishedAt: now,
+      url: 'https://example.test/rave',
+      eventKeyV78: 'rave:v86b100',
+      score: 70
+    },
+    {
+      id: 'einstein',
+      title: 'Nous sommes peut-être le jour d’après Einstein : une nouvelle piste en physique',
+      summary: 'Des chercheurs discutent une hypothèse sur les lois fondamentales de la physique.',
+      source: 'Source science',
+      category: 'Énergie',
+      publishedAt: now,
+      url: 'https://example.test/einstein',
+      eventKeyV78: 'einstein:v86b100',
+      score: 72
     }
   ],
   stats: {}
@@ -74,6 +96,8 @@ const transformed = api.transformPayload(payload);
 const aggregator = transformed.articles.find(article => article.id === 'aggregator');
 const publisher = transformed.articles.find(article => article.id === 'publisher');
 const unrelated = transformed.articles.find(article => article.id === 'unrelated');
+const rave = transformed.articles.find(article => article.id === 'rave');
+const einstein = transformed.articles.find(article => article.id === 'einstein');
 
 assert.equal(transformed.stats.leadChoiceV91, true, 'v91 stats marker missing');
 assert.equal(transformed.stats.leadComparedGroupsV91, 1, 'expected exactly one duplicate group');
@@ -86,5 +110,11 @@ assert.equal(publisher.essential, true, 'essential status should be propagated a
 assert.equal(aggregator.noveltyStateV78, 'development', 'strongest novelty should be propagated before v79 lead selection');
 assert.equal(publisher.noveltyStateV78, 'development', 'publisher should keep strongest novelty');
 assert.equal(unrelated.score, 91, 'unrelated story score must not be changed');
+assert.equal(unrelated.category, 'Énergie', 'clear energy story must stay in Énergie');
+assert.equal(rave.category, 'Société', 'obvious shooting story must not remain in Science');
+assert.equal(rave.categoryOriginalV912, 'Science', 'corrected category should retain provenance');
+assert.equal(einstein.category, 'Science', 'obvious physics story must not remain in Énergie');
+assert.equal(transformed.stats.categoryGuardV912, true, 'v91.2 category guard marker missing');
+assert.equal(transformed.stats.categoryCorrectionsV912, 2, 'expected two targeted category corrections');
 
-console.log('All v91 lead-choice checks passed.');
+console.log('All v91/v91.2 lead-choice checks passed.');
