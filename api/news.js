@@ -1,7 +1,7 @@
 const dns = require('node:dns').promises;
 const net = require('node:net');
 const { createHash } = require('node:crypto');
-const { classifyArticle } = require('./news-category');
+const { classifyArticle } = require('../lib/news-category');
 
 const MAX_CUSTOM_SOURCES = 12;
 const MAX_KEYWORDS = 8;
