@@ -18,8 +18,10 @@ jobs:
         run: |
           set -euo pipefail
           while IFS= read -r -d '' file; do node --check "$file"; done < <(find . -type f -name '*.js' -not -path './node_modules/*' -print0)
-      - name: v89 static regression suite
-        run: node tests/v89-static-check.mjs
+      - name: Static regression suites
+        run: |
+          node tests/v89-static-check.mjs
+          node tests/v91-lead-choice.mjs
 
   mobile-browser:
     needs: static-regression

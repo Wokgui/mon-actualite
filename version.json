@@ -1,5 +1,5 @@
 {
   "version": "60",
   "release": "2026-08-30",
-  "label": "v90.1 (socle v89) : Brief mobile réparé et résumé automatique des Veilles réellement supprimé"
+  "label": "v91 (socle v90.1 / v89) : meilleure source choisie automatiquement lors de la fusion des doublons"
 }
