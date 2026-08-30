@@ -109,6 +109,12 @@ try {
       ids: api.selectIds(items),
       ranks: Object.fromEntries(items.map(item => [item.id, api.rank(item)])),
       impact: Object.fromEntries(items.map(item => [item.id, api.impactScore(item)])),
+      wordingImpact: {
+        crue: api.impactScore({ title: 'Crue au Népal : le bilan passe à 734 morts' }),
+        chavire: api.impactScore({ title: 'Chypre : un ferry transportant plus de 267 personnes chavire en mer' }),
+        couleAuLarge: api.impactScore({ title: 'Un bateau transportant environ 270 personnes coule au large de Chypre' }),
+        unrelatedCoule: api.impactScore({ title: 'Une entreprise coule après plusieurs années de pertes' })
+      },
       duplicate: api.sameEvent(items.find(item => item.id === 'iceland-referendum'), items.find(item => item.id === 'iceland-duplicate')),
       stats: { ...api.stats }
     };
@@ -125,12 +131,16 @@ try {
     assert.ok(!result.ids.includes(id), `${id} should not displace a more consequential event merely because of raw feed score`);
   }
   assert.ok(result.ranks['nepal-floods'] > result.ranks['free-ai'], 'large human impact must outweigh a consumer AI guide');
+  assert.ok(result.impact['nepal-floods'] >= 49, '"crue" plus 734 deaths must contribute human-toll and major-event impact');
   assert.ok(result.impact['cyprus-ferry'] >= 34, '"six morts" written in words must contribute human-toll impact');
   assert.ok(result.impact['swiss-shooting'] >= 34, '"un mort et cinq blessés" plus gunfire must contribute human-toll and major-event impact');
+  assert.equal(result.wordingImpact.chavire, 15, '"chavire" must be recognized as a major sinking event');
+  assert.equal(result.wordingImpact.couleAuLarge, 15, '"coule au large" must be recognized as a major sinking event');
+  assert.equal(result.wordingImpact.unrelatedCoule, 0, 'generic business use of "coule" must not be treated as a major event');
   assert.ok(result.impact['free-ai'] < 0, 'consumer/how-to content should receive a Brief impact penalty');
   assert.equal(result.stats.lastChosen, 5);
 
-  console.log('v91.12 Brief live-feed word-form ranking passed.', JSON.stringify(result));
+  console.log('v91.12 Brief live event wording ranking passed.', JSON.stringify(result));
 } finally {
   await browser.close();
 }
