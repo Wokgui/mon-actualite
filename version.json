@@ -1,6 +1,6 @@
 {
   "version": "60",
-  "codeRelease": "91.5",
+  "codeRelease": "91.6",
   "release": "2026-08-30",
-  "label": "v91.5 (socle v91.4 / v91.3 / v90.1 / v89) : évite Groq quand le résumé spécialisé Parisien suffit, mise à jour PWA fiable et catégories live"
+  "label": "v91.6 (socle v91.5 / v91.4 / v91.3 / v90.1 / v89) : numéro de publication fiable dans Réglages, mise à jour PWA, optimisation Parisien et catégories live"
 }
