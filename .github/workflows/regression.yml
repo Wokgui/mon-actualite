@@ -24,6 +24,7 @@ jobs:
           node tests/v91-lead-choice.mjs
           node tests/v91-ai-request-control.mjs
           node tests/v914-release-watch.mjs
+          node tests/v9112-summary-gate.mjs
 
   mobile-browser:
     needs: static-regression
@@ -56,3 +57,4 @@ jobs:
           node tests/v919-summary-quality.mjs
           node tests/v9110-brief-dedup.mjs
           node tests/v9111-navigation-performance.mjs
+          node tests/v9112-brief-real-feed.mjs
