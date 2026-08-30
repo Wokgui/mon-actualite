@@ -159,7 +159,7 @@ function badgeFor(article) {
 function articleVisual(article, index = 0) {
   const prepared = hasPreparedVisual(article);
   const tile = sourceTileUrl(article);
-  return `<img class="article-image original-article-image stable-visual ${prepared ? 'prepared-visual' : 'source-tile-visual'}" src="${escapeHtml(articleVisualUrl(article))}" alt="" width="400" height="224" loading="${index < 12 ? 'eager' : 'lazy'}" decoding="async" referrerpolicy="no-referrer" style="background-image:url('${escapeHtml(tile)}');background-size:cover" ${index < 4 ? 'fetchpriority="high"' : ''}>`;
+  return `<img class="article-image original-article-image stable-visual ${prepared ? 'prepared-visual' : 'source-tile-visual'}" src="${escapeHtml(articleVisualUrl(article))}" alt="" width="400" height="224" loading="${index < 4 ? 'eager' : 'lazy'}" decoding="async" referrerpolicy="no-referrer" style="background-image:url('${escapeHtml(tile)}');background-size:cover" ${index < 4 ? 'fetchpriority="high"' : ''}>`;
 }
 
 function visibleArticles() {

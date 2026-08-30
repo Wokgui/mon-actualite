@@ -29,6 +29,7 @@ jobs:
           node tests/v9114-news-dedup.mjs
           node tests/v9115-home-significance.mjs
           node tests/v9119-visual-prepared-state.mjs
+          node tests/v9120-mobile-work-budget.mjs
 
   mobile-browser:
     needs: static-regression
