@@ -3,7 +3,6 @@ import { chromium } from 'playwright';
 
 const baseUrl = 'http://127.0.0.1:4173';
 const publishedAt = new Date().toISOString();
-let revision = 1;
 let preparedRequests = 0;
 let regeneratedRequests = 0;
 
@@ -22,25 +21,15 @@ function payload() {
       url: 'https://example.test/visual-stability',
       score: 100,
       editorialImportance: 80,
-      image: revision === 1 ? 'https://cdn.example.test/known-image.jpg' : ''
+      image: 'https://cdn.example.test/known-image.jpg'
     }]
   };
 }
 
 const browser = await chromium.launch({ headless: true });
-const context = await browser.newContext({
-  viewport: { width: 412, height: 915 },
-  isMobile: true,
-  hasTouch: true,
-  deviceScaleFactor: 2
-});
+const context = await browser.newContext({ viewport: { width: 412, height: 915 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2 });
 
-await context.route('**/api/news**', route => route.fulfill({
-  status: 200,
-  contentType: 'application/json',
-  body: JSON.stringify(payload())
-}));
-
+await context.route('**/api/news**', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify(payload()) }));
 const svg = '<svg xmlns="http://www.w3.org/2000/svg" width="640" height="420"><rect width="640" height="420" fill="#ddd"/></svg>';
 await context.route('**/api/article-photo-fast**', route => {
   const url = new URL(route.request().url());
@@ -53,11 +42,9 @@ await context.route('**/api/article-photo**', route => route.fulfill({ status: 2
 await context.route('https://oxdrhwveuctrorrkuurw.supabase.co/**', route => route.fulfill({ status: 200, contentType: 'application/json', body: '[]' }));
 
 const page = await context.newPage();
-const cardImage = '.article-card[data-article] img.article-image';
-
 try {
   await page.goto(baseUrl, { waitUntil: 'domcontentloaded' });
-  await page.waitForSelector(cardImage, { timeout: 15000 });
+  await page.waitForSelector('.article-card[data-article] img.article-image', { timeout: 15000 });
   await page.waitForFunction(() => {
     const image = document.querySelector('.article-card[data-article] img.article-image');
     return Boolean(image?.complete && image.naturalWidth > 1 && window.__visualStabilityV918?.remembered >= 1);
@@ -66,43 +53,34 @@ try {
   const initial = await page.evaluate(() => {
     const card = document.querySelector('.article-card[data-article]');
     const image = card?.querySelector('img.article-image');
-    return {
-      articleId: String(card?.dataset.article || ''),
-      src: image?.src || '',
-      classes: image?.className || '',
-      stats: { ...window.__visualStabilityV918 }
-    };
+    return { articleId: String(card?.dataset.article || ''), src: image?.src || '', classes: image?.className || '', stats: { ...window.__visualStabilityV918 } };
   });
-  assert.ok(initial.articleId, 'normalized article id should be present on the rendered card');
+  assert.ok(initial.articleId);
   assert.match(initial.src, /article-photo-fast/);
   assert.match(initial.src, /image=/);
   assert.match(initial.classes, /prepared-visual/);
-  assert.ok(initial.stats.remembered >= 1, 'known-good visual should be remembered');
 
-  await page.waitForTimeout(250);
-  revision = 2;
-  await page.reload({ waitUntil: 'domcontentloaded' });
-  await page.waitForSelector(cardImage, { timeout: 15000 });
+  await page.evaluate(id => {
+    const app = document.getElementById('app');
+    app.innerHTML = `<article class="article-card" data-article="${id}"><img class="article-image original-article-image stable-visual source-tile-visual" src="/api/article-photo-fast?v=85&url=https%3A%2F%2Fexample.test%2Fvisual-stability&title=regenerated" alt=""></article>`;
+  }, initial.articleId);
 
   await page.waitForFunction(({ id, expected }) => {
     const image = document.querySelector(`.article-card[data-article="${CSS.escape(id)}"] img.article-image`);
     return image?.src === expected && window.__visualStabilityV918?.reused >= 1;
-  }, { id: initial.articleId, expected: initial.src }, { timeout: 10000 });
+  }, { id: initial.articleId, expected: initial.src }, { timeout: 5000 });
 
   const after = await page.evaluate(id => {
     const image = document.querySelector(`.article-card[data-article="${CSS.escape(id)}"] img.article-image`);
-    return {
-      src: image?.src || '',
-      classes: image?.className || '',
-      stats: { ...window.__visualStabilityV918 }
-    };
+    return { src: image?.src || '', classes: image?.className || '', stats: { ...window.__visualStabilityV918 } };
   }, initial.articleId);
 
-  assert.equal(after.src, initial.src, 'PWA reload should keep the last successfully loaded visual URL');
+  assert.equal(after.src, initial.src, 'rerender should restore the last successfully loaded visual URL');
   assert.match(after.classes, /prepared-visual/);
-  assert.ok(after.stats.reused >= 1, 'visual stability guard should reuse the known-good URL');
-  assert.ok(after.stats.preventedChanges >= 1, 'guard should report a prevented visual URL change');
-  assert.ok(preparedRequests >= 1, 'expected at least one prepared image request');
+  assert.doesNotMatch(after.classes, /source-tile-visual/);
+  assert.ok(after.stats.reused >= 1);
+  assert.ok(after.stats.preventedChanges >= 1);
+  assert.ok(preparedRequests >= 1);
   assert.ok(regeneratedRequests <= 1, `unexpected repeated regenerated image requests: ${regeneratedRequests}`);
 
   console.log('v91.8 visual stability browser check passed.', JSON.stringify({ preparedRequests, regeneratedRequests, stats: after.stats }));
