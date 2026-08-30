@@ -45,14 +45,14 @@ function normalize(value = '') {
     .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
     .replace(/[’']/g, ' ')
     .toLowerCase()
-    .replace(/\s+[-–—]\s+le\s+parisien\s*$/i, '')
+    .replace(/\s+[-–—]\s+[^-–—]{2,55}$/i, '')
     .replace(/[^a-z0-9]+/g, ' ')
     .replace(/\s+/g, ' ')
     .trim();
 }
 
 function titleTokens(value = '') {
-  const stop = new Set(['avec','dans','pour','plus','apres','avant','cette','sont','etre','leur','leurs','tout','mais','sans','vers','entre','une','des','les','sur','qui','que','aux','par','son','ses','est','fait','article','parisien']);
+  const stop = new Set(['avec','dans','pour','plus','apres','avant','cette','sont','etre','leur','leurs','tout','mais','sans','vers','entre','une','des','les','sur','qui','que','aux','par','son','ses','est','fait','article','direct']);
   return [...new Set(normalize(value).split(' ').filter(word => word.length >= 3 && !stop.has(word)))];
 }
 
@@ -85,6 +85,20 @@ function xmlTag(block = '', name = '') {
   return match ? match[1] : '';
 }
 
+function isParisien(article = {}) {
+  return /le\s+parisien/i.test(`${clean(article.source || '')} ${clean(article.title || '')}`);
+}
+
+function titleWithoutSource(title = '', source = '') {
+  let value = clean(title);
+  const sourceText = clean(source);
+  if (sourceText) {
+    const escaped = sourceText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    value = value.replace(new RegExp(`\\s*[-–—|·:]\\s*${escaped}\\s*$`, 'i'), '').trim();
+  }
+  return value.replace(/\s+[-–—]\s+[^-–—]{2,55}$/i, '').trim();
+}
+
 async function fetchFeed(feedUrl, title) {
   const response = await fetch(feedUrl, {
     redirect: 'follow',
@@ -114,7 +128,7 @@ async function fetchFeed(feedUrl, title) {
   return null;
 }
 
-async function fetchRssText(title = '') {
+async function fetchParisienRssText(title = '') {
   const results = await Promise.allSettled(PARISIEN_FEEDS.map(feed => fetchFeed(feed, title)));
   return results
     .map(result => result.status === 'fulfilled' ? result.value : null)
@@ -122,13 +136,14 @@ async function fetchRssText(title = '') {
     .sort((a, b) => (b.text?.length || 0) - (a.text?.length || 0))[0] || null;
 }
 
-async function fetchBingNewsText(title = '') {
-  const cleanTitle = clean(title).replace(/\s+[-–—]\s+Le Parisien\s*$/i, '').slice(0, 220);
-  const queryVariants = [
+async function fetchBingNewsText(title = '', source = '') {
+  const cleanTitle = titleWithoutSource(title, source).slice(0, 220);
+  const sourceText = clean(source).slice(0, 80);
+  const queryVariants = [...new Set([
     `"${cleanTitle}"`,
     cleanTitle,
-    `${cleanTitle} Le Parisien`
-  ];
+    sourceText ? `${cleanTitle} ${sourceText}` : ''
+  ].filter(Boolean))];
   for (const query of queryVariants) {
     try {
       const url = new URL('https://www.bing.com/news/search');
@@ -171,11 +186,12 @@ function groundingUrls(payload = {}) {
     .slice(0, 6);
 }
 
-async function groundedSearch(title = '', articleUrl = '') {
+async function groundedSearch(title = '', articleUrl = '', source = '') {
   const key = geminiKey();
   if (!key) return { text: '', model: '', sources: [], error: 'Gemini key missing' };
-  const cleanTitle = clean(title).replace(/\s+[-–—]\s+Le Parisien\s*$/i, '');
-  const prompt = `Utilise Google Search pour retrouver l'article précis du Parisien intitulé : « ${cleanTitle} ». ${articleUrl ? `Le lien reçu par l'application est ${articleUrl}.` : ''}\n\nRédige ensuite en français un résumé factuel de 2 à 4 phrases, environ 55 à 100 mots. Utilise UNIQUEMENT des faits explicitement confirmés par les résultats de recherche qui concernent cet article exact ou le même événement. N'ajoute aucune connaissance générale, supposition, conseil ou détail plausible. Si les résultats publics ne donnent aucune information au-delà du titre, réponds exactement : AUCUNE_INFORMATION`;
+  const cleanTitle = titleWithoutSource(title, source);
+  const sourceText = clean(source) || 'la source indiquée';
+  const prompt = `Utilise Google Search pour retrouver l'article précis publié par ${sourceText} et intitulé : « ${cleanTitle} ». ${articleUrl ? `Le lien reçu par l'application est ${articleUrl}.` : ''}\n\nRédige ensuite en français un résumé factuel de 2 à 4 phrases, environ 55 à 100 mots. Utilise UNIQUEMENT des faits explicitement confirmés par les résultats de recherche qui concernent cet article exact ou le même événement. N'ajoute aucune connaissance générale, supposition, conseil ou détail plausible. Si les résultats publics ne donnent aucune information au-delà du titre, réponds exactement : AUCUNE_INFORMATION`;
   let lastError = '';
 
   for (const model of GEMINI_MODELS) {
@@ -208,20 +224,24 @@ async function groundedSearch(title = '', articleUrl = '') {
 
 async function recover(article = {}) {
   const title = clean(article.title || '');
-  const rss = await fetchRssText(title).catch(() => null);
-  if (rss?.text) {
-    return {
-      ok: true,
-      text: rss.text.slice(0, 3500),
-      articleUrl: rss.url || String(article.url || ''),
-      publishedAt: rss.publishedAt || '',
-      origin: 'publisher-rss',
-      grounded: false,
-      sources: []
-    };
+  const source = clean(article.source || '');
+
+  if (isParisien(article)) {
+    const rss = await fetchParisienRssText(title).catch(() => null);
+    if (rss?.text) {
+      return {
+        ok: true,
+        text: rss.text.slice(0, 3500),
+        articleUrl: rss.url || String(article.url || ''),
+        publishedAt: rss.publishedAt || '',
+        origin: 'publisher-rss',
+        grounded: false,
+        sources: []
+      };
+    }
   }
 
-  const bing = await fetchBingNewsText(title).catch(() => null);
+  const bing = await fetchBingNewsText(title, source).catch(() => null);
   if (bing?.text) {
     return {
       ok: true,
@@ -233,7 +253,7 @@ async function recover(article = {}) {
     };
   }
 
-  const searched = await groundedSearch(title, String(article.url || '')).catch(() => ({ text: '', model: '', sources: [], error: '' }));
+  const searched = await groundedSearch(title, String(article.url || ''), source).catch(() => ({ text: '', model: '', sources: [], error: '' }));
   if (searched.text) {
     return {
       ok: true,
@@ -260,15 +280,13 @@ async function recover(article = {}) {
 
 module.exports = async function handler(req, res) {
   if (req.method === 'GET' && String(req.query?.status || '') === '1') {
-    return send(res, 200, { ok: true, hasGeminiKey: Boolean(geminiKey()), models: GEMINI_MODELS });
+    return send(res, 200, { ok: true, genericSources: true, hasGeminiKey: Boolean(geminiKey()), models: GEMINI_MODELS });
   }
   if (!['GET', 'POST'].includes(req.method)) return send(res, 405, { error: 'Méthode non autorisée' });
   const input = req.method === 'POST' ? (req.body || {}) : (req.query || {});
   const article = input.article && typeof input.article === 'object' ? input.article : input;
   const title = clean(article.title || '');
-  const source = clean(article.source || 'Le Parisien');
   if (!title) return send(res, 400, { error: 'Titre manquant' });
-  if (!/le\s+parisien/i.test(`${source} ${title}`)) return send(res, 400, { error: 'Source non prise en charge' });
   const result = await recover(article);
   return send(res, 200, result);
 };
