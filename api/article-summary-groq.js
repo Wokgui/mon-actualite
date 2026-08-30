@@ -304,6 +304,78 @@ function paragraphize(value = '', wanted = 2) {
   return groups.join('\n\n');
 }
 
+function titleRestatement(summary = '', title = '') {
+  const summaryText = decodeEntities(summary).replace(/^(?:résumé|synthèse)\s*:\s*/i, '').trim();
+  const titleText = decodeEntities(title).trim();
+  if (!summaryText || !titleText) return false;
+  if (/^(?:cet article|l[’']article|ce texte|cette publication)\s+(?:porte sur|parle de|évoque|présente|explique|concerne)\b/i.test(summaryText)) return true;
+  const titleTokens = newsTokens(titleText).filter(token => token.length >= 4);
+  const summaryTokens = newsTokens(summaryText).filter(token => token.length >= 4);
+  if (titleTokens.length < 4 || summaryTokens.length < 3) return false;
+  const summarySet = new Set(summaryTokens);
+  const covered = titleTokens.filter(token => summarySet.has(token)).length / titleTokens.length;
+  const titleSet = new Set(titleTokens);
+  const extra = summaryTokens.filter(token => !titleSet.has(token)).length;
+  return covered >= 0.84 && extra <= 3 && summaryText.length <= Math.max(190, titleText.length * 1.65);
+}
+
+function dedupeFinalSentences(value = '') {
+  const kept = [];
+  const tokenSets = [];
+  for (const item of sentences(value)) {
+    if (item.length < 18 || isBoilerplate(item)) continue;
+    const normalized = normalizeSupport(item).replace(/[^a-z0-9]+/g, ' ').trim();
+    if (!normalized) continue;
+    const tokens = new Set(newsTokens(item).filter(token => token.length >= 4));
+    const duplicate = kept.some((previous, index) => {
+      if (normalizeSupport(previous).replace(/[^a-z0-9]+/g, ' ').trim() === normalized) return true;
+      const old = tokenSets[index];
+      const common = [...tokens].filter(token => old.has(token)).length;
+      return common / Math.max(1, Math.min(tokens.size, old.size)) >= 0.9;
+    });
+    if (duplicate) continue;
+    kept.push(item);
+    tokenSets.push(tokens);
+  }
+  return kept.join(' ').trim();
+}
+
+function googleAggregateRisk(article = {}, payload = {}, corroboratingHeadlines = []) {
+  const source = normalizeSupport(article.source || '').replace(/[^a-z0-9]+/g, ' ').trim();
+  let host = '';
+  try { host = new URL(String(article.url || '')).hostname.toLowerCase(); } catch {}
+  const google = source === 'google news' || host === 'news.google.com' || host.endsWith('.news.google.com');
+  return google && String(payload.provider || '').toLowerCase() === 'factual' && corroboratingHeadlines.length > 0;
+}
+
+function finalizeArticleSummary(body = {}, payload = {}, corroboratingHeadlines = []) {
+  if (body?.mode === 'category' || !body?.article || payload?.unavailable) return payload;
+  const cleaned = dedupeFinalSentences(payload.summary || '');
+  let reason = '';
+  if (!cleaned || cleaned.length < 55) reason = 'too-short-or-boilerplate';
+  else if (titleRestatement(cleaned, body.article.title || '')) reason = 'title-restatement';
+  else if (googleAggregateRisk(body.article, payload, corroboratingHeadlines)) reason = 'ambiguous-google-aggregate';
+  else if (newsTokens(cleaned).filter(token => token.length >= 4).length < 8 && cleaned.length < 100) reason = 'low-information';
+
+  if (reason) {
+    return {
+      ...payload,
+      summary: '',
+      unavailable: true,
+      qualityV9112: 'rejected',
+      qualityReasonV9112: reason,
+      providerOriginalV9112: String(payload.provider || '')
+    };
+  }
+  return {
+    ...payload,
+    summary: cleaned,
+    unavailable: false,
+    qualityV9112: 'accepted',
+    qualitySentenceCountV9112: sentences(cleaned).length
+  };
+}
+
 function promptFor(body, factual, corroborated = false) {
   const mode = body?.mode === 'category' ? 'category' : 'article';
   if (mode === 'category') {
@@ -375,10 +447,10 @@ async function probeGroq(key) {
   return { ok: false, error: lastError.replace(/gsk_[A-Za-z0-9_-]+/g, '[clé masquée]').slice(0, 420) };
 }
 
-module.exports = async function handler(req, res) {
+async function handler(req, res) {
   const key = groqKey();
   if (req.method === 'GET' && req.query?.status) {
-    const payload = { ok: true, provider: 'groq', model: GROQ_MODELS[0], models: GROQ_MODELS, hasGroqKey: Boolean(key), gatewayDisabled: true };
+    const payload = { ok: true, provider: 'groq', model: GROQ_MODELS[0], models: GROQ_MODELS, hasGroqKey: Boolean(key), gatewayDisabled: true, summaryQualityV9112: true };
     if (String(req.query?.probe || '') === '1' && key) payload.probe = await probeGroq(key);
     return send(res, 200, payload);
   }
@@ -415,18 +487,19 @@ module.exports = async function handler(req, res) {
   if (factual.length < (mode === 'article' ? 30 : 80)) {
     return send(res, 200, {
       ...base,
-      summary: 'Résumé indisponible pour cet article.',
+      summary: '',
       ai: false,
       unavailable: true,
       provider: 'unavailable',
       model: '',
-      corroborated: false
+      corroborated: false,
+      qualityV9112: mode === 'article' ? 'unavailable' : undefined
     });
   }
 
   const safeFallback = paragraphize(factual, 2);
   if (!key) {
-    return send(res, 200, {
+    const payload = {
       ...base,
       summary: safeFallback,
       ai: false,
@@ -434,7 +507,8 @@ module.exports = async function handler(req, res) {
       provider: 'factual',
       model: '',
       corroborated: corroboratingHeadlines.length > 0
-    });
+    };
+    return send(res, 200, finalizeArticleSummary(body, payload, corroboratingHeadlines));
   }
 
   const prompt = promptFor(body, factual, corroboratingHeadlines.length > 0);
@@ -447,7 +521,7 @@ module.exports = async function handler(req, res) {
 
   try {
     const aiResult = await generateWithFallback(key, prompt, validationSource, minLength);
-    return send(res, 200, {
+    const payload = {
       ...base,
       summary: paragraphize(aiResult.text, 2),
       ai: true,
@@ -455,11 +529,12 @@ module.exports = async function handler(req, res) {
       provider: 'groq',
       model: aiResult.model,
       corroborated: corroboratingHeadlines.length > 0
-    });
+    };
+    return send(res, 200, finalizeArticleSummary(body, payload, corroboratingHeadlines));
   } catch (error) {
     const message = String(error?.message || error).replace(/gsk_[A-Za-z0-9_-]+/g, '[clé masquée]').slice(0, 420);
     console.error('Groq summary unavailable:', message);
-    return send(res, 200, {
+    const payload = {
       ...base,
       summary: safeFallback,
       ai: false,
@@ -467,6 +542,12 @@ module.exports = async function handler(req, res) {
       provider: 'factual',
       model: '',
       corroborated: corroboratingHeadlines.length > 0
-    });
+    };
+    return send(res, 200, finalizeArticleSummary(body, payload, corroboratingHeadlines));
   }
-};
+}
+
+module.exports = handler;
+module.exports.finalizeArticleSummary = finalizeArticleSummary;
+module.exports.titleRestatement = titleRestatement;
+module.exports.googleAggregateRisk = googleAggregateRisk;
