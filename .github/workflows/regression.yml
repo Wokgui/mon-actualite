@@ -25,6 +25,7 @@ jobs:
           node tests/v91-ai-request-control.mjs
           node tests/v914-release-watch.mjs
           node tests/v9112-summary-gate.mjs
+          node tests/v9113-category-classifier.mjs
 
   mobile-browser:
     needs: static-regression
