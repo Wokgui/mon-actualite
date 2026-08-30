@@ -1,5 +1,5 @@
 import { importOpmlPreview, fetchLiveNews } from './services/source-connectors.js?v=45.3';
-import { articleVisualUrl, hasPreparedVisual, sourceTileUrl } from './services/article-visuals.js?v=56';
+import { articleVisualUrl, hasPreparedVisual, sourceTileUrl } from './services/article-visuals.js?v=57';
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const app = $('#app');
@@ -825,4 +825,3 @@ render();
 scheduleVisualBackfill();
 syncNews({ silent: true });
 window.setTimeout(() => checkAppUpdate(), 1200);
-

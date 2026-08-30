@@ -92,5 +92,11 @@ export function articleVisualUrl(article = {}) {
 }
 
 export function hasPreparedVisual(article = {}) {
-  return Boolean(feedlyProxyUrl(article));
+  if (pinnedProxyUrl(article)) return true;
+  const rawVisual = clean(article.visual?.url || article.image || '');
+  if (!rawVisual) return false;
+  if (extractPreparedImage(rawVisual)) return true;
+  if (!isSameOriginImageProxy(rawVisual)) return true;
+  const status = clean(article.visual?.status || article.visualStatus || '').toLowerCase();
+  return ['ready', 'available', 'loaded'].includes(status);
 }
