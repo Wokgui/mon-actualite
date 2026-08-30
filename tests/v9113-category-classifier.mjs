@@ -1,7 +1,7 @@
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
-const { classifyArticle, classifyArticleDetailed } = require('../api/news-category.js');
+const { classifyArticle, classifyArticleDetailed } = require('../lib/news-category.js');
 
 const cases = [
   ['IA gratuite', { title: 'ChatGPT, Claude, Gemini : ce que vous pouvez vraiment faire sans débourser un centime', categoryHint: 'Économie', strictCategory: true }, 'IA'],
