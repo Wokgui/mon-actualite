@@ -82,21 +82,27 @@ try {
   await page.waitForFunction(() => window.__navigationPerformanceV9111?.version === '91.11', null, { timeout: 10000 });
   await page.waitForSelector('.article-card[data-article]', { timeout: 15000 });
   await page.waitForFunction(() => window.__navigationPerformanceV9111?.newsResponses >= 1, null, { timeout: 15000 });
-  // The fetch wrapper sees the response before app.js has finished applying it.
-  // Wait for persistCache(), then two frames, so the node identity captured below
-  // belongs to the settled initial render rather than a transient startup render.
   await page.waitForFunction(seed => {
     try { return JSON.parse(localStorage.getItem('news-live-cache') || '{}').fetchedAt !== seed; }
     catch { return false; }
   }, seedFetchedAt, { timeout: 15000 });
+  // Several historical layers may finish their own startup work after the first
+  // response. Start the navigation measurement only once /api/news is quiet.
+  for (let pass = 0; pass < 5; pass += 1) {
+    const before = newsRequests;
+    await page.waitForTimeout(300);
+    if (newsRequests === before) break;
+  }
   await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
 
   await page.locator('.bottom-nav [data-view="brief"]').click();
   await page.waitForSelector('.bottom-nav [data-view="brief"].active');
+  await page.waitForSelector('.runtime-brief-content', { timeout: 10000 });
   await page.evaluate(() => { window.__v9111BriefNode = document.querySelector('#app > .page'); });
 
   await page.locator('.bottom-nav [data-view="home"]').click();
   await page.waitForSelector('.bottom-nav [data-view="home"].active');
+  await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
   await page.evaluate(() => { window.__v9111HomeNode = document.querySelector('#app > .page'); });
 
   const beforeSame = await page.evaluate(() => ({
@@ -104,7 +110,7 @@ try {
     cache: { ...window.__navigationCacheV9111.stats },
     cacheSize: window.__navigationCacheV9111.cacheSize()
   }));
-  assert.ok(beforeSame.cacheSize >= 1, 'Brief should be cached after the initial round trip');
+  assert.ok(beforeSame.cacheSize >= 1, `Brief should be cached after the initial round trip: ${JSON.stringify({ newsRequests, beforeSame })}`);
 
   const requestsBeforeSame = newsRequests;
   await page.evaluate(() => window.dispatchEvent(new Event('online')));
