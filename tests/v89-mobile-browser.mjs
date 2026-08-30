@@ -160,9 +160,15 @@ try {
   await page.waitForSelector('.bottom-nav [data-view="home"].active', { timeout: 5000 });
 
   const factualId = String(initial.factual.id || 'factual');
-  const factualCard = page.locator(`.article-card[data-article="${factualId}"]`);
-  await factualCard.scrollIntoViewIfNeeded();
-  await factualCard.click();
+  await page.waitForFunction(id => [...document.querySelectorAll('.article-card[data-article]')].some(card => card.dataset.article === id), factualId, { timeout: 5000 });
+  const factualClicked = await page.evaluate(id => {
+    const card = [...document.querySelectorAll('.article-card[data-article]')].find(item => item.dataset.article === id);
+    if (!card) return false;
+    card.scrollIntoView({ block: 'center', inline: 'nearest' });
+    card.click();
+    return true;
+  }, factualId);
+  assert.equal(factualClicked, true, 'factual card could not be clicked after home rerender');
   await page.waitForTimeout(250);
 
   const storedRead = await page.evaluate(() => JSON.parse(localStorage.getItem('news-read-revisions-v89') || '{}'));
