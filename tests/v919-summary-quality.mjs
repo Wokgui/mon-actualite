@@ -2,6 +2,7 @@ import assert from 'node:assert/strict';
 import { chromium } from 'playwright';
 
 const baseUrl = 'http://127.0.0.1:4173';
+const publishedAt = new Date().toISOString();
 const aggregate = 'Le fait principal &nbsp;&nbsp; Source Test Deuxième titre sans rapport &nbsp;&nbsp; Autre Média Voir plus de titres et de points de vue sur Google Actualités';
 const realSummary = 'Une source directe fournit ici un véritable résumé éditorial suffisamment long pour rester affiché dans la carte.';
 
@@ -14,7 +15,7 @@ function googleArticle(id = 'google-cluster') {
     source: 'Source Test',
     sources: ['Source Test'],
     category: 'International',
-    publishedAt: new Date().toISOString(),
+    publishedAt,
     url: 'https://news.google.com/rss/articles/CBMi-summary-v919?oc=5',
     score: 100
   };
@@ -36,7 +37,13 @@ function directArticle() {
 }
 
 const browser = await chromium.launch({ headless: true });
-const context = await browser.newContext({ viewport: { width: 412, height: 915 }, isMobile: true, hasTouch: true, deviceScaleFactor: 2 });
+const context = await browser.newContext({
+  viewport: { width: 412, height: 915 },
+  isMobile: true,
+  hasTouch: true,
+  deviceScaleFactor: 2,
+  serviceWorkers: 'block'
+});
 
 await context.addInitScript(({ aggregateValue, directValue }) => {
   localStorage.setItem('news-live-cache', JSON.stringify({
