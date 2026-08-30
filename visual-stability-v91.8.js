@@ -7,12 +7,14 @@
   const MAX_ENTRIES = 300;
   const readyVisuals = new Map();
   let persistTimer = null;
+  let sweepQueued = false;
 
   const stats = {
     version: '91.8',
     remembered: 0,
     reused: 0,
-    preventedChanges: 0
+    preventedChanges: 0,
+    sweeps: 0
   };
   window.__visualStabilityV918 = stats;
   document.documentElement.dataset.visualStabilityVersion = '91.8';
@@ -43,9 +45,6 @@
       if (id && url && savedAt && now - savedAt < MAX_AGE) readyVisuals.set(String(id), { url, savedAt });
     }
 
-    // Reuse the application's successful recovery cache too. This prevents a
-    // recovered thumbnail from being replaced by a freshly generated proxy URL
-    // on the next render/navigation.
     const backfills = readJson(BACKFILL_KEY);
     for (const [id, item] of Object.entries(backfills)) {
       const url = usableUrl(item?.url);
@@ -95,9 +94,6 @@
     const current = usableUrl(image.getAttribute('src') || image.src);
     if (current === remembered.url) return;
 
-    // Replace an about-to-load regenerated URL with the last URL that actually
-    // completed successfully for this article. This does not add a request: it
-    // cancels/replaces one pending image request with the known-good one.
     image.classList.remove('source-tile-visual');
     image.classList.add('prepared-visual');
     image.src = remembered.url;
@@ -111,22 +107,48 @@
     root.querySelectorAll?.('.article-card[data-article]').forEach(stabilizeCard);
   }
 
+  function sweep() {
+    sweepQueued = false;
+    stats.sweeps += 1;
+    document.querySelectorAll('.article-card[data-article]').forEach(stabilizeCard);
+  }
+
+  function queueSweep() {
+    if (sweepQueued) return;
+    sweepQueued = true;
+    queueMicrotask(() => requestAnimationFrame(sweep));
+  }
+
   hydrate();
   document.querySelectorAll('.article-card[data-article]').forEach(stabilizeCard);
 
-  document.addEventListener('load', event => rememberLoaded(event.target), true);
+  document.addEventListener('load', event => {
+    rememberLoaded(event.target);
+    queueSweep();
+  }, true);
 
   const app = document.getElementById('app');
   if (app) {
     new MutationObserver(mutations => {
       for (const mutation of mutations) {
-        for (const node of mutation.addedNodes) stabilizeTree(node);
+        if (mutation.type === 'childList') {
+          for (const node of mutation.addedNodes) stabilizeTree(node);
+        } else if (mutation.type === 'attributes') {
+          const card = mutation.target?.closest?.('.article-card[data-article]');
+          if (card) stabilizeCard(card);
+        }
       }
-    }).observe(app, { childList: true, subtree: true });
+      queueSweep();
+    }).observe(app, {
+      childList: true,
+      subtree: true,
+      attributes: true,
+      attributeFilter: ['src', 'class']
+    });
   }
 
   window.addEventListener('pageshow', () => {
     hydrate();
-    document.querySelectorAll('.article-card[data-article]').forEach(stabilizeCard);
+    sweep();
   });
 })();
