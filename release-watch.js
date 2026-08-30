@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const PAGE_RELEASE = '91.4';
+  const PAGE_RELEASE = '91.5';
   const VERSION_PATH = '/version.json';
   const CHECK_COOLDOWN_MS = 45_000;
   let checking = false;
