@@ -58,6 +58,18 @@ function quickIsLeParisien(article = {}) {
   } catch { return false; }
 }
 
+function quickIsGoogleNews(article = {}) {
+  if (/\bgoogle\s+news\b/i.test(quickClean(article.source))) return true;
+  try {
+    const host = new URL(String(article.url || ''), location.href).hostname.toLowerCase();
+    return host === 'news.google.com' || host.endsWith('.news.google.com');
+  } catch { return false; }
+}
+
+function quickNeedsSmartRecovery(article = {}) {
+  return quickIsLeParisien(article) || quickIsGoogleNews(article);
+}
+
 function quickNormalize(value = '') {
   return quickClean(value)
     .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
@@ -231,8 +243,8 @@ async function quickLoadSummary(article, modal) {
     body: JSON.stringify({ mode: 'article', article: articlePayload })
   });
 
-  if (quickIsLeParisien(article)) {
-    const smart = await quickFetchJson('/api/article-summary-smart?v=3', {
+  if (quickNeedsSmartRecovery(article)) {
+    const smart = await quickFetchJson('/api/article-summary-smart?v=4', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       cache: 'no-store',

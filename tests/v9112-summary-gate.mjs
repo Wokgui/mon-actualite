@@ -1,5 +1,7 @@
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
+import fs from 'node:fs';
+import vm from 'node:vm';
 
 const require = createRequire(import.meta.url);
 const qualityModule = require('../api/article-summary-groq.js');
@@ -73,5 +75,48 @@ const groundedAggregate = finalizeArticleSummary({ mode: 'article', article: goo
 }, corroborating);
 assert.equal(groundedAggregate.unavailable, false, 'a generated and validated synthesis must not be rejected merely because discovery came from Google News');
 assert.equal(groundedAggregate.qualityV9112, 'accepted');
+
+const quickviewSource = fs.readFileSync(new URL('../article-quickview.js', import.meta.url), 'utf8');
+function extractFunction(name) {
+  const start = quickviewSource.indexOf(`function ${name}(`);
+  assert.ok(start >= 0, `${name} must exist in article-quickview.js`);
+  const signatureEnd = quickviewSource.indexOf(') {', start);
+  assert.ok(signatureEnd >= 0, `${name} must use a block body`);
+  const brace = signatureEnd + 2;
+  let depth = 0;
+  for (let index = brace; index < quickviewSource.length; index += 1) {
+    if (quickviewSource[index] === '{') depth += 1;
+    if (quickviewSource[index] === '}') depth -= 1;
+    if (depth === 0) return quickviewSource.slice(start, index + 1);
+  }
+  throw new Error(`Unable to extract ${name}`);
+}
+
+const quickviewContext = {
+  location: { href: 'https://mon-actualite.vercel.app/' },
+  URL
+};
+vm.createContext(quickviewContext);
+vm.runInContext([
+  extractFunction('quickClean'),
+  extractFunction('quickIsLeParisien'),
+  extractFunction('quickIsGoogleNews'),
+  extractFunction('quickNeedsSmartRecovery'),
+  'globalThis.needsSmartRecovery = quickNeedsSmartRecovery;'
+].join('\n'), quickviewContext);
+
+assert.equal(quickviewContext.needsSmartRecovery({
+  source: 'Google News',
+  url: 'https://news.google.com/articles/example'
+}), true, 'Google News articles must use the existing grounded recovery path when the primary summary is weak');
+assert.equal(quickviewContext.needsSmartRecovery({
+  source: 'Le Parisien',
+  url: 'https://www.leparisien.fr/politique/example'
+}), true, 'Le Parisien must keep its publisher RSS recovery');
+assert.equal(quickviewContext.needsSmartRecovery({
+  source: 'France 24',
+  url: 'https://www.france24.com/fr/example'
+}), false, 'rich direct sources must not trigger an extra recovery fetch');
+assert.match(quickviewSource, /if \(quickNeedsSmartRecovery\(article\)\)[\s\S]*article-summary-smart\?v=4/, 'the production loader must route both source families to smart recovery');
 
 console.log('v91.12 integrated summary quality gate checks passed');
