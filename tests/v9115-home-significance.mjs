@@ -57,6 +57,20 @@ assert.ok(homeSignalScore(light[3]).score <= -15, 'un guide de téléphone doit 
 assert.ok(homeSignalScore(light[5]).score <= -15, 'le sport léger ne doit pas remonter dans l’Accueil général');
 assert.ok(homeSignalScore(light[6]).score <= -30, 'un titre manifestement vide doit être fortement pénalisé');
 
+assert.equal(
+  homeSignalScore(article('personal-sanction', '« Elle sera signalée pour blâme ou sanction » : Donald Trump cible une journaliste de NBC')).score,
+  0,
+  'une sanction personnelle ou disciplinaire ne doit pas être confondue avec un événement géopolitique majeur'
+);
+assert.ok(
+  homeSignalScore(article('systemic-sanctions', 'Ukraine : de nouvelles sanctions européennes contre la Russie entrent en vigueur')).score >= 15,
+  'des sanctions internationales contextualisées doivent rester un événement majeur'
+);
+assert.ok(
+  homeSignalScore(article('public-utility', 'Alerte météo : vigilance rouge et fermeture des écoles dans trois départements')).score >= 6,
+  'une information immédiatement utile au public doit recevoir un bonus mesuré'
+);
+
 const contamination = homeSignalScore(article(
   'contamination',
   'Le papier toilette au cœur des préoccupations des Américains',
