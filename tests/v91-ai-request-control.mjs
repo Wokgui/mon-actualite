@@ -2,7 +2,8 @@ import assert from 'node:assert/strict';
 import fs from 'node:fs';
 import vm from 'node:vm';
 
-const source = fs.readFileSync(new URL('../ai-request-control-v91.5.js', import.meta.url), 'utf8');
+const source = fs.readFileSync(new URL('../ai-request-control-v91.7.js', import.meta.url), 'utf8');
+const smartApi = fs.readFileSync(new URL('../api/article-summary-smart.js', import.meta.url), 'utf8');
 const calls = [];
 let active = 0;
 let maxActive = 0;
@@ -16,11 +17,16 @@ async function fakeFetch(input, init = {}) {
   await new Promise(resolve => setTimeout(resolve, 18));
   active -= 1;
   if (url.pathname === '/api/article-summary-smart') {
+    let article = {};
+    try { article = JSON.parse(String(init?.body || '{}'))?.article || {}; } catch {}
+    const parisien = /le parisien/i.test(String(article.source || ''));
     return new Response(JSON.stringify({
       ok: true,
-      text: 'Le résumé spécialisé du Parisien fournit ici suffisamment de faits précis pour éviter un second appel au modèle Groq.',
+      text: parisien
+        ? 'Le résumé spécialisé du Parisien fournit ici suffisamment de faits précis pour éviter un second appel au modèle Groq.'
+        : 'Le résumé sourcé de cet autre éditeur confirme plusieurs faits précis de l’article et permet de répondre sans solliciter inutilement le modèle Groq.',
       grounded: true,
-      origin: 'publisher-rss'
+      origin: parisien ? 'publisher-rss' : 'bing-news-rss'
     }), {
       status: 200,
       headers: { 'Content-Type': 'application/json' }
@@ -49,7 +55,7 @@ const context = vm.createContext({
   clearTimeout,
   console
 });
-vm.runInContext(source, context, { filename: 'ai-request-control-v91.5.js' });
+vm.runInContext(source, context, { filename: 'ai-request-control-v91.7.js' });
 
 const post = body => ({
   method: 'POST',
@@ -86,25 +92,42 @@ const parisienArticle = {
 };
 const beforeParisien = calls.length;
 const parisienGroq = window.fetch('/api/article-summary-groq?v=17', post({ mode: 'article', article: parisienArticle }));
-await window.fetch('/api/article-summary-smart?v=3', post({ article: parisienArticle }));
+await window.fetch('/api/article-summary-smart?v=4', post({ article: parisienArticle }));
 const parisienResponse = await parisienGroq;
 const parisienData = await parisienResponse.json();
 const parisienCalls = calls.slice(beforeParisien).map(call => call.path);
 assert.ok(parisienCalls.includes('/api/article-summary-smart'), 'Parisien smart recovery must run');
 assert.ok(!parisienCalls.includes('/api/article-summary-groq'), 'Groq must be skipped when Parisien smart recovery succeeds during the grace window');
-assert.match(parisienData.summary, /résumé spécialisé du Parisien/i, 'synthetic Groq response should reuse the specialized Parisien summary');
+assert.match(parisienData.summary, /résumé spécialisé du Parisien/i, 'synthetic response should reuse the specialized Parisien summary');
+
+const genericArticle = {
+  url: 'https://www.exemple.fr/monde/article-source.html',
+  title: 'Un autre éditeur publie des faits nouveaux sur cet événement',
+  source: 'Exemple Actualités'
+};
+const beforeGeneric = calls.length;
+const genericResponse = await window.fetch('/api/article-summary-groq?v=17', post({ mode: 'article', article: genericArticle }));
+const genericData = await genericResponse.json();
+const genericCalls = calls.slice(beforeGeneric).map(call => call.path);
+assert.ok(genericCalls.includes('/api/article-summary-smart'), 'generic source-first recovery must be attempted');
+assert.ok(!genericCalls.includes('/api/article-summary-groq'), 'Groq must be skipped when a generic sourced summary succeeds during the grace window');
+assert.match(genericData.summary, /autre éditeur/i, 'generic smart summary should be returned through the Groq-compatible response');
 
 const outsideBefore = calls.length;
 await window.fetch('/api/news', { method: 'GET' });
 assert.equal(calls.length, outsideBefore + 1, 'uncontrolled requests must pass through');
 
-const control = window.__aiRequestControlV915;
-assert.equal(control.version, '91.5');
-assert.equal(document.documentElement.dataset.aiRequestControlVersion, '91.5');
+const control = window.__aiRequestControlV917;
+assert.equal(control.version, '91.7');
+assert.equal(document.documentElement.dataset.aiRequestControlVersion, '91.7');
 assert.equal(control.requestPriority('/api/article-summary-groq'), 0);
 assert.equal(control.requestPriority('/api/article-summary-multisource'), 1);
 assert.equal(control.requestPriority('/api/article-story-intelligence'), 2);
 assert.ok(control.stats().deduped >= 1, 'dedupe counter should be exposed for diagnostics');
-assert.ok(control.stats().parisienGroqAvoided >= 1, 'Parisien Groq avoidance should be exposed for diagnostics');
+assert.ok(control.stats().smartGroqAvoided >= 2, 'source-first Groq avoidance should cover Parisien and generic sources');
 
-console.log('v91.5 AI request control checks passed');
+assert.ok(smartApi.includes('genericSources: true'), 'smart summary status must expose generic source support');
+assert.ok(!smartApi.includes("return send(res, 400, { error: 'Source non prise en charge' })"), 'smart summary API must no longer reject non-Parisien sources');
+assert.ok(smartApi.includes('publié par ${sourceText}'), 'grounded search prompt must include the actual publisher');
+
+console.log('v91.7 source-first AI request control checks passed');
