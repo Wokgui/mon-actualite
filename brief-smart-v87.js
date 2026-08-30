@@ -12,8 +12,13 @@
   const REACTION_RX = /\b(réagit|réaction|se confie|confidences?|donne son avis|tacle|coup de gueule|s['’]indigne|buzz|polémique|réseaux sociaux|les internautes)\b/i;
   const SPORTS_RX = /\b(match|football|tennis|cyclisme|tour de france|pogacar|ligue 1|champions league|grand prix|formule 1|mercato|but(?:s)?|score final)\b/i;
   const HISTORICAL_RX = /\b(il y a \d+ ans|archives?|histoire méconnue|en \d{4},|au siècle dernier)\b/i;
-  const HUMAN_TOLL_RX = /\b(?:au moins\s+)?(\d{1,4})\s+(?:morts?|décès|victimes?|blessés?|disparus?)\b/i;
-  const MAJOR_EVENT_RX = /\b(inondations?|séisme|tremblement de terre|ouragan|cyclone|incendie majeur|naufrage|catastrophe|guerre|invasion|frappes?|missiles?|cessez[- ]le[- ]feu|attentat|référendum|élections?|scrutin|vote|adopte|rejette|condamne|démissionne|sanctions?|accord de paix|état d['’]urgence)\b/i;
+  const NUMBER_WORD_VALUES = new Map(Object.entries({
+    un: 1, une: 1, deux: 2, trois: 3, quatre: 4, cinq: 5, six: 6, sept: 7, huit: 8, neuf: 9,
+    dix: 10, onze: 11, douze: 12, treize: 13, quatorze: 14, quinze: 15, seize: 16,
+    vingt: 20, trente: 30, quarante: 40, cinquante: 50, soixante: 60, cent: 100
+  }));
+  const HUMAN_TOLL_RX = /\b(?:au moins\s+)?(\d{1,4}|un|une|deux|trois|quatre|cinq|six|sept|huit|neuf|dix|onze|douze|treize|quatorze|quinze|seize|vingt|trente|quarante|cinquante|soixante|cent)\s+(?:morts?|décès|victimes?|blessés?|disparus?)\b/i;
+  const MAJOR_EVENT_RX = /\b(inondations?|séisme|tremblement de terre|ouragan|cyclone|incendie majeur|naufrage|catastrophe|guerre|invasion|frappes?|missiles?|cessez[- ]le[- ]feu|attentat|fusillade|coups? de feu|tirs? mortels?|référendum|élections?|scrutin|vote|adopte|rejette|condamne|démissionne|sanctions?|accord de paix|état d['’]urgence)\b/i;
   const PUBLIC_DECISION_RX = /\b(loi|réforme|gouvernement|parlement|cour suprême|conseil constitutionnel|commission européenne|union européenne|banque centrale|bce|fed|interdit|autorise|valide|annule|officialise)\b/i;
   const SCIENCE_BREAKTHROUGH_RX = /\b(découverte|découvre|démontre|première mondiale|essai clinique|traitement|vaccin|mission spatiale|lancement spatial|télescope|nasa|esa)\b/i;
   const upstreamFetch = window.fetch.bind(window);
@@ -183,7 +188,9 @@
     let value = 0;
     const human = text.match(HUMAN_TOLL_RX);
     if (human) {
-      const count = Number(human[1] || 0);
+      const token = normalize(human[1] || '');
+      const numeric = Number(token);
+      const count = Number.isFinite(numeric) && token ? numeric : (NUMBER_WORD_VALUES.get(token) || 1);
       value += count >= 100 ? 34 : count >= 10 ? 27 : 19;
     }
     if (MAJOR_EVENT_RX.test(text)) value += 15;

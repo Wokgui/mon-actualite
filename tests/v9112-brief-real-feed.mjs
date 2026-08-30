@@ -7,19 +7,19 @@ import { chromium } from 'playwright';
 const captured = [
   {
     id: 'nepal-floods',
-    title: 'Népal : le bilan des inondations atteint 734 morts, les secours restent difficiles',
+    title: 'DIRECT. Crue au Népal : le bilan passe à 734 morts, les opérations de secours compliquées par la montée des eaux',
     category: 'International', score: 105, noveltyStateV78: 'development', informationValueV89: 88,
     editorialImportanceV78: 93, corroboratedV79: true, mergedCount: 3, sources: ['France 24', 'Reuters', 'AP']
   },
   {
     id: 'cyprus-ferry',
-    title: 'Naufrage au large de Chypre : un ferry transportant 267 personnes fait au moins 6 morts',
+    title: 'Un ferry avec 267 personnes fait naufrage au large des côtes de la partie nord de Chypre, au moins six morts selon les autorités',
     category: 'International', score: 105, noveltyStateV78: 'new', informationValueV89: 86,
     editorialImportanceV78: 91, corroboratedV79: true, mergedCount: 2, sources: ['France 24', 'Reuters']
   },
   {
     id: 'swiss-shooting',
-    title: 'Suisse : une fusillade lors d’une rave party fait 1 mort et 5 blessés',
+    title: 'En Suisse, des coups de feu font un mort et cinq blessés en marge d’une rave party',
     category: 'Société', score: 101, noveltyStateV78: 'new', informationValueV89: 82,
     editorialImportanceV78: 84, corroboratedV79: true, mergedCount: 2, sources: ['AFP', 'RTS']
   },
@@ -125,10 +125,12 @@ try {
     assert.ok(!result.ids.includes(id), `${id} should not displace a more consequential event merely because of raw feed score`);
   }
   assert.ok(result.ranks['nepal-floods'] > result.ranks['free-ai'], 'large human impact must outweigh a consumer AI guide');
+  assert.ok(result.impact['cyprus-ferry'] >= 34, '"six morts" written in words must contribute human-toll impact');
+  assert.ok(result.impact['swiss-shooting'] >= 34, '"un mort et cinq blessés" plus gunfire must contribute human-toll and major-event impact');
   assert.ok(result.impact['free-ai'] < 0, 'consumer/how-to content should receive a Brief impact penalty');
   assert.equal(result.stats.lastChosen, 5);
 
-  console.log('v91.12 Brief captured-real-feed ranking passed.', JSON.stringify(result));
+  console.log('v91.12 Brief live-feed word-form ranking passed.', JSON.stringify(result));
 } finally {
   await browser.close();
 }
