@@ -28,8 +28,6 @@
     cacheInvalidations: 0
   };
 
-  let pendingTarget = '';
-  let leavingView = '';
   let suppressNextSilentRender = false;
   let suppressUntil = 0;
 
@@ -113,7 +111,14 @@
         const now = performance.now();
         const current = detectPageView();
         const targetFromMarkup = targetView(value);
-        const canSuppress = !pendingTarget
+        const transition = Boolean(
+          current
+          && targetFromMarkup
+          && current !== targetFromMarkup
+          && ['home', 'brief'].includes(current)
+          && ['home', 'brief'].includes(targetFromMarkup)
+        );
+        const canSuppress = !transition
           && suppressNextSilentRender
           && now <= suppressUntil
           && current
@@ -128,18 +133,11 @@
           return;
         }
 
-        if (!pendingTarget || !['home', 'brief'].includes(pendingTarget)) {
-          nativeInnerHTML.set.call(this, value);
-          return;
+        if (transition) {
+          stashCurrent(current);
+          if (restoreCached(targetFromMarkup)) return;
         }
 
-        const target = pendingTarget;
-        const from = leavingView;
-        pendingTarget = '';
-        leavingView = '';
-
-        if (from && from !== target) stashCurrent(from);
-        if (restoreCached(target)) return;
         nativeInnerHTML.set.call(this, value);
       }
     });
@@ -226,17 +224,6 @@
   document.documentElement.dataset.navigationPerformanceVersion = '91.11';
 
   document.addEventListener('click', event => {
-    const nav = event.target.closest?.('.bottom-nav [data-view="home"], .bottom-nav [data-view="brief"]');
-    if (nav) {
-      const target = nav.dataset.view;
-      const current = detectPageView();
-      if (current && current !== target) {
-        leavingView = current;
-        pendingTarget = target;
-      }
-      return;
-    }
-
     if (event.target.closest?.('[data-save], [data-saved-filter], [data-reset], [data-general-category], [data-interest], [data-brief-essential], [data-brief-watch], [data-topic-feedback], [data-quick-feedback]')) {
       clearCache();
     }
