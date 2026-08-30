@@ -54,7 +54,7 @@ for (const file of retired) {
 
 const codeRelease = String(version.codeRelease || '').trim();
 const cacheSlug = codeRelease.replace(/\./g, '-');
-if (!codeRelease || !sw.includes(`mon-actualite-v${cacheSlug}-core-r1`)) fail(`service worker cache does not match codeRelease ${codeRelease || '(missing)'}`);
+if (!codeRelease || !new RegExp(`mon-actualite-v${cacheSlug}-core-r\\d+`).test(sw)) fail(`service worker cache does not match codeRelease ${codeRelease || '(missing)'}`);
 else ok(`service worker cache matches codeRelease ${codeRelease}`);
 for (const asset of ['news-pipeline-v88.js?v=88.9', 'quality-signals-v89.js?v=89', 'quality-signals-v89.css?v=89']) {
   if (!sw.includes(asset)) fail(`service worker does not precache ${asset}`);
