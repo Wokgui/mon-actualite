@@ -53,23 +53,30 @@ await context.route('**/api/article-photo**', route => route.fulfill({ status: 2
 await context.route('https://oxdrhwveuctrorrkuurw.supabase.co/**', route => route.fulfill({ status: 200, contentType: 'application/json', body: '[]' }));
 
 const page = await context.newPage();
+const cardImage = '.article-card[data-article] img.article-image';
 
 try {
   await page.goto(baseUrl, { waitUntil: 'domcontentloaded' });
-  await page.waitForSelector('.article-card[data-article="visual-stability"] img.article-image', { timeout: 15000 });
+  await page.waitForSelector(cardImage, { timeout: 15000 });
   await page.waitForFunction(() => {
-    const image = document.querySelector('.article-card[data-article="visual-stability"] img.article-image');
+    const cache = JSON.parse(localStorage.getItem('news-live-cache') || '{}');
+    const article = (cache.articles || []).find(item => String(item.url || '').includes('/visual-stability'));
+    const image = article ? document.querySelector(`.article-card[data-article="${CSS.escape(String(article.id))}"] img.article-image`) : null;
     return Boolean(image?.complete && image.naturalWidth > 1 && window.__visualStabilityV918?.remembered >= 1);
   }, null, { timeout: 10000 });
 
   const initial = await page.evaluate(() => {
-    const image = document.querySelector('.article-card[data-article="visual-stability"] img.article-image');
+    const cache = JSON.parse(localStorage.getItem('news-live-cache') || '{}');
+    const article = (cache.articles || []).find(item => String(item.url || '').includes('/visual-stability'));
+    const image = article ? document.querySelector(`.article-card[data-article="${CSS.escape(String(article.id))}"] img.article-image`) : null;
     return {
+      articleId: String(article?.id || ''),
       src: image?.src || '',
       classes: image?.className || '',
       stats: { ...window.__visualStabilityV918 }
     };
   });
+  assert.ok(initial.articleId, 'normalized article id should be available from the live cache');
   assert.match(initial.src, /article-photo-fast/);
   assert.match(initial.src, /image=/);
   assert.match(initial.classes, /prepared-visual/);
@@ -78,19 +85,19 @@ try {
   revision = 2;
   await page.evaluate(() => window.dispatchEvent(new Event('online')));
 
-  await page.waitForFunction(expected => {
-    const image = document.querySelector('.article-card[data-article="visual-stability"] img.article-image');
+  await page.waitForFunction(({ id, expected }) => {
+    const image = document.querySelector(`.article-card[data-article="${CSS.escape(id)}"] img.article-image`);
     return image?.src === expected && window.__visualStabilityV918?.reused >= 1;
-  }, initial.src, { timeout: 10000 });
+  }, { id: initial.articleId, expected: initial.src }, { timeout: 10000 });
 
-  const after = await page.evaluate(() => {
-    const image = document.querySelector('.article-card[data-article="visual-stability"] img.article-image');
+  const after = await page.evaluate(id => {
+    const image = document.querySelector(`.article-card[data-article="${CSS.escape(id)}"] img.article-image`);
     return {
       src: image?.src || '',
       classes: image?.className || '',
       stats: { ...window.__visualStabilityV918 }
     };
-  });
+  }, initial.articleId);
 
   assert.equal(after.src, initial.src, 'rerender should keep the last successfully loaded visual URL');
   assert.match(after.classes, /prepared-visual/);
