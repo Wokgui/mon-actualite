@@ -36,13 +36,13 @@
   }
 
   function detectPageView() {
-    const active = app.querySelector('.bottom-nav .nav-item.active[data-view]')?.dataset.view || '';
-    if (active === 'home' || active === 'brief') return active;
     const page = app.querySelector(':scope > .page');
-    if (!page) return '';
-    if (page.querySelector('.runtime-brief-content, .brief-mode-tabs, .brief-points, .date-card')) return 'brief';
-    if (page.querySelector('.hero-header') && /mon actualité/i.test(page.textContent || '')) return 'home';
-    return '';
+    if (page) {
+      if (page.querySelector('.runtime-brief-content, .brief-mode-tabs, .brief-points, .date-card')) return 'brief';
+      if (page.querySelector('.hero-header') && /mon actualité/i.test(page.textContent || '')) return 'home';
+    }
+    const active = app.querySelector('.bottom-nav .nav-item.active[data-view]')?.dataset.view || '';
+    return active === 'home' || active === 'brief' ? active : '';
   }
 
   function targetView(markup = '') {
