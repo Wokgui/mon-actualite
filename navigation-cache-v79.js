@@ -46,10 +46,10 @@
   }
 
   function targetView(markup = '') {
-    const text = String(markup || '');
-    const match = text.match(/class="nav-item[^\"]*\bactive\b[^\"]*"[^>]*data-view="(home|brief)"/i)
-      || text.match(/data-view="(home|brief)"[^>]*class="nav-item[^\"]*\bactive\b/i);
-    return match?.[1] || '';
+    const template = document.createElement('template');
+    nativeInnerHTML.set.call(template, String(markup || ''));
+    const active = template.content.querySelector('.bottom-nav .nav-item.active[data-view]')?.dataset.view || '';
+    return active === 'home' || active === 'brief' ? active : '';
   }
 
   function savedOnlyHome() {
