@@ -2,6 +2,7 @@
 
 const coreHandler = require('../lib/news-core');
 const { mergeEventVariants } = require('../lib/news-dedup');
+const { rankCatalogArticles } = require('../lib/news-significance');
 
 const CATALOG_LIMIT = 90;
 
@@ -28,7 +29,8 @@ module.exports = async function handler(req, res) {
       if (Array.isArray(payload?.articles)) {
         const candidateItems = payload.articles.length;
         const uniqueCandidates = mergeEventVariants(payload.articles);
-        const articles = uniqueCandidates.slice(0, CATALOG_LIMIT);
+        const rankedCandidates = rankCatalogArticles(uniqueCandidates);
+        const articles = rankedCandidates.slice(0, CATALOG_LIMIT);
         payload.articles = articles;
         payload.stats = {
           ...(payload.stats || {}),
@@ -38,6 +40,9 @@ module.exports = async function handler(req, res) {
           eventDuplicatesRemoved: Math.max(0, candidateItems - uniqueCandidates.length),
           catalogLimit: CATALOG_LIMIT,
           catalogItems: articles.length,
+          catalogSignalV915: true,
+          catalogPositiveSignals: articles.filter(article => Number(article.catalogSignalV915 || 0) > 0).length,
+          catalogNegativeSignals: articles.filter(article => Number(article.catalogSignalV915 || 0) < 0).length,
           deduplicatedItems: articles.length
         };
         output = JSON.stringify(payload);
