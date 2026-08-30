@@ -5,6 +5,10 @@
   const MAX_STORY_GAP = 72 * 60 * 60 * 1000;
   const TITLE_MARK_RE = /\s*\[v86b\d+\]\s*$/i;
   const AGGREGATOR_HOST_RE = /(^|\.)news\.google\.|(^|\.)google\.com$|bing\.com$|feedly\.com$/i;
+  const STRICT_FEED_CATEGORIES = new Set(['Science','Santé','Tech','Économie','International']);
+  const SOCIETY_HARD_TITLE_RE = /\b(?:coups? de feu|fusillade|meurtre|homicide|agression|braquage|rave party|rave-party|police judiciaire|gendarmerie)\b/i;
+  const SCIENCE_HARD_TITLE_RE = /\b(?:einstein|physique|quantique|cosmologie|cosmologique|astronomie|astronomique|relativite|relativité|trou noir|trous noirs|particule|particules|telescope|télescope|nasa|esa)\b/i;
+  const ENERGY_HARD_TITLE_RE = /\b(?:electricite|électricité|centrale|reseau electrique|réseau électrique|eolien|éolien|solaire|hydrogene|hydrogène|gaz naturel|batterie|batteries)\b/i;
   const root = typeof window !== 'undefined' ? window : globalThis;
   const upstreamFetch = typeof window !== 'undefined' && typeof window.fetch === 'function'
     ? window.fetch.bind(window)
@@ -34,6 +38,22 @@
       title = title.replace(new RegExp(`\\s*[-–—|·:]\\s*${escaped}\\s*$`, 'i'), '').trim();
     }
     return title;
+  }
+
+  function obviousCategoryCorrection(article = {}) {
+    const current = clean(article.category || '');
+    const title = titleCore(article);
+    if (!current || !title) return current;
+
+    if (STRICT_FEED_CATEGORIES.has(current) && SOCIETY_HARD_TITLE_RE.test(title)) {
+      return 'Société';
+    }
+
+    if (current === 'Énergie' && SCIENCE_HARD_TITLE_RE.test(title) && !ENERGY_HARD_TITLE_RE.test(title)) {
+      return 'Science';
+    }
+
+    return current;
   }
 
   function canonicalUrl(value = '') {
@@ -148,8 +168,17 @@
   function transformPayload(payload) {
     if (!payload || !Array.isArray(payload.articles)) return payload;
 
+    let categoryCorrections = 0;
     const articles = payload.articles.map(article => {
       const copy = { ...article };
+      const originalCategory = clean(copy.category || '');
+      const correctedCategory = obviousCategoryCorrection(copy);
+      if (correctedCategory && correctedCategory !== originalCategory) {
+        copy.categoryOriginalV912 = originalCategory;
+        copy.category = correctedCategory;
+        copy.categoryCorrectedV912 = true;
+        categoryCorrections += 1;
+      }
       copy.scoreV91Base = Number.isFinite(Number(copy.scoreV91Base))
         ? Number(copy.scoreV91Base)
         : Number(copy.score || 0);
@@ -204,7 +233,9 @@
       ...(payload.stats || {}),
       leadChoiceV91: true,
       leadComparedGroupsV91: comparedGroups,
-      leadDirectPreferredV91: preferredDirect
+      leadDirectPreferredV91: preferredDirect,
+      categoryGuardV912: true,
+      categoryCorrectionsV912: categoryCorrections
     };
     return payload;
   }
@@ -223,11 +254,12 @@
   root.__leadChoiceV91 = {
     leadQuality,
     sameCandidateStory,
+    obviousCategoryCorrection,
     transformPayload
   };
 
   if (typeof document !== 'undefined') {
-    document.documentElement.dataset.leadChoiceVersion = '91';
+    document.documentElement.dataset.leadChoiceVersion = '91.2';
   }
 
   if (!upstreamFetch || typeof window === 'undefined') return;
