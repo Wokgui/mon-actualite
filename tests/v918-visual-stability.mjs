@@ -60,26 +60,35 @@ try {
   assert.match(initial.src, /image=/);
   assert.match(initial.classes, /prepared-visual/);
 
+  const baselineReused = Number(initial.stats.reused || 0);
+  const baselinePrevented = Number(initial.stats.preventedChanges || 0);
+
+  // Reproduce what the historical visual layers actually do: mutate the src
+  // and classes of the already-rendered image. Do not replace #app, because
+  // the application itself legitimately rebuilds that container.
   await page.evaluate(id => {
-    const app = document.getElementById('app');
-    app.innerHTML = `<article class="article-card" data-article="${id}"><img class="article-image original-article-image stable-visual source-tile-visual" src="/api/article-photo-fast?v=85&url=https%3A%2F%2Fexample.test%2Fvisual-stability&title=regenerated" alt=""></article>`;
+    const image = document.querySelector(`.article-card[data-article="${CSS.escape(id)}"] img.article-image`);
+    if (!image) throw new Error('target image missing');
+    image.classList.remove('prepared-visual');
+    image.classList.add('source-tile-visual');
+    image.src = '/api/article-photo-fast?v=85&url=https%3A%2F%2Fexample.test%2Fvisual-stability&title=regenerated';
   }, initial.articleId);
 
-  await page.waitForFunction(({ id, expected }) => {
+  await page.waitForFunction(({ id, expected, baselineReused }) => {
     const image = document.querySelector(`.article-card[data-article="${CSS.escape(id)}"] img.article-image`);
-    return image?.src === expected && window.__visualStabilityV918?.reused >= 1;
-  }, { id: initial.articleId, expected: initial.src }, { timeout: 5000 });
+    return image?.src === expected && Number(window.__visualStabilityV918?.reused || 0) > baselineReused;
+  }, { id: initial.articleId, expected: initial.src, baselineReused }, { timeout: 5000 });
 
   const after = await page.evaluate(id => {
     const image = document.querySelector(`.article-card[data-article="${CSS.escape(id)}"] img.article-image`);
     return { src: image?.src || '', classes: image?.className || '', stats: { ...window.__visualStabilityV918 } };
   }, initial.articleId);
 
-  assert.equal(after.src, initial.src, 'rerender should restore the last successfully loaded visual URL');
+  assert.equal(after.src, initial.src, 'layered rerender should restore the last successfully loaded visual URL');
   assert.match(after.classes, /prepared-visual/);
   assert.doesNotMatch(after.classes, /source-tile-visual/);
-  assert.ok(after.stats.reused >= 1);
-  assert.ok(after.stats.preventedChanges >= 1);
+  assert.ok(Number(after.stats.reused || 0) > baselineReused);
+  assert.ok(Number(after.stats.preventedChanges || 0) > baselinePrevented);
   assert.ok(preparedRequests >= 1);
   assert.ok(regeneratedRequests <= 1, `unexpected repeated regenerated image requests: ${regeneratedRequests}`);
 
