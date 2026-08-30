@@ -1,5 +1,5 @@
 {
   "version": "60",
   "release": "2026-08-30",
-  "label": "v91.1 (socle v91 / v90.1) : appels IA lourds sérialisés et dédupliqués pour éviter les limites Groq"
+  "label": "v91.1 (socle v91 / v90.1 / v89) : appels IA lourds sérialisés et dédupliqués pour éviter les limites Groq"
 }
