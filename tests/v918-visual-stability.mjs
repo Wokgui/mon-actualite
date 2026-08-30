@@ -89,7 +89,8 @@ try {
   assert.doesNotMatch(after.classes, /source-tile-visual/);
   assert.ok(Number(after.stats.reused || 0) > baselineReused);
   assert.ok(Number(after.stats.preventedChanges || 0) > baselinePrevented);
-  assert.ok(preparedRequests >= 1);
+  // The service worker may satisfy the prepared image from its cache before
+  // Playwright's network route sees it, so request-counting is only diagnostic.
   assert.ok(regeneratedRequests <= 1, `unexpected repeated regenerated image requests: ${regeneratedRequests}`);
 
   console.log('v91.8 visual stability browser check passed.', JSON.stringify({ preparedRequests, regeneratedRequests, stats: after.stats }));
