@@ -4,8 +4,12 @@
   const CACHE_KEY = 'news-live-cache';
   const SNAPSHOT_KEY = 'news-brief-facts-v87';
   const LAST_KEY = 'news-brief-last-open-v87';
-  let active = false;
+  const upstreamFetch = window.fetch.bind(window);
   let queued = false;
+  let lastView = '';
+  let visitPrevious = null;
+  let visitPreviousAt = 0;
+  let visitCommitted = false;
 
   function readJson(key, fallback) {
     try { return JSON.parse(localStorage.getItem(key) || 'null') ?? fallback; }
@@ -26,6 +30,10 @@
 
   function currentView() {
     return document.querySelector('.bottom-nav .nav-item.active[data-view]')?.dataset.view || '';
+  }
+
+  function currentBriefMode() {
+    return document.querySelector('.brief-mode-tab.active[data-brief-mode]')?.dataset.briefMode || 'essential';
   }
 
   function publishedAt(article = {}) {
@@ -125,42 +133,138 @@
     return clean(value).replace(/[&<>]/g, char => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;' }[char]));
   }
 
-  function render() {
-    queued = false;
-    const page = document.querySelector('.page');
-    const originalList = page?.querySelector('.brief-points');
-    const isBrief = Boolean(originalList) || currentView() === 'brief';
-    if (!isBrief) {
-      active = false;
-      return;
+  function beginVisitIfNeeded(view) {
+    if (view === 'brief' && lastView !== 'brief') {
+      visitPrevious = readJson(SNAPSHOT_KEY, []);
+      visitPreviousAt = Number(localStorage.getItem(LAST_KEY) || 0);
+      visitCommitted = false;
+    } else if (view !== 'brief' && lastView === 'brief') {
+      visitPrevious = null;
+      visitPreviousAt = 0;
+      visitCommitted = false;
     }
-    if (!page || !originalList) {
-      active = false;
-      return;
+    lastView = view;
+  }
+
+  function suppressWatchSummaryFetch(input, init) {
+    try {
+      const raw = typeof input === 'string' ? input : input?.url || '';
+      const url = new URL(raw, location.href);
+      if (url.origin !== location.origin || url.pathname !== '/api/article-summary-groq') return null;
+      const body = typeof init?.body === 'string' ? JSON.parse(init.body) : null;
+      if (body?.mode !== 'category') return null;
+      return new Response(JSON.stringify({ summary: '', unavailable: true, suppressedV90: true }), {
+        status: 200,
+        headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-store' }
+      });
+    } catch {
+      return null;
     }
+  }
 
-    if (active && page.querySelector('.brief-smart-v87')) return;
-    active = true;
+  window.fetch = function briefAwareFetch(input, init) {
+    const local = suppressWatchSummaryFetch(input, init);
+    if (local) return Promise.resolve(local);
+    return upstreamFetch(input, init);
+  };
 
-    const cache = readJson(CACHE_KEY, {});
-    const articles = Array.isArray(cache.articles) ? cache.articles : [];
-    const previous = readJson(SNAPSHOT_KEY, []);
-    const previousAt = Number(localStorage.getItem(LAST_KEY) || 0);
-    const { firstBrief, chosen } = selectFacts(articles, previous, previousAt);
+  function removeWatchSummary() {
+    document.querySelectorAll('.runtime-category-summary').forEach(node => node.remove());
+  }
 
-    writeJson(SNAPSHOT_KEY, articles.slice(0, 80).map(snapshotEntry));
-    try { localStorage.setItem(LAST_KEY, String(Date.now())); } catch {}
+  function restoreRuntimeContent(runtime) {
+    if (!runtime) return;
+    for (const child of [...runtime.children]) {
+      if (child.classList.contains('brief-smart-v87')) continue;
+      if (child.dataset.briefSmartOriginalV90 === '1') {
+        child.hidden = false;
+        delete child.dataset.briefSmartOriginalV90;
+      }
+    }
+  }
 
-    originalList.hidden = true;
-    const legacyStatus = page.querySelector('.brief-diff-v80');
-    if (legacyStatus) legacyStatus.hidden = true;
+  function removeSmartSections() {
+    for (const section of document.querySelectorAll('.brief-smart-v87')) {
+      const runtime = section.closest('.runtime-brief-content');
+      if (runtime) restoreRuntimeContent(runtime);
+      const legacy = section.parentElement?.querySelector('.brief-points');
+      if (legacy) legacy.hidden = false;
+      section.remove();
+    }
+  }
 
+  function ensureRuntimeSection(runtime) {
+    let section = runtime.querySelector(':scope > .brief-smart-v87');
+    if (!section) {
+      section = document.createElement('section');
+      section.className = 'brief-smart-v87';
+      runtime.prepend(section);
+    }
+    for (const child of [...runtime.children]) {
+      if (child === section) continue;
+      child.dataset.briefSmartOriginalV90 = '1';
+      child.hidden = true;
+    }
+    return section;
+  }
+
+  function ensureLegacySection(page, originalList) {
     let section = page.querySelector('.brief-smart-v87');
     if (!section) {
       section = document.createElement('section');
       section.className = 'brief-smart-v87';
       originalList.insertAdjacentElement('beforebegin', section);
     }
+    originalList.hidden = true;
+    const legacyStatus = page.querySelector('.brief-diff-v80');
+    if (legacyStatus) legacyStatus.hidden = true;
+    return section;
+  }
+
+  function render() {
+    queued = false;
+    removeWatchSummary();
+
+    const view = currentView();
+    beginVisitIfNeeded(view);
+    if (view !== 'brief') {
+      removeSmartSections();
+      return;
+    }
+
+    const page = document.querySelector('.page');
+    if (!page) return;
+
+    const runtime = page.querySelector('.runtime-brief-content');
+    if (runtime && currentBriefMode() === 'watches') {
+      removeSmartSections();
+      removeWatchSummary();
+      return;
+    }
+
+    const originalList = page.querySelector('.brief-points');
+    if (!runtime && !originalList) return;
+
+    if (visitPrevious === null) {
+      visitPrevious = readJson(SNAPSHOT_KEY, []);
+      visitPreviousAt = Number(localStorage.getItem(LAST_KEY) || 0);
+      visitCommitted = false;
+    }
+
+    const cache = readJson(CACHE_KEY, {});
+    const articles = Array.isArray(cache.articles) ? cache.articles : [];
+    const { firstBrief, chosen } = selectFacts(articles, visitPrevious, visitPreviousAt);
+
+    if (!visitCommitted) {
+      writeJson(SNAPSHOT_KEY, articles.slice(0, 80).map(snapshotEntry));
+      try { localStorage.setItem(LAST_KEY, String(Date.now())); } catch {}
+      visitCommitted = true;
+    }
+
+    const section = runtime ? ensureRuntimeSection(runtime) : ensureLegacySection(page, originalList);
+    const signature = `${firstBrief ? 'first' : 'diff'}|${chosen.map(item => item.article.id).join('|')}`;
+    if (section.dataset.briefSmartSignatureV90 === signature) return;
+    section.dataset.briefSmartSignatureV90 = signature;
 
     if (!chosen.length) {
       section.innerHTML = `<div class="brief-smart-head-v87"><strong>Aucun fait majeur nouveau</strong><span>Le Brief ne répète pas les éléments déjà vus.</span></div><button type="button" class="brief-full-v87" data-brief-full-v87>Voir le Brief complet</button>`;
@@ -173,9 +277,8 @@
 
     section.innerHTML = `<div class="brief-smart-head-v87"><strong>${label}</strong><span>${firstBrief ? 'Les prochaines consultations ne montreront que les changements.' : 'Uniquement les informations nouvelles ou réellement modifiées.'}</span></div>
       <div class="brief-facts-v87">${chosen.map(({ article }) => {
-        const sources = new Set([article.source, ...(Array.isArray(article.sources) ? article.sources : [])].map(clean).filter(Boolean)).size;
-        const meta = [clean(article.category || ''), sources >= 2 ? `${sources} sources` : clean(article.source || '')].filter(Boolean).join(' · ');
-        return `<button type="button" class="brief-fact-v87" data-article="${String(article.id || '').replace(/"/g, '&quot;')}"><span class="brief-fact-text-v87">${escapeHtml(factFor(article))}</span><small>${escapeHtml(meta)}</small></button>`;
+        const meta = clean(article.category || '');
+        return `<button type="button" class="brief-fact-v87" data-article="${String(article.id || '').replace(/"/g, '&quot;')}"><span class="brief-fact-text-v87">${escapeHtml(factFor(article))}</span>${meta ? `<small>${escapeHtml(meta)}</small>` : ''}</button>`;
       }).join('')}</div>
       <button type="button" class="brief-full-v87" data-brief-full-v87>Voir le Brief complet</button>`;
   }
@@ -189,27 +292,35 @@
   document.addEventListener('click', event => {
     const navBrief = event.target.closest?.('.bottom-nav [data-view="brief"]');
     if (navBrief) {
-      // The capture handler runs before app.js navigates. Run again just after
-      // the bubbling handler has swapped the page, then once more after the
-      // navigation cache has settled.
       setTimeout(schedule, 0);
       setTimeout(schedule, 120);
+      setTimeout(schedule, 320);
     }
 
     const button = event.target.closest?.('[data-brief-full-v87]');
     if (!button) return;
     event.preventDefault();
     event.stopImmediatePropagation();
-    const page = document.querySelector('.page');
-    const list = page?.querySelector('.brief-points');
-    const section = page?.querySelector('.brief-smart-v87');
-    if (!list || !section) return;
-    const showing = !list.hidden;
-    list.hidden = showing;
-    section.querySelector('.brief-facts-v87')?.toggleAttribute('hidden', !showing);
-    button.textContent = showing ? 'Voir le Brief complet' : 'Revenir aux faits nouveaux';
-    const legacyStatus = page.querySelector('.brief-diff-v80');
-    if (legacyStatus) legacyStatus.hidden = true;
+
+    const section = button.closest('.brief-smart-v87');
+    if (!section) return;
+    const showingFull = button.dataset.fullV90 === '1';
+    const runtime = section.closest('.runtime-brief-content');
+    const page = section.closest('.page');
+    const legacy = page?.querySelector('.brief-points');
+
+    if (runtime) {
+      for (const child of [...runtime.children]) {
+        if (child === section) continue;
+        if (child.dataset.briefSmartOriginalV90 === '1') child.hidden = showingFull;
+      }
+    }
+    if (legacy) legacy.hidden = showingFull;
+
+    section.querySelector('.brief-smart-head-v87')?.toggleAttribute('hidden', !showingFull);
+    section.querySelector('.brief-facts-v87')?.toggleAttribute('hidden', !showingFull);
+    button.dataset.fullV90 = showingFull ? '0' : '1';
+    button.textContent = showingFull ? 'Voir le Brief complet' : 'Revenir aux faits nouveaux';
   }, true);
 
   document.addEventListener('DOMContentLoaded', () => {
@@ -217,4 +328,5 @@
     schedule();
   }, { once: true });
   window.addEventListener('focus', schedule);
+  document.addEventListener('visibilitychange', () => { if (!document.hidden) schedule(); });
 })();
