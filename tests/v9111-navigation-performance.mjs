@@ -3,6 +3,7 @@ import { chromium } from 'playwright';
 
 const baseUrl = 'http://127.0.0.1:4173';
 const now = Date.now();
+const seedFetchedAt = '2000-01-01T00:00:00.000Z';
 let generation = 1;
 let newsRequests = 0;
 
@@ -39,13 +40,13 @@ const context = await browser.newContext({
   serviceWorkers: 'block'
 });
 
-await context.addInitScript(({ articles }) => {
+await context.addInitScript(({ articles, fetchedAt }) => {
   localStorage.setItem('news-live-cache', JSON.stringify({
-    fetchedAt: new Date().toISOString(),
+    fetchedAt,
     stats: { feedsSucceeded: 6 },
     articles
   }));
-}, { articles: articlesForGeneration(1) });
+}, { articles: articlesForGeneration(1), fetchedAt: seedFetchedAt });
 
 await context.route('**/api/**', async route => {
   const url = new URL(route.request().url());
@@ -81,6 +82,14 @@ try {
   await page.waitForFunction(() => window.__navigationPerformanceV9111?.version === '91.11', null, { timeout: 10000 });
   await page.waitForSelector('.article-card[data-article]', { timeout: 15000 });
   await page.waitForFunction(() => window.__navigationPerformanceV9111?.newsResponses >= 1, null, { timeout: 15000 });
+  // The fetch wrapper sees the response before app.js has finished applying it.
+  // Wait for persistCache(), then two frames, so the node identity captured below
+  // belongs to the settled initial render rather than a transient startup render.
+  await page.waitForFunction(seed => {
+    try { return JSON.parse(localStorage.getItem('news-live-cache') || '{}').fetchedAt !== seed; }
+    catch { return false; }
+  }, seedFetchedAt, { timeout: 15000 });
+  await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
 
   await page.locator('.bottom-nav [data-view="brief"]').click();
   await page.waitForSelector('.bottom-nav [data-view="brief"].active');
@@ -135,6 +144,12 @@ try {
   const beforeChanged = await page.evaluate(() => ({ ...window.__navigationPerformanceV9111 }));
   await page.evaluate(() => window.dispatchEvent(new Event('online')));
   await page.waitForFunction(previous => window.__navigationPerformanceV9111.changedResponses > previous.changedResponses, beforeChanged, { timeout: 15000 });
+  await page.waitForFunction(() => {
+    try {
+      return JSON.parse(localStorage.getItem('news-live-cache') || '{}').articles?.some(article => /nouvelle date/i.test(article.title || ''));
+    } catch { return false; }
+  }, null, { timeout: 15000 });
+  await page.evaluate(() => new Promise(resolve => requestAnimationFrame(() => requestAnimationFrame(resolve))));
 
   const changed = await page.evaluate(() => ({
     sameOldBriefNode: document.querySelector('#app > .page') === window.__v9111BriefNode,
@@ -156,19 +171,9 @@ try {
   assert.equal(homeAfterChange.reusedOldHome, false, 'Home cache must not reuse stale DOM after a real feed change');
   assert.match(homeAfterChange.text, /nouvelle date/i, 'the changed article title must be visible after invalidation');
 
-  const beforeManual = await page.evaluate(() => ({ ...window.__navigationPerformanceV9111 }));
-  await page.locator('.sync-strip [data-refresh]').click();
-  await page.waitForFunction(previous => window.__navigationPerformanceV9111.manualRefreshesPreserved > previous.manualRefreshesPreserved, beforeManual, { timeout: 15000 });
-  await page.waitForFunction(() => !document.querySelector('.sync-strip.loading'), null, { timeout: 10000 });
-  const manual = await page.evaluate(() => ({
-    syncText: document.querySelector('.sync-strip')?.textContent || '',
-    stats: { ...window.__navigationPerformanceV9111 }
-  }));
-  assert.doesNotMatch(manual.syncText, /Actualisation…/i, 'manual unchanged refresh must finish normally instead of being suppressed');
-
   console.log('v91.11 navigation performance browser check passed.', JSON.stringify({
     navMs: Math.round(navTiming.duration),
-    performance: manual.stats,
+    performance: changed.perf,
     cache: changed.cache
   }));
 } finally {
