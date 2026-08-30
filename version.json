@@ -1,6 +1,6 @@
 {
   "version": "60",
-  "codeRelease": "91.12",
+  "codeRelease": "91.14",
   "release": "2026-08-30",
-  "label": "v91.12 (socle v91.11 / v91.10 / v91.9 / v91.8 / v91.7 / v91.6 / v91.5 / v91.3 / v90.1 / v89) : résumé prioritaire après ouverture d’un article ; filtre serveur contre les résumés inutiles ou trompeurs ; Brief limité aux 5 événements les plus substantiels avec classement par importance, valeur informationnelle, impact et recoupement"
+  "label": "v91.14 (socle v91.13.1 / v91.13 / v91.12.2 / v91.12.1 / v91.12 / v91.11 / v91.10 / v91.9 / v91.8 / v91.7 / v91.6 / v91.5 / v91.3 / v90.1 / v89) : résumé prioritaire et filtré ; Brief limité aux 5 événements les plus substantiels ; catégories fiabilisées sur le contenu réel ; déduplication sémantique serveur avant l’Accueil et le Brief avec recoupement multi-source conservé"
 }
