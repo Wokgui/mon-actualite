@@ -1,4 +1,4 @@
-import { articleVisualUrl, hasPreparedVisual, preparedVisualUrl, sourceTileUrl } from './services/article-visuals.js?v=57';
+import { articleVisualUrl, hasPreparedVisual, sourceTileUrl } from './services/article-visuals.js?v=57';
 
 const GENERAL = ['Politique','International','Économie','Société','Santé','Environnement','Science','Culture','Éducation','Europe'];
 const PERSONAL = ['IA','Tech','Smartphones','VR','Automobile','Énergie'];
@@ -8,9 +8,6 @@ let briefMode = 'essential';
 let briefCategory = null;
 let homeLimit = 36;
 const summaryRequests = new Map();
-const warmedVisuals = new Set();
-const pendingVisuals = [];
-let visualWarmScheduled = false;
 
 function readJson(key, fallback) {
   try { return JSON.parse(localStorage.getItem(key) || 'null') ?? fallback; }
@@ -95,39 +92,10 @@ function importanceArticles() {
 }
 
 function rowImageMarkup(article, index = 0) {
-  const priority = index < 8;
+  const priority = index < 4;
   const prepared = hasPreparedVisual(article);
   const tile = sourceTileUrl(article);
   return `<img class="article-image original-article-image stable-visual ${prepared ? 'prepared-visual' : 'source-tile-visual'}" src="${esc(articleVisualUrl(article))}" alt="" width="400" height="224" loading="${priority ? 'eager' : 'lazy'}" decoding="async" referrerpolicy="no-referrer" style="background-image:url('${esc(tile)}');background-size:cover" ${index < 4 ? 'fetchpriority="high"' : ''}>`;
-}
-
-function warmPreparedVisuals(articles) {
-  const urls = articles.map(preparedVisualUrl).filter(url => url && !warmedVisuals.has(url));
-  urls.forEach(url => { warmedVisuals.add(url); pendingVisuals.push(url); });
-  if (!pendingVisuals.length || visualWarmScheduled) return;
-  visualWarmScheduled = true;
-  const run = async () => {
-    const worker = async () => {
-      while (pendingVisuals.length) {
-        const url = pendingVisuals.shift();
-        await new Promise(resolve => {
-          const image = document.createElement('img');
-          const done = () => { image.onload = null; image.onerror = null; resolve(); };
-          const timeout = setTimeout(done, 5000);
-          image.onload = image.onerror = () => { clearTimeout(timeout); done(); };
-          image.decoding = 'async';
-          image.fetchPriority = 'low';
-          image.referrerPolicy = 'no-referrer';
-          image.src = url;
-        });
-      }
-    };
-    await Promise.all(Array.from({ length: Math.min(4, pendingVisuals.length) }, worker));
-    visualWarmScheduled = false;
-    if (pendingVisuals.length) warmPreparedVisuals([]);
-  };
-  if ('requestIdleCallback' in window) requestIdleCallback(run, { timeout: 800 });
-  else setTimeout(run, 120);
 }
 
 function compactRow(article, index = 0) {
@@ -183,7 +151,6 @@ function enhanceHome() {
     const shown = articles.slice(0, homeLimit);
     const remaining = Math.max(0, articles.length - shown.length);
     feed.innerHTML = `${shown.map((article, index) => compactRow(article, index)).join('')}${remaining ? `<button type="button" class="home-more" data-home-more>Afficher ${Math.min(36, remaining)} articles de plus <small>${remaining} encore disponibles</small></button>` : ''}`;
-    warmPreparedVisuals(shown.slice(0, 36));
   }
 }
 
