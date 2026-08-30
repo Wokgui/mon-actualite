@@ -5,10 +5,19 @@
   const SNAPSHOT_KEY = 'news-brief-facts-v87';
   const LAST_KEY = 'news-brief-last-open-v87';
   const MAX_SEMANTIC_GAP_MS = 24 * 60 * 60 * 1000;
+  const MAX_BRIEF_FACTS = 5;
   const BRIEF_STOP = new Set('avec dans pour plus apres avant cette cet ces sont etre leur leurs tout tous mais sans vers entre une des les sur qui que aux par son ses est fait font comme dont elle elles ils nous vous notre votre aussi encore deja tres moins depuis alors chez contre lors peut peuvent avait avoir sera un le la du de au en et ou ce se sa ne pas actualite direct video photos photo selon annonce nouvelle nouveau nouvelles nouveaux article sous'.split(' '));
   const BRIEF_EVENT_TOKENS = new Set(['outcome','vote','negotiation']);
+  const CONSUMER_RX = /\b(comparatif|guide d['’]achat|meilleur(?:e|s)?|bon plan|promo(?:tion)?|soldes?|prix|acheter|test(?:é|er)?|prise en main|avis|astuce|comment faire|ce que vous pouvez|sans débourser|gratuitement|gratuit|offre|abonnement)\b/i;
+  const REACTION_RX = /\b(réagit|réaction|se confie|confidences?|donne son avis|tacle|coup de gueule|s['’]indigne|buzz|polémique|réseaux sociaux|les internautes)\b/i;
+  const SPORTS_RX = /\b(match|football|tennis|cyclisme|tour de france|pogacar|ligue 1|champions league|grand prix|formule 1|mercato|but(?:s)?|score final)\b/i;
+  const HISTORICAL_RX = /\b(il y a \d+ ans|archives?|histoire méconnue|en \d{4},|au siècle dernier)\b/i;
+  const HUMAN_TOLL_RX = /\b(?:au moins\s+)?(\d{1,4})\s+(?:morts?|décès|victimes?|blessés?|disparus?)\b/i;
+  const MAJOR_EVENT_RX = /\b(inondations?|séisme|tremblement de terre|ouragan|cyclone|incendie majeur|naufrage|catastrophe|guerre|invasion|frappes?|missiles?|cessez[- ]le[- ]feu|attentat|référendum|élections?|scrutin|vote|adopte|rejette|condamne|démissionne|sanctions?|accord de paix|état d['’]urgence)\b/i;
+  const PUBLIC_DECISION_RX = /\b(loi|réforme|gouvernement|parlement|cour suprême|conseil constitutionnel|commission européenne|union européenne|banque centrale|bce|fed|interdit|autorise|valide|annule|officialise)\b/i;
+  const SCIENCE_BREAKTHROUGH_RX = /\b(découverte|découvre|démontre|première mondiale|essai clinique|traitement|vaccin|mission spatiale|lancement spatial|télescope|nasa|esa)\b/i;
   const upstreamFetch = window.fetch.bind(window);
-  const briefStats = { version: '91.10', lastDeduped: 0, lastCandidates: 0, lastChosen: 0 };
+  const briefStats = { version: '91.12', lastDeduped: 0, lastCandidates: 0, lastChosen: 0, lastTopScores: [] };
   let queued = false;
   let lastView = '';
   let visitPrevious = null;
@@ -142,25 +151,69 @@
     return first.slice(0, 280);
   }
 
+  function summaryUsableForBrief(article = {}) {
+    if (article.summaryNeedsFetchV919) return false;
+    if (/headline-cluster|title-restatement|aggregate|rejected/i.test(clean(article.summaryQualityV919 || article.summaryQuality || ''))) return false;
+    const summary = clean(article.summary || article.detail || '');
+    if (summary.length < 55) return false;
+    const title = clean(article.title || '');
+    const titleTokens = briefTokens({ title });
+    const summaryTokens = briefTokens({ title: summary });
+    if (titleTokens.length >= 4 && summaryTokens.length >= 3) {
+      const overlap = semanticOverlap(titleTokens, summaryTokens);
+      const extra = summaryTokens.filter(token => !titleTokens.some(titleToken => tokenEquivalent(titleToken, token))).length;
+      if (overlap.coverage >= 0.86 && extra <= 3 && summary.length <= Math.max(190, title.length * 1.65)) return false;
+    }
+    return true;
+  }
+
   function factFor(article = {}) {
     const delta = clean(article.deltaPreviewV81 || '');
     if (delta.length >= 45) return sentence(delta) || delta.slice(0, 280);
-    const summary = clean(article.summary || article.detail || '');
-    if (summary.length >= 55) return sentence(summary);
+    if (summaryUsableForBrief(article)) return sentence(article.summary || article.detail || '');
     return clean(article.title || '').slice(0, 280);
   }
 
-  function importance(article = {}) {
-    let value = Number(article.score || 0);
-    if (article.essential) value += 80;
-    value += Number(article.editorialImportanceV78 || article.editorialImportance || 0) * 0.7;
-    if (article.noveltyStateV78 === 'development') value += 24;
-    else if (article.noveltyStateV78 === 'new') value += 15;
-    else if (article.noveltyStateV78 === 'minor-update') value += 8;
-    if (article.corroboratedV79 || Number(article.mergedCount || 0) >= 2) value += 7;
-    if (Number(article.informationValueV89 || 0) >= 75) value += 8;
-    if (article.lowInformationV89) value -= 18;
+  function sourceCount(article = {}) {
+    return new Set([article.source, ...(Array.isArray(article.sources) ? article.sources : [])].map(normalize).filter(Boolean)).size;
+  }
+
+  function impactScore(article = {}) {
+    const text = clean(`${article.title || ''} ${article.summary || article.detail || ''}`);
+    let value = 0;
+    const human = text.match(HUMAN_TOLL_RX);
+    if (human) {
+      const count = Number(human[1] || 0);
+      value += count >= 100 ? 34 : count >= 10 ? 27 : 19;
+    }
+    if (MAJOR_EVENT_RX.test(text)) value += 15;
+    if (PUBLIC_DECISION_RX.test(text)) value += 9;
+    if (SCIENCE_BREAKTHROUGH_RX.test(text)) value += 7;
+    if (CONSUMER_RX.test(text) && !human && !article.essential) value -= 25;
+    if (REACTION_RX.test(text) && !human && !article.essential) value -= 18;
+    if (SPORTS_RX.test(text) && !human && !article.essential) value -= 18;
+    if (HISTORICAL_RX.test(text) && !article.essential) value -= 16;
+    if (/\?$/.test(titleText(article))) value -= 6;
     return value;
+  }
+
+  function importance(article = {}) {
+    const raw = Number(article.score || article.editorialScore || 0);
+    const editorial = Number(article.editorialImportanceV78 || article.editorialImportance || 0);
+    const informationRaw = Number(article.informationValueV89 || 0);
+    const information = informationRaw > 0 ? informationRaw : 50;
+    let value = raw * 0.34 + editorial * 1.08 + information * 0.72 + impactScore(article);
+    if (article.essential) value += 46;
+    if (article.noveltyStateV78 === 'development') value += 20;
+    else if (article.noveltyStateV78 === 'new') value += 12;
+    else if (article.noveltyStateV78 === 'minor-update') value += 5;
+    const sources = sourceCount(article);
+    if (article.corroboratedV79 || Number(article.mergedCount || 0) >= 2 || sources >= 2) value += 9 + Math.min(5, Math.max(0, sources - 2) * 2);
+    if (information >= 82) value += 8;
+    else if (information < 45) value -= 12;
+    if (article.lowInformationV89) value -= 34;
+    if (article.titleSupportV83 === 'weak') value -= 10;
+    return Math.round(value * 10) / 10;
   }
 
   function snapshotEntry(article = {}) {
@@ -203,34 +256,39 @@
     };
 
     for (const item of candidates) {
-      if (chosen.length >= 8) break;
+      if (chosen.length >= MAX_BRIEF_FACTS) break;
       if (duplicateAlreadyChosen(item)) continue;
       const cat = clean(item.article.category || 'Autres');
       const count = categoryCounts.get(cat) || 0;
-      if (count >= 2 && !item.article.essential && chosen.length >= 4) continue;
+      if (count >= 2 && !item.article.essential && chosen.length >= 3) continue;
       chosen.push(item);
       categoryCounts.set(cat, count + 1);
     }
-    if (firstBrief && chosen.length < Math.min(5, candidates.length)) {
+    if (firstBrief && chosen.length < Math.min(MAX_BRIEF_FACTS, candidates.length)) {
       for (const item of candidates) {
         if (chosen.includes(item) || duplicateAlreadyChosen(item)) continue;
         chosen.push(item);
-        if (chosen.length >= Math.min(5, candidates.length)) break;
+        if (chosen.length >= Math.min(MAX_BRIEF_FACTS, candidates.length)) break;
       }
     }
 
     briefStats.lastDeduped = suppressedIds.size;
     briefStats.lastCandidates = candidates.length;
     briefStats.lastChosen = chosen.length;
+    briefStats.lastTopScores = chosen.map(item => ({ id: String(item.article.id || ''), score: item.rank })).slice(0, MAX_BRIEF_FACTS);
     return { firstBrief, chosen };
   }
 
-  window.__briefSmartV9110 = {
-    version: '91.10',
+  const publicBrief = {
+    version: '91.12',
     stats: briefStats,
     sameEvent: (a, b) => sameBriefEvent(a, b),
+    rank: article => importance(article),
+    impactScore: article => impactScore(article),
     selectIds: articles => selectFacts(Array.isArray(articles) ? articles : [], [], 0).chosen.map(item => String(item.article.id || ''))
   };
+  window.__briefSmartV9110 = publicBrief;
+  window.__briefSmartV9112 = publicBrief;
 
   function escapeHtml(value = '') {
     return clean(value).replace(/[&<>]/g, char => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;' }[char]));
