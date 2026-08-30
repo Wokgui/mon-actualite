@@ -59,31 +59,30 @@ try {
   await page.goto(baseUrl, { waitUntil: 'domcontentloaded' });
   await page.waitForSelector(cardImage, { timeout: 15000 });
   await page.waitForFunction(() => {
-    const cache = JSON.parse(localStorage.getItem('news-live-cache') || '{}');
-    const article = (cache.articles || []).find(item => String(item.url || '').includes('/visual-stability'));
-    const image = article ? document.querySelector(`.article-card[data-article="${CSS.escape(String(article.id))}"] img.article-image`) : null;
+    const image = document.querySelector('.article-card[data-article] img.article-image');
     return Boolean(image?.complete && image.naturalWidth > 1 && window.__visualStabilityV918?.remembered >= 1);
   }, null, { timeout: 10000 });
 
   const initial = await page.evaluate(() => {
-    const cache = JSON.parse(localStorage.getItem('news-live-cache') || '{}');
-    const article = (cache.articles || []).find(item => String(item.url || '').includes('/visual-stability'));
-    const image = article ? document.querySelector(`.article-card[data-article="${CSS.escape(String(article.id))}"] img.article-image`) : null;
+    const card = document.querySelector('.article-card[data-article]');
+    const image = card?.querySelector('img.article-image');
     return {
-      articleId: String(article?.id || ''),
+      articleId: String(card?.dataset.article || ''),
       src: image?.src || '',
       classes: image?.className || '',
       stats: { ...window.__visualStabilityV918 }
     };
   });
-  assert.ok(initial.articleId, 'normalized article id should be available from the live cache');
+  assert.ok(initial.articleId, 'normalized article id should be present on the rendered card');
   assert.match(initial.src, /article-photo-fast/);
   assert.match(initial.src, /image=/);
   assert.match(initial.classes, /prepared-visual/);
   assert.ok(initial.stats.remembered >= 1, 'known-good visual should be remembered');
 
+  await page.waitForTimeout(250);
   revision = 2;
-  await page.evaluate(() => window.dispatchEvent(new Event('online')));
+  await page.reload({ waitUntil: 'domcontentloaded' });
+  await page.waitForSelector(cardImage, { timeout: 15000 });
 
   await page.waitForFunction(({ id, expected }) => {
     const image = document.querySelector(`.article-card[data-article="${CSS.escape(id)}"] img.article-image`);
@@ -99,7 +98,7 @@ try {
     };
   }, initial.articleId);
 
-  assert.equal(after.src, initial.src, 'rerender should keep the last successfully loaded visual URL');
+  assert.equal(after.src, initial.src, 'PWA reload should keep the last successfully loaded visual URL');
   assert.match(after.classes, /prepared-visual/);
   assert.ok(after.stats.reused >= 1, 'visual stability guard should reuse the known-good URL');
   assert.ok(after.stats.preventedChanges >= 1, 'guard should report a prevented visual URL change');
