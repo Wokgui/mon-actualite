@@ -1,6 +1,7 @@
 const dns = require('node:dns').promises;
 const net = require('node:net');
 const { createHash } = require('node:crypto');
+const { classifyArticle } = require('./news-category');
 
 const MAX_CUSTOM_SOURCES = 12;
 const MAX_KEYWORDS = 8;
@@ -266,13 +267,7 @@ function similarity(a, b) {
 }
 
 function classify(item, keywords) {
-  if (item.strictCategory && item.categoryHint) return item.categoryHint;
-  const haystack = ` ${normalizeText(`${item.title} ${item.summary}`)} `;
-  for (const [category, terms] of CATEGORY_RULES) {
-    if (terms.some(term => haystack.includes(normalizeText(term)))) return category;
-  }
-  const matchingKeyword = keywords.find(keyword => haystack.includes(normalizeText(keyword)));
-  return matchingKeyword ? 'À suivre' : 'Société';
+  return classifyArticle(item, keywords);
 }
 
 function keywordMatches(item, keywords) {
