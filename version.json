@@ -1,5 +1,5 @@
 {
   "version": "60",
   "release": "2026-08-30",
-  "label": "v91.2 (socle v91.1 / v90.1 / v89) : garde-fou de catégories évidentes et contrôle des appels IA Groq"
+  "label": "v91.3 (socle v91.2 / v90.1 / v89) : corrections prudentes des catégories live, meilleure fusion des sujets et contrôle IA Groq"
 }
