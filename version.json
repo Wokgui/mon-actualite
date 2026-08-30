@@ -1,5 +1,6 @@
 {
   "version": "60",
+  "codeRelease": "91.4",
   "release": "2026-08-30",
-  "label": "v91.3 (socle v91.2 / v90.1 / v89) : corrections prudentes des catégories live, meilleure fusion des sujets et contrôle IA Groq"
+  "label": "v91.4 (socle v91.3 / v90.1 / v89) : mise à jour PWA fiable, cache v91 actualisé, catégories live et contrôle IA Groq"
 }
