@@ -54,3 +54,4 @@ jobs:
           node tests/v916-settings-browser.mjs
           node tests/v918-visual-stability.mjs
           node tests/v919-summary-quality.mjs
+          node tests/v9110-brief-dedup.mjs

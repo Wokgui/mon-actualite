@@ -4,7 +4,11 @@
   const CACHE_KEY = 'news-live-cache';
   const SNAPSHOT_KEY = 'news-brief-facts-v87';
   const LAST_KEY = 'news-brief-last-open-v87';
+  const MAX_SEMANTIC_GAP_MS = 24 * 60 * 60 * 1000;
+  const BRIEF_STOP = new Set('avec dans pour plus apres avant cette cet ces sont etre leur leurs tout tous mais sans vers entre une des les sur qui que aux par son ses est fait font comme dont elle elles ils nous vous notre votre aussi encore deja tres moins depuis alors chez contre lors peut peuvent avait avoir sera un le la du de au en et ou ce se sa ne pas actualite direct video photos photo selon annonce nouvelle nouveau nouvelles nouveaux article sous'.split(' '));
+  const BRIEF_EVENT_TOKENS = new Set(['outcome','vote','negotiation']);
   const upstreamFetch = window.fetch.bind(window);
+  const briefStats = { version: '91.10', lastDeduped: 0, lastCandidates: 0, lastChosen: 0 };
   let queued = false;
   let lastView = '';
   let visitPrevious = null;
@@ -45,6 +49,86 @@
     return clean(article.eventKeyV78 || article.storyMemoryV81?.key || '')
       || String(article.id || '')
       || normalize(article.title || '');
+  }
+
+  function titleText(article = {}) {
+    return clean(article.title || '').replace(/\s+[-–—|]\s+[^–—|]{2,45}$/i, '').trim();
+  }
+
+  function canonicalBriefToken(word = '') {
+    if (word === 'non' || /^(?:rejet|refus|emport|impos)/.test(word)) return 'outcome';
+    if (/^(?:referend|scrutin|vot)/.test(word)) return 'vote';
+    if (/^(?:negoci|adhes|integr)/.test(word)) return 'negotiation';
+    return word;
+  }
+
+  function briefTokens(article = {}) {
+    const text = normalize(titleText(article)).replace(/\bunion europeenne\b/g, 'ue');
+    const tokens = [];
+    for (const raw of text.split(' ')) {
+      if (!raw) continue;
+      const word = canonicalBriefToken(raw);
+      if (!word || BRIEF_STOP.has(word) || (word.length < 4 && word !== 'ue')) continue;
+      if (!tokens.includes(word)) tokens.push(word);
+    }
+    return tokens.slice(0, 20);
+  }
+
+  function tokenEquivalent(a = '', b = '') {
+    if (a === b) return true;
+    return a.length >= 6 && b.length >= 6 && a.slice(0, 5) === b.slice(0, 5);
+  }
+
+  function semanticOverlap(a = [], b = []) {
+    const used = new Set();
+    const matches = [];
+    for (const left of a) {
+      const index = b.findIndex((right, i) => !used.has(i) && tokenEquivalent(left, right));
+      if (index < 0) continue;
+      used.add(index);
+      matches.push([left, b[index]]);
+    }
+    const common = matches.length;
+    return {
+      common,
+      coverage: common / Math.max(1, Math.min(a.length, b.length)),
+      jaccard: common / Math.max(1, a.length + b.length - common),
+      matches
+    };
+  }
+
+  function mergedIds(article = {}) {
+    const values = [article.id, ...(Array.isArray(article.mergedArticleIdsV79) ? article.mergedArticleIdsV79 : [])];
+    return new Set(values.map(value => String(value || '')).filter(Boolean));
+  }
+
+  function sameBriefEvent(a = {}, b = {}) {
+    const aKey = clean(a.eventKeyV78 || a.storyMemoryV81?.key || '');
+    const bKey = clean(b.eventKeyV78 || b.storyMemoryV81?.key || '');
+    if (aKey && bKey && aKey === bKey) return true;
+
+    const aIds = mergedIds(a);
+    const bIds = mergedIds(b);
+    if ([...aIds].some(id => bIds.has(id))) return true;
+
+    const at = publishedAt(a);
+    const bt = publishedAt(b);
+    if (at && bt && Math.abs(at - bt) > MAX_SEMANTIC_GAP_MS) return false;
+
+    const left = briefTokens(a);
+    const right = briefTokens(b);
+    if (left.length < 3 || right.length < 3) return false;
+    const overlap = semanticOverlap(left, right);
+    if (overlap.common >= 5 && overlap.coverage >= 0.55) return true;
+    if (overlap.common >= 4 && overlap.coverage >= 0.60 && overlap.jaccard >= 0.30) return true;
+
+    const matched = overlap.matches.map(([token]) => token);
+    const eventMatches = matched.filter(token => BRIEF_EVENT_TOKENS.has(token));
+    const anchorMatches = matched.filter(token => !BRIEF_EVENT_TOKENS.has(token));
+    return overlap.common >= 3
+      && overlap.coverage >= 0.58
+      && eventMatches.includes('outcome')
+      && anchorMatches.length >= 2;
   }
 
   function fingerprint(article = {}) {
@@ -111,8 +195,16 @@
 
     const chosen = [];
     const categoryCounts = new Map();
+    const suppressedIds = new Set();
+    const duplicateAlreadyChosen = item => {
+      const duplicate = chosen.some(existing => sameBriefEvent(existing.article, item.article));
+      if (duplicate) suppressedIds.add(String(item.article.id || item.entry.key || item.article.title || ''));
+      return duplicate;
+    };
+
     for (const item of candidates) {
       if (chosen.length >= 8) break;
+      if (duplicateAlreadyChosen(item)) continue;
       const cat = clean(item.article.category || 'Autres');
       const count = categoryCounts.get(cat) || 0;
       if (count >= 2 && !item.article.essential && chosen.length >= 4) continue;
@@ -121,13 +213,24 @@
     }
     if (firstBrief && chosen.length < Math.min(5, candidates.length)) {
       for (const item of candidates) {
-        if (chosen.includes(item)) continue;
+        if (chosen.includes(item) || duplicateAlreadyChosen(item)) continue;
         chosen.push(item);
         if (chosen.length >= Math.min(5, candidates.length)) break;
       }
     }
+
+    briefStats.lastDeduped = suppressedIds.size;
+    briefStats.lastCandidates = candidates.length;
+    briefStats.lastChosen = chosen.length;
     return { firstBrief, chosen };
   }
+
+  window.__briefSmartV9110 = {
+    version: '91.10',
+    stats: briefStats,
+    sameEvent: (a, b) => sameBriefEvent(a, b),
+    selectIds: articles => selectFacts(Array.isArray(articles) ? articles : [], [], 0).chosen.map(item => String(item.article.id || ''))
+  };
 
   function escapeHtml(value = '') {
     return clean(value).replace(/[&<>]/g, char => ({ '&':'&amp;', '<':'&lt;', '>':'&gt;' }[char]));
