@@ -1,7 +1,29 @@
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import { createRequire } from 'node:module';
+import vm from 'node:vm';
 const require = createRequire(import.meta.url);
 const { homeSignalScore, catalogRank, rankCatalogArticles } = require('../lib/news-significance.js');
+
+function extractFunction(source, name) {
+  const start = source.indexOf(`function ${name}()`);
+  assert.ok(start >= 0, `${name} doit rester défini dans app.js`);
+  const openingBrace = source.indexOf('{', start);
+  let depth = 0;
+  for (let index = openingBrace; index < source.length; index += 1) {
+    if (source[index] === '{') depth += 1;
+    if (source[index] === '}') depth -= 1;
+    if (depth === 0) return source.slice(start, index + 1);
+  }
+  assert.fail(`impossible d’extraire ${name} depuis app.js`);
+}
+
+function runRealVisibleArticles(state) {
+  const appSource = fs.readFileSync(new URL('../app.js', import.meta.url), 'utf8');
+  const functionSource = extractFunction(appSource, 'visibleArticles');
+  const visibleArticles = vm.runInNewContext(`(${functionSource})`, { state });
+  return visibleArticles();
+}
 
 const iso = '2026-08-30T15:00:00.000Z';
 const article = (id, title, score = 100, extra = {}) => ({ id, title, score, publishedAt: iso, source: 'Source', sources: ['Source'], ...extra });
@@ -66,9 +88,9 @@ require.cache[corePath] = {
     res.setHeader('Content-Type', 'application/json; charset=utf-8');
     res.end(JSON.stringify({
       articles: [
-        article('guide', 'Pourquoi le meilleur clavier du monde est japonais (et n’est pas fait pour vous)', 105),
-        article('major', "Suisse : un mort et cinq blessés après des tirs lors d'une rave party", 100),
-        article('policy-live', 'Ce qui change à partir du 1er septembre 2026 : chômage, arrêts maladie, factures…', 101)
+        article('guide', 'Pourquoi le meilleur clavier du monde est japonais (et n’est pas fait pour vous)', 105, { category: 'Tech', tags: ['Tech'] }),
+        article('major', "Suisse : un mort et cinq blessés après des tirs lors d'une rave party", 100, { category: 'International', tags: ['International'] }),
+        article('policy-live', 'Ce qui change à partir du 1er septembre 2026 : chômage, arrêts maladie, factures…', 101, { category: 'Politique', tags: ['Politique'] })
       ],
       stats: { rawItems: 3, deduplicatedItems: 3 }
     }));
@@ -86,9 +108,47 @@ const payload = JSON.parse(responseBody);
 assert.equal(payload.articles[0].id, 'major', 'l’API doit appliquer le signal avant la coupe du catalogue');
 assert.equal(payload.articles[1].id, 'policy-live', 'la décision publique doit remonter derrière l’événement majeur');
 assert.equal(payload.articles[2].id, 'guide', 'le guide matériel doit descendre malgré un score brut légèrement supérieur');
+assert.deepEqual(
+  payload.articles.map(item => item.scoreV915Base),
+  [100, 101, 105],
+  'le score serveur antérieur doit rester disponible pour le diagnostic'
+);
+assert.ok(
+  payload.articles.every(item => item.score === item.catalogScoreV915),
+  'article.score doit transmettre le classement v91.15 réellement consommé par le client'
+);
 assert.equal(payload.stats.catalogSignalV915, true, 'les diagnostics doivent annoncer le classement v91.15');
 assert.ok(payload.stats.catalogPositiveSignals >= 2, 'les diagnostics doivent compter les signaux positifs');
 assert.ok(payload.stats.catalogNegativeSignals >= 1, 'les diagnostics doivent compter les signaux négatifs');
+
+const clientState = {
+  articles: payload.articles,
+  feedback: {},
+  topicPreferences: {},
+  settings: {
+    interests: ['Tech'],
+    generalCategories: ['International', 'Politique']
+  }
+};
+assert.deepEqual(
+  runRealVisibleArticles(clientState).map(item => item.id),
+  ['major', 'policy-live', 'guide'],
+  'le tri réel de visibleArticles() doit conserver les événements importants devant le contenu léger'
+);
+
+clientState.feedback.guide = 'follow';
+clientState.topicPreferences.Tech = 2;
+assert.equal(
+  runRealVisibleArticles(clientState)[0].id,
+  'guide',
+  'le pont de score ne doit pas neutraliser un suivi et un apprentissage explicites côté client'
+);
+
+clientState.feedback.major = 'not';
+assert.ok(
+  !runRealVisibleArticles(clientState).some(item => item.id === 'major'),
+  'visibleArticles() doit toujours retirer un article explicitement ignoré'
+);
 
 if (originalCore) require.cache[corePath] = originalCore;
 else delete require.cache[corePath];
