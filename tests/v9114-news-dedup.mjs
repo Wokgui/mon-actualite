@@ -1,4 +1,5 @@
 import assert from 'node:assert/strict';
+import fs from 'node:fs';
 import { createRequire } from 'node:module';
 const require = createRequire(import.meta.url);
 const { sameNewsEvent, mergeEventVariants, representativeQuality } = require('../lib/news-dedup.js');
@@ -51,43 +52,77 @@ assert.ok(
   'la carte représentante doit privilégier une source éditoriale informative'
 );
 
+const coreSource = fs.readFileSync(new URL('../lib/news-core.js', import.meta.url), 'utf8');
+assert.match(
+  coreSource,
+  /mergeDuplicates\(enriched\)[\s\S]{0,240}\.slice\(0,\s*140\)/,
+  'le cœur doit fournir 140 candidats avant la déduplication sémantique finale'
+);
+
 const corePath = require.resolve('../lib/news-core.js');
 const wrapperPath = require.resolve('../api/news.js');
 const originalCore = require.cache[corePath];
-require.cache[corePath] = {
-  id: corePath,
-  filename: corePath,
-  loaded: true,
-  exports: async (_req, res) => {
-    res.statusCode = 200;
-    res.setHeader('Content-Type', 'application/json; charset=utf-8');
-    res.end(JSON.stringify({
-      articles: [
-        { id: 'a', ...art("Référendum en Islande sur l'UE : le non l'emporte", 'facebook.com', 100), visualStatus: 'unavailable' },
-        { id: 'b', ...art('Référendum islandais sur l’UE : le non s’impose avec 52,5 % des voix', 'Euronews', 99), visualStatus: 'unavailable' },
-        { id: 'c', ...art('Ukraine : de nouvelles sanctions européennes contre la Russie entrent en vigueur', 'Franceinfo', 98), visualStatus: 'unavailable' }
-      ],
-      stats: { rawItems: 3, deduplicatedItems: 3 }
-    }));
-  }
-};
-delete require.cache[wrapperPath];
-const wrapper = require(wrapperPath);
-const headers = {};
-let responseBody = '';
-const response = {
-  statusCode: 0,
-  setHeader(name, value) { headers[name] = value; },
-  end(value = '') { responseBody += value; }
-};
-await wrapper({ method: 'GET' }, response);
-const payload = JSON.parse(responseBody);
-assert.equal(payload.articles.length, 2, 'l’adaptateur API doit appliquer la fusion sémantique');
-assert.equal(payload.stats.eventDuplicatesRemoved, 1, 'les stats doivent indiquer le doublon retiré');
-assert.equal(payload.articles[0].source, 'Euronews', 'la meilleure carte doit représenter le cluster');
-assert.equal(payload.articles[0].mergedCount, 2, 'le recoupement multi-source doit parvenir au client');
+
+function wrapperWithArticles(articles) {
+  require.cache[corePath] = {
+    id: corePath,
+    filename: corePath,
+    loaded: true,
+    exports: async (_req, res) => {
+      res.statusCode = 200;
+      res.setHeader('Content-Type', 'application/json; charset=utf-8');
+      res.end(JSON.stringify({
+        articles,
+        stats: { rawItems: articles.length, deduplicatedItems: articles.length }
+      }));
+    }
+  };
+  delete require.cache[wrapperPath];
+  return require(wrapperPath);
+}
+
+async function invoke(wrapper) {
+  let responseBody = '';
+  const response = {
+    statusCode: 0,
+    setHeader() {},
+    end(value = '') { responseBody += value; }
+  };
+  await wrapper({ method: 'GET' }, response);
+  return JSON.parse(responseBody);
+}
+
+const basicPayload = await invoke(wrapperWithArticles([
+  { id: 'a', ...art("Référendum en Islande sur l'UE : le non l'emporte", 'facebook.com', 100), visualStatus: 'unavailable' },
+  { id: 'b', ...art('Référendum islandais sur l’UE : le non s’impose avec 52,5 % des voix', 'Euronews', 99), visualStatus: 'unavailable' },
+  { id: 'c', ...art('Ukraine : de nouvelles sanctions européennes contre la Russie entrent en vigueur', 'Franceinfo', 98), visualStatus: 'unavailable' }
+]));
+assert.equal(basicPayload.articles.length, 2, 'l’adaptateur API doit appliquer la fusion sémantique');
+assert.equal(basicPayload.stats.eventDuplicatesRemoved, 1, 'les stats doivent indiquer le doublon retiré');
+assert.equal(basicPayload.articles[0].source, 'Euronews', 'la meilleure carte doit représenter le cluster');
+assert.equal(basicPayload.articles[0].mergedCount, 2, 'le recoupement multi-source doit parvenir au client');
+
+const overflowCandidates = [
+  ...island.map((item, index) => ({ id: `island-${index}`, ...item, visualStatus: 'unavailable' })),
+  ...Array.from({ length: 100 }, (_, index) => ({
+    id: `unique-${index}`,
+    ...art(`zx${index} qv${index} mn${index} pk${index}`, `Unique ${index}`, 80 - index / 100),
+    visualStatus: 'unavailable'
+  }))
+];
+const overflowPayload = await invoke(wrapperWithArticles(overflowCandidates));
+assert.equal(overflowPayload.stats.candidateItems, 113, 'les 113 candidats du cœur doivent être visibles dans les stats');
+assert.equal(overflowPayload.stats.eventDeduplicatedItems, 101, 'les 13 variantes Islande doivent libérer 12 places avant la coupe finale');
+assert.equal(overflowPayload.articles.length, 90, 'le catalogue public reste limité à 90 événements');
+assert.equal(overflowPayload.stats.catalogLimit, 90, 'la limite publique doit être explicite');
+assert.equal(overflowPayload.stats.catalogItems, 90, 'les stats doivent refléter le catalogue final');
+assert.ok(
+  overflowPayload.articles.some(article => article.id === 'unique-82'),
+  'un événement situé après l’ancien rang 90 doit réapparaître grâce au réservoir de 140 candidats'
+);
+
 if (originalCore) require.cache[corePath] = originalCore;
 else delete require.cache[corePath];
 delete require.cache[wrapperPath];
 
-console.log('v91.14 server event dedup passed.');
+console.log('v91.14 server event dedup and catalog fill passed.');
