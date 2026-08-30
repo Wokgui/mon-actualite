@@ -53,3 +53,4 @@ jobs:
           node tests/v89-mobile-browser.mjs
           node tests/v916-settings-browser.mjs
           node tests/v918-visual-stability.mjs
+          node tests/v919-summary-quality.mjs

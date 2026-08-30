@@ -1,6 +1,6 @@
 {
   "version": "60",
-  "codeRelease": "91.8",
+  "codeRelease": "91.9",
   "release": "2026-08-30",
-  "label": "v91.8 (socle v91.7 / v91.6 / v91.5 / v91.3 / v90.1 / v89) : images stables entre re-renders, réutilisation des visuels réellement chargés et cache PWA aligné sur article-visuals"
+  "label": "v91.9 (socle v91.8 / v91.7 / v91.6 / v91.5 / v91.3 / v90.1 / v89) : faux résumés Google Actualités supprimés avant classement et Brief ; les cartes n’affichent plus de grappes de titres"
 }

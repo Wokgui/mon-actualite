@@ -1,7 +1,182 @@
 (() => {
   'use strict';
 
-  const PAGE_RELEASE = '91.8';
+  const SUMMARY_CACHE_KEY = 'news-live-cache';
+  const summaryStats = {
+    version: '91.9',
+    cleanedFeedSummaries: 0,
+    cleanedCacheSummaries: 0,
+    hiddenEmptyNodes: 0
+  };
+  window.__summaryQualityV919 = summaryStats;
+  document.documentElement.dataset.summaryQualityVersion = '91.9';
+
+  function summaryClean(value = '') {
+    return String(value ?? '')
+      .replace(/&nbsp;|&#160;|&#x0*a0;/gi, ' ')
+      .replace(/&amp;/gi, '&')
+      .replace(/&quot;/gi, '"')
+      .replace(/&#39;|&apos;/gi, "'")
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  function summaryNormalize(value = '') {
+    return summaryClean(value)
+      .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+      .replace(/[’']/g, ' ')
+      .toLowerCase()
+      .replace(/[^a-z0-9]+/g, ' ')
+      .replace(/\s+/g, ' ')
+      .trim();
+  }
+
+  function summaryEscapeRegExp(value = '') {
+    return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  }
+
+  function titleWithoutPublisher(article = {}) {
+    let title = summaryClean(article.title || '');
+    const source = summaryClean(article.source || '');
+    if (source) {
+      const stripped = title.replace(new RegExp(`\\s*[-–—|]\\s*${summaryEscapeRegExp(source)}\\s*$`, 'i'), '').trim();
+      if (stripped !== title) title = stripped;
+    }
+    return title;
+  }
+
+  function googleNewsRssArticle(article = {}) {
+    if (!article || article.customSource === true) return false;
+    try {
+      const url = new URL(String(article.url || ''), location.href);
+      return url.hostname.toLowerCase() === 'news.google.com' && /^\/rss\/articles\//.test(url.pathname);
+    } catch {
+      return false;
+    }
+  }
+
+  function titleRestatement(value = '', article = {}) {
+    const text = summaryNormalize(value);
+    const title = summaryNormalize(titleWithoutPublisher(article));
+    if (!text || !title) return false;
+    const wanted = [...new Set(title.split(' ').filter(word => word.length >= 4))];
+    const found = new Set(text.split(' ').filter(word => word.length >= 4));
+    if (wanted.length < 3) return false;
+    const hits = wanted.filter(word => found.has(word)).length;
+    const coverage = hits / wanted.length;
+    return coverage >= 0.82 && summaryClean(value).length <= Math.max(230, titleWithoutPublisher(article).length * 2.1);
+  }
+
+  function googleFeedDescription(value = '', article = {}) {
+    const raw = String(value ?? '');
+    if (!raw.trim() || !googleNewsRssArticle(article)) return false;
+    if (/&nbsp;|&#160;|&#x0*a0;/i.test(raw)) return true;
+    if (/voir plus de titres et de points de vue sur google actualit(?:é|e)s?/i.test(summaryClean(raw))) return true;
+    const source = summaryNormalize(article.source || '');
+    const text = summaryNormalize(raw);
+    return Boolean(source && text.includes(source) && titleRestatement(raw, article));
+  }
+
+  function sanitizeSummaryArticle(article = {}, origin = 'feed') {
+    if (!googleNewsRssArticle(article)) return { article, changed: false };
+    const copy = { ...article };
+    let changed = false;
+
+    if (googleFeedDescription(copy.summary, copy)) {
+      copy.summary = '';
+      changed = true;
+    }
+    if (googleFeedDescription(copy.detail, copy)) {
+      copy.detail = '';
+      changed = true;
+    }
+
+    if (!changed) return { article, changed: false };
+    copy.summaryQualityV919 = 'google-news-headline-cluster';
+    copy.summaryUnavailableV919 = true;
+    copy.summaryNeedsFetchV919 = true;
+    if (origin === 'cache') summaryStats.cleanedCacheSummaries += 1;
+    else summaryStats.cleanedFeedSummaries += 1;
+    return { article: copy, changed: true };
+  }
+
+  function sanitizeSummaryPayload(payload, origin = 'feed') {
+    if (!payload || !Array.isArray(payload.articles)) return { payload, changed: false };
+    let changed = false;
+    const articles = payload.articles.map(article => {
+      const result = sanitizeSummaryArticle(article, origin);
+      if (result.changed) changed = true;
+      return result.article;
+    });
+    return { payload: changed ? { ...payload, articles } : payload, changed };
+  }
+
+  function sanitizeSummaryCache() {
+    try {
+      const cached = JSON.parse(localStorage.getItem(SUMMARY_CACHE_KEY) || 'null');
+      const result = sanitizeSummaryPayload(cached, 'cache');
+      if (result.changed) localStorage.setItem(SUMMARY_CACHE_KEY, JSON.stringify(result.payload));
+    } catch {}
+  }
+
+  function responseWithSummaryPayload(response, payload) {
+    const headers = new Headers(response.headers);
+    headers.delete('content-length');
+    headers.delete('content-encoding');
+    headers.set('Content-Type', 'application/json; charset=utf-8');
+    return new Response(JSON.stringify(payload), {
+      status: response.status,
+      statusText: response.statusText,
+      headers
+    });
+  }
+
+  const summaryUpstreamFetch = window.fetch.bind(window);
+  window.fetch = async function summaryQualityV919Fetch(input, init) {
+    const response = await summaryUpstreamFetch(input, init);
+    if (!response.ok) return response;
+    try {
+      const raw = typeof input === 'string' ? input : input?.url || '';
+      const url = new URL(raw, location.href);
+      if (url.origin !== location.origin || url.pathname !== '/api/news') return response;
+      const data = await response.clone().json();
+      const result = sanitizeSummaryPayload(data, 'feed');
+      return result.changed ? responseWithSummaryPayload(response, result.payload) : response;
+    } catch {
+      return response;
+    }
+  };
+
+  function hideEmptySummaries(root = document) {
+    const nodes = [];
+    if (root instanceof Element && root.matches('.article-card .summary')) nodes.push(root);
+    root.querySelectorAll?.('.article-card .summary').forEach(node => nodes.push(node));
+    for (const node of nodes) {
+      if (String(node.textContent || '').trim()) continue;
+      if (!node.hidden) {
+        node.hidden = true;
+        summaryStats.hiddenEmptyNodes += 1;
+      }
+    }
+  }
+
+  sanitizeSummaryCache();
+  document.addEventListener('DOMContentLoaded', () => {
+    hideEmptySummaries(document);
+    new MutationObserver(mutations => {
+      for (const mutation of mutations) {
+        for (const node of mutation.addedNodes) {
+          if (node instanceof Element) hideEmptySummaries(node);
+        }
+      }
+    }).observe(document.body, { childList: true, subtree: true });
+  }, { once: true });
+})();
+
+(() => {
+  'use strict';
+
+  const PAGE_RELEASE = '91.9';
   const RELEASE_DATE = '30 août 2026';
   const VERSION_PATH = '/version.json';
   const CHECK_COOLDOWN_MS = 45_000;
