@@ -3,6 +3,8 @@
 const coreHandler = require('../lib/news-core');
 const { mergeEventVariants } = require('../lib/news-dedup');
 
+const CATALOG_LIMIT = 90;
+
 module.exports = async function handler(req, res) {
   let statusCode = 200;
   let body = '';
@@ -24,14 +26,18 @@ module.exports = async function handler(req, res) {
     try {
       const payload = JSON.parse(body);
       if (Array.isArray(payload?.articles)) {
-        const before = payload.articles.length;
-        const articles = mergeEventVariants(payload.articles);
+        const candidateItems = payload.articles.length;
+        const uniqueCandidates = mergeEventVariants(payload.articles);
+        const articles = uniqueCandidates.slice(0, CATALOG_LIMIT);
         payload.articles = articles;
         payload.stats = {
           ...(payload.stats || {}),
-          lexicalDeduplicatedItems: before,
-          eventDeduplicatedItems: articles.length,
-          eventDuplicatesRemoved: Math.max(0, before - articles.length),
+          candidateItems,
+          lexicalDeduplicatedItems: candidateItems,
+          eventDeduplicatedItems: uniqueCandidates.length,
+          eventDuplicatesRemoved: Math.max(0, candidateItems - uniqueCandidates.length),
+          catalogLimit: CATALOG_LIMIT,
+          catalogItems: articles.length,
           deduplicatedItems: articles.length
         };
         output = JSON.stringify(payload);
