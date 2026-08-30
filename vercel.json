@@ -4,6 +4,12 @@
     "api/article-thumbnail.js": { "maxDuration": 30 },
     "api/article-photo-fast.js": { "maxDuration": 30 }
   },
+  "rewrites": [
+    {
+      "source": "/api/article-summary-groq",
+      "destination": "/api/article-summary-groq-v9112"
+    }
+  ],
   "headers": [
     {
       "source": "/manifest.webmanifest",
@@ -39,4 +45,3 @@
     }
   ]
 }
-
