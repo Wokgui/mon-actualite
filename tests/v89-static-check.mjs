@@ -52,11 +52,17 @@ for (const file of retired) {
   if (sw.includes(file)) fail(`service worker still precaches retired ${file}`);
 }
 
-if (!sw.includes("mon-actualite-v91-4-core-r1")) fail('service worker cache is not v91.4');
-else ok('service worker cache is v91.4');
-for (const asset of ['news-pipeline-v88.js?v=88.9', 'quality-signals-v89.js?v=89', 'quality-signals-v89.css?v=89', 'release-watch.js?v=91.4', 'lead-choice-v91.js?v=91.3', 'ai-request-control-v91.1.js?v=91.1']) {
+const codeRelease = String(version.codeRelease || '').trim();
+const cacheSlug = codeRelease.replace(/\./g, '-');
+if (!codeRelease || !sw.includes(`mon-actualite-v${cacheSlug}-core-r1`)) fail(`service worker cache does not match codeRelease ${codeRelease || '(missing)'}`);
+else ok(`service worker cache matches codeRelease ${codeRelease}`);
+for (const asset of ['news-pipeline-v88.js?v=88.9', 'quality-signals-v89.js?v=89', 'quality-signals-v89.css?v=89']) {
   if (!sw.includes(asset)) fail(`service worker does not precache ${asset}`);
   else ok(`service worker precaches ${asset}`);
+}
+for (const src of scripts.filter(value => /(?:release-watch|lead-choice|ai-request-control|brief-smart)/.test(value))) {
+  if (!sw.includes(`./${src}`)) fail(`service worker does not precache critical script ${src}`);
+  else ok(`service worker precaches critical script ${src}`);
 }
 
 const apiDir = path.join(root, 'api');
