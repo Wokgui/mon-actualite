@@ -1,6 +1,7 @@
 (() => {
   'use strict';
 
+  const CACHE_KEY = 'news-live-cache';
   const app = document.getElementById('app');
   if (!app) return;
 
@@ -8,9 +9,33 @@
   if (!nativeInnerHTML?.get || !nativeInnerHTML?.set) return;
 
   const viewCache = new Map();
+  const cacheStats = {
+    version: '91.11',
+    stashed: 0,
+    restored: 0,
+    misses: 0,
+    invalidations: 0,
+    preservedRefreshes: 0
+  };
+  const performanceStats = {
+    version: '91.11',
+    newsResponses: 0,
+    unchangedResponses: 0,
+    changedResponses: 0,
+    suppressedSilentRenders: 0,
+    manualRefreshesPreserved: 0,
+    cachePreservations: 0,
+    cacheInvalidations: 0
+  };
+
   let pendingTarget = '';
   let leavingView = '';
-  const upstreamFetch = window.fetch.bind(window);
+  let suppressNextSilentRender = false;
+  let suppressUntil = 0;
+
+  function clean(value = '') {
+    return String(value ?? '').replace(/\s+/g, ' ').trim();
+  }
 
   function detectPageView() {
     const page = app.querySelector(':scope > .page');
@@ -18,6 +43,13 @@
     if (page.querySelector('.brief-points, .date-card') && /brief/i.test(page.textContent || '')) return 'brief';
     if (page.querySelector('.hero-header') && /mon actualité/i.test(page.textContent || '')) return 'home';
     return '';
+  }
+
+  function targetView(markup = '') {
+    const text = String(markup || '');
+    const match = text.match(/class="nav-item[^\"]*\bactive\b[^\"]*"[^>]*data-view="(home|brief)"/i)
+      || text.match(/data-view="(home|brief)"[^>]*class="nav-item[^\"]*\bactive\b/i);
+    return match?.[1] || '';
   }
 
   function savedOnlyHome() {
@@ -43,15 +75,29 @@
     const fragment = document.createDocumentFragment();
     while (app.firstChild) fragment.appendChild(app.firstChild);
     viewCache.set(view, fragment);
+    cacheStats.stashed += 1;
   }
 
   function restoreCached(view) {
     const fragment = viewCache.get(view);
-    if (!fragment || !fragment.childNodes.length) return false;
+    if (!fragment || !fragment.childNodes.length) {
+      cacheStats.misses += 1;
+      return false;
+    }
     app.appendChild(fragment);
     viewCache.delete(view);
     setNavActive(view);
+    cacheStats.restored += 1;
     return true;
+  }
+
+  function clearCache() {
+    if (viewCache.size) cacheStats.invalidations += 1;
+    viewCache.clear();
+  }
+
+  function preserveRefresh() {
+    cacheStats.preservedRefreshes += 1;
   }
 
   try {
@@ -62,6 +108,24 @@
         return nativeInnerHTML.get.call(this);
       },
       set(value) {
+        const now = performance.now();
+        const current = detectPageView();
+        const targetFromMarkup = targetView(value);
+        const canSuppress = !pendingTarget
+          && suppressNextSilentRender
+          && now <= suppressUntil
+          && current
+          && current === targetFromMarkup
+          && ['home', 'brief'].includes(current)
+          && !this.querySelector('.sync-strip.loading');
+
+        suppressNextSilentRender = false;
+        suppressUntil = 0;
+        if (canSuppress) {
+          performanceStats.suppressedSilentRenders += 1;
+          return;
+        }
+
         if (!pendingTarget || !['home', 'brief'].includes(pendingTarget)) {
           nativeInnerHTML.set.call(this, value);
           return;
@@ -81,19 +145,83 @@
     return;
   }
 
-  function clearCache() {
-    viewCache.clear();
+  function articlePart(article = {}) {
+    const sources = Array.isArray(article.sources) ? [...article.sources].map(clean).filter(Boolean).sort().join(',') : '';
+    return [
+      clean(article.id || ''),
+      clean(article.url || ''),
+      clean(article.title || ''),
+      clean(article.summary || ''),
+      clean(article.detail || ''),
+      clean(article.source || ''),
+      clean(article.category || ''),
+      clean(article.publishedAt || article.date || ''),
+      article.essential ? '1' : '0',
+      sources
+    ].join('\u001f');
   }
 
+  function payloadSignature(payload = {}) {
+    const articles = Array.isArray(payload.articles) ? payload.articles : [];
+    return articles.map(articlePart).join('\u001e');
+  }
+
+  function cachedSignature() {
+    try {
+      const cached = JSON.parse(localStorage.getItem(CACHE_KEY) || 'null');
+      return cached && Array.isArray(cached.articles) ? payloadSignature(cached) : '';
+    } catch {
+      return '';
+    }
+  }
+
+  let lastSignature = cachedSignature();
+  const upstreamFetch = window.fetch.bind(window);
   window.fetch = async function navigationCacheFetch(input, init) {
     const response = await upstreamFetch(input, init);
+    if (!response.ok) return response;
+
     try {
       const raw = typeof input === 'string' ? input : input?.url || '';
       const url = new URL(raw, location.href);
-      if (url.origin === location.origin && url.pathname === '/api/news' && response.ok) clearCache();
+      if (url.origin !== location.origin || url.pathname !== '/api/news') return response;
+
+      performanceStats.newsResponses += 1;
+      const manualRefresh = Boolean(app.querySelector('.sync-strip.loading'));
+      const payload = await response.clone().json();
+      const signature = payloadSignature(payload);
+      const unchanged = Boolean(lastSignature) && signature === lastSignature;
+
+      if (unchanged) {
+        performanceStats.unchangedResponses += 1;
+        performanceStats.cachePreservations += 1;
+        preserveRefresh();
+        if (manualRefresh) {
+          performanceStats.manualRefreshesPreserved += 1;
+        } else {
+          suppressNextSilentRender = true;
+          suppressUntil = performance.now() + 750;
+        }
+      } else {
+        performanceStats.changedResponses += 1;
+        performanceStats.cacheInvalidations += 1;
+        suppressNextSilentRender = false;
+        suppressUntil = 0;
+        clearCache();
+      }
+
+      lastSignature = signature;
     } catch {}
     return response;
   };
+
+  window.__navigationCacheV9111 = {
+    stats: cacheStats,
+    clearCache,
+    cacheSize: () => viewCache.size
+  };
+  window.__navigationPerformanceV9111 = performanceStats;
+  document.documentElement.dataset.navigationPerformanceVersion = '91.11';
 
   document.addEventListener('click', event => {
     const nav = event.target.closest?.('.bottom-nav [data-view="home"], .bottom-nav [data-view="brief"]');

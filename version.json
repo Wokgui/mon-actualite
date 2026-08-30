@@ -2,5 +2,5 @@
   "version": "60",
   "codeRelease": "91.10",
   "release": "2026-08-30",
-  "label": "v91.10 (socle v91.9 / v91.8 / v91.7 / v91.6 / v91.5 / v91.3 / v90.1 / v89) : Brief dédupliqué sémantiquement entre formulations d’un même événement, sans fusionner les développements réellement distincts"
+  "label": "v91.10 + garde-fou navigation 91.11 : Brief dédupliqué sémantiquement ; les rafraîchissements silencieux sans changement ne détruisent plus le DOM ni le cache Accueil/Brief"
 }
