@@ -9,6 +9,9 @@
   const SOCIETY_HARD_TITLE_RE = /\b(?:coups? de feu|fusillade|meurtre|homicide|agression|braquage|rave party|rave-party|police judiciaire|gendarmerie)\b/i;
   const SCIENCE_HARD_TITLE_RE = /\b(?:einstein|physique|quantique|cosmologie|cosmologique|astronomie|astronomique|relativite|relativité|trou noir|trous noirs|particule|particules|telescope|télescope|nasa|esa)\b/i;
   const ENERGY_HARD_TITLE_RE = /\b(?:electricite|électricité|centrale|reseau electrique|réseau électrique|eolien|éolien|solaire|hydrogene|hydrogène|gaz naturel|batterie|batteries)\b/i;
+  const EUROPE_REFERENDUM_RE = /\b(?:islande|europe|ue|union europeenne)\b.*\b(?:referendum|adhesion)\b|\b(?:referendum|adhesion)\b.*\b(?:islande|europe|ue|union europeenne)\b/i;
+  const CULTURE_HARD_RE = /\b(?:film|cinema|festival du film|festival francophone|acteur|actrice|comedien|comedienne|serie televisee|serie netflix)\b/i;
+  const TECH_HARD_RE = /\b(?:imprimante|ordinateur|smartphone|galaxy|nvidia|dlss|cyberattaque|cybersecurite|hackers?|piratage informatique|fuite de donnees)\b/i;
   const root = typeof window !== 'undefined' ? window : globalThis;
   const upstreamFetch = typeof window !== 'undefined' && typeof window.fetch === 'function'
     ? window.fetch.bind(window)
@@ -43,6 +46,7 @@
   function obviousCategoryCorrection(article = {}) {
     const current = clean(article.category || '');
     const title = titleCore(article);
+    const normalizedTitle = normalize(title);
     if (!current || !title) return current;
 
     if (STRICT_FEED_CATEGORIES.has(current) && SOCIETY_HARD_TITLE_RE.test(title)) {
@@ -51,6 +55,18 @@
 
     if (current === 'Énergie' && SCIENCE_HARD_TITLE_RE.test(title) && !ENERGY_HARD_TITLE_RE.test(title)) {
       return 'Science';
+    }
+
+    if (current !== 'Europe' && EUROPE_REFERENDUM_RE.test(normalizedTitle)) {
+      return 'Europe';
+    }
+
+    if (['Politique','Société','International'].includes(current) && CULTURE_HARD_RE.test(normalizedTitle)) {
+      return 'Culture';
+    }
+
+    if (['Société','Économie','International'].includes(current) && TECH_HARD_RE.test(normalizedTitle)) {
+      return 'Tech';
     }
 
     return current;
@@ -174,9 +190,9 @@
       const originalCategory = clean(copy.category || '');
       const correctedCategory = obviousCategoryCorrection(copy);
       if (correctedCategory && correctedCategory !== originalCategory) {
-        copy.categoryOriginalV912 = originalCategory;
+        copy.categoryOriginalV913 = originalCategory;
         copy.category = correctedCategory;
-        copy.categoryCorrectedV912 = true;
+        copy.categoryCorrectedV913 = true;
         categoryCorrections += 1;
       }
       copy.scoreV91Base = Number.isFinite(Number(copy.scoreV91Base))
@@ -235,7 +251,8 @@
       leadComparedGroupsV91: comparedGroups,
       leadDirectPreferredV91: preferredDirect,
       categoryGuardV912: true,
-      categoryCorrectionsV912: categoryCorrections
+      categoryGuardV913: true,
+      categoryCorrectionsV913: categoryCorrections
     };
     return payload;
   }
@@ -259,7 +276,7 @@
   };
 
   if (typeof document !== 'undefined') {
-    document.documentElement.dataset.leadChoiceVersion = '91.2';
+    document.documentElement.dataset.leadChoiceVersion = '91.3';
   }
 
   if (!upstreamFetch || typeof window === 'undefined') return;
