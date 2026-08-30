@@ -48,7 +48,7 @@ await context.route('https://oxdrhwveuctrorrkuurw.supabase.co/**', route => rout
 const page = await context.newPage();
 try {
   await page.goto(baseUrl, { waitUntil: 'domcontentloaded' });
-  await page.waitForFunction(() => window.__briefSmartV9110?.version === '91.10', null, { timeout: 10000 });
+  await page.waitForFunction(() => window.__briefSmartV9110?.version === '91.12', null, { timeout: 10000 });
 
   const result = await page.evaluate(samples => {
     const api = window.__briefSmartV9110;
@@ -74,7 +74,7 @@ try {
   assert.equal(result.ids.length, 5, 'deduplication must not refill the Brief with suppressed duplicates');
   assert.ok(result.stats.lastDeduped >= 3, `expected at least three suppressed duplicates, got ${result.stats.lastDeduped}`);
 
-  console.log('v91.10 Brief semantic dedup check passed.', JSON.stringify(result));
+  console.log('v91.12 Brief semantic dedup check passed.', JSON.stringify(result));
 } finally {
   await browser.close();
 }
