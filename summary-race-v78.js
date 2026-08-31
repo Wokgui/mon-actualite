@@ -77,9 +77,10 @@
     if (!key) return;
     const entry = { dataPromise, at: Date.now() };
     inflightGroq.set(key, entry);
-    setTimeout(() => {
+    const timer = setTimeout(() => {
       if (inflightGroq.get(key) === entry) inflightGroq.delete(key);
     }, INFLIGHT_TTL);
+    timer?.unref?.();
   }
 
   function goodGroqCandidate(data) {
@@ -138,7 +139,10 @@
   function deadlineValue(promise, timeoutMs) {
     return Promise.race([
       promise,
-      new Promise(resolve => setTimeout(() => resolve(null), timeoutMs))
+      new Promise(resolve => {
+        const timer = setTimeout(() => resolve(null), timeoutMs);
+        timer?.unref?.();
+      })
     ]);
   }
 
