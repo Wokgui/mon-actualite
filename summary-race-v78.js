@@ -28,12 +28,13 @@
   }
 
   function readJson(key, fallback) {
+    if (typeof localStorage === 'undefined') return fallback;
     try { return JSON.parse(localStorage.getItem(key) || 'null') ?? fallback; }
     catch { return fallback; }
   }
 
   function nowMs() {
-    return typeof performance?.now === 'function' ? performance.now() : Date.now();
+    return typeof performance !== 'undefined' && typeof performance.now === 'function' ? performance.now() : Date.now();
   }
 
   function parseBody(init) {
@@ -261,10 +262,12 @@
     }).catch(() => {});
   }
 
-  document.addEventListener('pointerdown', event => {
-    if (event.isPrimary === false) return;
-    if (event.target.closest?.('button,a,input,select,textarea,label,[data-save],[data-category]')) return;
-    const card = event.target.closest?.('.article-card[data-article]');
-    if (card) warmFromPointer(card);
-  }, { capture: true, passive: true });
+  if (typeof document !== 'undefined') {
+    document.addEventListener('pointerdown', event => {
+      if (event.isPrimary === false) return;
+      if (event.target.closest?.('button,a,input,select,textarea,label,[data-save],[data-category]')) return;
+      const card = event.target.closest?.('.article-card[data-article]');
+      if (card) warmFromPointer(card);
+    }, { capture: true, passive: true });
+  }
 })();
