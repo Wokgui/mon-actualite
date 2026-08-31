@@ -20,8 +20,17 @@ function extractFunction(source, name) {
 
 function runRealVisibleArticles(state) {
   const appSource = fs.readFileSync(new URL('../app.js', import.meta.url), 'utf8');
+  const personalizationSource = fs.readFileSync(new URL('../personalization-learning-v91.js', import.meta.url), 'utf8');
+  const values = new Map();
+  const localStorage = {
+    getItem(key) { return values.has(key) ? values.get(key) : null; },
+    setItem(key, value) { values.set(key, String(value)); },
+    removeItem(key) { values.delete(key); }
+  };
+  const personalizationContext = { window: {}, localStorage };
+  vm.runInNewContext(personalizationSource, personalizationContext);
   const functionSource = extractFunction(appSource, 'visibleArticles');
-  const visibleArticles = vm.runInNewContext(`(${functionSource})`, { state });
+  const visibleArticles = vm.runInNewContext(`(${functionSource})`, { state, window: personalizationContext.window });
   return visibleArticles();
 }
 

@@ -196,6 +196,17 @@
 
   function ensureTrustLine(card, article) {
     let line = card.querySelector('.trust-line-v83');
+    const weak = article.titleSupportV83 === 'weak';
+    const partial = article.titleSupportV83 === 'partial';
+    const caution = weak
+      ? '<span class="title-support-v83 weak">Titre peu étayé par le résumé disponible</span>'
+      : partial && article.titleSensationalV83
+        ? '<span class="title-support-v83 partial">Titre à interpréter avec prudence</span>'
+        : '';
+    if (!caution) {
+      line?.remove();
+      return;
+    }
     if (!line) {
       line = document.createElement('div');
       line.className = 'trust-line-v83';
@@ -203,10 +214,7 @@
       if (title) title.insertAdjacentElement('afterend', line);
       else card.querySelector('.article-body')?.prepend(line);
     }
-    const verify = verification(article);
-    const weak = article.titleSupportV83 === 'weak';
-    const partial = article.titleSupportV83 === 'partial';
-    line.innerHTML = `<span class="verify-chip-v83 ${verify.level}">${verify.label}</span>${weak ? '<span class="title-support-v83 weak">Titre peu étayé par le résumé disponible</span>' : partial && article.titleSensationalV83 ? '<span class="title-support-v83 partial">Titre à interpréter avec prudence</span>' : ''}`;
+    line.innerHTML = caution;
   }
 
   function decorateCards() {

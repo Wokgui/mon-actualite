@@ -163,14 +163,17 @@ function articleVisual(article, index = 0) {
 }
 
 function visibleArticles() {
+  const personalizationScore = window.NewsPersonalizationV91?.createRanker(
+    state.topicPreferences,
+    state.settings.generalCategories
+  ) || (() => 0);
   return state.articles
     .filter(article => state.feedback[article.id] !== 'not')
     .slice()
     .sort((a, b) => {
       const feedbackScore = article => ({ more: 24, less: -20, follow: 38 }[state.feedback[article.id]] || 0);
       const topicScore = article => {
-        const topics = [...new Set([article.category, ...(article.tags || []), ...(article.matches || [])].filter(Boolean))];
-        const learned = topics.reduce((total, topic) => total + Number(state.topicPreferences[topic] || 0) * 12, 0);
+        const learned = personalizationScore(article);
         const chosen = state.settings.interests.includes(article.category) ? 22 : state.settings.generalCategories.includes(article.category) ? 8 : 0;
         return learned + chosen;
       };
@@ -190,7 +193,7 @@ function articleCard(article, index = 0) {
     ${articleVisual(article, index)}
     <div class="article-body">
       <button class="save-btn ${saved ? 'saved' : ''}" data-save="${escapeHtml(article.id)}" aria-label="${saved ? 'Retirer des sauvegardes' : 'Sauvegarder l’article'}">${icon('bookmark', saved)}</button>
-      <div class="card-top"><span class="badge ${badge === 'Important' ? 'important' : ''}">${badge}</span>${article.sources?.length > 1 ? `<span class="merged-count">${article.sources.length} sources</span>` : ''}</div>
+      <div class="card-top"><span class="badge ${badge === 'Important' ? 'important' : ''}">${badge}</span></div>
       <h2>${escapeHtml(article.title)}</h2>
       <p class="summary">${escapeHtml(article.summary)}</p>
       <div class="meta"><span class="source">${escapeHtml(article.source)}</span><i class="dot"></i><span>${timeLabel(article.publishedAt)}</span><i class="dot"></i><button class="category-link" data-category="${escapeHtml(article.category)}">${escapeHtml(article.category)}</button></div>
@@ -748,7 +751,18 @@ app.addEventListener('click', async event => {
   const period = event.target.closest('[data-period]');
   if (period) { state.newsPeriod = period.dataset.period; render(); return; }
   const feedback = event.target.closest('[data-feedback]');
-  if (feedback) { state.feedback[feedback.dataset.id] = feedback.dataset.feedback; persist(); toast('Préférence enregistrée'); render(); return; }
+  if (feedback) {
+    const id = feedback.dataset.id;
+    const next = feedback.dataset.feedback;
+    const previous = state.feedback[id] || '';
+    const article = state.articles.find(item => String(item.id) === String(id));
+    if (article) window.NewsPersonalizationV91?.recordFeedback(article, next, previous);
+    state.feedback[id] = next;
+    persist();
+    toast('Préférence enregistrée');
+    render();
+    return;
+  }
   const toggle = event.target.closest('[data-setting-toggle]');
   if (toggle) { const key = toggle.dataset.settingToggle; state.settings[key] = !state.settings[key]; persist(); render(); if (['webSearch', 'sourcePriority'].includes(key)) syncNews({ silent: true }); return; }
   const interest = event.target.closest('[data-interest]');
@@ -760,7 +774,7 @@ app.addEventListener('click', async event => {
   const briefWatch = event.target.closest('[data-brief-watch]');
   if (briefWatch) { const name = briefWatch.dataset.briefWatch; const current = new Set(state.settings.briefWatchTopics); current.has(name) ? current.delete(name) : current.add(name); state.settings.briefWatchTopics = [...current]; persist(); render(); return; }
   if (event.target.closest('[data-saved-filter]')) { state.savedOnly = !state.savedOnly; render(); return; }
-  if (event.target.closest('[data-reset]')) { state.settings = { ...defaultSettings, generalCategories: [...GENERAL_CATEGORIES], interests: [...PERSONAL_THEMES], briefEssentialCategories: [...GENERAL_CATEGORIES], briefWatchTopics: [...DEFAULT_WATCH_TOPICS] }; state.keywords = []; state.topicPreferences = {}; persist(); render(); toast('Préférences réinitialisées'); syncNews({ silent: true }); return; }
+  if (event.target.closest('[data-reset]')) { state.settings = { ...defaultSettings, generalCategories: [...GENERAL_CATEGORIES], interests: [...PERSONAL_THEMES], briefEssentialCategories: [...GENERAL_CATEGORIES], briefWatchTopics: [...DEFAULT_WATCH_TOPICS] }; state.keywords = []; state.topicPreferences = {}; window.NewsPersonalizationV91?.reset(); persist(); render(); toast('Préférences réinitialisées'); syncNews({ silent: true }); return; }
   if (event.target.closest('[data-install]')) {
     if (isInstalled) return toast('L’application est déjà installée');
     if (deferredInstallPrompt) { deferredInstallPrompt.prompt(); const choice = await deferredInstallPrompt.userChoice; deferredInstallPrompt = null; toast(choice.outcome === 'accepted' ? 'Installation lancée' : 'Installation annulée'); }

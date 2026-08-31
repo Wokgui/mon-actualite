@@ -89,7 +89,9 @@
         if (value < negative) negative = value;
       }
     }
-    return positive > 0 ? positive : negative;
+    const explicit = positive > 0 ? positive : negative;
+    const learned = Number(window.NewsPersonalizationV91?.learnedSignal(article) || 0);
+    return Math.max(-2, Math.min(2, explicit + learned));
   }
 
   function category(article = {}) {

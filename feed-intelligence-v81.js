@@ -467,18 +467,7 @@
         chip.textContent = chipText;
       } else chip?.remove();
 
-      const intel = readIntel(article);
-      let warning = card.querySelector('.story-warning-v81');
-      if (intel?.contradictions?.length) {
-        if (!warning) {
-          warning = document.createElement('span');
-          warning.className = 'story-warning-v81';
-          warning.textContent = 'Sources en désaccord';
-          const anchor = chip || card.querySelector('.why-v78, .meta');
-          if (anchor) anchor.insertAdjacentElement('afterend', warning);
-          else (card.querySelector('.article-body') || card).appendChild(warning);
-        }
-      } else warning?.remove();
+      card.querySelector('.story-warning-v81')?.remove();
     });
   }
 

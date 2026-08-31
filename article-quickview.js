@@ -328,7 +328,10 @@ document.addEventListener('click', event => {
     const article = quickArticles().find(item => titleWithoutSource(item.title, item.source) === title);
     if (!article) return;
     const feedback = quickReadJson('news-feedback', {});
-    feedback[article.id] = feedbackButton.dataset.quickFeedback;
+    const next = feedbackButton.dataset.quickFeedback;
+    const previous = feedback[article.id] || '';
+    window.NewsPersonalizationV91?.recordFeedback(article, next, previous);
+    feedback[article.id] = next;
     quickWriteJson('news-feedback', feedback);
     modal.querySelectorAll('[data-quick-feedback]').forEach(button => button.classList.toggle('selected', button === feedbackButton));
     window.dispatchEvent(new Event('focus'));

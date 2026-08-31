@@ -65,13 +65,16 @@ function visibleArticles() {
   const articles = allCachedArticles();
   const current = currentSettings();
   const feedback = readJson('news-feedback', {});
+  const personalizationScore = window.NewsPersonalizationV91?.createRanker(
+    current.topicPreferences,
+    current.general
+  ) || (() => 0);
   return articles
     .filter(article => feedback[article.id] !== 'not')
     .slice()
     .sort((a, b) => {
       const score = article => {
-        const topics = [...new Set([article.category, ...(article.tags || []), ...(article.matches || [])].filter(Boolean))];
-        const learned = topics.reduce((total, topic) => total + Number(current.topicPreferences[topic] || 0) * 12, 0);
+        const learned = personalizationScore(article);
         const chosen = current.interests.includes(article.category) ? 22 : current.general.includes(article.category) ? 8 : 0;
         const articleFeedback = ({ more: 24, less: -20, follow: 38 }[feedback[article.id]] || 0);
         const recency = Math.max(0, 72 - ((Date.now() - Date.parse(article.publishedAt || 0)) / 3600000));
@@ -497,7 +500,10 @@ document.addEventListener('click', event => {
     event.preventDefault();
     event.stopPropagation();
     const feedback = readJson('news-feedback', {});
-    delete feedback[deleteFollowed.dataset.runtimeFollowDelete];
+    const id = deleteFollowed.dataset.runtimeFollowDelete;
+    const article = allCachedArticles().find(item => String(item.id) === String(id));
+    if (article) window.NewsPersonalizationV91?.recordFeedback(article, '', feedback[id] || '');
+    delete feedback[id];
     writeJson('news-feedback', feedback);
     window.location.reload();
     return;
