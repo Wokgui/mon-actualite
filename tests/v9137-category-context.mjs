@@ -73,6 +73,12 @@ const cases = [
     { title: 'L’Algérie envoie quatre avions de combat Su-30 au Niger après une mutinerie survenue à Niamey' },
     'International',
     'military-crisis-title'
+  ],
+  [
+    'déploiement militaire réel France 24',
+    { title: 'En déployant ses avions de combat au Niger, l’Algérie veut « prévenir d’éventuelles attaques »' },
+    'International',
+    'military-crisis-title'
   ]
 ];
 
