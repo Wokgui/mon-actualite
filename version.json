@@ -1,6 +1,6 @@
 {
   "version": "65",
-  "codeRelease": "91.31",
+  "codeRelease": "91.33",
   "release": "2026-08-31",
-  "label": "v91.31 (socle v89) : catégories mieux contextualisées sur les flux réels ; faux rapprochements lexicaux supprimés ; santé, tech, énergie, culture et international mieux reconnus ; nucléaire civil distingué des armes nucléaires"
+  "label": "v91.33 (socle v89) : ouverture article plus réactive sur Android ; préchauffage au toucher ; réutilisation des résumés déjà en cours ; diagnostic local du délai jusqu’au premier résumé utile"
 }
