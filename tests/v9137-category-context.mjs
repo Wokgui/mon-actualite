@@ -30,6 +30,12 @@ const cases = [
     'sovereign-economy-title'
   ],
   [
+    'indexation des pensions',
+    { title: 'Retraites : pourquoi une sous-indexation des pensions des plus aisés interroge le système tout entier' },
+    'Économie',
+    'pensions-economy-title'
+  ],
+  [
     'licenciement télétravail',
     {
       title: "Une salariée se fait licencier après 26 ans d’ancienneté pour avoir télétravaillé neuf jours d'affilée sans autorisation",
@@ -81,6 +87,13 @@ assert.equal(militaryProcurement.category, 'International',
 assert.notEqual(militaryProcurement.reason, 'corporate-economy-title');
 assert.notEqual(militaryProcurement.reason, 'military-crisis-title');
 
+const sportsRetirement = classifyArticleDetailed({
+  title: 'Lionel Messi annonce sa retraite internationale avec l’Argentine'
+}, []);
+assert.equal(sportsRetirement.category, 'Société',
+  `une retraite internationale sportive doit rester Société: ${JSON.stringify(sportsRetirement)}`);
+assert.equal(sportsRetirement.reason, 'sports-title');
+
 const aiFactory = classifyArticleDetailed({
   title: "Bull sélectionné par l’Europe pour fournir une AI Factory à 388 millions d’euros en Finlande"
 }, []);
@@ -115,4 +128,4 @@ const realStudents = classifyArticleDetailed({
 assert.equal(realStudents.category, 'Éducation',
   `le vrai pluriel « élèves » doit rester un signal Éducation: ${JSON.stringify(realStudents)}`);
 
-console.log(`v91.37 contextual category checks passed (${cases.length + 8} assertions).`);
+console.log(`v91.37 contextual category checks passed (${cases.length + 10} assertions).`);
