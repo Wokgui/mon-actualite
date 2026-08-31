@@ -22,6 +22,14 @@
   const MISSILE_ATTACK_RX = /\b(?:(?:frappes?|attaques?|tirs?|salves?|lancements?)\s+(?:de |des |d['’])?missiles?|missiles?\s+(?:tirés?|lancés?|frappent?|s['’]abattent?|touchent?))\b/i;
   const PUBLIC_DECISION_RX = /\b(loi|réforme|gouvernement|parlement|cour suprême|conseil constitutionnel|commission européenne|union européenne|banque centrale|bce|fed|interdit|autorise|valide|annule|officialise)\b/i;
   const SCIENCE_BREAKTHROUGH_RX = /\b(découverte|découvre|démontre|première mondiale|essai clinique|traitement|vaccin|mission spatiale|lancement spatial|télescope|nasa|esa)\b/i;
+  const DISASTER_KIND_RULES = [
+    ['flood', /\b(inondations?|crues?|montée des eaux|débordements?)\b/i],
+    ['quake', /\b(séisme|tremblement de terre)\b/i],
+    ['storm', /\b(ouragan|cyclone|typhon|tempête majeure)\b/i],
+    ['fire', /\b(incendie majeur|feux? de forêt|incendies? de forêt)\b/i],
+    ['sinking', /\b(naufrage|chavir(?:e|é|ent|ement)|coule au large)\b/i]
+  ];
+  const DISASTER_TOKEN_STOP = new Set('inondation inondations crue crues montee eaux eau debordement debordements seisme tremblement terre ouragan cyclone typhon tempete majeure incendie incendies feu feux foret forets naufrage chavire chavirent chavirement coule large catastrophe secours evacuation evacuation evacue evacues victime victimes mort morts'.split(' '));
   const upstreamFetch = window.fetch.bind(window);
   const briefStats = { version: '91.12', lastDeduped: 0, lastCandidates: 0, lastChosen: 0, lastTopScores: [] };
   let queued = false;
@@ -117,6 +125,45 @@
     return new Set(values.map(value => String(value || '')).filter(Boolean));
   }
 
+  function trustedEventText(article = {}) {
+    const trustedSummary = summaryUsableForBrief(article) ? clean(article.summary || article.detail || '') : '';
+    return clean(`${titleText(article)} ${trustedSummary}`);
+  }
+
+  function disasterKind(article = {}) {
+    const text = trustedEventText(article);
+    for (const [kind, pattern] of DISASTER_KIND_RULES) {
+      if (pattern.test(text)) return kind;
+    }
+    return '';
+  }
+
+  function disasterAnchorTokens(article = {}) {
+    const tokens = [];
+    for (const raw of normalize(trustedEventText(article)).split(' ')) {
+      if (!raw) continue;
+      const word = canonicalBriefToken(raw);
+      if (!word || BRIEF_STOP.has(word) || DISASTER_TOKEN_STOP.has(word) || word.length < 4 || /^\d+$/.test(word)) continue;
+      if (!tokens.includes(word)) tokens.push(word);
+    }
+    return tokens.slice(0, 30);
+  }
+
+  function sameDisasterEvent(a = {}, b = {}) {
+    const aKind = disasterKind(a);
+    const bKind = disasterKind(b);
+    if (!aKind || aKind !== bKind) return false;
+    const overlap = semanticOverlap(disasterAnchorTokens(a), disasterAnchorTokens(b));
+    const anchors = overlap.matches.map(([token]) => token).filter(token => token.length >= 4);
+    if (anchors.length >= 2) return true;
+    if (anchors.length !== 1) return false;
+    const anchor = anchors[0];
+    const aTitle = briefTokens(a);
+    const bTitle = briefTokens(b);
+    return aTitle.some(token => tokenEquivalent(token, anchor))
+      && bTitle.some(token => tokenEquivalent(token, anchor));
+  }
+
   function sameBriefEvent(a = {}, b = {}) {
     const aKey = clean(a.eventKeyV78 || a.storyMemoryV81?.key || '');
     const bKey = clean(b.eventKeyV78 || b.storyMemoryV81?.key || '');
@@ -129,6 +176,7 @@
     const at = publishedAt(a);
     const bt = publishedAt(b);
     if (at && bt && Math.abs(at - bt) > MAX_SEMANTIC_GAP_MS) return false;
+    if (sameDisasterEvent(a, b)) return true;
 
     const left = briefTokens(a);
     const right = briefTokens(b);
