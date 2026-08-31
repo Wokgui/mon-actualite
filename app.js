@@ -463,6 +463,21 @@ function persistCache() {
   localStorage.setItem('news-live-cache', JSON.stringify({ articles: state.articles, fetchedAt: state.lastSync, stats: state.stats }));
 }
 
+function applyDownloadedNews(payload) {
+  if (!payload || !Array.isArray(payload.articles)) return false;
+  state.articles = payload.articles.map(applyRememberedVisual);
+  state.lastSync = payload.fetchedAt || new Date().toISOString();
+  state.stats = payload.stats || null;
+  state.syncStatus = 'idle';
+  state.syncError = '';
+  persistCache();
+  render();
+  scheduleVisualBackfill();
+  return true;
+}
+
+window.__applyNewsPayloadV9128 = applyDownloadedNews;
+
 function articleThumbnailUrl(article) {
   const params = new URLSearchParams({
     v: '19',
