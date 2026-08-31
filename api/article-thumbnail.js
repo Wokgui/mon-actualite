@@ -393,6 +393,10 @@ function sameEvent(candidate = '', expected = '') {
 function queryVariants(title = '') {
   const clean = plain(title).replace(/\s+[-–—]\s+[^-–—]{2,90}$/, '').slice(0, 240);
   const variants = [clean];
+  // Live articles prepend the latest update to a stable trailing headline.
+  // Search that stable clause before the rolling prefix makes it stale.
+  const liveTail = clean.split(/\s*(?:\u2026|\.{3})\s*/).filter(Boolean).pop();
+  if (liveTail && liveTail !== clean && titleWords(liveTail).length >= 4) variants.push(liveTail);
   const afterColon = clean.split(/\s*[:：]\s*/).filter(Boolean).pop();
   if (afterColon && afterColon !== clean && titleWords(afterColon).length >= 4) variants.push(afterColon);
   const words = titleWords(clean).filter(word => word.length >= 4);
