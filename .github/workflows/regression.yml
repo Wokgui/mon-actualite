@@ -45,6 +45,7 @@ jobs:
           node tests/v9134-brief-disaster-dedup.mjs
           node tests/v9135-final-image-prewarm.mjs
           node tests/v9136-ranking-summary-quality.mjs
+          node tests/v9137-category-context.mjs
 
   mobile-browser:
     needs: static-regression
