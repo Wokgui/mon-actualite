@@ -1,6 +1,6 @@
 {
   "version": "65",
-  "codeRelease": "91.33",
+  "codeRelease": "91.34",
   "release": "2026-08-31",
-  "label": "v91.33 (socle v89) : ouverture article plus réactive sur Android ; préchauffage au toucher ; réutilisation des résumés déjà en cours ; diagnostic local du délai jusqu’au premier résumé utile"
+  "label": "v91.34 (socle v89) : Brief plus propre sur les catastrophes ; deux angles du même événement n’occupent plus deux places parmi les cinq faits essentiels"
 }
