@@ -3,6 +3,10 @@ import fs from 'node:fs';
 import vm from 'node:vm';
 
 const source = fs.readFileSync('brief-smart-v87.js', 'utf8');
+const indexSource = fs.readFileSync('index.html', 'utf8');
+const workerSource = fs.readFileSync('sw.js', 'utf8');
+const version = JSON.parse(fs.readFileSync('version.json', 'utf8'));
+const manifest = JSON.parse(fs.readFileSync('manifest.webmanifest', 'utf8'));
 const local = new Map();
 const document = {
   querySelector() { return null; },
@@ -31,6 +35,18 @@ vm.runInNewContext(source, context, { filename: 'brief-smart-v87.js' });
 
 const api = window.__briefSmartV9112;
 assert.ok(api, 'Brief public API must be available');
+assert.match(indexSource, /brief-smart-v87\.js\?v=91\.34/,
+  'the page must request the v91.34 Brief asset instead of a stale cached v91.30 copy');
+assert.match(indexSource, /manifest\.webmanifest\?v=91\.34/,
+  'the page must request the v91.34 manifest');
+assert.match(workerSource, /mon-actualite-v91-34-core-r1/,
+  'the service worker cache must rotate for the v91.34 client change');
+assert.match(workerSource, /brief-smart-v87\.js\?v=91\.34/,
+  'the service worker must precache the v91.34 Brief asset');
+assert.match(workerSource, /manifest\.webmanifest\?v=91\.34/,
+  'the service worker must precache the v91.34 manifest');
+assert.equal(version.codeRelease, '91.34', 'version.json must publish code release 91.34');
+assert.equal(manifest.start_url, '/?code-release=91.34', 'PWA start URL must publish code release 91.34');
 
 const now = Date.now();
 const nepalEvacuation = {
@@ -85,4 +101,4 @@ assert.equal(api.sameEvent(nepalEvacuation, oldNepalFlood), false,
 assert.equal(api.sameEvent(nepalEvacuation, rejectedClusterNoise), false,
   'a rejected Google News aggregate summary must not create a false disaster duplicate');
 
-console.log('v91.34 Brief disaster dedup checks passed');
+console.log('v91.34 Brief disaster dedup and PWA release checks passed');
