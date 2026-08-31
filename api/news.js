@@ -3,6 +3,7 @@
 const coreHandler = require('../lib/news-core');
 const { mergeEventVariants } = require('../lib/news-dedup');
 const { rankCatalogArticles } = require('../lib/news-significance');
+const { suppressCorePrewarmRequest, scheduleFinalImagePrewarm } = require('../lib/final-image-prewarm');
 
 const CATALOG_LIMIT = 90;
 
@@ -20,7 +21,12 @@ module.exports = async function handler(req, res) {
     end(chunk = '') { if (chunk) this.write(chunk); return this; }
   };
 
-  await coreHandler(req, capture);
+  // news-core ranks and lexically deduplicates the broad candidate pool. Its
+  // historical image prewarm happens before this route performs semantic
+  // event deduplication and final catalogue significance ranking. Suppress
+  // only that early prewarm here, then spend the same 16-request budget on
+  // the actual final-ranked catalogue below.
+  await coreHandler(suppressCorePrewarmRequest(req), capture);
 
   let output = body;
   if (statusCode === 200 && body) {
@@ -31,6 +37,7 @@ module.exports = async function handler(req, res) {
         const uniqueCandidates = mergeEventVariants(payload.articles);
         const rankedCandidates = rankCatalogArticles(uniqueCandidates);
         const articles = rankedCandidates.slice(0, CATALOG_LIMIT);
+        const prewarmScheduled = await scheduleFinalImagePrewarm(req, articles);
         payload.articles = articles;
         payload.stats = {
           ...(payload.stats || {}),
@@ -43,7 +50,9 @@ module.exports = async function handler(req, res) {
           catalogSignalV915: true,
           catalogPositiveSignals: articles.filter(article => Number(article.catalogSignalV915 || 0) > 0).length,
           catalogNegativeSignals: articles.filter(article => Number(article.catalogSignalV915 || 0) < 0).length,
-          deduplicatedItems: articles.length
+          deduplicatedItems: articles.length,
+          prewarmScheduled,
+          prewarmStageV9135: 'final-ranked-catalog'
         };
         output = JSON.stringify(payload);
       }
