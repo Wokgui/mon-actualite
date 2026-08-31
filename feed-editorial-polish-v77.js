@@ -4,6 +4,7 @@
   const SEEN_KEY = 'news-seen-v77';
   const CACHE_KEY = 'news-live-cache';
   const READING_ANCHOR_KEY = 'news-reading-anchor-v85';
+  const MIN_HOME_FALLBACK = 12;
   const upstreamFetch = window.fetch.bind(window);
   const openedThisSession = new Set();
   let scheduled = false;
@@ -134,13 +135,18 @@
     const anchor = readAnchor();
     const modalOpen = Boolean(document.querySelector('.quick-summary-backdrop'));
 
-    for (const card of [...feed.querySelectorAll(':scope > .article-card[data-article]')]) {
+    const cards = [...feed.querySelectorAll(':scope > .article-card[data-article]')];
+    const removableBudget = Math.max(0, cards.length - MIN_HOME_FALLBACK);
+    let removed = 0;
+
+    for (const card of cards) {
       const id = String(card.dataset.article || '');
       const article = map.get(id);
       const shouldHide = !savedOnly && (currentSeen.has(id) || openedThisSession.has(id));
-      if (shouldHide) {
+      if (shouldHide && removed < removableBudget) {
         if (modalOpen && anchor?.id === id) continue;
         removeWithStablePosition(card, id, anchor);
+        removed += 1;
         continue;
       }
       if (article?.essential || card.classList.contains('essential-v77')) beautifyEssentialCard(card);
@@ -177,4 +183,8 @@
 
   window.addEventListener('focus', scheduleClean);
   document.addEventListener('visibilitychange', () => { if (!document.hidden) scheduleClean(); });
+  window.__homeSeenFallbackV9127 = {
+    minimumVisible: MIN_HOME_FALLBACK,
+    removalBudget: count => Math.max(0, Number(count || 0) - MIN_HOME_FALLBACK)
+  };
 })();
