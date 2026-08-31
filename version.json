@@ -1,6 +1,6 @@
 {
-  "version": "64",
-  "codeRelease": "91.28",
+  "version": "65",
+  "codeRelease": "91.29",
   "release": "2026-08-31",
-  "label": "v91.28 (socle v89) : Accueil toujours visible et mises à jour appliquées immédiatement ; déduplication, résumés, images et performances mobiles renforcés ; catégories avec confiance ; personnalisation anti-bulle ; vraie nouveauté et diagnostics internes fiabilisés"
+  "label": "v91.29 (socle v89) : Accueil toujours visible et mises à jour immédiates ; résumés de repli sans faux bruit d’erreur ; déduplication, images et performances mobiles renforcées ; catégories avec confiance ; personnalisation anti-bulle ; vraie nouveauté et diagnostics internes fiabilisés"
 }

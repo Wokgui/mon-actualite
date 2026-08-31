@@ -63,7 +63,7 @@
 
   function goodGroqCandidate(data) {
     const summary = clean(data?.summary || '');
-    if (data?.unavailable || !usefulSummary(summary)) throw new Error('groq summary unavailable');
+    if (data?.unavailable || !usefulSummary(summary)) return null;
     return {
       ok: true,
       text: summary,
@@ -79,14 +79,35 @@
     const response = await responsePromise;
     const data = await responseJson(response);
     const summary = clean(data?.text || '');
-    if (!data?.ok || !usefulSummary(summary)) throw new Error('smart summary unavailable');
+    if (!data?.ok || !usefulSummary(summary)) return null;
     return { ...data, text: summary, raced: true };
   }
 
-  function deadline(promise, timeoutMs) {
+  function firstUseful(candidates) {
+    return new Promise(resolve => {
+      let pending = candidates.length;
+      let settled = false;
+      const finish = value => {
+        if (settled) return;
+        if (value) {
+          settled = true;
+          resolve(value);
+          return;
+        }
+        pending -= 1;
+        if (pending <= 0) {
+          settled = true;
+          resolve(null);
+        }
+      };
+      for (const candidate of candidates) Promise.resolve(candidate).then(finish, () => finish(null));
+    });
+  }
+
+  function deadlineValue(promise, timeoutMs) {
     return Promise.race([
       promise,
-      new Promise((_, reject) => setTimeout(() => reject(new Error('summary race timeout')), timeoutMs))
+      new Promise(resolve => setTimeout(() => resolve(null), timeoutMs))
     ]);
   }
 
@@ -143,9 +164,8 @@
 
       if (candidates.length === 1) return smartResponsePromise;
 
-      return deadline(Promise.any(candidates), SMART_RACE_DEADLINE)
-        .then(winner => jsonResponse(winner))
-        .catch(() => jsonResponse({ ok: false, text: '', origin: 'parallel-timeout', raced: true }));
+      return deadlineValue(firstUseful(candidates), SMART_RACE_DEADLINE)
+        .then(winner => jsonResponse(winner || { ok: false, text: '', origin: 'parallel-timeout', raced: true }));
     }
 
     return upstreamFetch(input, init);
