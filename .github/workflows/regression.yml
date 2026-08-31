@@ -34,6 +34,10 @@ jobs:
           node tests/v9123-home-source-mentions.mjs
           node tests/v9124-true-novelty.mjs
           node tests/v9125-diagnostic-metrics.mjs
+          node tests/v9126-manual-refresh-bridge.mjs
+          node tests/v9127-home-seen-fallback.mjs
+          node tests/v9128-pending-payload-apply.mjs
+          node tests/v9129-summary-race-diagnostics.mjs
 
   mobile-browser:
     needs: static-regression
