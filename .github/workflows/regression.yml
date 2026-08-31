@@ -45,6 +45,7 @@ jobs:
           node tests/v9134-brief-disaster-dedup.mjs
           node tests/v9135-final-image-prewarm.mjs
           node tests/v9136-ranking-summary-quality.mjs
+          node tests/v9136-live-title-thumbnail.mjs
           node tests/v9137-category-context.mjs
           node tests/v9137-significance-context.mjs
           node tests/v9137-brief-war-context.mjs
