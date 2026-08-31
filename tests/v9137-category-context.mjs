@@ -51,6 +51,12 @@ const cases = [
     'heritage-culture-title'
   ],
   [
+    'rétrospective Galliano au Met',
+    { title: "L'exposition rétrospective sur John Galliano au Met n'aura pas lieu, annonce le créateur" },
+    'Culture',
+    'culture-exhibition-title'
+  ],
+  [
     'rachat TAP',
     { title: 'Lufthansa contre Air France‑KLM : le grand duel du ciel européen pour acquérir TAP Air Portugal' },
     'Économie',
@@ -94,6 +100,13 @@ assert.equal(sportsRetirement.category, 'Société',
   `une retraite internationale sportive doit rester Société: ${JSON.stringify(sportsRetirement)}`);
 assert.equal(sportsRetirement.reason, 'sports-title');
 
+const financialExposure = classifyArticleDetailed({
+  title: 'Une entreprise réduit son exposition au risque de change',
+  categoryHint: 'Économie'
+}, []);
+assert.notEqual(financialExposure.reason, 'culture-exhibition-title',
+  `« exposition » au sens financier ne doit pas devenir Culture: ${JSON.stringify(financialExposure)}`);
+
 const aiFactory = classifyArticleDetailed({
   title: "Bull sélectionné par l’Europe pour fournir une AI Factory à 388 millions d’euros en Finlande"
 }, []);
@@ -128,4 +141,4 @@ const realStudents = classifyArticleDetailed({
 assert.equal(realStudents.category, 'Éducation',
   `le vrai pluriel « élèves » doit rester un signal Éducation: ${JSON.stringify(realStudents)}`);
 
-console.log(`v91.37 contextual category checks passed (${cases.length + 10} assertions).`);
+console.log(`v91.37 contextual category checks passed (${cases.length + 11} assertions).`);
