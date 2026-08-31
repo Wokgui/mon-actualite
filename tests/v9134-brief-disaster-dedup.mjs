@@ -54,6 +54,13 @@ const indiaFlood = {
   summaryQualityV919: 'source-grounded',
   publishedAt: new Date(now - 20 * 60 * 1000).toISOString()
 };
+const nepalQuake = {
+  id: 'nepal-quake',
+  title: 'Népal : un séisme secoue l’ouest du pays sans lien avec les inondations',
+  summary: 'Un tremblement de terre distinct a été enregistré dans l’ouest du Népal, sans rapport avec les crues suivies ailleurs dans le pays.',
+  summaryQualityV919: 'source-grounded',
+  publishedAt: new Date(now - 10 * 60 * 1000).toISOString()
+};
 const oldNepalFlood = {
   ...nepalGlaciers,
   id: 'nepal-old',
@@ -71,6 +78,8 @@ assert.equal(api.sameEvent(nepalEvacuation, nepalGlaciers), true,
   'two angles of the same Nepal flood event must occupy only one Brief slot');
 assert.equal(api.sameEvent(nepalEvacuation, indiaFlood), false,
   'different floods in different countries must remain separate events');
+assert.equal(api.sameEvent(nepalEvacuation, nepalQuake), false,
+  'different disaster types in the same country must remain separate events');
 assert.equal(api.sameEvent(nepalEvacuation, oldNepalFlood), false,
   'the disaster shortcut must not merge coverage more than 24 hours apart');
 assert.equal(api.sameEvent(nepalEvacuation, rejectedClusterNoise), false,
