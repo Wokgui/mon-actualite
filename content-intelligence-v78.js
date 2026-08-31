@@ -237,7 +237,6 @@
     const settings = readJson(SETTINGS_KEY, {});
     if (Array.isArray(settings.interests) && settings.interests.includes(article.category)) return `Centre d’intérêt : ${article.category}`;
     if (article.customSource) return `Découvert via ${clean(article.source || 'une source ajoutée')}`;
-    if ((article.sources || []).length >= 3) return `${article.sources.length} sources concordantes`;
     return 'Actualité récente';
   }
 

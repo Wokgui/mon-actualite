@@ -193,7 +193,7 @@ function articleCard(article, index = 0) {
     ${articleVisual(article, index)}
     <div class="article-body">
       <button class="save-btn ${saved ? 'saved' : ''}" data-save="${escapeHtml(article.id)}" aria-label="${saved ? 'Retirer des sauvegardes' : 'Sauvegarder l’article'}">${icon('bookmark', saved)}</button>
-      <div class="card-top"><span class="badge ${badge === 'Important' ? 'important' : ''}">${badge}</span>${article.sources?.length > 1 ? `<span class="merged-count">${article.sources.length} sources</span>` : ''}</div>
+      <div class="card-top"><span class="badge ${badge === 'Important' ? 'important' : ''}">${badge}</span></div>
       <h2>${escapeHtml(article.title)}</h2>
       <p class="summary">${escapeHtml(article.summary)}</p>
       <div class="meta"><span class="source">${escapeHtml(article.source)}</span><i class="dot"></i><span>${timeLabel(article.publishedAt)}</span><i class="dot"></i><button class="category-link" data-category="${escapeHtml(article.category)}">${escapeHtml(article.category)}</button></div>
