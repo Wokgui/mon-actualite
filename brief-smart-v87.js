@@ -130,12 +130,21 @@
     return clean(`${titleText(article)} ${trustedSummary}`);
   }
 
-  function disasterKind(article = {}) {
-    const text = trustedEventText(article);
+  function disasterKindsInText(text = '') {
+    const kinds = [];
     for (const [kind, pattern] of DISASTER_KIND_RULES) {
-      if (pattern.test(text)) return kind;
+      if (pattern.test(clean(text))) kinds.push(kind);
     }
-    return '';
+    return kinds;
+  }
+
+  function disasterKind(article = {}) {
+    const titleKinds = disasterKindsInText(titleText(article));
+    if (titleKinds.length === 1) return titleKinds[0];
+    if (titleKinds.length > 1) return '';
+    if (!summaryUsableForBrief(article)) return '';
+    const summaryKinds = disasterKindsInText(clean(article.summary || article.detail || ''));
+    return summaryKinds.length === 1 ? summaryKinds[0] : '';
   }
 
   function disasterProperAnchors(article = {}) {
