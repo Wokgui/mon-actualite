@@ -92,4 +92,20 @@ const gta = classifyArticleDetailed({
 assert.equal(gta.category, 'Tech',
   'la correction v91.36 GTA doit rester stable');
 
-console.log(`v91.37 contextual category checks passed (${cases.length + 4} assertions).`);
+const highDieselPrice = classifyArticleDetailed({
+  title: 'Pourquoi le prix du gazole va rester élevé en France',
+  categoryHint: 'Économie',
+  strictCategory: true
+}, []);
+assert.equal(highDieselPrice.category, 'Économie',
+  `« élevé » ne doit plus être confondu avec « élève »: ${JSON.stringify(highDieselPrice)}`);
+assert.equal(highDieselPrice.reason, 'feed-hint',
+  `sans signal thématique plus fort, le flux Économie doit être conservé: ${JSON.stringify(highDieselPrice)}`);
+
+const realStudents = classifyArticleDetailed({
+  title: 'Des élèves de lycée découvrent un nouveau laboratoire scientifique'
+}, []);
+assert.equal(realStudents.category, 'Éducation',
+  `le vrai pluriel « élèves » doit rester un signal Éducation: ${JSON.stringify(realStudents)}`);
+
+console.log(`v91.37 contextual category checks passed (${cases.length + 7} assertions).`);
