@@ -97,4 +97,3 @@ else ok('mobile Playwright regression job configured');
 
 if (process.exitCode) process.exit(process.exitCode);
 console.log('All v89 static regression checks passed.');
-

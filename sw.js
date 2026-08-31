@@ -170,4 +170,3 @@ self.addEventListener('fetch', event => {
 
   event.respondWith(staleWhileRevalidate(event.request, CACHE).catch(() => caches.match('./index.html')));
 });
-

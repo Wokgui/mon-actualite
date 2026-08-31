@@ -5,13 +5,13 @@ const $ = (selector, root = document) => root.querySelector(selector);
 const app = $('#app');
 const toastEl = $('#toast');
 const APP_VERSION = '60';
-const APP_RELEASE = '29 ao�t 2026';
+const APP_RELEASE = '29 août 2026';
 document.documentElement.dataset.appVersion = APP_VERSION;
 
-const GENERAL_CATEGORIES = ['Politique', 'International', '�conomie', 'Soci�t�', 'Sant�', 'Environnement', 'Science', 'Culture', '�ducation', 'Europe'];
-const PERSONAL_THEMES = ['IA', 'Tech', 'Smartphones', 'VR', 'Automobile', '�nergie'];
-const WATCH_TOPICS = ['Recherche scientifique', 'Innovations', 'Progr�s humains', 'M�decine', 'Espace', 'IA', 'VR', 'Tech', '�nergie', 'Environnement', 'Mobilit�', '�ducation'];
-const DEFAULT_WATCH_TOPICS = ['Recherche scientifique', 'Innovations', 'Progr�s humains', 'M�decine', 'Espace', 'IA', '�nergie', 'Environnement', '�ducation'];
+const GENERAL_CATEGORIES = ['Politique', 'International', 'Économie', 'Société', 'Santé', 'Environnement', 'Science', 'Culture', 'Éducation', 'Europe'];
+const PERSONAL_THEMES = ['IA', 'Tech', 'Smartphones', 'VR', 'Automobile', 'Énergie'];
+const WATCH_TOPICS = ['Recherche scientifique', 'Innovations', 'Progrès humains', 'Médecine', 'Espace', 'IA', 'VR', 'Tech', 'Énergie', 'Environnement', 'Mobilité', 'Éducation'];
+const DEFAULT_WATCH_TOPICS = ['Recherche scientifique', 'Innovations', 'Progrès humains', 'Médecine', 'Espace', 'IA', 'Énergie', 'Environnement', 'Éducation'];
 // v3 deliberately drops the old persisted failure markers. A single transient
 // miss used to freeze a source tile for six hours, even when the exact image
 // became available a few seconds later.
@@ -23,21 +23,21 @@ const VISUAL_BACKFILL_MAX_ATTEMPTS = 2;
 const categoryMeta = {
   Politique: { icon: 'landmark', label: 'Politique' },
   International: { icon: 'globe', label: 'International' },
-  �conomie: { icon: 'chart', label: '�conomie' },
-  Soci�t�: { icon: 'users', label: 'Soci�t�' },
-  Sant�: { icon: 'heart', label: 'Sant�' },
+  Économie: { icon: 'chart', label: 'Économie' },
+  Société: { icon: 'users', label: 'Société' },
+  Santé: { icon: 'heart', label: 'Santé' },
   Environnement: { icon: 'leaf', label: 'Environnement' },
   Science: { icon: 'flask', label: 'Science' },
   Culture: { icon: 'book', label: 'Culture' },
-  �ducation: { icon: 'school', label: '�ducation' },
+  Éducation: { icon: 'school', label: 'Éducation' },
   Europe: { icon: 'globe', label: 'Europe' },
   IA: { icon: 'sparkles', label: 'IA' },
   Tech: { icon: 'cpu', label: 'Tech' },
   Smartphones: { icon: 'smartphone', label: 'Smartphones' },
   VR: { icon: 'glasses', label: 'VR' },
   Automobile: { icon: 'car', label: 'Automobile' },
-  �nergie: { icon: 'sun', label: '�nergie' },
-  '� suivre': { icon: 'bookmark', label: '� suivre' }
+  Énergie: { icon: 'sun', label: 'Énergie' },
+  'À suivre': { icon: 'bookmark', label: 'À suivre' }
 };
 
 const defaultSettings = {
@@ -71,7 +71,7 @@ const state = {
   lastSync: cache.fetchedAt || null,
   syncStatus: 'idle', syncError: '', stats: cache.stats || null,
   newsPeriod: 'today', customFrom: todayOffset(-7), customTo: todayOffset(0),
-  sheet: false, savedOnly: false, opmlName: 'Aucun fichier import�',
+  sheet: false, savedOnly: false, opmlName: 'Aucun fichier importé',
   settings: {
     ...defaultSettings,
     ...savedSettings,
@@ -142,7 +142,7 @@ function timeLabel(dateString) {
   const date = new Date(dateString);
   if (Number.isNaN(date.getTime())) return '';
   const diffMinutes = Math.round((Date.now() - date.getTime()) / 60000);
-  if (diffMinutes < 1) return '� l'instant';
+  if (diffMinutes < 1) return 'À l’instant';
   if (diffMinutes < 60) return `Il y a ${diffMinutes} min`;
   if (diffMinutes < 24 * 60) return `Il y a ${Math.floor(diffMinutes / 60)} h`;
   if (diffMinutes < 48 * 60) return `Hier, ${new Intl.DateTimeFormat('fr-FR', { hour: '2-digit', minute: '2-digit' }).format(date)}`;
@@ -151,7 +151,7 @@ function timeLabel(dateString) {
 
 function badgeFor(article) {
   if (article.customSource) return 'Source suivie';
-  if ((article.tags || []).some(tag => state.keywords.includes(tag))) return '� suivre';
+  if ((article.tags || []).some(tag => state.keywords.includes(tag))) return 'À suivre';
   if ((article.score || 0) >= 130) return 'Important';
   return 'Nouveau';
 }
@@ -192,7 +192,7 @@ function articleCard(article, index = 0) {
   return `<article class="article-card" data-article="${escapeHtml(article.id)}" tabindex="0" aria-label="Lire : ${escapeHtml(article.title)}">
     ${articleVisual(article, index)}
     <div class="article-body">
-      <button class="save-btn ${saved ? 'saved' : ''}" data-save="${escapeHtml(article.id)}" aria-label="${saved ? 'Retirer des sauvegardes' : 'Sauvegarder l'article'}">${icon('bookmark', saved)}</button>
+      <button class="save-btn ${saved ? 'saved' : ''}" data-save="${escapeHtml(article.id)}" aria-label="${saved ? 'Retirer des sauvegardes' : 'Sauvegarder l’article'}">${icon('bookmark', saved)}</button>
       <div class="card-top"><span class="badge ${badge === 'Important' ? 'important' : ''}">${badge}</span>${article.sources?.length > 1 ? `<span class="merged-count">${article.sources.length} sources</span>` : ''}</div>
       <h2>${escapeHtml(article.title)}</h2>
       <p class="summary">${escapeHtml(article.summary)}</p>
@@ -206,7 +206,7 @@ function topbar(title, back = true, right = '') {
 }
 
 function syncStrip() {
-  const label = state.syncStatus === 'loading' ? 'Actualisation.' : state.syncStatus === 'error' ? 'Actualisation impossible' : state.lastSync ? `Mis � jour ${timeLabel(state.lastSync).toLowerCase()}` : 'Premi�re actualisation en cours';
+  const label = state.syncStatus === 'loading' ? 'Actualisation…' : state.syncStatus === 'error' ? 'Actualisation impossible' : state.lastSync ? `Mis à jour ${timeLabel(state.lastSync).toLowerCase()}` : 'Première actualisation en cours';
   return `<div class="sync-strip ${state.syncStatus}"><span class="sync-dot"></span><span>${escapeHtml(label)}</span><button data-refresh aria-label="Actualiser maintenant">${icon('refresh')}</button></div>`;
 }
 
@@ -214,10 +214,10 @@ function renderHome() {
   const all = visibleArticles();
   const feed = state.savedOnly ? all.filter(article => state.saved.has(article.id)) : all.slice(0, 12);
   return `<main class="page">
-    <header class="hero-header"><div class="hero-mark"></div><span class="eyebrow">${escapeHtml(dateLabel())}</span><h1>Mon actualit�</h1><p>Tous les articles, class�s selon vos centres d'int�r�t</p></header>
+    <header class="hero-header"><div class="hero-mark"></div><span class="eyebrow">${escapeHtml(dateLabel())}</span><h1>Mon actualité</h1><p>Tous les articles, classés selon vos centres d’intérêt</p></header>
     ${syncStrip()}
-    ${state.saved.size ? `<div class="saved-filter"><button class="text-btn" data-saved-filter>${state.savedOnly ? 'Voir toute l'actualit�' : 'Articles sauvegard�s'}</button></div>` : ''}
-    <section class="feed">${feed.length ? feed.map(articleCard).join('') : emptyState(state.syncStatus === 'error' ? 'Impossible de charger l'actualit�' : 'Actualisation en cours', state.syncError || 'Les nouveaux articles appara�tront ici d�s que les sources auront r�pondu.')}</section>
+    ${state.saved.size ? `<div class="saved-filter"><button class="text-btn" data-saved-filter>${state.savedOnly ? 'Voir toute l’actualité' : 'Articles sauvegardés'}</button></div>` : ''}
+    <section class="feed">${feed.length ? feed.map(articleCard).join('') : emptyState(state.syncStatus === 'error' ? 'Impossible de charger l’actualité' : 'Actualisation en cours', state.syncError || 'Les nouveaux articles apparaîtront ici dès que les sources auront répondu.')}</section>
   </main>${nav('home')}`;
 }
 
@@ -227,7 +227,7 @@ function categoryArticles(category = state.category) {
 
 function categoryBrief(category) {
   const list = categoryArticles(category).slice(0, 5);
-  if (!list.length) return `Aucun article r�cent suffisamment pertinent dans ${category}.`;
+  if (!list.length) return `Aucun article récent suffisamment pertinent dans ${category}.`;
   return list.slice(0, 3).map(article => article.summary).filter(Boolean).join(' ');
 }
 
@@ -235,9 +235,9 @@ function renderCategory() {
   const meta = categoryMeta[state.category] || { icon: 'bookmark', label: state.category };
   const list = categoryArticles();
   const content = state.categoryTab === 'brief'
-    ? `<section class="brief-card"><span class="brief-label">Ce qu'il faut retenir</span><h2>Le point sur ${escapeHtml(state.category)}</h2><p>${escapeHtml(categoryBrief(state.category))}</p><div class="source-list">${[...new Set(list.flatMap(article => article.sources || [article.source]))].slice(0, 5).map(source => `<span class="source-chip">${escapeHtml(source)}</span>`).join('')}</div></section>${list.slice(0, 2).map(articleCard).join('')}`
-    : `<section class="feed">${list.length ? list.map(articleCard).join('') : emptyState('Aucun article r�cent', 'Cette cat�gorie sera aliment�e d�s qu'une information r�cente correspondra.')}</section>`;
-  return `<main class="page">${topbar('Cat�gorie')}
+    ? `<section class="brief-card"><span class="brief-label">Ce qu’il faut retenir</span><h2>Le point sur ${escapeHtml(state.category)}</h2><p>${escapeHtml(categoryBrief(state.category))}</p><div class="source-list">${[...new Set(list.flatMap(article => article.sources || [article.source]))].slice(0, 5).map(source => `<span class="source-chip">${escapeHtml(source)}</span>`).join('')}</div></section>${list.slice(0, 2).map(articleCard).join('')}`
+    : `<section class="feed">${list.length ? list.map(articleCard).join('') : emptyState('Aucun article récent', 'Cette catégorie sera alimentée dès qu’une information récente correspondra.')}</section>`;
+  return `<main class="page">${topbar('Catégorie')}
     <section class="title-row"><div class="category-icon">${icon(meta.icon)}</div><h1>${escapeHtml(meta.label)}</h1></section>
     <div class="tabs" role="tablist"><button class="tab ${state.categoryTab === 'brief' ? 'active' : ''}" data-tab="brief">Brief</button><button class="tab ${state.categoryTab === 'all' ? 'active' : ''}" data-tab="all">Tous les articles</button></div>
     <div class="feed">${content}</div>
@@ -246,29 +246,29 @@ function renderCategory() {
 
 function renderDetail() {
   const article = state.articles.find(item => item.id === state.articleId);
-  if (!article) return `<main class="page">${topbar('Article')}${emptyState('Article indisponible', 'Il n'est plus pr�sent dans le flux actuel.')}</main>${nav('')}`;
+  if (!article) return `<main class="page">${topbar('Article')}${emptyState('Article indisponible', 'Il n’est plus présent dans le flux actuel.')}</main>${nav('')}`;
   const saved = state.saved.has(article.id);
   const currentFeedback = state.feedback[article.id];
-  const meta = categoryMeta[article.category] || categoryMeta.Soci�t�;
+  const meta = categoryMeta[article.category] || categoryMeta.Société;
   return `<main class="page detail-page">${topbar('Article', true, `<button class="icon-btn save-btn-detail ${saved ? 'saved' : ''}" data-save="${escapeHtml(article.id)}" aria-label="Sauvegarder">${icon('bookmark', saved)}</button>`)}
     <div class="detail-hero article-placeholder">${icon(meta.icon)}<span>${escapeHtml(article.category)}</span></div>
     <article class="detail-content"><span class="badge ${badgeFor(article) === 'Important' ? 'important' : ''}">${badgeFor(article)}</span><h1>${escapeHtml(article.title)}</h1>
-      <div class="detail-meta">${escapeHtml(article.source)} � ${timeLabel(article.publishedAt)} � <button class="category-link" data-category="${escapeHtml(article.category)}">${escapeHtml(article.category)}</button></div>
-      <section class="ai-summary"><strong>${icon('sparkles')} Synth�se</strong><p>${escapeHtml(article.detail || article.summary)}</p></section>
+      <div class="detail-meta">${escapeHtml(article.source)} · ${timeLabel(article.publishedAt)} · <button class="category-link" data-category="${escapeHtml(article.category)}">${escapeHtml(article.category)}</button></div>
+      <section class="ai-summary"><strong>${icon('sparkles')} Synthèse</strong><p>${escapeHtml(article.detail || article.summary)}</p></section>
       <div class="tags">${(article.tags || [article.category]).map(tag => `<span class="tag">${escapeHtml(tag)}</span>`).join('')}</div>
-      <a class="primary-btn" href="${escapeHtml(article.url)}" target="_blank" rel="noopener noreferrer">Lire l'article original ${icon('external')}</a>
-      <p class="feedback-title">Aidez l'application � mieux hi�rarchiser vos sujets</p>
-      <div class="feedback-grid">${[['more', 'Plus comme �a'], ['less', 'Moins comme �a'], ['not', 'Pas int�ress�'], ['follow', 'Sujet � suivre']].map(([key, label]) => `<button class="${currentFeedback === key ? 'selected' : ''}" data-feedback="${key}" data-id="${escapeHtml(article.id)}">${label}</button>`).join('')}</div>
+      <a class="primary-btn" href="${escapeHtml(article.url)}" target="_blank" rel="noopener noreferrer">Lire l’article original ${icon('external')}</a>
+      <p class="feedback-title">Aidez l’application à mieux hiérarchiser vos sujets</p>
+      <div class="feedback-grid">${[['more', 'Plus comme ça'], ['less', 'Moins comme ça'], ['not', 'Pas intéressé'], ['follow', 'Sujet à suivre']].map(([key, label]) => `<button class="${currentFeedback === key ? 'selected' : ''}" data-feedback="${key}" data-id="${escapeHtml(article.id)}">${label}</button>`).join('')}</div>
       ${article.sources?.length > 1 ? `<div class="source-list detail-sources">${article.sources.map(source => `<span class="source-chip">${escapeHtml(source)}</span>`).join('')}</div>` : ''}
     </article>
   </main>${nav('')}`;
 }
 
 function renderBrief() {
-  const majorTerms = /guerre|attaque|cessez-le-feu|�lection|gouvernement|pr�sident|premier ministre|attentat|catastrophe|s�isme|inondation|incendie|disparu|crise|accord|sommet|justice|condamn|cour des comptes|budget|retraite|d�ficit|croissance|inflation|ch�mage|�pid�mie|climat|diplomatie|nucl�aire/i;
-  const lowPriorityTerms = /\bpsg\b|ligue 1|football|match|composition|mercato|tennis|formule 1|prix en chute|promotion|bon plan|soldes?|r�duction|stations?-service|carburant|diesel|essence � \d|console|smartphone|windows|gta|jeu vid�o|montre connect�e|audiences? t�l�|people|c�l�brit�|t�l�-r�alit�|pyramide des pr�sidents|classement.{0,30}pr�sident|r�seau social.{0,80}pr�sident/i;
-  const worldTerms = /ukraine|russie|n�pal|tibet|gaza|isra�l|iran|chine|�tats[- ]unis|donald trump|fed\b|otan|onu\b|royaume-uni|allemagne|italie|espagne|autriche|gr�ce|inde|pakistan|japon|cor�e|afrique|moyen-orient|am�rique|br�sil|canada/i;
-  const editorialCategories = new Set(['Politique', 'International', 'Europe', '�conomie', 'Soci�t�', 'Sant�', 'Environnement']);
+  const majorTerms = /guerre|attaque|cessez-le-feu|élection|gouvernement|président|premier ministre|attentat|catastrophe|séisme|inondation|incendie|disparu|crise|accord|sommet|justice|condamn|cour des comptes|budget|retraite|déficit|croissance|inflation|chômage|épidémie|climat|diplomatie|nucléaire/i;
+  const lowPriorityTerms = /\bpsg\b|ligue 1|football|match|composition|mercato|tennis|formule 1|prix en chute|promotion|bon plan|soldes?|réduction|stations?-service|carburant|diesel|essence à \d|console|smartphone|windows|gta|jeu vidéo|montre connectée|audiences? télé|people|célébrité|télé-réalité|pyramide des présidents|classement.{0,30}président|réseau social.{0,80}président/i;
+  const worldTerms = /ukraine|russie|népal|tibet|gaza|israël|iran|chine|états[- ]unis|donald trump|fed\b|otan|onu\b|royaume-uni|allemagne|italie|espagne|autriche|grèce|inde|pakistan|japon|corée|afrique|moyen-orient|amérique|brésil|canada/i;
+  const editorialCategories = new Set(['Politique', 'International', 'Europe', 'Économie', 'Société', 'Santé', 'Environnement']);
   const scopeOf = article => worldTerms.test(String(article.title || '')) || ['International', 'Europe'].includes(article.category) ? 'Monde' : 'France';
   const topicWords = article => new Set(String(article.title || '')
     .normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
@@ -289,7 +289,7 @@ function renderBrief() {
     const lightweight = lowPriorityTerms.test(haystack) ? -220 : 0;
     const weakSignal = !majorTerms.test(haystack) && corroboration === 0 ? -65 : 0;
     // Do not use article.score: it includes personal-source and interest
-    // boosts, while L'essentiel must remain publisher-neutral.
+    // boosts, while L’essentiel must remain publisher-neutral.
     return { article, score: 100 + editorial + corroboration + headline + lightweight + weakSignal - Math.min(age, 72), scope: scopeOf(article), newsworthy: headline > 0 || corroboration > 0 };
   }).sort((a, b) => b.score - a.score);
   const recent = ranked.filter(item => Date.now() - Date.parse(item.article.publishedAt || 0) <= 72 * 3600000);
@@ -324,11 +324,11 @@ function renderBrief() {
     if (picks.length >= 5) break;
     if (!picks.includes(candidate)) picks.push(candidate);
   }
-  const global = picks.length ? `Ces cinq �v�nements sont retenus pour leur port�e nationale ou internationale, leur gravit�, leur actualit� et leur confirmation par les sources disponibles.` : 'Le brief se construira apr�s la premi�re synchronisation.';
+  const global = picks.length ? `Ces cinq événements sont retenus pour leur portée nationale ou internationale, leur gravité, leur actualité et leur confirmation par les sources disponibles.` : 'Le brief se construira après la première synchronisation.';
   return `<main class="page">${topbar('Brief du jour', false)}${syncStrip()}
-    <section class="date-card"><span class="date">${escapeHtml(dateLabel())}</span><h2>Les 5 �v�nements majeurs France & Monde</h2></section>
+    <section class="date-card"><span class="date">${escapeHtml(dateLabel())}</span><h2>Les 5 événements majeurs France & Monde</h2></section>
     <ol class="brief-points">${picks.map(({ article, scope }, index) => `<li class="brief-point" data-article="${escapeHtml(article.id)}" data-index="${index + 1}"><small class="brief-scope">${scope}</small><strong>${escapeHtml(article.title)}</strong><span>${escapeHtml(article.summary)}</span></li>`).join('')}</ol>
-    <section class="brief-card"><span class="brief-label">S�lection �ditoriale</span><h2>� la une d'un journal t�l�vis�</h2><p>${escapeHtml(global)}</p><div class="source-list"><span class="source-chip">${state.stats?.feedsSucceeded ?? '-'} flux lus</span><span class="source-chip">5 faits maximum</span><span class="source-chip">France + Monde</span></div></section>
+    <section class="brief-card"><span class="brief-label">Sélection éditoriale</span><h2>À la une d’un journal télévisé</h2><p>${escapeHtml(global)}</p><div class="source-list"><span class="source-chip">${state.stats?.feedsSucceeded ?? '—'} flux lus</span><span class="source-chip">5 faits maximum</span><span class="source-chip">France + Monde</span></div></section>
   </main>${nav('brief')}`;
 }
 
@@ -349,12 +349,12 @@ function periodArticles() {
 }
 
 function renderNews() {
-  const periods = [['today', 'Aujourd'hui'], ['yesterday', 'Hier'], ['week', '7 derniers jours'], ['month', '30 derniers jours'], ['custom', 'Personnalis�e']];
+  const periods = [['today', 'Aujourd’hui'], ['yesterday', 'Hier'], ['week', '7 derniers jours'], ['month', '30 derniers jours'], ['custom', 'Personnalisée']];
   const list = periodArticles();
-  return `<main class="page">${topbar('Actualit�', false)}${syncStrip()}
+  return `<main class="page">${topbar('Actualité', false)}${syncStrip()}
     <div class="periods">${periods.map(([key, label]) => `<button class="period ${state.newsPeriod === key ? 'active' : ''}" data-period="${key}">${label}</button>`).join('')}</div>
     ${state.newsPeriod === 'custom' ? `<div class="custom-dates"><label>Du<input type="date" data-date="from" value="${state.customFrom}"></label><label>Au<input type="date" data-date="to" value="${state.customTo}"></label></div>` : ''}
-    <section class="feed">${list.length ? list.map(articleCard).join('') : emptyState('Rien sur cette p�riode', 'Aucun article r�cent ne correspond aux cat�gories actuellement affich�es.')}</section>
+    <section class="feed">${list.length ? list.map(articleCard).join('') : emptyState('Rien sur cette période', 'Aucun article récent ne correspond aux catégories actuellement affichées.')}</section>
   </main>${nav('news')}`;
 }
 
@@ -363,37 +363,37 @@ function settingRow(title, description, key) {
 }
 
 function sourceRows() {
-  if (!state.sources.length) return '<p class="muted-note">Aucune source personnelle ajout�e. Le flux g�n�ral reste actif.</p>';
-  return `<div class="source-settings-list">${state.sources.map((source, index) => `<div class="source-setting"><button class="source-state ${source.enabled !== false ? 'active' : ''}" data-source-toggle="${index}" aria-label="Activer ou d�sactiver la source"></button><div><strong>${escapeHtml(source.title)}</strong><span>${escapeHtml(source.url)}</span></div><button class="mini-icon-btn" data-source-delete="${index}" aria-label="Supprimer">${icon('trash')}</button></div>`).join('')}</div>`;
+  if (!state.sources.length) return '<p class="muted-note">Aucune source personnelle ajoutée. Le flux général reste actif.</p>';
+  return `<div class="source-settings-list">${state.sources.map((source, index) => `<div class="source-setting"><button class="source-state ${source.enabled !== false ? 'active' : ''}" data-source-toggle="${index}" aria-label="Activer ou désactiver la source"></button><div><strong>${escapeHtml(source.title)}</strong><span>${escapeHtml(source.url)}</span></div><button class="mini-icon-btn" data-source-delete="${index}" aria-label="Supprimer">${icon('trash')}</button></div>`).join('')}</div>`;
 }
 
 function keywordChips() {
-  return state.keywords.length ? `<div class="keyword-list">${state.keywords.map((keyword, index) => `<span class="keyword-chip">${escapeHtml(keyword)}<button data-keyword-delete="${index}" aria-label="Supprimer ${escapeHtml(keyword)}">�</button></span>`).join('')}</div>` : '<p class="muted-note">Ajoutez par exemple : espace, Allemagne, arch�ologie, voitures �lectriques.</p>';
+  return state.keywords.length ? `<div class="keyword-list">${state.keywords.map((keyword, index) => `<span class="keyword-chip">${escapeHtml(keyword)}<button data-keyword-delete="${index}" aria-label="Supprimer ${escapeHtml(keyword)}">×</button></span>`).join('')}</div>` : '<p class="muted-note">Ajoutez par exemple : espace, Allemagne, archéologie, voitures électriques…</p>';
 }
 
 function renderSettings() {
-  return `<main class="page">${topbar('R�glages', false)}
-    <section class="settings-section install-section"><div class="install-app-icon"><img src="assets/app-icon.svg" alt="" /></div><div class="install-copy"><h2>${isInstalled ? 'Application install�e' : 'Installer l'application'}</h2><p>${isInstalled ? 'Mon actualit� fonctionne comme une application autonome sur cet appareil.' : 'Ajoutez Mon actualit� � Android pour l'ouvrir sans la barre de Chrome.'}</p></div><button class="${isInstalled ? 'secondary-btn' : 'primary-btn'}" data-install ${isInstalled ? 'disabled' : ''}>${isInstalled ? `${icon('check')} D�j� install�e` : `${icon('install')} Installer sur cet appareil`}</button></section>
+  return `<main class="page">${topbar('Réglages', false)}
+    <section class="settings-section install-section"><div class="install-app-icon"><img src="assets/app-icon.svg" alt="" /></div><div class="install-copy"><h2>${isInstalled ? 'Application installée' : 'Installer l’application'}</h2><p>${isInstalled ? 'Mon actualité fonctionne comme une application autonome sur cet appareil.' : 'Ajoutez Mon actualité à Android pour l’ouvrir sans la barre de Chrome.'}</p></div><button class="${isInstalled ? 'secondary-btn' : 'primary-btn'}" data-install ${isInstalled ? 'disabled' : ''}>${isInstalled ? `${icon('check')} Déjà installée` : `${icon('install')} Installer sur cet appareil`}</button></section>
 
-    <section class="settings-section"><h2>Actualisation</h2><p>Les nouveaux articles sont charg�s au d�marrage, au retour dans l'application et p�riodiquement lorsqu'elle reste ouverte.</p>${settingRow('Actualisation automatique', 'Toutes les 15 minutes quand l'application est ouverte', 'autoRefresh')}<button class="secondary-btn compact-btn" data-refresh>${icon('refresh')} Actualiser maintenant</button></section>
+    <section class="settings-section"><h2>Actualisation</h2><p>Les nouveaux articles sont chargés au démarrage, au retour dans l’application et périodiquement lorsqu’elle reste ouverte.</p>${settingRow('Actualisation automatique', 'Toutes les 15 minutes quand l’application est ouverte', 'autoRefresh')}<button class="secondary-btn compact-btn" data-refresh>${icon('refresh')} Actualiser maintenant</button></section>
 
-    <section class="settings-section"><h2>Sources personnelles</h2><p>Elles passent avant les sources g�n�ralistes. Vous pouvez ajouter directement une adresse RSS/Atom ou importer un fichier OPML.</p>
+    <section class="settings-section"><h2>Sources personnelles</h2><p>Elles passent avant les sources généralistes. Vous pouvez ajouter directement une adresse RSS/Atom ou importer un fichier OPML.</p>
       <div class="form-stack"><input id="source-name" class="text-input" type="text" maxlength="80" placeholder="Nom de la source"><input id="source-url" class="text-input" type="url" maxlength="600" placeholder="https://exemple.fr/feed"><button class="secondary-btn" data-add-source>${icon('plus')} Ajouter la source</button></div>
       ${sourceRows()}
       <div class="import-status">${icon('upload')}<span>${escapeHtml(state.opmlName)}</span></div><label class="secondary-btn" for="opml-input">Importer un fichier OPML</label><input id="opml-input" class="file-input" type="file" accept=".opml,.xml">
-      ${settingRow('Priorit� aux sources', 'Vos flux personnels sont remont�s dans la s�lection', 'sourcePriority')}${settingRow('Recherche web compl�mentaire', 'Google Actualit�s compl�te les sujets et mots-cl�s manquants', 'webSearch')}
+      ${settingRow('Priorité aux sources', 'Vos flux personnels sont remontés dans la sélection', 'sourcePriority')}${settingRow('Recherche web complémentaire', 'Google Actualités complète les sujets et mots-clés manquants', 'webSearch')}
     </section>
 
-    <section class="settings-section"><h2>Actualit� g�n�rale</h2><p>Ces rubriques restent pr�sentes m�me si elles ne font pas partie de vos centres d'int�r�t personnels.</p><div class="interest-grid">${GENERAL_CATEGORIES.map(category => `<button class="interest ${state.settings.generalCategories.includes(category) ? 'active' : ''}" data-general-category="${category}">${category}</button>`).join('')}</div></section>
+    <section class="settings-section"><h2>Actualité générale</h2><p>Ces rubriques restent présentes même si elles ne font pas partie de vos centres d’intérêt personnels.</p><div class="interest-grid">${GENERAL_CATEGORIES.map(category => `<button class="interest ${state.settings.generalCategories.includes(category) ? 'active' : ''}" data-general-category="${category}">${category}</button>`).join('')}</div></section>
 
-    <section class="settings-section"><h2>Centres d'int�r�t</h2><p>Ils servent � mettre certains sujets davantage en avant, sans supprimer l'actualit� g�n�rale.</p><div class="interest-grid">${PERSONAL_THEMES.map(theme => `<button class="interest ${state.settings.interests.includes(theme) ? 'active' : ''}" data-interest="${theme}">${theme}</button>`).join('')}</div>
-      <div class="inline-form"><input id="keyword-input" class="text-input" type="text" maxlength="70" placeholder="Ajouter un mot-cl�"><button class="small-primary-btn" data-add-keyword>Ajouter</button></div>${keywordChips()}
+    <section class="settings-section"><h2>Centres d’intérêt</h2><p>Ils servent à mettre certains sujets davantage en avant, sans supprimer l’actualité générale.</p><div class="interest-grid">${PERSONAL_THEMES.map(theme => `<button class="interest ${state.settings.interests.includes(theme) ? 'active' : ''}" data-interest="${theme}">${theme}</button>`).join('')}</div>
+      <div class="inline-form"><input id="keyword-input" class="text-input" type="text" maxlength="70" placeholder="Ajouter un mot-clé"><button class="small-primary-btn" data-add-keyword>Ajouter</button></div>${keywordChips()}
     </section>
 
-    <section class="settings-section"><h2>S�lection et r�sum�s</h2><div class="setting-row"><div class="setting-label"><strong>Longueur des r�sum�s</strong><span>Format affich� dans les cartes</span></div><select class="select" data-setting-select="summaryLength"><option value="tr�s court" ${state.settings.summaryLength === 'tr�s court' ? 'selected' : ''}>Tr�s court</option><option value="court" ${state.settings.summaryLength === 'court' ? 'selected' : ''}>Court</option><option value="d�taill�" ${state.settings.summaryLength === 'd�taill�' ? 'selected' : ''}>D�taill�</option></select></div></section>
-    <section class="settings-section"><h2>Notifications</h2>${settingRow('Brief du matin', 'Pr�f�rence conserv�e pour les futures notifications push', 'notifications')}</section>
-    <section class="settings-section app-version-section"><h2>Version de l'application</h2><p>Ce num�ro permet de v�rifier imm�diatement que le smartphone utilise bien la derni�re publication.</p><div class="app-version-row"><div><strong>Mon actualit� � version ${APP_VERSION}</strong><span>Publication du ${APP_RELEASE}</span></div><span class="app-version-badge">v${APP_VERSION}</span></div><button class="secondary-btn compact-btn" data-check-update>${icon('refresh')} V�rifier et mettre � jour</button></section>
-    <button class="secondary-btn" data-reset>R�initialiser les pr�f�rences</button>
+    <section class="settings-section"><h2>Sélection et résumés</h2><div class="setting-row"><div class="setting-label"><strong>Longueur des résumés</strong><span>Format affiché dans les cartes</span></div><select class="select" data-setting-select="summaryLength"><option value="très court" ${state.settings.summaryLength === 'très court' ? 'selected' : ''}>Très court</option><option value="court" ${state.settings.summaryLength === 'court' ? 'selected' : ''}>Court</option><option value="détaillé" ${state.settings.summaryLength === 'détaillé' ? 'selected' : ''}>Détaillé</option></select></div></section>
+    <section class="settings-section"><h2>Notifications</h2>${settingRow('Brief du matin', 'Préférence conservée pour les futures notifications push', 'notifications')}</section>
+    <section class="settings-section app-version-section"><h2>Version de l’application</h2><p>Ce numéro permet de vérifier immédiatement que le smartphone utilise bien la dernière publication.</p><div class="app-version-row"><div><strong>Mon actualité · version ${APP_VERSION}</strong><span>Publication du ${APP_RELEASE}</span></div><span class="app-version-badge">v${APP_VERSION}</span></div><button class="secondary-btn compact-btn" data-check-update>${icon('refresh')} Vérifier et mettre à jour</button></section>
+    <button class="secondary-btn" data-reset>Réinitialiser les préférences</button>
   </main>${nav('settings')}`;
 }
 
@@ -405,15 +405,15 @@ function renderSheet() {
   if (!state.sheet) return '';
   const chips = (items, selected, attribute) => `<div class="personalize-chips">${items.map(item => `<button type="button" class="personalize-chip ${selected.includes(item) ? 'active' : ''}" ${attribute}="${escapeHtml(item)}" aria-pressed="${selected.includes(item)}">${escapeHtml(item)}</button>`).join('')}</div>`;
   const watchTopics = [...new Set([...WATCH_TOPICS, ...state.keywords])];
-  return `<div class="sheet-backdrop" data-close-sheet><section class="sheet personalization-sheet" role="dialog" aria-modal="true" aria-label="Personnaliser mon actualit�" data-sheet-panel>
+  return `<div class="sheet-backdrop" data-close-sheet><section class="sheet personalization-sheet" role="dialog" aria-modal="true" aria-label="Personnaliser mon actualité" data-sheet-panel>
     <div class="sheet-handle"></div>
-    <header class="personalize-head"><div><span>Votre s�lection</span><h2>Personnaliser</h2></div><button type="button" class="personalize-close" data-dismiss-sheet aria-label="Fermer">�</button></header>
-    <section class="personalize-section"><h3>Accueil</h3><p>Tous les articles restent accessibles. Ces choix d�terminent ceux qui remontent en premier.</p>${chips(GENERAL_CATEGORIES, state.settings.generalCategories, 'data-general-category')}${chips(PERSONAL_THEMES, state.settings.interests, 'data-interest')}</section>
-    <section class="personalize-section"><h3>Brief � Essentiel</h3><p>Choisissez les rubriques utilis�es pour le point d'actualit� France et Monde.</p>${chips(GENERAL_CATEGORIES, state.settings.briefEssentialCategories, 'data-brief-essential')}</section>
-    <section class="personalize-section"><h3>Brief � Mes veilles</h3><p>Une veille large sur toute la recherche, les innovations de tous domaines et les progr�s humains. Affinez librement les th�mes suivis.</p>${chips(watchTopics, state.settings.briefWatchTopics, 'data-brief-watch')}
-      <div class="inline-form personalize-add"><input id="keyword-input" class="text-input" type="text" maxlength="70" placeholder="Ajouter une veille pr�cise"><button class="small-primary-btn" data-add-keyword>Ajouter</button></div>
+    <header class="personalize-head"><div><span>Votre sélection</span><h2>Personnaliser</h2></div><button type="button" class="personalize-close" data-dismiss-sheet aria-label="Fermer">×</button></header>
+    <section class="personalize-section"><h3>Accueil</h3><p>Tous les articles restent accessibles. Ces choix déterminent ceux qui remontent en premier.</p>${chips(GENERAL_CATEGORIES, state.settings.generalCategories, 'data-general-category')}${chips(PERSONAL_THEMES, state.settings.interests, 'data-interest')}</section>
+    <section class="personalize-section"><h3>Brief · Essentiel</h3><p>Choisissez les rubriques utilisées pour le point d’actualité France et Monde.</p>${chips(GENERAL_CATEGORIES, state.settings.briefEssentialCategories, 'data-brief-essential')}</section>
+    <section class="personalize-section"><h3>Brief · Mes veilles</h3><p>Une veille large sur toute la recherche, les innovations de tous domaines et les progrès humains. Affinez librement les thèmes suivis.</p>${chips(watchTopics, state.settings.briefWatchTopics, 'data-brief-watch')}
+      <div class="inline-form personalize-add"><input id="keyword-input" class="text-input" type="text" maxlength="70" placeholder="Ajouter une veille précise"><button class="small-primary-btn" data-add-keyword>Ajouter</button></div>
     </section>
-    <button type="button" class="secondary-btn personalize-settings" data-open-settings>R�glages avanc�s</button>
+    <button type="button" class="secondary-btn personalize-settings" data-open-settings>Réglages avancés</button>
   </section></div>`;
 }
 
@@ -651,7 +651,7 @@ async function syncNews({ silent = false } = {}) {
       persistCache();
       render();
       scheduleVisualBackfill();
-      if (!silent) toast(`${state.articles.length} article${state.articles.length > 1 ? 's' : ''} actualis�${state.articles.length > 1 ? 's' : ''}`);
+      if (!silent) toast(`${state.articles.length} article${state.articles.length > 1 ? 's' : ''} actualisé${state.articles.length > 1 ? 's' : ''}`);
     } catch (error) {
       state.syncStatus = 'error';
       state.syncError = error?.message || 'Connexion impossible';
@@ -668,18 +668,18 @@ function addSource() {
   const name = $('#source-name')?.value.trim();
   const url = $('#source-url')?.value.trim();
   if (!url || !/^https?:\/\//i.test(url)) return toast('Saisissez une adresse RSS ou Atom valide');
-  if (state.sources.some(source => source.url === url)) return toast('Cette source est d�j� ajout�e');
+  if (state.sources.some(source => source.url === url)) return toast('Cette source est déjà ajoutée');
   state.sources.push({ id: crypto.randomUUID ? crypto.randomUUID() : `feed-${Date.now()}`, title: name || new URL(url).hostname, url, enabled: true });
-  persist(); render(); toast('Source ajout�e'); syncNews({ silent: true });
+  persist(); render(); toast('Source ajoutée'); syncNews({ silent: true });
 }
 
 function addKeyword() {
   const value = $('#keyword-input')?.value.trim();
   if (!value) return;
-  if (state.keywords.some(keyword => keyword.toLowerCase() === value.toLowerCase())) return toast('Ce mot-cl� est d�j� suivi');
+  if (state.keywords.some(keyword => keyword.toLowerCase() === value.toLowerCase())) return toast('Ce mot-clé est déjà suivi');
   state.keywords.push(value);
   if (!state.settings.briefWatchTopics.includes(value)) state.settings.briefWatchTopics.push(value);
-  persist(); render(); toast('Centre d'int�r�t ajout�'); syncNews({ silent: true });
+  persist(); render(); toast('Centre d’intérêt ajouté'); syncNews({ silent: true });
 }
 
 async function checkAppUpdate({ announce = false } = {}) {
@@ -695,16 +695,16 @@ async function checkAppUpdate({ announce = false } = {}) {
     if (registration?.waiting) registration.waiting.postMessage({ type: 'SKIP_WAITING' });
 
     if (publishedVersion && publishedVersion !== APP_VERSION) {
-      if (announce) toast(`Mise � jour vers la version ${publishedVersion}.`);
+      if (announce) toast(`Mise à jour vers la version ${publishedVersion}…`);
       const nextUrl = new URL(location.href);
       nextUrl.searchParams.set('app-version', publishedVersion);
       nextUrl.searchParams.set('update', Date.now().toString());
       window.setTimeout(() => window.location.replace(nextUrl.href), 250);
       return;
     }
-    if (announce) toast(`Version ${APP_VERSION} � jour`);
+    if (announce) toast(`Version ${APP_VERSION} à jour`);
   } catch {
-    if (announce) toast('V�rification impossible pour le moment');
+    if (announce) toast('Vérification impossible pour le moment');
   }
 }
 
@@ -742,7 +742,7 @@ app.addEventListener('click', async event => {
   const sourceToggle = event.target.closest('[data-source-toggle]');
   if (sourceToggle) { const source = state.sources[Number(sourceToggle.dataset.sourceToggle)]; if (source) source.enabled = source.enabled === false; persist(); render(); syncNews({ silent: true }); return; }
   const sourceDelete = event.target.closest('[data-source-delete]');
-  if (sourceDelete) { state.sources.splice(Number(sourceDelete.dataset.sourceDelete), 1); persist(); render(); toast('Source supprim�e'); syncNews({ silent: true }); return; }
+  if (sourceDelete) { state.sources.splice(Number(sourceDelete.dataset.sourceDelete), 1); persist(); render(); toast('Source supprimée'); syncNews({ silent: true }); return; }
   const keywordDelete = event.target.closest('[data-keyword-delete]');
   if (keywordDelete) { state.keywords.splice(Number(keywordDelete.dataset.keywordDelete), 1); persist(); render(); syncNews({ silent: true }); return; }
 
@@ -759,7 +759,7 @@ app.addEventListener('click', async event => {
     if (article) window.NewsPersonalizationV91?.recordFeedback(article, next, previous);
     state.feedback[id] = next;
     persist();
-    toast('Pr�f�rence enregistr�e');
+    toast('Préférence enregistrée');
     render();
     return;
   }
@@ -774,11 +774,11 @@ app.addEventListener('click', async event => {
   const briefWatch = event.target.closest('[data-brief-watch]');
   if (briefWatch) { const name = briefWatch.dataset.briefWatch; const current = new Set(state.settings.briefWatchTopics); current.has(name) ? current.delete(name) : current.add(name); state.settings.briefWatchTopics = [...current]; persist(); render(); return; }
   if (event.target.closest('[data-saved-filter]')) { state.savedOnly = !state.savedOnly; render(); return; }
-  if (event.target.closest('[data-reset]')) { state.settings = { ...defaultSettings, generalCategories: [...GENERAL_CATEGORIES], interests: [...PERSONAL_THEMES], briefEssentialCategories: [...GENERAL_CATEGORIES], briefWatchTopics: [...DEFAULT_WATCH_TOPICS] }; state.keywords = []; state.topicPreferences = {}; window.NewsPersonalizationV91?.reset(); persist(); render(); toast('Pr�f�rences r�initialis�es'); syncNews({ silent: true }); return; }
+  if (event.target.closest('[data-reset]')) { state.settings = { ...defaultSettings, generalCategories: [...GENERAL_CATEGORIES], interests: [...PERSONAL_THEMES], briefEssentialCategories: [...GENERAL_CATEGORIES], briefWatchTopics: [...DEFAULT_WATCH_TOPICS] }; state.keywords = []; state.topicPreferences = {}; window.NewsPersonalizationV91?.reset(); persist(); render(); toast('Préférences réinitialisées'); syncNews({ silent: true }); return; }
   if (event.target.closest('[data-install]')) {
-    if (isInstalled) return toast('L'application est d�j� install�e');
-    if (deferredInstallPrompt) { deferredInstallPrompt.prompt(); const choice = await deferredInstallPrompt.userChoice; deferredInstallPrompt = null; toast(choice.outcome === 'accepted' ? 'Installation lanc�e' : 'Installation annul�e'); }
-    else toast('Dans Chrome : menu ? puis Installer l'application');
+    if (isInstalled) return toast('L’application est déjà installée');
+    if (deferredInstallPrompt) { deferredInstallPrompt.prompt(); const choice = await deferredInstallPrompt.userChoice; deferredInstallPrompt = null; toast(choice.outcome === 'accepted' ? 'Installation lancée' : 'Installation annulée'); }
+    else toast('Dans Chrome : menu ⋮ puis Installer l’application');
     return;
   }
   if (event.target.closest('[data-close-sheet]') && !event.target.closest('[data-sheet-panel]')) { state.sheet = false; render(); }
@@ -786,7 +786,7 @@ app.addEventListener('click', async event => {
 
 app.addEventListener('change', async event => {
   if (event.target.matches('[data-date]')) { state[event.target.dataset.date === 'from' ? 'customFrom' : 'customTo'] = event.target.value; render(); }
-  if (event.target.matches('[data-setting-select]')) { state.settings[event.target.dataset.settingSelect] = event.target.value; persist(); toast('R�glage enregistr�'); }
+  if (event.target.matches('[data-setting-select]')) { state.settings[event.target.dataset.settingSelect] = event.target.value; persist(); toast('Réglage enregistré'); }
   if (event.target.id === 'opml-input' && event.target.files[0]) {
     const file = event.target.files[0];
     try {
@@ -794,10 +794,10 @@ app.addEventListener('change', async event => {
       const existing = new Set(state.sources.map(source => source.url));
       const added = preview.feeds.filter(feed => !existing.has(feed.url));
       state.sources.push(...added);
-      state.opmlName = `${file.name} � ${added.length} nouvelle${added.length > 1 ? 's' : ''} source${added.length > 1 ? 's' : ''} ajout�e${added.length > 1 ? 's' : ''}`;
-      persist(); render(); toast('Sources OPML enregistr�es'); syncNews({ silent: true });
+      state.opmlName = `${file.name} · ${added.length} nouvelle${added.length > 1 ? 's' : ''} source${added.length > 1 ? 's' : ''} ajoutée${added.length > 1 ? 's' : ''}`;
+      persist(); render(); toast('Sources OPML enregistrées'); syncNews({ silent: true });
     } catch {
-      state.opmlName = `${file.name} � format non reconnu`; render(); toast('Impossible de lire ce fichier OPML');
+      state.opmlName = `${file.name} · format non reconnu`; render(); toast('Impossible de lire ce fichier OPML');
     }
   }
 });
@@ -823,7 +823,7 @@ window.addEventListener('beforeinstallprompt', event => {
   event.preventDefault(); deferredInstallPrompt = event;
   if (state.view === 'settings') render();
 });
-window.addEventListener('appinstalled', () => { deferredInstallPrompt = null; isInstalled = true; render(); toast('Mon actualit� est install�e'); });
+window.addEventListener('appinstalled', () => { deferredInstallPrompt = null; isInstalled = true; render(); toast('Mon actualité est installée'); });
 window.addEventListener('online', () => syncNews({ silent: true }));
 window.addEventListener('focus', () => { if (!state.lastSync || Date.now() - Date.parse(state.lastSync) > 5 * 60 * 1000) syncNews({ silent: true }); });
 window.addEventListener('news-topic-preferences-changed', event => {
@@ -839,4 +839,3 @@ render();
 scheduleVisualBackfill();
 syncNews({ silent: true });
 window.setTimeout(() => checkAppUpdate(), 1200);
-

@@ -37,7 +37,7 @@
   function articleTopics(article = {}) {
     return [...new Set([article.category, ...(article.tags || []), ...(article.matches || [])]
       .map(value => String(value || '').trim())
-      .filter(value => value && value !== '� suivre'))].slice(0, 3);
+      .filter(value => value && value !== 'À suivre'))].slice(0, 3);
   }
 
   function recordFeedback(article, nextAction = '', previousAction = '') {
@@ -100,4 +100,3 @@
     reset
   });
 })();
-

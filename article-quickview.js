@@ -12,10 +12,10 @@ function quickWriteJson(key, value) {
 
 function quickClean(value = '') {
   return String(value ?? '')
-    .replace(/&rsquo;/gi, ''').replace(/&lsquo;/gi, ''')
-    .replace(/&ldquo;/gi, '"').replace(/&rdquo;/gi, '"')
-    .replace(/&ndash;/gi, '-').replace(/&mdash;/gi, '-')
-    .replace(/&hellip;/gi, '.').replace(/&nbsp;/gi, ' ')
+    .replace(/&rsquo;/gi, '’').replace(/&lsquo;/gi, '‘')
+    .replace(/&ldquo;/gi, '“').replace(/&rdquo;/gi, '”')
+    .replace(/&ndash;/gi, '–').replace(/&mdash;/gi, '—')
+    .replace(/&hellip;/gi, '…').replace(/&nbsp;/gi, ' ')
     .replace(/&amp;/gi, '&').replace(/&quot;/gi, '"')
     .replace(/&#39;|&apos;/gi, "'")
     .replace(/&#(\d+);/g, (_, n) => { try { return String.fromCodePoint(Number(n)); } catch { return _; } })
@@ -30,12 +30,12 @@ function quickEsc(value = '') {
 function quickUnavailable(value = '') {
   const text = quickClean(value).toLowerCase();
   return !text
-    || /r�sum� indisponible/.test(text)
-    || /r�sum� d�taill� momentan�ment indisponible/.test(text)
-    || /ouvrez?\s+l['']article/.test(text)
-    || /consultez?\s+(?:les?\s+)?d�tails/.test(text)
-    || /d�tails publi�s par la source/.test(text)
-    || /pour\s+(?:sauvegarder|enregistrer|m�moriser|partager|commenter|lire)\s+(?:(?:cet|cette|un|une|l['']?)\s*)?article/.test(text);
+    || /résumé indisponible/.test(text)
+    || /résumé détaillé momentanément indisponible/.test(text)
+    || /ouvrez?\s+l[’']article/.test(text)
+    || /consultez?\s+(?:les?\s+)?détails/.test(text)
+    || /détails publiés par la source/.test(text)
+    || /pour\s+(?:sauvegarder|enregistrer|mémoriser|partager|commenter|lire)\s+(?:(?:cet|cette|un|une|l[’']?)\s*)?article/.test(text);
 }
 
 function quickArticleSummary(article = {}) {
@@ -73,7 +73,7 @@ function quickNeedsSmartRecovery(article = {}) {
 function quickNormalize(value = '') {
   return quickClean(value)
     .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
-    .replace(/['']/g, ' ')
+    .replace(/[’']/g, ' ')
     .toLowerCase()
     .replace(/[^a-z0-9]+/g, ' ')
     .replace(/\s+/g, ' ')
@@ -104,11 +104,11 @@ function quickGoodSummary(value = '', article = {}) {
 }
 
 function quickProvisionalSummary(article = {}) {
-  return quickArticleSummary(article) || 'R�sum� en cours de pr�paration.';
+  return quickArticleSummary(article) || 'Résumé en cours de préparation…';
 }
 
 function quickUnavailableSummary() {
-  return 'R�sum� d�taill� momentan�ment indisponible pour cet article.';
+  return 'Résumé détaillé momentanément indisponible pour cet article.';
 }
 
 function escapeRegExp(value = '') {
@@ -126,15 +126,15 @@ function titleWithoutSource(title = '', source = '') {
       cleanSource.replace(/\.(com|fr|eu|org|net)$/i, '')
     ].filter(Boolean))];
     for (const variant of variants) {
-      const rx = new RegExp(`\\s*(?:[---|�:]\\s*)${escapeRegExp(variant)}\\s*$`, 'i');
+      const rx = new RegExp(`\\s*(?:[-–—|·:]\\s*)${escapeRegExp(variant)}\\s*$`, 'i');
       const stripped = result.replace(rx, '').trim();
       if (stripped !== result) return stripped;
     }
   }
-  const trailing = result.match(/^(.*\S)\s+[---|]\s+([^--|]{2,42})$/);
+  const trailing = result.match(/^(.*\S)\s+[-–—|]\s+([^–—|]{2,42})$/);
   if (trailing) {
     const suffix = trailing[2].trim();
-    if (/\.(?:com|fr|eu|org|net|be|ch|co\.uk)$/i.test(suffix) || /^(?:le |la |les |l[''])?[A-Z�-��-�][\w�-�.'' -]{1,35}$/u.test(suffix)) {
+    if (/\.(?:com|fr|eu|org|net|be|ch|co\.uk)$/i.test(suffix) || /^(?:le |la |les |l['’])?[A-ZÀ-ÖØ-Ý][\wÀ-ÿ.'’ -]{1,35}$/u.test(suffix)) {
       return trailing[1].trim();
     }
   }
@@ -154,7 +154,7 @@ function quickTime(value) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return '';
   const minutes = Math.max(0, Math.round((Date.now() - date.getTime()) / 60000));
-  if (minutes < 1) return '� l'instant';
+  if (minutes < 1) return 'À l’instant';
   if (minutes < 60) return `Il y a ${minutes} min`;
   if (minutes < 1440) return `Il y a ${Math.floor(minutes / 60)} h`;
   return `Il y a ${Math.floor(minutes / 1440)} j`;
@@ -167,7 +167,7 @@ function enhanceArticleTitlesAndTabs() {
     const cleanTitle = titleWithoutSource(article.title, article.source);
     const title = card.querySelector('h2, .brief-copy strong');
     if (title) title.textContent = cleanTitle;
-    card.setAttribute('aria-label', `Ouvrir le r�sum� : ${cleanTitle}`);
+    card.setAttribute('aria-label', `Ouvrir le résumé : ${cleanTitle}`);
     card.querySelectorAll('[data-quick-summary]').forEach(node => node.remove());
   });
 
@@ -182,10 +182,10 @@ function enhanceArticleTitlesAndTabs() {
 
 function quickFeedbackMarkup(key, selected) {
   const map = {
-    more: ['+', 'Plus comme �a', 'Davantage de sujets similaires'],
-    less: ['-', 'Moins comme �a', 'R�duire ce type de sujets'],
-    not: ['�', 'Pas int�ress�', 'Masquer cet article et ses sujets proches'],
-    follow: ['?', 'Sujet � suivre', 'Suivre pr�cis�ment le sujet de cet article']
+    more: ['+', 'Plus comme ça', 'Davantage de sujets similaires'],
+    less: ['−', 'Moins comme ça', 'Réduire ce type de sujets'],
+    not: ['×', 'Pas intéressé', 'Masquer cet article et ses sujets proches'],
+    follow: ['☆', 'Sujet à suivre', 'Suivre précisément le sujet de cet article']
   };
   const [symbol, title, text] = map[key];
   return `<button type="button" class="quick-feedback-tile ${selected === key ? 'selected' : ''}" data-quick-feedback="${key}">
@@ -198,11 +198,11 @@ function quickTopicFeedbackMarkup(article) {
   const preferences = quickReadJson('news-topic-preferences-v1', {});
   const topics = [...new Set([article?.category, ...(article?.tags || []), ...(article?.matches || [])]
     .map(value => String(value || '').trim())
-    .filter(value => value && value !== '� suivre'))].slice(0, 3);
+    .filter(value => value && value !== 'À suivre'))].slice(0, 3);
   if (!topics.length) return '';
-  return `<section class="quick-topic-feedback"><strong>R�glage g�n�ral des th�mes</strong><p>Les boutons - / + modifient toute une cat�gorie (par exemple Politique), dans tous les articles. Ils ne concernent pas uniquement cet article.</p><div class="quick-topic-list">${topics.map(topic => {
+  return `<section class="quick-topic-feedback"><strong>Réglage général des thèmes</strong><p>Les boutons − / + modifient toute une catégorie (par exemple Politique), dans tous les articles. Ils ne concernent pas uniquement cet article.</p><div class="quick-topic-list">${topics.map(topic => {
     const value = Number(preferences[topic] || 0);
-    return `<div class="quick-topic-row"><span>${quickEsc(topic)}</span><div><button type="button" class="${value < 0 ? 'selected' : ''}" data-topic-feedback="${quickEsc(topic)}" data-topic-direction="less" aria-label="Moins de ${quickEsc(topic)}">-</button><button type="button" class="${value > 0 ? 'selected' : ''}" data-topic-feedback="${quickEsc(topic)}" data-topic-direction="more" aria-label="Plus de ${quickEsc(topic)}">+</button></div></div>`;
+    return `<div class="quick-topic-row"><span>${quickEsc(topic)}</span><div><button type="button" class="${value < 0 ? 'selected' : ''}" data-topic-feedback="${quickEsc(topic)}" data-topic-direction="less" aria-label="Moins de ${quickEsc(topic)}">−</button><button type="button" class="${value > 0 ? 'selected' : ''}" data-topic-feedback="${quickEsc(topic)}" data-topic-direction="more" aria-label="Plus de ${quickEsc(topic)}">+</button></div></div>`;
   }).join('')}</div></section>`;
 }
 
@@ -293,17 +293,17 @@ function openQuickSummary(article) {
     || quickUsefulVisualUrl(article.quickVisualUrl);
   const backdrop = document.createElement('div');
   backdrop.className = 'quick-summary-backdrop';
-  backdrop.innerHTML = `<section class="quick-summary-sheet" role="dialog" aria-modal="true" aria-label="R�sum� de l'article">
+  backdrop.innerHTML = `<section class="quick-summary-sheet" role="dialog" aria-modal="true" aria-label="Résumé de l’article">
     <header class="quick-summary-head">
       <h2>${quickEsc(cleanTitle)}</h2>
-      <button type="button" class="quick-summary-close" data-quick-close aria-label="Fermer">�</button>
+      <button type="button" class="quick-summary-close" data-quick-close aria-label="Fermer">×</button>
     </header>
     ${visualUrl ? `<img class="quick-summary-image" src="${quickEsc(visualUrl)}" alt="" referrerpolicy="no-referrer" decoding="async">` : ''}
     <div class="quick-summary-meta"><span>${quickEsc(article.source || '')}</span><span>${quickEsc(quickTime(article.publishedAt))}</span><span>${quickEsc(article.category || '')}</span></div>
     <div class="quick-summary-text" data-quick-summary-text>${quickEsc(immediate)}</div>
-    <a class="quick-full-article" href="${quickEsc(article.url || '#')}" target="_blank" rel="noopener noreferrer">Lire l'article complet <span aria-hidden="true">?</span></a>
+    <a class="quick-full-article" href="${quickEsc(article.url || '#')}" target="_blank" rel="noopener noreferrer">Lire l’article complet <span aria-hidden="true">↗</span></a>
     ${quickTopicFeedbackMarkup(article)}
-    <p class="quick-feedback-help"><strong>Choix sur cet article</strong> � Pas int�ress� � r�duit les sujets semblables ; � Sujet � suivre � surveille au contraire ce sujet pr�cis.</p>
+    <p class="quick-feedback-help"><strong>Choix sur cet article</strong> « Pas intéressé » réduit les sujets semblables ; « Sujet à suivre » surveille au contraire ce sujet précis.</p>
     <div class="quick-feedback-grid quick-feedback-secondary" data-quick-feedback-grid>
       ${['not','follow'].map(key => quickFeedbackMarkup(key, current)).join('')}
     </div>
@@ -382,4 +382,3 @@ const quickRoot = document.getElementById('app');
 if (quickRoot) new MutationObserver(scheduleQuickEnhance).observe(quickRoot, { childList: true, subtree: true });
 window.addEventListener('focus', scheduleQuickEnhance);
 scheduleQuickEnhance();
-
