@@ -544,6 +544,11 @@
     const intel = readJson(INTEL_KEY, {});
     const cacheNames = 'caches' in window ? await caches.keys().catch(() => []) : [];
     const storageBytes = [CACHE_KEY, STORY_KEY, INTEL_KEY, PERF_KEY].reduce((total, key) => total + String(localStorage.getItem(key) || '').length * 2, 0);
+    const metrics = window.NewsDiagnosticsV91?.collect({
+      cache,
+      errors: readJson('news-client-errors-v88', []),
+      imageErrors
+    }) || null;
     const [groq, multi, story] = await Promise.all([
       apiStatus('/api/article-summary-groq?status=1'),
       apiStatus('/api/article-summary-multisource?status=1'),
@@ -560,6 +565,7 @@
       serviceWorker: Boolean(navigator.serviceWorker?.controller),
       cacheNames,
       perf: perfSummary(),
+      metrics,
       apis: { groq, multi, story }
     };
   }
@@ -575,7 +581,9 @@
     if (!backdrop.isConnected) return;
     const apiRow = (name, status) => `<div class="diagnostic-row-v81"><span>${escapeHtml(name)}</span><strong class="${status.ok ? 'ok' : 'bad'}">${status.ok ? 'OK' : 'Erreur'} · ${status.ms} ms</strong></div>`;
     const perf = data.perf.length ? data.perf.slice(0, 8).map(item => `<div class="diagnostic-row-v81"><span>${escapeHtml(item.name)} <small>(${item.count})</small></span><strong>${item.median} ms méd. · ${item.p95} ms p95</strong></div>`).join('') : '<p>Aucune mesure disponible pour l’instant.</p>';
-    content.innerHTML = `<section><h3>État du fil</h3><div class="diagnostic-grid-v81"><div><strong>${data.articles}</strong><span>articles</span></div><div><strong>${data.essentials}</strong><span>Essentiels</span></div><div><strong>${data.duplicates}</strong><span>doublons fusionnés</span></div><div><strong>${data.stories}</strong><span>événements suivis</span></div></div></section><section><h3>Stabilité locale</h3><div class="diagnostic-row-v81"><span>Service worker</span><strong class="${data.serviceWorker ? 'ok' : 'bad'}">${data.serviceWorker ? 'Actif' : 'Inactif'}</strong></div><div class="diagnostic-row-v81"><span>Caches PWA</span><strong>${data.cacheNames.length}</strong></div><div class="diagnostic-row-v81"><span>Stockage suivi</span><strong>${data.storageKB} Ko</strong></div><div class="diagnostic-row-v81"><span>Erreurs images cette session</span><strong class="${data.imageErrors ? 'bad' : 'ok'}">${data.imageErrors}</strong></div></section><section><h3>API</h3>${apiRow('Résumé Groq', data.apis.groq)}${apiRow('Résumé multi-sources', data.apis.multi)}${apiRow('Mémoire / contradictions', data.apis.story)}</section><section><h3>Performances mesurées</h3>${perf}</section><div class="diagnostic-actions-v81"><button type="button" data-diagnostic-copy-v81>Copier le diagnostic</button><button type="button" data-diagnostic-clear-v81>Effacer les mesures</button></div>`;
+    const metrics = data.metrics;
+    const quality = metrics ? `<section><h3>Qualité du fil</h3><div class="diagnostic-row-v81"><span>Déduplication</span><strong>${metrics.dedup.collapsed} retirés · ${metrics.dedup.mergedArticles} regroupés · max ${metrics.dedup.largestCluster}</strong></div><div class="diagnostic-row-v81"><span>Classement</span><strong>${metrics.ranking.positiveSignals} bonus · ${metrics.ranking.negativeSignals} malus · ${metrics.ranking.lowInformation} faibles</strong></div><div class="diagnostic-row-v81"><span>Nouveauté</span><strong>${metrics.ranking.novelty.development} développements · ${metrics.ranking.novelty.repeat} répétitions</strong></div><div class="diagnostic-row-v81"><span>Images</span><strong>${metrics.images.ready} vérifiées · ${metrics.images.candidate} candidates · ${metrics.images.missing} absentes</strong></div><div class="diagnostic-row-v81"><span>Résumés</span><strong>${metrics.summaries.usable} utiles · ${metrics.summaries.missing} vides · ${metrics.summaries.generic} génériques · ${metrics.summaries.titleLike} proches du titre</strong></div><div class="diagnostic-row-v81"><span>Erreurs client</span><strong class="${metrics.errors.total ? 'bad' : 'ok'}">${metrics.errors.total} · ${metrics.errors.rejections} rejets</strong></div></section>` : '';
+    content.innerHTML = `<section><h3>État du fil</h3><div class="diagnostic-grid-v81"><div><strong>${data.articles}</strong><span>articles</span></div><div><strong>${data.essentials}</strong><span>Essentiels</span></div><div><strong>${data.duplicates}</strong><span>doublons fusionnés</span></div><div><strong>${data.stories}</strong><span>événements suivis</span></div></div></section>${quality}<section><h3>Stabilité locale</h3><div class="diagnostic-row-v81"><span>Service worker</span><strong class="${data.serviceWorker ? 'ok' : 'bad'}">${data.serviceWorker ? 'Actif' : 'Inactif'}</strong></div><div class="diagnostic-row-v81"><span>Caches PWA</span><strong>${data.cacheNames.length}</strong></div><div class="diagnostic-row-v81"><span>Stockage suivi</span><strong>${data.storageKB} Ko</strong></div><div class="diagnostic-row-v81"><span>Erreurs images cette session</span><strong class="${data.imageErrors ? 'bad' : 'ok'}">${data.imageErrors}</strong></div></section><section><h3>API et latence</h3>${apiRow('Résumé Groq', data.apis.groq)}${apiRow('Résumé multi-sources', data.apis.multi)}${apiRow('Mémoire / contradictions', data.apis.story)}</section><section><h3>Performances mesurées</h3>${perf}</section><div class="diagnostic-actions-v81"><button type="button" data-diagnostic-copy-v81>Copier le diagnostic</button><button type="button" data-diagnostic-clear-v81>Effacer les mesures</button></div>`;
     backdrop.dataset.diagnosticText = JSON.stringify(data, null, 2);
   }
 
