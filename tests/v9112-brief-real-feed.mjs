@@ -113,7 +113,17 @@ try {
         crue: api.impactScore({ title: 'Crue au Népal : le bilan passe à 734 morts' }),
         chavire: api.impactScore({ title: 'Chypre : un ferry transportant plus de 267 personnes chavire en mer' }),
         couleAuLarge: api.impactScore({ title: 'Un bateau transportant environ 270 personnes coule au large de Chypre' }),
-        unrelatedCoule: api.impactScore({ title: 'Une entreprise coule après plusieurs années de pertes' })
+        unrelatedCoule: api.impactScore({ title: 'Une entreprise coule après plusieurs années de pertes' }),
+        japanDefense: api.impactScore({ title: 'IA, drones, missiles : le Japon réclame 48 milliards d’euros pour sa défense - Boursorama' }),
+        sportsEarthquake: api.impactScore({ title: 'Un calvaire, des larmes et un séisme : Novak Djokovic éliminé à l’US Open - Eurosport' }),
+        missileAttack: api.impactScore({ title: 'Ukraine : une salve de missiles frappe plusieurs infrastructures énergétiques' }),
+        droneAttack: api.impactScore({ title: "L'une des plus grandes raffineries russes prend feu après une attaque de drones ukrainiens, Moscou prépare sa riposte" }),
+        severalDead: api.impactScore({ title: 'Naufrage en Méditerranée : plusieurs morts après le chavirement d’un bateau' }),
+        headlineClusterNoise: api.impactScore({
+          title: 'Une entreprise locale annonce ses nouveaux résultats trimestriels',
+          summary: 'Guerre et catastrophe : 800 morts dans un autre titre voisin du cluster.',
+          summaryQualityV919: 'headline-cluster'
+        })
       },
       duplicate: api.sameEvent(items.find(item => item.id === 'iceland-referendum'), items.find(item => item.id === 'iceland-duplicate')),
       stats: { ...api.stats }
@@ -137,6 +147,12 @@ try {
   assert.equal(result.wordingImpact.chavire, 15, '"chavire" must be recognized as a major sinking event');
   assert.equal(result.wordingImpact.couleAuLarge, 15, '"coule au large" must be recognized as a major sinking event');
   assert.equal(result.wordingImpact.unrelatedCoule, 0, 'generic business use of "coule" must not be treated as a major event');
+  assert.equal(result.wordingImpact.japanDefense, 0, 'defense procurement mentioning missiles must not be promoted as an attack');
+  assert.ok(result.wordingImpact.sportsEarthquake < 0, 'a metaphorical sports "séisme" must not be promoted as a disaster');
+  assert.ok(result.wordingImpact.missileAttack >= 15, 'an actual contextual missile attack must remain a major event');
+  assert.ok(result.wordingImpact.droneAttack >= 15, 'a plural drone attack must remain a major event');
+  assert.ok(result.wordingImpact.severalDead >= 34, '"plusieurs morts" in a real disaster must contribute conservative human-toll impact');
+  assert.equal(result.wordingImpact.headlineClusterNoise, 0, 'a rejected Google News headline cluster must not leak another story impact into Brief ranking');
   assert.ok(result.impact['free-ai'] < 0, 'consumer/how-to content should receive a Brief impact penalty');
   assert.equal(result.stats.lastChosen, 5);
 
