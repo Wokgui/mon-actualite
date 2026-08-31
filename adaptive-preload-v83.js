@@ -43,6 +43,26 @@
     return text.length >= 55 && !/résumé (?:détaillé )?momentanément indisponible|résumé indisponible|en cours de préparation|ouvrez? l[’']article|consultez? les? détails/i.test(text);
   }
 
+  function isGoogleNewsArticle(article = {}) {
+    if (/\bgoogle\s+news\b/i.test(clean(article.source || ''))) return true;
+    try {
+      const host = new URL(String(article.url || ''), location.href).hostname.toLowerCase();
+      return host === 'news.google.com' || host.endsWith('.news.google.com');
+    } catch { return false; }
+  }
+
+  function safeFeedSummary(article = {}) {
+    const summary = clean(article.summary || '');
+    if (!usefulSummary(summary)) return '';
+    const quality = clean(article.summaryQualityV919 || article.summaryQuality || article.summaryQualityReason || '').toLowerCase();
+    if (/headline-cluster|aggregate|aggregated|rejected|title-restatement/.test(quality)) return '';
+    if (isGoogleNewsArticle(article)) return '';
+    const lower = summary.toLowerCase();
+    const sources = [...new Set([article.source, ...(article.sources || [])].map(clean).filter(Boolean))];
+    if (sources.filter(source => lower.includes(source.toLowerCase())).length >= 2) return '';
+    return summary;
+  }
+
   function currentArticles() {
     const cache = readJson(CACHE_KEY, {});
     return Array.isArray(cache.articles) ? cache.articles : [];
@@ -103,7 +123,7 @@
       const payload = {
         url: article.url,
         title: clean(article.title),
-        summary: usefulSummary(article.summary) ? clean(article.summary) : '',
+        summary: safeFeedSummary(article),
         source: clean(article.source || '')
       };
       const response = await fetch('/api/article-summary-groq?v=17', {
