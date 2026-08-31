@@ -12,8 +12,8 @@ const cases = [
     'food-health-title'
   ],
   [
-    'rapprochement Decathlon',
-    { title: 'Rapprochement stratégique entre Decathlon et Céraclès Coopérative' },
+    'rapprochement Decathlon réel',
+    { title: 'Decathlon et Céraclès Coopérative (ex-Groupe Sport 2000) affichent leurs ambitions en annonçant un rapprochement stratégique' },
     'Économie',
     'corporate-economy-title'
   ],
