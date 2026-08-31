@@ -1,7 +1,7 @@
 const CACHE = 'mon-actualite-v91-33-core-r1';
 const COMPAT_DIAGNOSTIC = 'v91.33-core';
 const THUMB_CACHE = 'mon-actualite-thumbnails-v6-feedly';
-const THUMB_NEGATIVE_TTL_MS = 15 * 60 * 1000;
+const THUMB_NEGATIVE_TTL_MS = 90 * 1000;
 const thumbnailInflight = new Map();
 const ASSETS = ['./', './index.html', './styles.css?v=53', './feedly-compact.css?v=44', './feed-editorial-v77.css?v=77.2', './feedly-left.css?v=43', './ui-fixes-v2.css?v=43', './article-quickview.css?v=53', './feed-quality.css?v=43', './performance-v42.css?v=45', './personalization-v44.css?v=53', './feed-editorial-v78.css?v=78.1', './feed-experience-v79.css?v=79', './feed-experience-v80.css?v=80', './feed-intelligence-v81.css?v=81', './source-quality-v82.css?v=82', './content-trust-v83.css?v=83', './maintenance-v84.css?v=84', './experience-v85.css?v=85', './feed-v87.css?v=87', './quality-v88.css?v=88', './quality-signals-v89.css?v=89', './release-watch.js?v=91.33', './bootstrap-v42.js?v=54', './stable-dom.js?v=44', './content-intelligence-v76.js?v=76', './feed-editorial-v77.js?v=77', './feed-editorial-polish-v77.js?v=91.27', './novelty-detection-v91.js?v=91.24', './content-intelligence-v78.js?v=78.3', './feed-editorial-v78.js?v=78.1', './summary-race-v78.js?v=91.33', './content-trust-v83.js?v=83.2', './source-quality-v82.js?v=82', './lead-choice-v91.js?v=91.3', './ai-request-control-v91.7.js?v=91.12', './feed-experience-v79.js?v=79', './navigation-cache-v79.js?v=91.26', './feed-experience-v80.js?v=91.28', './diagnostic-metrics-v91.js?v=91.25', './feed-intelligence-v81.js?v=81.2', './adaptive-preload-v83.js?v=83', './maintenance-v84.js?v=84', './experience-v85.js?v=85', './lifecycle-v86.js?v=86', './personalization-learning-v91.js?v=91.22', './news-pipeline-v88.js?v=88.10', './brief-smart-v87.js?v=91.30', './quality-v88.js?v=88', './quality-signals-v89.js?v=89', './visual-stability-v91.8.js?v=91.8', './app.js?v=68', './feedly-runtime.js?v=64', './summary-fixes.js?v=44', './article-quickview.js?v=58', './feed-quality.js?v=45', './source-discovery-ui.js?v=3', './services/source-connectors.js?v=45.3', './services/article-visuals.js?v=57', './manifest.webmanifest?v=91.33', './version.json', './assets/app-icon-192.png', './assets/app-icon-512.png', './assets/app-icon-maskable-512.png', './assets/apple-touch-icon-180.png'];
 
@@ -55,7 +55,7 @@ function neutralThumbnailResponse() {
     status: 200,
     headers: {
       'Content-Type': 'image/svg+xml',
-      'Cache-Control': 'public, max-age=900',
+      'Cache-Control': 'public, max-age=90',
       'X-Thumbnail-Status': 'neutral-fallback',
       'X-Thumbnail-Cached-At': String(Date.now())
     }
@@ -85,26 +85,34 @@ function isFallbackThumbnail(response) {
   return status === 'fallback' || status === 'publisher-tile' || status === 'neutral-fallback' || /image\/svg\+xml/i.test(type);
 }
 
-async function cacheThumbnail(cache, request, canonicalKey, response) {
+async function cacheThumbnail(cache, request, canonicalKey, response, { canonical = true } = {}) {
   if (!response) return;
   await cache.put(request, response.clone()).catch(() => {});
-  if (canonicalKey.url !== request.url) await cache.put(canonicalKey, response.clone()).catch(() => {});
+  if (canonical && canonicalKey.url !== request.url) await cache.put(canonicalKey, response.clone()).catch(() => {});
 }
 
 async function thumbnailResponse(request) {
   const cache = await caches.open(THUMB_CACHE);
   const canonicalKey = thumbnailCacheKey(request);
-  let cached = await cache.match(canonicalKey);
-  if (!cached) {
-    cached = await cache.match(request);
-    if (cached && canonicalKey.url !== request.url) cache.put(canonicalKey, cached.clone()).catch(() => {});
+
+  const canonicalCached = await cache.match(canonicalKey);
+  if (canonicalCached) {
+    if (!isFallbackThumbnail(canonicalCached)) return canonicalCached;
+    // Older workers stored neutral failures under the shared article key.
+    // Drop those global negatives so the fast and full resolvers can fail
+    // independently instead of blocking each other for the same article.
+    await cache.delete(canonicalKey).catch(() => {});
   }
 
+  const cached = await cache.match(request);
   if (cached) {
-    if (!isFallbackThumbnail(cached)) return cached;
+    if (!isFallbackThumbnail(cached)) {
+      if (canonicalKey.url !== request.url) cache.put(canonicalKey, cached.clone()).catch(() => {});
+      return cached;
+    }
     const cachedAt = Number(cached.headers.get('X-Thumbnail-Cached-At') || 0);
     if (cachedAt && Date.now() - cachedAt < THUMB_NEGATIVE_TTL_MS) return cached;
-    await Promise.allSettled([cache.delete(request), cache.delete(canonicalKey)]);
+    await cache.delete(request).catch(() => {});
   }
 
   const inflightKey = canonicalKey.url;
@@ -122,16 +130,18 @@ async function thumbnailResponse(request) {
         return response;
       }
 
-      await Promise.allSettled([cache.delete(request), cache.delete(canonicalKey)]);
+      await cache.delete(request).catch(() => {});
       if (response.status === 404 || isFallbackThumbnail(response)) {
         const fallback = neutralThumbnailResponse();
-        await cacheThumbnail(cache, request, canonicalKey, fallback);
+        // A negative result belongs only to this resolver URL. A fast-search
+        // miss must never prevent the independent full resolver from trying.
+        await cacheThumbnail(cache, request, canonicalKey, fallback, { canonical: false });
         return fallback;
       }
       return response;
     } catch {
       const fallback = neutralThumbnailResponse();
-      await cacheThumbnail(cache, request, canonicalKey, fallback);
+      await cacheThumbnail(cache, request, canonicalKey, fallback, { canonical: false });
       return fallback;
     }
   })();
