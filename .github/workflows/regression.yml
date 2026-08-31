@@ -33,7 +33,7 @@ jobs:
           node tests/v9122-personalization-learning.mjs
           node tests/v9123-home-source-mentions.mjs
           node tests/v9124-true-novelty.mjs
-          node tests/v9125-diagnostic-metrics.mjs
+          node tests/v9125-diagnostic-metrics-v91.js
           node tests/v9126-manual-refresh-bridge.mjs
           node tests/v9127-home-seen-fallback.mjs
           node tests/v9128-pending-payload-apply.mjs
@@ -42,6 +42,7 @@ jobs:
           node tests/v9131-category-context.mjs
           node tests/v9132-category-gaps.mjs
           node tests/v9133-summary-reuse.mjs
+          node tests/v9134-brief-disaster-dedup.mjs
 
   mobile-browser:
     needs: static-regression
