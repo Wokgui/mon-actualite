@@ -80,6 +80,20 @@ assert.ok(
   'une information immédiatement utile au public doit recevoir un bonus mesuré'
 );
 
+assert.equal(
+  homeSignalScore(article('japan-defense-budget', 'IA, drones, missiles : le Japon réclame 48 milliards d’euros pour sa défense - Boursorama')).score,
+  0,
+  'le mot missiles dans un budget de défense ne doit pas suffire à créer un événement majeur'
+);
+assert.ok(
+  homeSignalScore(article('real-missile-attack', 'Ukraine : une salve de missiles frappe plusieurs infrastructures énergétiques')).score >= 15,
+  'une attaque de missiles contextualisée doit rester un événement majeur'
+);
+assert.ok(
+  homeSignalScore(article('sports-earthquake', 'Un calvaire, des larmes et un séisme : Novak Djokovic éliminé à l’US Open - Eurosport')).score <= -15,
+  'un séisme métaphorique dans un titre sportif ne doit pas être traité comme une catastrophe'
+);
+
 const contamination = homeSignalScore(article(
   'contamination',
   'Le papier toilette au cœur des préoccupations des Américains',
