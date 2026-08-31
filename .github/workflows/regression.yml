@@ -43,6 +43,7 @@ jobs:
           node tests/v9132-category-gaps.mjs
           node tests/v9133-summary-reuse.mjs
           node tests/v9134-brief-disaster-dedup.mjs
+          node tests/v9135-final-image-prewarm.mjs
 
   mobile-browser:
     needs: static-regression
