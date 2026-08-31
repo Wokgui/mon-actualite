@@ -186,6 +186,11 @@
     return Array.isArray(memory) ? memory.filter(item => item && now - Number(item.at || 0) <= MEMORY_MAX_AGE).slice(-320) : [];
   }
 
+  function publishedAt(article = {}) {
+    const parsed = Date.parse(article.publishedAt || article.date || '');
+    return Number.isFinite(parsed) ? new Date(parsed).toISOString() : '';
+  }
+
   function refineNovelty(article, memory) {
     const at = tokens(article);
     if (at.length < 3) return { state: article.noveltyState || 'new', delta: 0, reason: '' };
@@ -207,6 +212,15 @@
     const newEntities = entities(article).filter(value => !oldEntities.has(normalize(value)));
     const recap = /\b(ce que l'on sait|ce qu'il faut savoir|récap|retour sur|tout comprendre|en images|revivez)\b/i.test(titleText(article));
 
+    const precise = window.NewsNoveltyV91?.classify({
+      title: titleText(article),
+      publishedAt: publishedAt(article),
+      facts: facts(article),
+      actions: actions(article),
+      entities: entities(article)
+    }, best.item);
+    if (precise) return precise;
+
     if (newFacts.length >= 2 || newActions.length >= 1 || newEntities.length >= 3) {
       return { state: 'development', delta: 14 + Math.min(10, newFacts.length * 2), reason: 'Nouveau développement' };
     }
@@ -221,7 +235,8 @@
     for (const article of articles) {
       const id = String(article.id || '');
       if (!id) continue;
-      byId.set(id, { id, tokens: tokens(article), facts: facts(article), actions: actions(article), entities: entities(article), eventKey: article.eventKeyV78 || eventKey(article), at: now });
+      const title = titleText(article);
+      byId.set(id, { id, title, publishedAt: publishedAt(article), tokens: tokens(article), facts: facts(article), actions: actions(article), entities: entities(article), markers: window.NewsNoveltyV91?.markers(title) || [], eventKey: article.eventKeyV78 || eventKey(article), at: now });
     }
     writeJson(STORY_MEMORY_KEY, [...byId.values()].sort((a, b) => Number(a.at || 0) - Number(b.at || 0)).slice(-320));
   }
@@ -252,6 +267,8 @@
       const novelty = refineNovelty(copy, memory);
       copy.noveltyStateV78 = novelty.state;
       copy.noveltyReasonV78 = novelty.reason;
+      copy.noveltyConfidenceV9124 = novelty.confidence || 'legacy';
+      copy.noveltyEvidenceV9124 = novelty.evidence || null;
       copy.score = Math.round(Number(copy.score || 0) + novelty.delta);
       copy.whyV78 = whyArticle(copy);
       return copy;

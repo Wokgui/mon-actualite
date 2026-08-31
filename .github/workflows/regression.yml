@@ -32,6 +32,7 @@ jobs:
           node tests/v9120-mobile-work-budget.mjs
           node tests/v9122-personalization-learning.mjs
           node tests/v9123-home-source-mentions.mjs
+          node tests/v9124-true-novelty.mjs
 
   mobile-browser:
     needs: static-regression
