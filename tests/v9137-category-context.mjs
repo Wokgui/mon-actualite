@@ -55,6 +55,12 @@ const cases = [
     { title: 'Guerre au Moyen-Orient : Donald Trump publie une vidéo générée par IA de l’armée américaine «réduisant en miettes» l’île de Kharg' },
     'International',
     'war-ai-incidental-title'
+  ],
+  [
+    'déploiement militaire après mutinerie',
+    { title: 'L’Algérie envoie quatre avions de combat Su-30 au Niger après une mutinerie survenue à Niamey' },
+    'International',
+    'military-crisis-title'
   ]
 ];
 
@@ -73,6 +79,7 @@ const militaryProcurement = classifyArticleDetailed({
 assert.equal(militaryProcurement.category, 'International',
   `un achat militaire d'État ne doit pas être confondu avec une acquisition d'entreprise: ${JSON.stringify(militaryProcurement)}`);
 assert.notEqual(militaryProcurement.reason, 'corporate-economy-title');
+assert.notEqual(militaryProcurement.reason, 'military-crisis-title');
 
 const aiFactory = classifyArticleDetailed({
   title: "Bull sélectionné par l’Europe pour fournir une AI Factory à 388 millions d’euros en Finlande"
@@ -108,4 +115,4 @@ const realStudents = classifyArticleDetailed({
 assert.equal(realStudents.category, 'Éducation',
   `le vrai pluriel « élèves » doit rester un signal Éducation: ${JSON.stringify(realStudents)}`);
 
-console.log(`v91.37 contextual category checks passed (${cases.length + 7} assertions).`);
+console.log(`v91.37 contextual category checks passed (${cases.length + 8} assertions).`);
