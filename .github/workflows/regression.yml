@@ -40,6 +40,7 @@ jobs:
           node tests/v9129-summary-race-diagnostics.mjs
           node tests/v9130-context-signals.mjs
           node tests/v9131-category-context.mjs
+          node tests/v9132-category-gaps.mjs
 
   mobile-browser:
     needs: static-regression
