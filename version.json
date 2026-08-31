@@ -1,6 +1,6 @@
 {
-  "version": "62",
-  "codeRelease": "91.26",
+  "version": "63",
+  "codeRelease": "91.27",
   "release": "2026-08-31",
-  "label": "v91.26 (socle v89) : Accueil mieux équilibré et actualisation explicite fiabilisée ; déduplication, résumés, images et performances mobiles renforcés ; catégories avec confiance ; personnalisation anti-bulle ; vraie nouveauté et diagnostics internes fiabilisés"
+  "label": "v91.27 (socle v89) : Accueil toujours visible même après lecture et actualisation explicite fiabilisée ; déduplication, résumés, images et performances mobiles renforcés ; catégories avec confiance ; personnalisation anti-bulle ; vraie nouveauté et diagnostics internes fiabilisés"
 }
