@@ -35,6 +35,7 @@ order('feed-editorial-polish-v77.js', 'content-intelligence-v78.js');
 order('novelty-detection-v91.js', 'content-intelligence-v78.js');
 order('content-intelligence-v78.js', 'content-trust-v83.js');
 order('content-trust-v83.js', 'feed-experience-v79.js');
+order('diagnostic-metrics-v91.js', 'feed-intelligence-v81.js');
 order('feed-experience-v79.js', 'news-pipeline-v88.js');
 order('experience-v85.js', 'news-pipeline-v88.js');
 order('personalization-learning-v91.js', 'news-pipeline-v88.js');
