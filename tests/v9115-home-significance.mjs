@@ -90,6 +90,10 @@ assert.ok(
   'une attaque de missiles contextualisée doit rester un événement majeur'
 );
 assert.ok(
+  homeSignalScore(article('plural-drone-attack', "L'une des plus grandes raffineries russes prend feu après une attaque de drones ukrainiens, Moscou prépare sa riposte")).score >= 15,
+  'une attaque de drones au pluriel doit rester reconnue comme événement majeur'
+);
+assert.ok(
   homeSignalScore(article('sports-earthquake', 'Un calvaire, des larmes et un séisme : Novak Djokovic éliminé à l’US Open - Eurosport')).score <= -15,
   'un séisme métaphorique dans un titre sportif ne doit pas être traité comme une catastrophe'
 );
