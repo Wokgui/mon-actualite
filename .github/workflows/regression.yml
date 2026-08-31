@@ -39,6 +39,7 @@ jobs:
           node tests/v9128-pending-payload-apply.mjs
           node tests/v9129-summary-race-diagnostics.mjs
           node tests/v9130-context-signals.mjs
+          node tests/v9131-category-context.mjs
 
   mobile-browser:
     needs: static-regression
