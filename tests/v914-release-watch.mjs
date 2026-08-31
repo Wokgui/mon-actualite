@@ -12,9 +12,10 @@ assert.match(release, /^\d+\.\d+$/, 'version.json must expose a semantic codeRel
 const slug = release.replace(/\./g, '-');
 const watcherAsset = `release-watch.js?v=${release}`;
 const manifestAsset = `manifest.webmanifest?v=${release}`;
+const appAsset = index.match(/<script[^>]+src="(app\.js\?v=[^"]+)"/)?.[1] || '';
 
 assert.ok(index.includes(watcherAsset), 'index must load the independent release watcher for the published release');
-assert.ok(index.indexOf(watcherAsset) < index.indexOf('app.js?v=61'), 'release watcher must load before app.js');
+assert.ok(appAsset && index.indexOf(watcherAsset) < index.indexOf(appAsset), 'release watcher must load before the current app.js asset');
 assert.ok(index.includes(manifestAsset), 'manifest cache buster must track the published release');
 assert.equal(manifest.start_url, `/?code-release=${release}`, 'installed PWA start URL must identify the published release');
 assert.ok(watcher.includes(`const PAGE_RELEASE = '${release}'`), 'release watcher page identity must match version.json');

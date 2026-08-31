@@ -4,8 +4,8 @@ import { articleVisualUrl, hasPreparedVisual, sourceTileUrl } from './services/a
 const $ = (selector, root = document) => root.querySelector(selector);
 const app = $('#app');
 const toastEl = $('#toast');
-const APP_VERSION = '60';
-const APP_RELEASE = '29 août 2026';
+const APP_VERSION = '61';
+const APP_RELEASE = '31 août 2026';
 document.documentElement.dataset.appVersion = APP_VERSION;
 
 const GENERAL_CATEGORIES = ['Politique', 'International', 'Économie', 'Société', 'Santé', 'Environnement', 'Science', 'Culture', 'Éducation', 'Europe'];
