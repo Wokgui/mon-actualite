@@ -49,18 +49,21 @@ assert.equal(version.codeRelease, '91.34', 'version.json must publish code relea
 assert.equal(manifest.start_url, '/?code-release=91.34', 'PWA start URL must publish code release 91.34');
 
 const now = Date.now();
+// Captured from the real 2026-08-31 feed. Google News descriptions are
+// deliberately marked as headline-cluster so the disaster shortcut must
+// succeed from trustworthy title evidence rather than aggregate snippets.
 const nepalEvacuation = {
   id: 'nepal-school',
-  title: 'Népal : plus de 900 élèves évacués après les fortes inondations',
-  summary: 'Les inondations qui frappent le Népal ont forcé les autorités à évacuer des écoles et plusieurs villages dans les zones touchées.',
-  summaryQualityV919: 'source-grounded',
+  title: 'Ce directeur d’école raconte comment il a évacué 900 élèves avant la crue éclair au Népal',
+  summary: 'Ce directeur d’école raconte comment il a évacué 900 élèves avant la crue éclair au Népal Le HuffPost Au Népal, après les inondations, les glaciologues sidérés par l’ampleur de la catastrophe Le Monde.fr',
+  summaryQualityV919: 'headline-cluster',
   publishedAt: new Date(now).toISOString()
 };
 const nepalGlaciers = {
   id: 'nepal-glaciers',
-  title: 'Après les inondations au Népal, les glaciologues alertent sur les risques dans l’Himalaya',
-  summary: 'Après les crues au Népal, des scientifiques analysent les glaciers et les risques de nouvelles montées des eaux dans les régions sinistrées.',
-  summaryQualityV919: 'source-grounded',
+  title: 'Au Népal, après les inondations, les glaciologues sidérés par l’ampleur de la catastrophe',
+  summary: 'Au Népal, après les inondations, les glaciologues sidérés par l’ampleur de la catastrophe Le Monde.fr Après les crues meurtrières au Népal, plusieurs médias suivent les opérations de secours.',
+  summaryQualityV919: 'headline-cluster',
   publishedAt: new Date(now - 30 * 60 * 1000).toISOString()
 };
 const indiaFlood = {
@@ -91,7 +94,7 @@ const rejectedClusterNoise = {
 };
 
 assert.equal(api.sameEvent(nepalEvacuation, nepalGlaciers), true,
-  'two angles of the same Nepal flood event must occupy only one Brief slot');
+  'the two captured Nepal flood angles must occupy only one Brief slot');
 assert.equal(api.sameEvent(nepalEvacuation, indiaFlood), false,
   'different floods in different countries must remain separate events');
 assert.equal(api.sameEvent(nepalEvacuation, nepalQuake), false,
@@ -101,4 +104,4 @@ assert.equal(api.sameEvent(nepalEvacuation, oldNepalFlood), false,
 assert.equal(api.sameEvent(nepalEvacuation, rejectedClusterNoise), false,
   'a rejected Google News aggregate summary must not create a false disaster duplicate');
 
-console.log('v91.34 Brief disaster dedup and PWA release checks passed');
+console.log('v91.34 Brief disaster dedup, captured-feed and PWA release checks passed');
