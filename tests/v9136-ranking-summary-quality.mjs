@@ -5,6 +5,7 @@ import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
 const { homeSignalScore } = require('../lib/news-significance.js');
+const { classifyArticleDetailed } = require('../lib/news-category.js');
 
 function signal(title) {
   return homeSignalScore({ title });
@@ -38,6 +39,40 @@ assert.ok(retirement.score >= 10 && retirement.reasons.includes('décision publi
 const dsa = signal('ChatGPT, Roblox et Reddit vont être soumis à des règles renforcées dans l’UE');
 assert.ok(dsa.score >= 10 && dsa.reasons.includes('décision publique'),
   'strengthened EU platform rules are a real public-policy change');
+
+const categoryCases = [
+  [
+    'GTA 6',
+    { title: '« Ne plus tuer la police et les civils » GTA 6 a une nouvelle mécanique qui change tout' },
+    'Tech'
+  ],
+  [
+    'Carmat',
+    { title: 'Après des résultats favorables, le cœur artificiel Carmat bientôt remboursé ?' },
+    'Santé'
+  ],
+  [
+    'AI Factory',
+    { title: "Bull sélectionné par l’Europe pour fournir une AI Factory à 388 millions d’euros en Finlande" },
+    'IA'
+  ],
+  [
+    'supercalculateur',
+    { title: 'Le français Bull décroche un contrat à 400 millions d’euros pour livrer un supercalculateur à la Finlande' },
+    'Tech'
+  ],
+  [
+    'retraite internationale sportive',
+    { title: 'Lionel Messi met un terme à sa carrière internationale avec l’Argentine', summary: 'Il annonce sa retraite internationale.' },
+    'Société'
+  ]
+];
+
+for (const [label, article, expected] of categoryCases) {
+  const result = classifyArticleDetailed(article, []);
+  assert.equal(result.category, expected,
+    `${label} must be classified ${expected}: ${JSON.stringify(result)}`);
+}
 
 const source = fs.readFileSync('summary-race-v78.js', 'utf8');
 
@@ -111,4 +146,4 @@ const aggregate = 'Titre principal &nbsp;&nbsp; Le Monde.fr Autre titre voisin s
   assert.equal(data.provider, 'feed-fallback');
 }
 
-console.log('v91.36 ranking and safe summary fallback checks passed');
+console.log('v91.36 ranking, category and safe summary fallback checks passed');
