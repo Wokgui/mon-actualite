@@ -98,6 +98,9 @@ async function thumbnailResponse(request) {
   const canonicalCached = await cache.match(canonicalKey);
   if (canonicalCached) {
     if (!isFallbackThumbnail(canonicalCached)) return canonicalCached;
+    // Older workers stored neutral failures under the shared article key.
+    // Drop those global negatives so the fast and full resolvers can fail
+    // independently instead of blocking each other for the same article.
     await cache.delete(canonicalKey).catch(() => {});
   }
 
@@ -130,6 +133,8 @@ async function thumbnailResponse(request) {
       await cache.delete(request).catch(() => {});
       if (response.status === 404 || isFallbackThumbnail(response)) {
         const fallback = neutralThumbnailResponse();
+        // A negative result belongs only to this resolver URL. A fast-search
+        // miss must never prevent the independent full resolver from trying.
         await cacheThumbnail(cache, request, canonicalKey, fallback, { canonical: false });
         return fallback;
       }
