@@ -1,6 +1,6 @@
 {
   "version": "65",
-  "codeRelease": "91.30",
+  "codeRelease": "91.31",
   "release": "2026-08-31",
-  "label": "v91.30 (socle v89) : événements majeurs mieux contextualisés dans l’Accueil et le Brief ; faux positifs missiles/séisme sportif supprimés ; attaques réelles et bilans humains préservés ; résumés Google News agrégés exclus des signaux d’impact"
+  "label": "v91.31 (socle v89) : catégories mieux contextualisées sur les flux réels ; faux rapprochements lexicaux supprimés ; santé, tech, énergie, culture et international mieux reconnus ; nucléaire civil distingué des armes nucléaires"
 }
