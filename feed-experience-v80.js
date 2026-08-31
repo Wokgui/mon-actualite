@@ -206,6 +206,14 @@
     applyingPending = true;
     removePendingBanner();
     forceRefreshUntil = Date.now() + 5000;
+    if (window.__applyNewsPayloadV9128?.(payload)) {
+      deliverPayload = null;
+      requestAnimationFrame(() => requestAnimationFrame(() => {
+        window.scrollTo({ top: scrollTop, behavior: 'instant' });
+        applyingPending = false;
+      }));
+      return;
+    }
     const refresh = document.querySelector('[data-refresh]');
     if (refresh) refresh.click();
     else window.location.reload();
