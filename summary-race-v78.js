@@ -9,10 +9,11 @@
   const SUMMARY_CACHE_KEY = 'news-article-summaries-v8';
   const LIVE_CACHE_KEY = 'news-live-cache';
   const latencyStats = window.__summaryLatencyV9133 = {
-    version: '91.33',
+    version: '91.36',
     groqStarted: 0,
     groqReused: 0,
     pointerWarms: 0,
+    feedFallbackRejected: 0,
     usefulSamplesMs: [],
     lastUsefulMs: 0
   };
@@ -52,6 +53,25 @@
 
   function articleKey(article = {}) {
     return clean(article.url || '') || `${clean(article.source || '')}|${clean(article.title || '')}`;
+  }
+
+  function googleNewsArticle(article = {}) {
+    try {
+      const host = new URL(String(article.url || ''), location.href).hostname.toLowerCase();
+      return host === 'news.google.com' || host.endsWith('.news.google.com');
+    } catch {
+      return false;
+    }
+  }
+
+  function safeFeedSummary(article = {}) {
+    const summary = clean(article.summary || '');
+    if (!usefulSummary(summary)) return '';
+    if (googleNewsArticle(article)) {
+      latencyStats.feedFallbackRejected += 1;
+      return '';
+    }
+    return summary;
   }
 
   function jsonResponse(payload, sourceResponse = null) {
@@ -174,10 +194,10 @@
 
       latencyStats.groqStarted += 1;
       const rawPromise = upstreamFetch(input, init);
-      const feedFallback = clean(article?.summary || '');
+      const feedFallback = safeFeedSummary(article || {});
 
       const finalPromise = rawPromise.then(async response => {
-        if (!response?.ok || !usefulSummary(feedFallback)) return response;
+        if (!response?.ok || !feedFallback) return response;
         const data = await responseJson(response);
         const generated = clean(data?.summary || '');
         if (!data || (!data.unavailable && usefulSummary(generated))) return response;
@@ -227,13 +247,7 @@
   }
 
   function immediateFeedSummary(article = {}) {
-    const summary = clean(article.summary || '');
-    if (!usefulSummary(summary)) return false;
-    try {
-      const host = new URL(String(article.url || ''), location.href).hostname.toLowerCase();
-      if (host === 'news.google.com' || host.endsWith('.news.google.com')) return false;
-    } catch {}
-    return true;
+    return Boolean(safeFeedSummary(article));
   }
 
   function liveArticle(id) {
