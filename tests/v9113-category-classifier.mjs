@@ -1,5 +1,6 @@
 import assert from 'node:assert/strict';
 import { createRequire } from 'node:module';
+import fs from 'node:fs';
 const require = createRequire(import.meta.url);
 const { classifyArticle, classifyArticleDetailed } = require('../lib/news-category.js');
 
@@ -33,4 +34,27 @@ assert.equal(classifyArticle({ title: 'Une découverte historique inattendue - S
 const roman = classifyArticleDetailed(cases[6][1], []);
 assert.equal(roman.reason, 'content');
 assert.ok(roman.confidence >= 20, 'les indices du titre doivent dominer le simple indice du flux');
+assert.equal(roman.confidenceLevel, 'high');
+
+const ambiguous = classifyArticleDetailed({
+  title: 'Un smartphone mise sur une nouvelle intelligence artificielle',
+  categoryHint: 'Tech'
+}, []);
+assert.equal(ambiguous.confidenceLevel, 'low', 'deux catégories thématiques au coude-à-coude doivent rester signalées comme ambiguës');
+assert.equal(ambiguous.margin, 0);
+assert.ok(ambiguous.alternatives.some(item => item.category === 'Smartphones'));
+
+const countryOnly = classifyArticleDetailed({
+  title: 'La Chine publie son calendrier pour les prochains mois',
+  categoryHint: 'Science',
+  strictCategory: true
+}, []);
+assert.equal(countryOnly.category, 'Science', 'un simple nom de pays ne doit plus écraser à lui seul une rubrique stricte');
+assert.equal(countryOnly.reason, 'feed-hint');
+assert.equal(countryOnly.confidenceLevel, 'low');
+
+const coreSource = fs.readFileSync(new URL('../lib/news-core.js', import.meta.url), 'utf8');
+for (const field of ['categoryConfidence', 'categoryConfidenceLevel', 'categoryConfidenceMargin', 'categoryAlternatives']) {
+  assert.match(coreSource, new RegExp(`${field}:`), `${field} must be exposed on API articles`);
+}
 console.log(`v91.13 category classifier passed (${cases.length + 3} assertions).`);
