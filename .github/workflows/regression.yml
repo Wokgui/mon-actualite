@@ -47,6 +47,7 @@ jobs:
           node tests/v9136-ranking-summary-quality.mjs
           node tests/v9137-category-context.mjs
           node tests/v9137-significance-context.mjs
+          node tests/v9137-brief-war-context.mjs
 
   mobile-browser:
     needs: static-regression
