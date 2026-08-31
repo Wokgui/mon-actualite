@@ -176,7 +176,7 @@
 (() => {
   'use strict';
 
-  const PAGE_RELEASE = '91.29';
+  const PAGE_RELEASE = '91.30';
   const RELEASE_DATE = '31 août 2026';
   const VERSION_PATH = '/version.json';
   const CHECK_COOLDOWN_MS = 45_000;
