@@ -29,7 +29,7 @@
     ['fire', /\b(incendie majeur|feux? de forêt|incendies? de forêt)\b/i],
     ['sinking', /\b(naufrage|chavir(?:e|é|ent|ement)|coule au large)\b/i]
   ];
-  const DISASTER_TOKEN_STOP = new Set('inondation inondations crue crues montee eaux eau debordement debordements seisme tremblement terre ouragan cyclone typhon tempete majeure incendie incendies feu feux foret forets naufrage chavire chavirent chavirement coule large catastrophe secours evacuation evacuation evacue evacues victime victimes mort morts'.split(' '));
+  const DISASTER_TOKEN_STOP = new Set('inondation inondations crue crues montee eaux eau debordement debordements seisme tremblement terre ouragan cyclone typhon tempete majeure incendie incendies feu feux foret forets naufrage chavire chavirent chavirement coule large catastrophe secours evacuation evacue evacues victime victimes mort morts'.split(' '));
   const upstreamFetch = window.fetch.bind(window);
   const briefStats = { version: '91.12', lastDeduped: 0, lastCandidates: 0, lastChosen: 0, lastTopScores: [] };
   let queued = false;
@@ -138,30 +138,26 @@
     return '';
   }
 
-  function disasterAnchorTokens(article = {}) {
-    const tokens = [];
-    for (const raw of normalize(trustedEventText(article)).split(' ')) {
-      if (!raw) continue;
-      const word = canonicalBriefToken(raw);
-      if (!word || BRIEF_STOP.has(word) || DISASTER_TOKEN_STOP.has(word) || word.length < 4 || /^\d+$/.test(word)) continue;
-      if (!tokens.includes(word)) tokens.push(word);
-    }
-    return tokens.slice(0, 30);
+  function disasterProperAnchors(article = {}) {
+    const found = [];
+    try {
+      const matches = titleText(article).match(/\b[A-ZÀ-ÖØ-Þ][\p{L}\d’'\-]{3,}\b/gu) || [];
+      for (const raw of matches) {
+        const token = normalize(raw);
+        if (!token || BRIEF_STOP.has(token) || DISASTER_TOKEN_STOP.has(token)) continue;
+        if (!found.includes(token)) found.push(token);
+      }
+    } catch {}
+    return found.slice(0, 10);
   }
 
   function sameDisasterEvent(a = {}, b = {}) {
     const aKind = disasterKind(a);
     const bKind = disasterKind(b);
     if (!aKind || aKind !== bKind) return false;
-    const overlap = semanticOverlap(disasterAnchorTokens(a), disasterAnchorTokens(b));
-    const anchors = overlap.matches.map(([token]) => token).filter(token => token.length >= 4);
-    if (anchors.length >= 2) return true;
-    if (anchors.length !== 1) return false;
-    const anchor = anchors[0];
-    const aTitle = briefTokens(a);
-    const bTitle = briefTokens(b);
-    return aTitle.some(token => tokenEquivalent(token, anchor))
-      && bTitle.some(token => tokenEquivalent(token, anchor));
+    const left = disasterProperAnchors(a);
+    const right = disasterProperAnchors(b);
+    return left.some(anchor => right.some(other => tokenEquivalent(anchor, other)));
   }
 
   function sameBriefEvent(a = {}, b = {}) {
