@@ -30,6 +30,15 @@
 
   let suppressNextSilentRender = false;
   let suppressUntil = 0;
+  let manualRefreshUntil = 0;
+
+  function markManualRefresh() {
+    manualRefreshUntil = performance.now() + 5000;
+  }
+
+  function manualRefreshActive() {
+    return performance.now() <= manualRefreshUntil;
+  }
 
   function clean(value = '') {
     return String(value ?? '').replace(/\s+/g, ' ').trim();
@@ -187,7 +196,10 @@
       if (url.origin !== location.origin || url.pathname !== '/api/news') return response;
 
       performanceStats.newsResponses += 1;
-      const manualRefresh = Boolean(app.querySelector('.sync-strip.loading'));
+      // The compact Home runtime removes the visual sync strip. Keep an
+      // explicit interaction deadline so an "Afficher maintenant" refresh is
+      // never mistaken for a silent background refresh and suppressed.
+      const manualRefresh = manualRefreshActive() || Boolean(app.querySelector('.sync-strip.loading'));
       const payload = await response.clone().json();
       const signature = payloadSignature(payload);
       const unchanged = Boolean(lastSignature) && signature === lastSignature;
@@ -224,6 +236,7 @@
   document.documentElement.dataset.navigationPerformanceVersion = '91.11';
 
   document.addEventListener('click', event => {
+    if (event.target.closest?.('[data-refresh]')) markManualRefresh();
     if (event.target.closest?.('[data-save], [data-saved-filter], [data-reset], [data-general-category], [data-interest], [data-brief-essential], [data-brief-watch], [data-topic-feedback], [data-quick-feedback]')) {
       clearCache();
     }
