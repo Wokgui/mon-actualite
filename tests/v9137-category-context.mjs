@@ -30,6 +30,12 @@ const cases = [
     'sovereign-economy-title'
   ],
   [
+    'prix du gazole en Guadeloupe',
+    { title: 'Prix des carburants en Guadeloupe : forte hausse du gazole au 1er septembre' },
+    'Économie',
+    'fuel-price-economy-title'
+  ],
+  [
     'indexation des pensions',
     { title: 'Retraites : pourquoi une sous-indexation des pensions des plus aisés interroge le système tout entier' },
     'Économie',
@@ -138,8 +144,8 @@ const highDieselPrice = classifyArticleDetailed({
 }, []);
 assert.equal(highDieselPrice.category, 'Économie',
   `« élevé » ne doit plus être confondu avec « élève »: ${JSON.stringify(highDieselPrice)}`);
-assert.equal(highDieselPrice.reason, 'feed-hint',
-  `sans signal thématique plus fort, le flux Économie doit être conservé: ${JSON.stringify(highDieselPrice)}`);
+assert.ok(['feed-hint', 'fuel-price-economy-title'].includes(highDieselPrice.reason),
+  `le prix du gazole doit rester Économie: ${JSON.stringify(highDieselPrice)}`);
 
 const realStudents = classifyArticleDetailed({
   title: 'Des élèves de lycée découvrent un nouveau laboratoire scientifique'
