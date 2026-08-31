@@ -7,8 +7,8 @@
   const PROVENANCE_KEY = 'news-provenance-v88';
   const READ_REVISION_KEY = 'news-read-revisions-v89';
   const TITLE_MARK_RE = /\s*\[v86b\d+\]\s*$/i;
-  const LOW_VALUE_RX = /\b(réagit|réaction|se confie|confidences?|donne son avis|tacle|coup de gueule|s['’]indigne|fait polémique|buzz|réseaux sociaux|les internautes|voici ce qu['’]il pense|interview promo|promotion de)\b/i;
-  const ACTION_RX = /\b(adopte|vote|rejette|valide|annule|interdit|autorise|condamne|acquitte|démissionne|nomme|remplace|ferme|ouvre|suspend|reprend|cesse|annonce|lance|publie|officialise|découvre|confirme|atteint|baisse|augmente)\b/i;
+  const LOW_VALUE_RX = /\b(r�agit|r�action|se confie|confidences?|donne son avis|tacle|coup de gueule|s['']indigne|fait pol�mique|buzz|r�seaux sociaux|les internautes|voici ce qu['']il pense|interview promo|promotion de)\b/i;
+  const ACTION_RX = /\b(adopte|vote|rejette|valide|annule|interdit|autorise|condamne|acquitte|d�missionne|nomme|remplace|ferme|ouvre|suspend|reprend|cesse|annonce|lance|publie|officialise|d�couvre|confirme|atteint|baisse|augmente)\b/i;
   const upstreamFetch = window.fetch.bind(window);
 
   window.__NEWS_PIPELINE_VERSION__ = '89';
@@ -28,7 +28,7 @@
   }
 
   function normalize(value = '') {
-    return clean(value).normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[’']/g, ' ').toLowerCase().replace(/[^a-z0-9%€$]+/g, ' ').replace(/\s+/g, ' ').trim();
+    return clean(value).normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/['']/g, ' ').toLowerCase().replace(/[^a-z0-9%?$]+/g, ' ').replace(/\s+/g, ' ').trim();
   }
 
   function canonicalUrl(value = '') {
@@ -89,7 +89,9 @@
         if (value < negative) negative = value;
       }
     }
-    return positive > 0 ? positive : negative;
+    const explicit = positive > 0 ? positive : negative;
+    const learned = Number(window.NewsPersonalizationV91?.learnedSignal(article) || 0);
+    return Math.max(-2, Math.min(2, explicit + learned));
   }
 
   function category(article = {}) {
@@ -107,7 +109,7 @@
   }
 
   function numericClaims(value = '') {
-    return [...new Set((clean(value).match(/\b\d+(?:[.,]\d+)?(?:\s?(?:%|€|\$|euros?|dollars?|km|milliards?|millions?|ans?|mois|jours?|heures?))?\b/gi) || []).map(normalize).filter(Boolean))].slice(0, 20);
+    return [...new Set((clean(value).match(/\b\d+(?:[.,]\d+)?(?:\s?(?:%|?|\$|euros?|dollars?|km|milliards?|millions?|ans?|mois|jours?|heures?))?\b/gi) || []).map(normalize).filter(Boolean))].slice(0, 20);
   }
 
   function informationValue(article = {}) {
@@ -121,28 +123,28 @@
     let value = 42;
     const reasons = [];
 
-    if (article.essential) { value += 26; reasons.push('actualité majeure'); }
-    else if (Number(article.editorialImportanceV78 || article.editorialImportance || 0) >= 80) { value += 10; reasons.push('forte importance éditoriale'); }
+    if (article.essential) { value += 26; reasons.push('actualit� majeure'); }
+    else if (Number(article.editorialImportanceV78 || article.editorialImportance || 0) >= 80) { value += 10; reasons.push('forte importance �ditoriale'); }
 
     const novelty = clean(article.noveltyStateV78 || article.noveltyState || '');
-    if (novelty === 'development') { value += 15; reasons.push('nouveau développement'); }
+    if (novelty === 'development') { value += 15; reasons.push('nouveau d�veloppement'); }
     else if (novelty === 'new') { value += 8; reasons.push('information nouvelle'); }
     else if (novelty === 'minor-update') value += 3;
-    else if (novelty === 'repeat') { value -= 18; reasons.push('information déjà connue'); }
+    else if (novelty === 'repeat') { value -= 18; reasons.push('information d�j� connue'); }
 
     if (sources >= 2) { value += Math.min(12, 4 + (sources - 2) * 2); reasons.push(`${sources} sources`); }
     if (summary.length >= 180) value += 8;
     else if (summary.length >= 90) value += 4;
     else if (summary.length < 55) value -= 8;
-    if (numbers.length) { value += Math.min(12, numbers.length * 3); reasons.push('faits chiffrés'); }
-    if (hasAction) { value += 9; reasons.push('fait ou décision identifiable'); }
+    if (numbers.length) { value += Math.min(12, numbers.length * 3); reasons.push('faits chiffr�s'); }
+    if (hasAction) { value += 9; reasons.push('fait ou d�cision identifiable'); }
     if (article.titleSupportV83 === 'weak') value -= 8;
     if (/\?$/.test(title)) value -= 4;
 
     if (reactional) {
       const penalty = numbers.length || hasAction ? 12 : 24;
       value -= penalty;
-      reasons.push('contenu surtout réactionnel');
+      reasons.push('contenu surtout r�actionnel');
       // An upstream "Essentiel" flag must never make a pure reaction outrank
       // a concrete factual item. Without a number or a verifiable action,
       // reaction/commentary content is deliberately capped.
@@ -239,8 +241,8 @@
     copy.revisionSinceReadV89 = true;
     copy.revisionTypeV89 = correction ? 'correction' : 'updated';
     copy.revisionReasonV89 = correction
-      ? 'Des données chiffrées du même article ont changé sans nouvelle publication identifiable.'
-      : 'Le contenu de cet article a substantiellement changé depuis votre lecture.';
+      ? 'Des donn�es chiffr�es du m�me article ont chang� sans nouvelle publication identifiable.'
+      : 'Le contenu de cet article a substantiellement chang� depuis votre lecture.';
     copy.revisionDetectedAtV89 = Date.now();
     return copy;
   }
@@ -267,7 +269,7 @@
     return {
       ...article,
       discoveryV87: true,
-      discoveryReasonV87: 'Ouverture éditoriale : sujet pertinent hors de vos thèmes les plus favorisés'
+      discoveryReasonV87: 'Ouverture �ditoriale : sujet pertinent hors de vos th�mes les plus favoris�s'
     };
   }
 
@@ -397,7 +399,7 @@
   function poorSummary(payload = {}, article = {}) {
     const summary = clean(payload.summary || payload.text || '');
     if (payload.unavailable || summary.length < 70) return true;
-    if (/résumé (?:détaillé )?momentanément indisponible|résumé indisponible|en cours de préparation/i.test(summary)) return true;
+    if (/r�sum� (?:d�taill� )?momentan�ment indisponible|r�sum� indisponible|en cours de pr�paration/i.test(summary)) return true;
     return titleRestatement(summary, article.title || '');
   }
 
@@ -506,7 +508,7 @@
       if (!article?.discoveryV87 || card.querySelector('.discovery-chip-v87')) return;
       const chip = document.createElement('span');
       chip.className = 'discovery-chip-v87';
-      chip.textContent = 'À découvrir';
+      chip.textContent = '� d�couvrir';
       const top = card.querySelector('.card-top') || card.querySelector('.article-body');
       top?.prepend(chip);
     });
@@ -525,3 +527,4 @@
     decorateDiscovery();
   }, { once: true });
 })();
+

@@ -1,7 +1,7 @@
 import { articleVisualUrl, hasPreparedVisual, sourceTileUrl } from './services/article-visuals.js?v=57';
 
-const GENERAL = ['Politique','International','Économie','Société','Santé','Environnement','Science','Culture','Éducation','Europe'];
-const PERSONAL = ['IA','Tech','Smartphones','VR','Automobile','Énergie'];
+const GENERAL = ['Politique','International','�conomie','Soci�t�','Sant�','Environnement','Science','Culture','�ducation','Europe'];
+const PERSONAL = ['IA','Tech','Smartphones','VR','Automobile','�nergie'];
 const SUMMARY_CACHE_KEY = 'news-article-summaries-v4';
 let scheduled = false;
 let briefMode = 'essential';
@@ -19,9 +19,9 @@ function writeJson(key, value) {
 }
 
 const MOJIBAKE = [
-  ['â€™','’'],['â€˜','‘'],['â€œ','“'],['â€','”'],['â€“','–'],['â€”','—'],['â€¦','…'],
-  ['Â ',' '],['Â«','«'],['Â»','»'],['Ã©','é'],['Ã¨','è'],['Ãª','ê'],['Ã«','ë'],['Ã ','à'],
-  ['Ã¢','â'],['Ã§','ç'],['Ã®','î'],['Ã¯','ï'],['Ã´','ô'],['Ã¹','ù'],['Ã»','û'],['Ã‰','É'],['Å“','œ']
+  ['�?T','''],['�?~','''],['�?o','"'],['�??','"'],['�?"','-'],['�?"','-'],['�?�','.'],
+  ['��',' '],['��','�'],['��','�'],['Ǹ','�'],['��','�'],['Ǧ','�'],['Ǯ','�'],['� ','�'],
+  ['ǽ','�'],['��','�'],['ǩ','�'],['��','�'],['��','�'],['��','�'],['ǯ','�'],['�%','�'],['�"','o']
 ];
 
 function cleanText(value) {
@@ -38,7 +38,7 @@ function timeLabel(value) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return '';
   const minutes = Math.max(0, Math.round((Date.now() - date.getTime()) / 60000));
-  if (minutes < 1) return 'À l’instant';
+  if (minutes < 1) return '� l'instant';
   if (minutes < 60) return `Il y a ${minutes} min`;
   if (minutes < 24 * 60) return `Il y a ${Math.floor(minutes / 60)} h`;
   const days = Math.floor(minutes / (24 * 60));
@@ -51,7 +51,7 @@ function currentSettings() {
     general: Array.isArray(raw.generalCategories) ? raw.generalCategories : GENERAL,
     interests: Array.isArray(raw.interests) ? raw.interests : PERSONAL,
     briefEssential: Array.isArray(raw.briefEssentialCategories) ? raw.briefEssentialCategories : GENERAL,
-    briefWatches: Array.isArray(raw.briefWatchTopics) ? raw.briefWatchTopics : ['Recherche scientifique', 'Innovations', 'Progrès humains', 'Médecine', 'Espace', 'IA', 'Énergie', 'Environnement', 'Éducation'],
+    briefWatches: Array.isArray(raw.briefWatchTopics) ? raw.briefWatchTopics : ['Recherche scientifique', 'Innovations', 'Progr�s humains', 'M�decine', 'Espace', 'IA', '�nergie', 'Environnement', '�ducation'],
     topicPreferences: readJson('news-topic-preferences-v1', {})
   };
 }
@@ -65,13 +65,16 @@ function visibleArticles() {
   const articles = allCachedArticles();
   const current = currentSettings();
   const feedback = readJson('news-feedback', {});
+  const personalizationScore = window.NewsPersonalizationV91?.createRanker(
+    current.topicPreferences,
+    current.general
+  ) || (() => 0);
   return articles
     .filter(article => feedback[article.id] !== 'not')
     .slice()
     .sort((a, b) => {
       const score = article => {
-        const topics = [...new Set([article.category, ...(article.tags || []), ...(article.matches || [])].filter(Boolean))];
-        const learned = topics.reduce((total, topic) => total + Number(current.topicPreferences[topic] || 0) * 12, 0);
+        const learned = personalizationScore(article);
         const chosen = current.interests.includes(article.category) ? 22 : current.general.includes(article.category) ? 8 : 0;
         const articleFeedback = ({ more: 24, less: -20, follow: 38 }[feedback[article.id]] || 0);
         const recency = Math.max(0, 72 - ((Date.now() - Date.parse(article.publishedAt || 0)) / 3600000));
@@ -111,10 +114,10 @@ function compactRow(article, index = 0) {
 function isUnavailableSummary(value = '') {
   const text = cleanText(value).toLowerCase();
   return !text
-    || /résumé indisponible/.test(text)
-    || /ouvrez?\s+l[’']article/.test(text)
-    || /consultez?\s+(?:les?\s+)?détails/.test(text)
-    || /détails publiés par la source/.test(text);
+    || /r�sum� indisponible/.test(text)
+    || /ouvrez?\s+l['']article/.test(text)
+    || /consultez?\s+(?:les?\s+)?d�tails/.test(text)
+    || /d�tails publi�s par la source/.test(text);
 }
 
 function removeRedundantUi() {
@@ -137,7 +140,7 @@ function removeRedundantUi() {
 function enhanceHome() {
   if (!document.querySelector('.nav-item.active[data-view="home"]')) return;
   const subtitle = document.querySelector('.hero-header p');
-  if (subtitle) subtitle.textContent = 'Tous les articles, personnalisés pour vous';
+  if (subtitle) subtitle.textContent = 'Tous les articles, personnalis�s pour vous';
   const savedButton = document.querySelector('.saved-filter [data-saved-filter]');
   if (savedButton && /voir toute/i.test(savedButton.textContent || '')) return;
   const feed = document.querySelector('.page .feed');
@@ -156,10 +159,10 @@ function enhanceHome() {
 
 function essentialBrief() {
   const selected = new Set(currentSettings().briefEssential);
-  const majorTerms = /guerre|attaque|cessez-le-feu|élection|gouvernement|président|premier ministre|attentat|catastrophe|séisme|inondation|incendie|disparu|crise|accord|sommet|justice|condamn|budget|déficit|croissance|inflation|chômage|épidémie|climat|diplomatie|nucléaire/i;
-  const lowPriorityTerms = /\bpsg\b|ligue 1|football|match|composition|mercato|tennis|formule 1|prix en chute|promotion|bon plan|soldes?|réduction|stations?-service|carburant|diesel|essence à \d|console|smartphone|windows|gta|jeu vidéo|montre connectée|audiences? télé|people|célébrité|télé-réalité/i;
-  const worldTerms = /ukraine|russie|népal|tibet|gaza|israël|iran|chine|états[- ]unis|donald trump|fed\b|otan|onu\b|royaume-uni|allemagne|italie|espagne|autriche|grèce|inde|pakistan|japon|corée|afrique|moyen-orient|amérique|brésil|canada/i;
-  const editorialCategories = new Set(['Politique', 'International', 'Europe', 'Économie', 'Société', 'Santé', 'Environnement']);
+  const majorTerms = /guerre|attaque|cessez-le-feu|�lection|gouvernement|pr�sident|premier ministre|attentat|catastrophe|s�isme|inondation|incendie|disparu|crise|accord|sommet|justice|condamn|budget|d�ficit|croissance|inflation|ch�mage|�pid�mie|climat|diplomatie|nucl�aire/i;
+  const lowPriorityTerms = /\bpsg\b|ligue 1|football|match|composition|mercato|tennis|formule 1|prix en chute|promotion|bon plan|soldes?|r�duction|stations?-service|carburant|diesel|essence � \d|console|smartphone|windows|gta|jeu vid�o|montre connect�e|audiences? t�l�|people|c�l�brit�|t�l�-r�alit�/i;
+  const worldTerms = /ukraine|russie|n�pal|tibet|gaza|isra�l|iran|chine|�tats[- ]unis|donald trump|fed\b|otan|onu\b|royaume-uni|allemagne|italie|espagne|autriche|gr�ce|inde|pakistan|japon|cor�e|afrique|moyen-orient|am�rique|br�sil|canada/i;
+  const editorialCategories = new Set(['Politique', 'International', 'Europe', '�conomie', 'Soci�t�', 'Sant�', 'Environnement']);
   const scopeOf = article => {
     const title = String(article.title || '');
     if (worldTerms.test(title) || article.category === 'International' || article.category === 'Europe') return 'Monde';
@@ -184,7 +187,7 @@ function essentialBrief() {
     const weakSignal = !majorTerms.test(text) && corroboration === 0 ? -65 : 0;
     const age = Math.max(0, (Date.now() - Date.parse(article.publishedAt || 0)) / 3600000);
     // Deliberately ignore article.score here: that score contains personal
-    // source and interest boosts. L’essentiel must be publisher-neutral.
+    // source and interest boosts. L'essentiel must be publisher-neutral.
     return 100 + editorial + headline + corroboration + lightweight + weakSignal - Math.min(age, 72);
   };
   const ranked = importanceArticles().filter(article => selected.has(article.category)).sort((a, b) => scoreOf(b) - scoreOf(a));
@@ -235,14 +238,14 @@ function watchItems(topic, limit = 10) {
   const aliases = {
     innovation: ['innovation', 'start-up', 'startup', 'brevet', 'recherche', 'nouvelle technologie'],
     innovations: ['innovation', 'start-up', 'startup', 'brevet', 'recherche', 'nouvelle technologie'],
-    'recherche scientifique': ['recherche', 'science', 'scientifique', 'laboratoire', 'étude', 'découverte'],
-    'progres humains': ['progrès', 'avancée', 'découverte', 'qualité de vie', 'éducation', 'droits humains', 'développement humain'],
-    medecine: ['médecine', 'médical', 'santé', 'traitement', 'thérapie', 'vaccin', 'chirurgie'],
+    'recherche scientifique': ['recherche', 'science', 'scientifique', 'laboratoire', '�tude', 'd�couverte'],
+    'progres humains': ['progr�s', 'avanc�e', 'd�couverte', 'qualit� de vie', '�ducation', 'droits humains', 'd�veloppement humain'],
+    medecine: ['m�decine', 'm�dical', 'sant�', 'traitement', 'th�rapie', 'vaccin', 'chirurgie'],
     espace: ['espace', 'spatial', 'astronomie', 'nasa', 'esa', 'satellite', 'lune', 'mars'],
-    energie: ['énergie', 'électricité', 'nucléaire', 'solaire', 'éolien', 'batterie', 'hydrogène'],
-    environnement: ['environnement', 'climat', 'biodiversité', 'pollution', 'écologie'],
-    education: ['éducation', 'école', 'université', 'apprentissage', 'formation'],
-    vr: ['vr', 'réalité virtuelle', 'virtual reality', 'quest', 'steamvr'],
+    energie: ['�nergie', '�lectricit�', 'nucl�aire', 'solaire', '�olien', 'batterie', 'hydrog�ne'],
+    environnement: ['environnement', 'climat', 'biodiversit�', 'pollution', '�cologie'],
+    education: ['�ducation', '�cole', 'universit�', 'apprentissage', 'formation'],
+    vr: ['vr', 'r�alit� virtuelle', 'virtual reality', 'quest', 'steamvr'],
     ia: ['intelligence artificielle', ' ia ', 'openai', 'chatgpt', 'gemini', 'anthropic']
   };
   const wanted = normalize(topic);
@@ -256,7 +259,7 @@ function watchItems(topic, limit = 10) {
 
 function renderEssential() {
   const items = essentialBrief();
-  return `<section class="journal-section"><h2 class="brief-section-title">Les 5 événements majeurs · France & Monde</h2><p class="muted-note">Une sélection resserrée des faits dignes de l’ouverture d’un journal télévisé.</p><div class="feed">${items.length ? items.map(({ article, scope }, index) => `<div class="runtime-essential-item"><span class="brief-scope">${scope}</span>${compactRow(article, index)}</div>`).join('') : '<p class="muted-note">Aucune information majeure récente.</p>'}</div></section>`;
+  return `<section class="journal-section"><h2 class="brief-section-title">Les 5 �v�nements majeurs � France & Monde</h2><p class="muted-note">Une s�lection resserr�e des faits dignes de l'ouverture d'un journal t�l�vis�.</p><div class="feed">${items.length ? items.map(({ article, scope }, index) => `<div class="runtime-essential-item"><span class="brief-scope">${scope}</span>${compactRow(article, index)}</div>`).join('') : '<p class="muted-note">Aucune information majeure r�cente.</p>'}</div></section>`;
 }
 
 function categoryCacheKey(category, items) {
@@ -298,9 +301,9 @@ async function loadCategorySummary(category, items) {
     articles: items.slice(0, 4).map(article => ({ url: article.url, title: cleanText(article.title), summary: isUnavailableSummary(article.summary) ? '' : cleanText(article.summary) }))
   });
   if (!target.isConnected || target.dataset.summaryKey !== key) return;
-  target.textContent = cleanText(result?.summary || 'Résumé indisponible pour cette rubrique.');
+  target.textContent = cleanText(result?.summary || 'R�sum� indisponible pour cette rubrique.');
   const label = document.querySelector('.runtime-category-summary .brief-label');
-  if (label) label.textContent = result?.ai ? `Veille · ${category} · Résumé IA` : `Veille · ${category} · Résumé factuel`;
+  if (label) label.textContent = result?.ai ? `Veille � ${category} � R�sum� IA` : `Veille � ${category} � R�sum� factuel`;
 }
 
 function renderCategories() {
@@ -312,8 +315,8 @@ function renderCategories() {
   const key = categoryCacheKey(briefCategory, summaryItems);
   const cached = readJson(SUMMARY_CACHE_KEY, {})[key];
   return `<div class="brief-category-tabs">${categories.map(category => `<button class="brief-category-tab ${category === briefCategory ? 'active' : ''}" data-brief-category="${esc(category)}">${esc(category)}</button>`).join('')}</div>
-    <section class="brief-card runtime-category-summary"><span class="brief-label">Veille · ${esc(briefCategory)}${cached?.ai ? ' · Résumé IA' : ''}</span><h2>Ce qui évolue</h2><p data-runtime-category-summary data-summary-key="${esc(key)}">${esc(cached?.summary || 'Résumé en cours…')}</p></section>
-    <div class="feed">${items.length ? items.map((article, index) => compactRow(article, index)).join('') : '<p class="muted-note">Aucun article récent dans cette veille.</p>'}</div>`;
+    <section class="brief-card runtime-category-summary"><span class="brief-label">Veille � ${esc(briefCategory)}${cached?.ai ? ' � R�sum� IA' : ''}</span><h2>Ce qui �volue</h2><p data-runtime-category-summary data-summary-key="${esc(key)}">${esc(cached?.summary || 'R�sum� en cours.')}</p></section>
+    <div class="feed">${items.length ? items.map((article, index) => compactRow(article, index)).join('') : '<p class="muted-note">Aucun article r�cent dans cette veille.</p>'}</div>`;
 }
 
 function enhanceBrief() {
@@ -327,7 +330,7 @@ function enhanceBrief() {
   if (page.dataset.runtimeBriefSignature === signature) return;
   page.dataset.runtimeBriefSignature = signature;
   [...page.children].forEach(child => { if (child !== topbar) child.remove(); });
-  page.insertAdjacentHTML('beforeend', `<div class="brief-mode-tabs"><button class="brief-mode-tab ${briefMode === 'essential' ? 'active' : ''}" data-brief-mode="essential">L’essentiel</button><button class="brief-mode-tab ${briefMode === 'watches' ? 'active' : ''}" data-brief-mode="watches">Mes veilles</button></div><div class="runtime-brief-content">${briefMode === 'essential' ? renderEssential() : renderCategories()}</div>`);
+  page.insertAdjacentHTML('beforeend', `<div class="brief-mode-tabs"><button class="brief-mode-tab ${briefMode === 'essential' ? 'active' : ''}" data-brief-mode="essential">L'essentiel</button><button class="brief-mode-tab ${briefMode === 'watches' ? 'active' : ''}" data-brief-mode="watches">Mes veilles</button></div><div class="runtime-brief-content">${briefMode === 'essential' ? renderEssential() : renderCategories()}</div>`);
   if (briefMode === 'watches' && briefCategory) {
     const items = watchItems(briefCategory, 4);
     loadCategorySummary(briefCategory, items);
@@ -336,10 +339,10 @@ function enhanceBrief() {
 
 function feedbackMarkup(key) {
   const map = {
-    more: ['+', 'Plus comme ça', 'Montre davantage de sujets similaires'],
-    less: ['−', 'Moins comme ça', 'Réduis ce type d’articles'],
-    not: ['×', 'Pas intéressé', 'Masque les sujets de ce type'],
-    follow: ['☆', 'Sujet à suivre', 'Fais remonter ce sujet à l’avenir']
+    more: ['+', 'Plus comme �a', 'Montre davantage de sujets similaires'],
+    less: ['-', 'Moins comme �a', 'R�duis ce type d'articles'],
+    not: ['�', 'Pas int�ress�', 'Masque les sujets de ce type'],
+    follow: ['?', 'Sujet � suivre', 'Fais remonter ce sujet � l'avenir']
   };
   const [symbol, title, text] = map[key] || ['', key, ''];
   return `<span class="feedback-symbol">${symbol}</span><span class="feedback-copy"><strong>${title}</strong><small>${text}</small></span>`;
@@ -352,10 +355,10 @@ async function loadArticleSummary(article, box) {
   const label = box.querySelector('strong');
   if (cached?.summary && !cached.unavailable && !isUnavailableSummary(cached.summary)) {
     paragraph.textContent = cleanText(cached.summary);
-    label.textContent = cached.ai ? 'Résumé IA' : 'Résumé factuel';
+    label.textContent = cached.ai ? 'R�sum� IA' : 'R�sum� factuel';
     return;
   }
-  paragraph.textContent = 'Résumé en cours…';
+  paragraph.textContent = 'R�sum� en cours.';
   const result = await requestSummary(key, {
     mode: 'article',
     article: {
@@ -366,12 +369,12 @@ async function loadArticleSummary(article, box) {
   });
   if (!box.isConnected) return;
   if (result?.unavailable || isUnavailableSummary(result?.summary)) {
-    paragraph.textContent = 'Résumé indisponible pour cet article.';
-    label.textContent = 'Résumé indisponible';
+    paragraph.textContent = 'R�sum� indisponible pour cet article.';
+    label.textContent = 'R�sum� indisponible';
     return;
   }
-  paragraph.textContent = cleanText(result?.summary || 'Résumé indisponible pour cet article.');
-  label.textContent = result?.ai ? 'Résumé IA' : 'Résumé factuel';
+  paragraph.textContent = cleanText(result?.summary || 'R�sum� indisponible pour cet article.');
+  label.textContent = result?.ai ? 'R�sum� IA' : 'R�sum� factuel';
 }
 
 function enhanceDetail() {
@@ -402,7 +405,7 @@ function enhanceDetail() {
   const summary = page.querySelector('.ai-summary');
   if (summary) {
     summary.classList.add('runtime-summary');
-    summary.innerHTML = '<strong>Résumé</strong><p>Résumé en cours…</p>';
+    summary.innerHTML = '<strong>R�sum�</strong><p>R�sum� en cours.</p>';
     const meta = page.querySelector('.detail-meta');
     if (meta) meta.insertAdjacentElement('afterend', summary);
     loadArticleSummary(article, summary);
@@ -421,19 +424,19 @@ function enhanceSheet() {
   const handle = sheet.querySelector('.sheet-handle');
   const tabs = document.createElement('div');
   tabs.className = 'runtime-sheet-tabs';
-  tabs.innerHTML = '<button class="runtime-sheet-tab active">Ajouter</button><button class="runtime-sheet-tab" data-runtime-settings>Réglages</button>';
+  tabs.innerHTML = '<button class="runtime-sheet-tab active">Ajouter</button><button class="runtime-sheet-tab" data-runtime-settings>R�glages</button>';
   handle?.insertAdjacentElement('afterend', tabs);
 }
 
 function followedTopicsMarkup() {
   const feedback = readJson('news-feedback', {});
   const followedIds = Object.keys(feedback).filter(id => feedback[id] === 'follow');
-  if (!followedIds.length) return '<p class="muted-note runtime-no-followed">Aucun sujet marqué « Sujet à suivre ».</p>';
+  if (!followedIds.length) return '<p class="muted-note runtime-no-followed">Aucun sujet marqu� � Sujet � suivre �.</p>';
   const byId = new Map(allCachedArticles().map(article => [String(article.id), article]));
   return `<div class="runtime-followed-list">${followedIds.map(id => {
     const article = byId.get(String(id));
     const title = article?.title || 'Sujet suivi';
-    return `<div class="runtime-followed-item"><span>${esc(title)}</span><button type="button" data-runtime-follow-delete="${esc(id)}" aria-label="Supprimer ce sujet">×</button></div>`;
+    return `<div class="runtime-followed-item"><span>${esc(title)}</span><button type="button" data-runtime-follow-delete="${esc(id)}" aria-label="Supprimer ce sujet">�</button></div>`;
   }).join('')}</div>`;
 }
 
@@ -442,11 +445,11 @@ function enhanceSettings() {
   if (!sections.length) return;
   document.querySelectorAll('.install-section').forEach(node => node.remove());
   if (document.querySelector('.runtime-followed-section')) return;
-  const interests = sections.find(section => /centres d[’']intérêt/i.test(section.querySelector('h2')?.textContent || ''));
+  const interests = sections.find(section => /centres d['']int�r�t/i.test(section.querySelector('h2')?.textContent || ''));
   if (!interests) return;
   const section = document.createElement('section');
   section.className = 'settings-section runtime-followed-section';
-  section.innerHTML = `<h2>Sujets suivis</h2><p>Les sujets marqués « Sujet à suivre » peuvent être retirés ici.</p>${followedTopicsMarkup()}`;
+  section.innerHTML = `<h2>Sujets suivis</h2><p>Les sujets marqu�s � Sujet � suivre � peuvent �tre retir�s ici.</p>${followedTopicsMarkup()}`;
   interests.insertAdjacentElement('afterend', section);
 }
 
@@ -497,7 +500,10 @@ document.addEventListener('click', event => {
     event.preventDefault();
     event.stopPropagation();
     const feedback = readJson('news-feedback', {});
-    delete feedback[deleteFollowed.dataset.runtimeFollowDelete];
+    const id = deleteFollowed.dataset.runtimeFollowDelete;
+    const article = allCachedArticles().find(item => String(item.id) === String(id));
+    if (article) window.NewsPersonalizationV91?.recordFeedback(article, '', feedback[id] || '');
+    delete feedback[id];
     writeJson('news-feedback', feedback);
     window.location.reload();
     return;
@@ -534,3 +540,4 @@ window.addEventListener('focus', scheduleEnhance);
 window.addEventListener('news-topic-preferences-changed', scheduleEnhance);
 document.addEventListener('visibilitychange', () => { if (!document.hidden) scheduleEnhance(); });
 scheduleEnhance();
+
