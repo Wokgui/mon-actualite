@@ -146,4 +146,87 @@ const aggregate = 'Titre principal &nbsp;&nbsp; Le Monde.fr Autre titre voisin s
   assert.equal(data.provider, 'feed-fallback');
 }
 
-console.log('v91.36 ranking, category and safe summary fallback checks passed');
+{
+  const preloadSource = fs.readFileSync('adaptive-preload-v83.js', 'utf8');
+  const trustedFeed = 'La mairie a confirmé lundi la création de trois nouvelles lignes de bus. Elles entreront en service en octobre et desserviront six quartiers.';
+  const articles = [
+    {
+      id: 'google-preload',
+      url: 'https://news.google.com/rss/articles/preload-example',
+      title: 'Un événement suivi par plusieurs médias',
+      summary: aggregate,
+      source: 'Le Monde.fr',
+      sources: ['Le Monde.fr', 'BFM']
+    },
+    {
+      id: 'publisher-preload',
+      url: 'https://publisher.example/direct',
+      title: 'Trois nouvelles lignes de bus annoncées',
+      summary: trustedFeed,
+      source: 'Publisher',
+      sources: ['Publisher']
+    }
+  ];
+  const store = new Map([
+    ['news-live-cache', JSON.stringify({ articles })],
+    ['news-article-summaries-v8', '{}']
+  ]);
+  const cards = articles.map(article => ({
+    dataset: { article: article.id },
+    getBoundingClientRect() { return { top: 20 }; },
+    classList: { contains() { return false; } }
+  }));
+  const posted = [];
+  const localStorage = {
+    getItem(key) { return store.has(key) ? store.get(key) : null; },
+    setItem(key, value) { store.set(key, String(value)); }
+  };
+  const document = {
+    readyState: 'complete',
+    hidden: false,
+    addEventListener() {},
+    getElementById() { return null; },
+    querySelector() { return null; },
+    querySelectorAll(selector) {
+      if (selector === '.article-card[data-article]:not([hidden])') return cards;
+      return [];
+    }
+  };
+  const window = {
+    scrollY: 0,
+    innerHeight: 900,
+    requestIdleCallback(callback) { callback({ timeRemaining: () => 20 }); },
+    addEventListener() {}
+  };
+  const fetch = async (url, options = {}) => {
+    if (String(url).startsWith('/api/article-summary-groq')) posted.push(JSON.parse(String(options.body || '{}')));
+    return Response.json({ unavailable: true, summary: '' });
+  };
+  const context = {
+    window,
+    document,
+    navigator: { connection: { effectiveType: '4g', saveData: false }, deviceMemory: 8 },
+    localStorage,
+    location: { href: 'https://example.test/', origin: 'https://example.test' },
+    fetch,
+    URL,
+    Response,
+    Promise,
+    clearTimeout() {},
+    setTimeout(callback) { callback(); return 1; }
+  };
+  vm.runInNewContext(preloadSource, context, { filename: 'adaptive-preload-v83.js' });
+  for (let i = 0; i < 5; i += 1) await new Promise(resolve => setImmediate(resolve));
+
+  assert.equal(posted.length, 2, 'the two eligible summaries should still be preloaded');
+  const googlePost = posted.find(item => item.article?.url?.includes('news.google.com'));
+  const publisherPost = posted.find(item => item.article?.url?.includes('publisher.example'));
+  assert.ok(googlePost, 'the Google News article must still be preloaded');
+  assert.equal(googlePost.article.summary, '',
+    'Google News aggregate descriptions must not be sent as preload evidence');
+  assert.ok(publisherPost, 'the direct publisher article must still be preloaded');
+  assert.equal(publisherPost.article.summary, trustedFeed,
+    'a trustworthy direct publisher summary should still accelerate preload generation');
+}
+
+console.log('v91.36 ranking, category, safe summary fallback and preload checks passed');
