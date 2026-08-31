@@ -18,6 +18,14 @@ const tradeWar = homeSignalScore({
 assert.equal(tradeWar.reasons.includes('événement majeur'), false,
   'une guerre commerciale ne doit pas déclencher le signal événement majeur');
 
+const marketReaction = homeSignalScore({
+  title: "Sur la réserve face aux frappes au Moyen-Orient, le Cac 40 termine le mois d'août dans le rouge"
+});
+assert.equal(marketReaction.reasons.includes('événement majeur'), false,
+  `un article sur la réaction du CAC 40 ne doit pas être promu comme la frappe elle-même: ${JSON.stringify(marketReaction)}`);
+assert.equal(marketReaction.score, 0,
+  `le titre boursier observé ne doit plus recevoir le bonus conflit: ${JSON.stringify(marketReaction)}`);
+
 const warCriminals = homeSignalScore({
   title: 'Obsèques nationales pour Ratko Mladic : la Commission européenne avertit que la glorification des criminels de guerre n’a pas sa place dans l’UE'
 });
@@ -52,4 +60,4 @@ const strikesDespiteMetaphor = homeSignalScore({
 assert.ok(strikesDespiteMetaphor.reasons.includes('événement majeur'),
   `les frappes explicites doivent rester majeures même si « guerre économique » apparaît aussi: ${JSON.stringify(strikesDespiteMetaphor)}`);
 
-console.log('v91.37 significance-context checks passed (10 assertions).');
+console.log('v91.37 significance-context checks passed (12 assertions).');
