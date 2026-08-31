@@ -117,6 +117,7 @@ try {
         japanDefense: api.impactScore({ title: 'IA, drones, missiles : le Japon réclame 48 milliards d’euros pour sa défense - Boursorama' }),
         sportsEarthquake: api.impactScore({ title: 'Un calvaire, des larmes et un séisme : Novak Djokovic éliminé à l’US Open - Eurosport' }),
         missileAttack: api.impactScore({ title: 'Ukraine : une salve de missiles frappe plusieurs infrastructures énergétiques' }),
+        droneAttack: api.impactScore({ title: "L'une des plus grandes raffineries russes prend feu après une attaque de drones ukrainiens, Moscou prépare sa riposte" }),
         severalDead: api.impactScore({ title: 'Naufrage en Méditerranée : plusieurs morts après le chavirement d’un bateau' }),
         headlineClusterNoise: api.impactScore({
           title: 'Une entreprise locale annonce ses nouveaux résultats trimestriels',
@@ -149,6 +150,7 @@ try {
   assert.equal(result.wordingImpact.japanDefense, 0, 'defense procurement mentioning missiles must not be promoted as an attack');
   assert.ok(result.wordingImpact.sportsEarthquake < 0, 'a metaphorical sports "séisme" must not be promoted as a disaster');
   assert.ok(result.wordingImpact.missileAttack >= 15, 'an actual contextual missile attack must remain a major event');
+  assert.ok(result.wordingImpact.droneAttack >= 15, 'a plural drone attack must remain a major event');
   assert.ok(result.wordingImpact.severalDead >= 34, '"plusieurs morts" in a real disaster must contribute conservative human-toll impact');
   assert.equal(result.wordingImpact.headlineClusterNoise, 0, 'a rejected Google News headline cluster must not leak another story impact into Brief ranking');
   assert.ok(result.impact['free-ai'] < 0, 'consumer/how-to content should receive a Brief impact penalty');
