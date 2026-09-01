@@ -11,15 +11,27 @@ function find(nodes,sel){for(const n of els(nodes)){if(n.matches?.(sel))return n
 function viewOf(nodes){const nav=find(nodes,'.bottom-nav');return nav?.querySelector?.('.nav-item.active[data-view]')?.dataset?.view||''}
 function liveView(){return app.querySelector('.bottom-nav .nav-item.active[data-view]')?.dataset?.view||''}
 function textCards(sel,min=3){return [...app.querySelectorAll(sel)].filter(n=>String(n.textContent||'').trim().length>3).length>=min}
+function imagesReady(sel,min=3,max=5){
+  const imgs=[...app.querySelectorAll(sel)].slice(0,max);
+  if(!imgs.length)return true;
+  let loaded=0;
+  for(let i=0;i<imgs.length;i++){
+    const img=imgs[i];
+    img.loading='eager';img.decoding='async';
+    try{if('fetchPriority' in img)img.fetchPriority=i<4?'high':'auto'}catch{}
+    if(img.complete&&img.naturalWidth>8&&img.naturalHeight>8)loaded++;
+  }
+  return loaded>=Math.min(min,imgs.length);
+}
 function ready(target){
-  if(target==='home')return liveView()==='home'&&textCards('.page .feed .article-card[data-article] h2',4);
-  if(target==='watches')return liveView()==='brief'&&!!app.querySelector('.brief-mode-tab.active[data-brief-mode="watches"]')&&!!app.querySelector('.watch-layout-v9138');
-  if(target==='essential')return liveView()==='brief'&&!!app.querySelector('.brief-mode-tab.active[data-brief-mode="essential"]')&&textCards('.runtime-brief-content .article-card[data-article] h2',3);
-  if(target==='brief')return liveView()==='brief'&&(textCards('.runtime-brief-content .article-card[data-article] h2',3)||!!app.querySelector('.watch-layout-v9138'));
+  if(target==='home')return liveView()==='home'&&textCards('.page .feed .article-card[data-article] h2',4)&&imagesReady('.page .feed .article-card[data-article] img.article-image',4,6);
+  if(target==='watches')return liveView()==='brief'&&!!app.querySelector('.brief-mode-tab.active[data-brief-mode="watches"]')&&!!app.querySelector('.watch-layout-v9138')&&textCards('.watch-layout-v9138 .article-card[data-article] h2',2)&&imagesReady('.watch-layout-v9138 .article-card[data-article] img.article-image',3,5);
+  if(target==='essential')return liveView()==='brief'&&!!app.querySelector('.brief-mode-tab.active[data-brief-mode="essential"]')&&textCards('.runtime-brief-content .article-card[data-article] h2',3)&&imagesReady('.runtime-brief-content .article-card[data-article] img.article-image',4,5);
+  if(target==='brief')return liveView()==='brief'&&((textCards('.runtime-brief-content .article-card[data-article] h2',3)&&imagesReady('.runtime-brief-content .article-card[data-article] img.article-image',4,5))||(!!app.querySelector('.watch-layout-v9138')&&imagesReady('.watch-layout-v9138 .article-card[data-article] img.article-image',3,5)));
   return true;
 }
 function endTransition(){if(!transition)return;transition.overlay.remove();transition=null;document.documentElement.classList.remove('stable-view-transition-v9139')}
-function waitTransition(){if(!transition)return;const age=performance.now()-transition.started;if(ready(transition.target)){transition.good=(transition.good||0)+1;if(transition.good>=2){endTransition();return}}else transition.good=0;if(age>1400){endTransition();return}requestAnimationFrame(waitTransition)}
+function waitTransition(){if(!transition)return;const age=performance.now()-transition.started;if(ready(transition.target)){transition.good=(transition.good||0)+1;if(transition.good>=3){endTransition();return}}else transition.good=0;if(age>2200){endTransition();return}requestAnimationFrame(waitTransition)}
 function neutralizeClone(clone){
   clone.dataset.stabilityClone='1';
   clone.querySelectorAll('[id]').forEach(n=>n.removeAttribute('id'));
@@ -34,7 +46,7 @@ function startTransition(target){
   const overlay=document.createElement('div');overlay.className='stable-view-overlay-v9139';
   const clone=app.cloneNode(true);clone.removeAttribute('id');clone.classList.add('stable-view-clone-v9139');neutralizeClone(clone);clone.style.top=`-${window.scrollY}px`;
   overlay.appendChild(clone);document.body.appendChild(overlay);document.documentElement.classList.add('stable-view-transition-v9139');
-  transition={overlay,target,started:performance.now(),good:0};allowRender(1000);requestAnimationFrame(waitTransition);
+  transition={overlay,target,started:performance.now(),good:0};allowRender(1200);requestAnimationFrame(waitTransition);
 }
 function targetFrom(el){if(el.matches?.('[data-brief-mode="watches"]'))return'watches';if(el.matches?.('[data-brief-mode="essential"]'))return'essential';const v=el.dataset?.view;if(v==='home')return'home';if(v==='brief')return'brief';return''}
 
