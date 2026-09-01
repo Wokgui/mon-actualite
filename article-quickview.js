@@ -103,12 +103,12 @@ function quickGoodSummary(value = '', article = {}) {
   return text.length >= 55 && !quickUnavailable(text) && !quickLooksLikeTitleRestatement(text, article);
 }
 
-function quickProvisionalSummary(article = {}) {
-  return quickArticleSummary(article) || 'Résumé en cours de préparation…';
+function quickProvisionalSummary() {
+  return 'Résumé IA en cours de préparation…';
 }
 
 function quickUnavailableSummary() {
-  return 'Résumé détaillé momentanément indisponible pour cet article.';
+  return 'Résumé IA momentanément indisponible pour cet article.';
 }
 
 function escapeRegExp(value = '') {
@@ -216,7 +216,14 @@ async function quickFetchJson(url, options) {
 
 function quickCacheSummary(key, summary, data = {}) {
   const latest = quickReadJson(QUICK_CACHE_KEY, {});
-  latest[key] = { summary, ai: Boolean(data.ai || data.grounded), unavailable: false, savedAt: Date.now() };
+  latest[key] = {
+    summary,
+    ai: Boolean(data.ai),
+    grounded: Boolean(data.grounded),
+    provider: quickClean(data.provider || data.origin || ''),
+    unavailable: false,
+    savedAt: Date.now()
+  };
   quickWriteJson(QUICK_CACHE_KEY, Object.fromEntries(Object.entries(latest).slice(-180)));
 }
 
@@ -225,7 +232,7 @@ async function quickLoadSummary(article, modal) {
   const cache = quickReadJson(QUICK_CACHE_KEY, {});
   const text = modal.querySelector('[data-quick-summary-text]');
   const cached = cache[key];
-  if (cached?.summary && !cached.unavailable && quickGoodSummary(cached.summary, article)) {
+  if (cached?.ai === true && cached?.summary && !cached.unavailable && quickGoodSummary(cached.summary, article)) {
     text.textContent = quickClean(cached.summary);
     return;
   }
@@ -237,15 +244,25 @@ async function quickLoadSummary(article, modal) {
     source: quickClean(article.source || '')
   };
 
-  const groqPromise = quickFetchJson('/api/article-summary-groq?v=17', {
+  const data = await quickFetchJson('/api/article-summary-groq?v=18&intent=foreground', {
     method: 'POST',
     headers: { 'Content-Type': 'application/json' },
     cache: 'no-store',
     body: JSON.stringify({ mode: 'article', article: articlePayload })
   });
+  if (!modal.isConnected) return;
+
+  const groqSummary = quickClean(data?.summary || '');
+  if (data?.ai === true && !data?.unavailable && quickGoodSummary(groqSummary, article)) {
+    text.textContent = groqSummary;
+    quickCacheSummary(key, groqSummary, data || {});
+    return;
+  }
+
+  let factualFallback = !data?.unavailable && quickGoodSummary(groqSummary, article) ? groqSummary : '';
 
   if (quickNeedsSmartRecovery(article)) {
-    const smart = await quickFetchJson('/api/article-summary-smart?v=4', {
+    const smart = await quickFetchJson('/api/article-summary-smart?v=4&intent=fallback', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       cache: 'no-store',
@@ -255,17 +272,13 @@ async function quickLoadSummary(article, modal) {
     const smartSummary = quickClean(smart?.text || '');
     if (smart?.ok && quickGoodSummary(smartSummary, article)) {
       text.textContent = smartSummary;
-      quickCacheSummary(key, smartSummary, smart);
+      quickCacheSummary(key, smartSummary, { ...smart, ai: false });
       return;
     }
   }
 
-  const data = await groqPromise;
-  if (!modal.isConnected) return;
-  const summary = quickClean(data?.summary || '');
-  if (!data?.unavailable && quickGoodSummary(summary, article)) {
-    text.textContent = summary;
-    quickCacheSummary(key, summary, data || {});
+  if (factualFallback) {
+    text.textContent = factualFallback;
     return;
   }
 
