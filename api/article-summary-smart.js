@@ -1,26 +1,18 @@
-const TIMEOUT_MS = 8000;
-const GEMINI_TIMEOUT_MS = 18000;
-const UA = 'Mozilla/5.0 (Linux; Android 16) AppleWebKit/537.36 Chrome/140 Safari/537.36';
-const PARISIEN_FEEDS = [
-  'https://feeds.leparisien.fr/leparisien/rss',
-  'https://feeds.leparisien.fr/leparisien/rss/societe',
-  'https://feeds.leparisien.fr/leparisien/rss/futurs',
-  'https://feeds.leparisien.fr/leparisien/rss/economie',
-  'https://feeds.leparisien.fr/leparisien/rss/international'
-];
-const GEMINI_MODELS = ['gemini-2.5-flash', 'gemini-2.5-flash-lite'];
+const GROQ_ENDPOINT = 'https://api.groq.com/openai/v1/chat/completions';
+const GROQ_MODEL = String(process.env.GROQ_FAST_MODEL || 'openai/gpt-oss-20b').trim();
+const TIMEOUT_MS = 12000;
 
 function send(res, status, payload) {
   res.statusCode = status;
   res.setHeader('Content-Type', 'application/json; charset=utf-8');
-  res.setHeader('Cache-Control', status === 200 ? 'public, max-age=60, s-maxage=300' : 'no-store');
+  res.setHeader('Cache-Control', 'no-store');
   res.end(JSON.stringify(payload));
 }
 
 function decodeEntities(value = '') {
-  return String(value || '')
+  return String(value ?? '')
     .replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1')
-    .replace(/&nbsp;/gi, ' ')
+    .replace(/&nbsp;|&#160;|&#x0*a0;/gi, ' ')
     .replace(/&amp;/gi, '&')
     .replace(/&quot;/gi, '"')
     .replace(/&#39;|&apos;/gi, "'")
@@ -31,7 +23,7 @@ function decodeEntities(value = '') {
 }
 
 function clean(value = '') {
-  return decodeEntities(String(value || '')
+  return decodeEntities(String(value ?? '')
     .replace(/<script\b[\s\S]*?<\/script>/gi, ' ')
     .replace(/<style\b[\s\S]*?<\/style>/gi, ' ')
     .replace(/<[^>]+>/g, ' '))
@@ -44,249 +36,151 @@ function normalize(value = '') {
   return clean(value)
     .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
     .replace(/[’']/g, ' ')
-    .toLowerCase()
-    .replace(/\s+[-–—]\s+[^-–—]{2,55}$/i, '')
-    .replace(/[^a-z0-9]+/g, ' ')
-    .replace(/\s+/g, ' ')
-    .trim();
+    .toLowerCase().replace(/[^a-z0-9]+/g, ' ')
+    .replace(/\s+/g, ' ').trim();
 }
 
-function titleTokens(value = '') {
-  const stop = new Set(['avec','dans','pour','plus','apres','avant','cette','sont','etre','leur','leurs','tout','mais','sans','vers','entre','une','des','les','sur','qui','que','aux','par','son','ses','est','fait','article','direct']);
-  return [...new Set(normalize(value).split(' ').filter(word => word.length >= 3 && !stop.has(word)))];
+const STOP = new Set([
+  'avec','dans','pour','plus','apres','avant','cette','cet','ces','sont','etre','leur','leurs','tout','tous','mais','sans','vers','entre','une','des','les','sur','qui','que','aux','par','son','ses','est','fait','font','comme','dont','elle','elles','ils','nous','vous','notre','votre','aussi','encore','deja','tres','moins','depuis','alors','chez','contre','lors','peut','peuvent','avait','avoir','sera','article','direct','video'
+]);
+
+function tokens(value = '') {
+  return normalize(value).split(' ').filter(token => token.length >= 4 && !STOP.has(token));
 }
 
-function sameTitle(candidate = '', expected = '') {
-  const a = normalize(candidate);
-  const b = normalize(expected);
-  if (!a || !b) return false;
-  if (a === b || a.includes(b) || b.includes(a)) return true;
-  const wanted = titleTokens(expected);
-  const found = new Set(titleTokens(candidate));
-  if (!wanted.length || !found.size) return false;
-  const hits = wanted.filter(word => found.has(word)).length;
-  return hits >= Math.min(5, wanted.length)
-    && hits / Math.max(1, Math.min(wanted.length, found.size)) >= 0.72;
+function fuzzy(token = '') {
+  if (/^\d+$/.test(token)) return token;
+  if (token.length <= 6) return token;
+  return token.slice(0, token.length >= 10 ? 6 : 5);
 }
 
-function informativeText(raw = '', title = '') {
-  const text = clean(raw);
-  if (text.length < 60) return '';
-  const textNorm = normalize(text);
-  const titleNorm = normalize(title);
-  if (!textNorm || textNorm === titleNorm) return '';
-  if (textNorm.includes(titleNorm) && text.length < Math.max(220, clean(title).length * 1.5)) return '';
-  return text;
+function numberClaims(value = '') {
+  const text = normalize(value).replace(/[\u202f\u00a0]/g, ' ');
+  const values = text.match(/\b\d{1,3}(?:[ .]\d{3})*(?:[,.]\d+)?\b|\b\d{4}\b/g) || [];
+  return [...new Set(values.map(value => value.replace(/[ .]/g, '').replace(',', '.')))];
 }
 
-function xmlTag(block = '', name = '') {
-  const escaped = name.replace(':', '\\:');
-  const match = block.match(new RegExp(`<${escaped}(?:\\s[^>]*)?>([\\s\\S]*?)<\\/${escaped}>`, 'i'));
-  return match ? match[1] : '';
+function titleRestatement(summary = '', title = '') {
+  const text = clean(summary);
+  const heading = clean(title);
+  if (!text || !heading) return false;
+  if (/^(?:cet article|l[’']article|ce texte|cette publication)\s+(?:porte sur|parle de|évoque|présente|explique|concerne)\b/i.test(text)) return true;
+  const wanted = tokens(heading);
+  const found = new Set(tokens(text));
+  if (wanted.length < 4 || !found.size) return false;
+  const coverage = wanted.filter(token => found.has(token)).length / wanted.length;
+  return coverage >= 0.88 && text.length <= Math.max(190, heading.length * 1.65);
 }
 
-function isParisien(article = {}) {
-  return /le\s+parisien/i.test(`${clean(article.source || '')} ${clean(article.title || '')}`);
+function supported(summary = '', source = '', title = '') {
+  const text = clean(summary);
+  if (text.length < 55 || text.length > 900) return false;
+  if (/résumé indisponible|aucune information|ouvrez? l[’']article|abonnez[- ]?vous|connectez[- ]?vous/i.test(text)) return false;
+  if (titleRestatement(text, title)) return false;
+
+  const support = `${clean(source)} ${clean(title)}`;
+  const sourceNumbers = new Set(numberClaims(support));
+  if (numberClaims(text).some(value => !sourceNumbers.has(value))) return false;
+
+  const generated = tokens(text);
+  const sourceTokens = tokens(support);
+  if (generated.length < 6 || sourceTokens.length < 3) return false;
+  const exactSet = new Set(sourceTokens);
+  const fuzzySet = new Set(sourceTokens.map(fuzzy));
+  const exact = generated.filter(token => exactSet.has(token)).length;
+  const fuzzyHits = generated.filter(token => fuzzySet.has(fuzzy(token))).length;
+  return exact >= 3 || fuzzyHits >= 4 || exact / generated.length >= 0.08 || fuzzyHits / generated.length >= 0.18;
 }
 
-function titleWithoutSource(title = '', source = '') {
-  let value = clean(title);
-  const sourceText = clean(source);
-  if (sourceText) {
-    const escaped = sourceText.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-    value = value.replace(new RegExp(`\\s*[-–—|·:]\\s*${escaped}\\s*$`, 'i'), '').trim();
-  }
-  return value.replace(/\s+[-–—]\s+[^-–—]{2,55}$/i, '').trim();
+function groqKey() {
+  let key = String(process.env.GROQ_API_KEY || '').trim();
+  key = key.replace(/^GROQ_API_KEY\s*=\s*/i, '').trim();
+  if ((key.startsWith('"') && key.endsWith('"')) || (key.startsWith("'") && key.endsWith("'"))) key = key.slice(1, -1).trim();
+  return key;
 }
 
-async function fetchFeed(feedUrl, title) {
-  const response = await fetch(feedUrl, {
-    redirect: 'follow',
+function promptFor(article = {}, source = '', strict = false) {
+  const title = clean(article.title || '').slice(0, 300);
+  const publisher = clean(article.source || '').slice(0, 100);
+  const rule = strict
+    ? 'Reste encore plus près des formulations du texte fourni. N’introduis aucun terme factuel important qui n’y figure pas.'
+    : 'Reformule naturellement sans recopier le début du texte.';
+  return `Rédige un vrai résumé journalistique en français de 2 ou 3 phrases, environ 45 à 80 mots. Commence directement par l'information principale. Utilise UNIQUEMENT les faits explicitement présents dans le TITRE et le TEXTE ci-dessous. N'ajoute aucun nom, chiffre, date, lieu, version, cause, conséquence ou contexte extérieur. Ne dis pas « cet article ». ${rule}\n\nSOURCE : ${publisher}\nTITRE : ${title}\nTEXTE : ${source}`;
+}
+
+async function callGroq(key, prompt, temperature = 0.1, maxTokens = 300) {
+  const response = await fetch(GROQ_ENDPOINT, {
+    method: 'POST',
     signal: AbortSignal.timeout(TIMEOUT_MS),
     headers: {
-      'User-Agent': UA,
-      'Accept': 'application/rss+xml,application/xml,text/xml,*/*;q=0.5',
-      'Accept-Language': 'fr-FR,fr;q=0.9'
-    }
+      'Content-Type': 'application/json',
+      'Authorization': `Bearer ${key}`
+    },
+    body: JSON.stringify({
+      model: GROQ_MODEL,
+      messages: [{ role: 'user', content: prompt }],
+      temperature,
+      max_completion_tokens: maxTokens,
+      include_reasoning: false,
+      reasoning_effort: 'low'
+    })
   });
-  if (!response.ok) return null;
-  const xml = await response.text();
-  const items = xml.match(/<item\b[\s\S]*?<\/item>/gi) || [];
-  for (const item of items.slice(0, 70)) {
-    const itemTitle = clean(xmlTag(item, 'title'));
-    if (!sameTitle(itemTitle, title)) continue;
-    const candidates = ['content:encoded', 'description', 'summary', 'content']
-      .map(name => informativeText(xmlTag(item, name), title))
-      .filter(Boolean)
-      .sort((a, b) => b.length - a.length);
+  const payload = await response.json().catch(() => ({}));
+  if (!response.ok) {
     return {
-      text: candidates[0] || '',
-      url: clean(xmlTag(item, 'link')),
-      publishedAt: clean(xmlTag(item, 'pubDate'))
+      ok: false,
+      rateLimited: response.status === 429,
+      retryAfter: clean(response.headers.get('retry-after') || ''),
+      error: clean(payload?.error?.message || `HTTP ${response.status}`).slice(0, 320)
     };
   }
-  return null;
+  const text = clean(payload?.choices?.[0]?.message?.content || '');
+  return text ? { ok: true, text } : { ok: false, error: 'Réponse vide' };
 }
 
-async function fetchParisienRssText(title = '') {
-  const results = await Promise.allSettled(PARISIEN_FEEDS.map(feed => fetchFeed(feed, title)));
-  return results
-    .map(result => result.status === 'fulfilled' ? result.value : null)
-    .filter(Boolean)
-    .sort((a, b) => (b.text?.length || 0) - (a.text?.length || 0))[0] || null;
-}
-
-async function fetchBingNewsText(title = '', source = '') {
-  const cleanTitle = titleWithoutSource(title, source).slice(0, 220);
-  const sourceText = clean(source).slice(0, 80);
-  const queryVariants = [...new Set([
-    `"${cleanTitle}"`,
-    cleanTitle,
-    sourceText ? `${cleanTitle} ${sourceText}` : ''
-  ].filter(Boolean))];
-  for (const query of queryVariants) {
-    try {
-      const url = new URL('https://www.bing.com/news/search');
-      url.search = new URLSearchParams({ q: query, format: 'RSS', qft: 'sortbydate="1"' }).toString();
-      const response = await fetch(url, {
-        redirect: 'follow',
-        signal: AbortSignal.timeout(TIMEOUT_MS),
-        headers: {
-          'User-Agent': UA,
-          'Accept': 'application/rss+xml,application/xml,text/xml,*/*;q=0.5',
-          'Accept-Language': 'fr-FR,fr;q=0.9'
-        }
-      });
-      if (!response.ok) continue;
-      const xml = await response.text();
-      const items = xml.match(/<item\b[\s\S]*?<\/item>/gi) || [];
-      for (const item of items.slice(0, 20)) {
-        const itemTitle = clean(xmlTag(item, 'title'));
-        if (!sameTitle(itemTitle, title)) continue;
-        const description = informativeText(xmlTag(item, 'description'), title);
-        const snippet = informativeText(xmlTag(item, 'News:Description'), title) || description;
-        if (!snippet) continue;
-        const link = clean(xmlTag(item, 'link'));
-        return { text: snippet, url: link, title: itemTitle };
-      }
-    } catch {}
-  }
-  return null;
-}
-
-function geminiKey() {
-  return String(process.env.GEMINI_API_KEY || process.env.GOOGLE_GENERATIVE_AI_API_KEY || '').trim();
-}
-
-function groundingUrls(payload = {}) {
-  const chunks = payload?.candidates?.[0]?.groundingMetadata?.groundingChunks || [];
-  return [...new Set(chunks
-    .map(chunk => chunk?.web?.uri || '')
-    .filter(uri => /^https?:\/\//i.test(uri)))]
-    .slice(0, 6);
-}
-
-async function groundedSearch(title = '', articleUrl = '', source = '') {
-  const key = geminiKey();
-  if (!key) return { text: '', model: '', sources: [], error: 'Gemini key missing' };
-  const cleanTitle = titleWithoutSource(title, source);
-  const sourceText = clean(source) || 'la source indiquée';
-  const prompt = `Utilise Google Search pour retrouver l'article précis publié par ${sourceText} et intitulé : « ${cleanTitle} ». ${articleUrl ? `Le lien reçu par l'application est ${articleUrl}.` : ''}\n\nRédige ensuite en français un résumé factuel de 2 à 4 phrases, environ 55 à 100 mots. Utilise UNIQUEMENT des faits explicitement confirmés par les résultats de recherche qui concernent cet article exact ou le même événement. N'ajoute aucune connaissance générale, supposition, conseil ou détail plausible. Si les résultats publics ne donnent aucune information au-delà du titre, réponds exactement : AUCUNE_INFORMATION`;
-  let lastError = '';
-
-  for (const model of GEMINI_MODELS) {
-    try {
-      const response = await fetch(`https://generativelanguage.googleapis.com/v1beta/models/${encodeURIComponent(model)}:generateContent`, {
-        method: 'POST',
-        signal: AbortSignal.timeout(GEMINI_TIMEOUT_MS),
-        headers: { 'Content-Type': 'application/json', 'x-goog-api-key': key },
-        body: JSON.stringify({
-          contents: [{ role: 'user', parts: [{ text: prompt }] }],
-          tools: [{ google_search: {} }],
-          generationConfig: { temperature: 0.05, maxOutputTokens: 320 }
-        })
-      });
-      const payload = await response.json().catch(() => ({}));
-      if (!response.ok) {
-        lastError = `${model}: ${payload?.error?.message || `HTTP ${response.status}`}`;
-        continue;
-      }
-      const text = clean((payload?.candidates?.[0]?.content?.parts || []).map(part => part?.text || '').join(' '));
-      if (!text || /^AUCUNE_INFORMATION\.?$/i.test(text)) return { text: '', model, sources: groundingUrls(payload), error: '' };
-      if (text.length < 60) return { text: '', model, sources: groundingUrls(payload), error: 'Grounded answer too short' };
-      return { text: text.slice(0, 900), model, sources: groundingUrls(payload), error: '' };
-    } catch (error) {
-      lastError = `${model}: ${String(error?.message || error)}`.slice(0, 280);
-    }
-  }
-  return { text: '', model: '', sources: [], error: lastError };
-}
-
-async function recover(article = {}) {
+async function summarize(article = {}) {
   const title = clean(article.title || '');
-  const source = clean(article.source || '');
+  const source = clean(article.summary || article.detail || article.description || '').slice(0, 2600);
+  if (!title) return { ok: false, reason: 'title-missing' };
+  if (source.length < 60) return { ok: false, reason: 'source-too-short' };
 
-  if (isParisien(article)) {
-    const rss = await fetchParisienRssText(title).catch(() => null);
-    if (rss?.text) {
-      return {
-        ok: true,
-        text: rss.text.slice(0, 3500),
-        articleUrl: rss.url || String(article.url || ''),
-        publishedAt: rss.publishedAt || '',
-        origin: 'publisher-rss',
-        grounded: false,
-        sources: []
-      };
-    }
+  const key = groqKey();
+  if (!key) return { ok: false, reason: 'groq-key-missing' };
+
+  const first = await callGroq(key, promptFor(article, source, false), 0.1, 300);
+  if (first.ok && supported(first.text, source, title)) {
+    return { ok: true, text: first.text, ai: true, grounded: true, origin: 'groq-fast', model: GROQ_MODEL };
   }
+  if (first.rateLimited) return { ok: false, rateLimited: true, retryAfter: first.retryAfter || '', reason: 'rate-limit' };
 
-  const bing = await fetchBingNewsText(title, source).catch(() => null);
-  if (bing?.text) {
-    return {
-      ok: true,
-      text: bing.text.slice(0, 1200),
-      articleUrl: bing.url || String(article.url || ''),
-      origin: 'bing-news-rss',
-      grounded: true,
-      sources: bing.url ? [bing.url] : []
-    };
+  const second = await callGroq(key, promptFor(article, source, true), 0, 240);
+  if (second.ok && supported(second.text, source, title)) {
+    return { ok: true, text: second.text, ai: true, grounded: true, origin: 'groq-fast-retry', model: GROQ_MODEL };
   }
-
-  const searched = await groundedSearch(title, String(article.url || ''), source).catch(() => ({ text: '', model: '', sources: [], error: '' }));
-  if (searched.text) {
-    return {
-      ok: true,
-      text: searched.text,
-      articleUrl: String(article.url || ''),
-      origin: 'google-search-grounded',
-      grounded: true,
-      model: searched.model,
-      sources: searched.sources
-    };
-  }
-
-  return {
-    ok: false,
-    text: '',
-    articleUrl: String(article.url || ''),
-    origin: 'unavailable',
-    grounded: true,
-    model: searched.model || '',
-    sources: searched.sources || [],
-    error: searched.error || ''
-  };
+  if (second.rateLimited) return { ok: false, rateLimited: true, retryAfter: second.retryAfter || '', reason: 'rate-limit' };
+  return { ok: false, reason: 'validation', error: clean(second.error || first.error || '').slice(0, 240) };
 }
 
 module.exports = async function handler(req, res) {
   if (req.method === 'GET' && String(req.query?.status || '') === '1') {
-    return send(res, 200, { ok: true, genericSources: true, hasGeminiKey: Boolean(geminiKey()), models: GEMINI_MODELS });
+    return send(res, 200, {
+      ok: true,
+      provider: 'groq-fast',
+      model: GROQ_MODEL,
+      hasGroqKey: Boolean(groqKey()),
+      maxCompletionTokens: 300,
+      onDemandOnly: true,
+      version: '91.43'
+    });
   }
-  if (!['GET', 'POST'].includes(req.method)) return send(res, 405, { error: 'Méthode non autorisée' });
-  const input = req.method === 'POST' ? (req.body || {}) : (req.query || {});
+  if (req.method !== 'POST') return send(res, 405, { error: 'Méthode non autorisée' });
+  const input = req.body && typeof req.body === 'object' ? req.body : {};
   const article = input.article && typeof input.article === 'object' ? input.article : input;
-  const title = clean(article.title || '');
-  if (!title) return send(res, 400, { error: 'Titre manquant' });
-  const result = await recover(article);
-  return send(res, 200, result);
+  try {
+    const result = await summarize(article);
+    return send(res, 200, result);
+  } catch (error) {
+    console.error('Fast Groq summary failed:', clean(error?.message || error).slice(0, 240));
+    return send(res, 200, { ok: false, reason: 'exception' });
+  }
 };
