@@ -89,126 +89,15 @@
   <script src="lifecycle-v86.js?v=86"></script>
   <script src="personalization-learning-v91.js?v=91.22"></script>
   <script src="news-pipeline-v88.js?v=88.10"></script>
-  <script src="brief-smart-v87.js?v=91.38.5"></script>
+  <script src="brief-smart-v87.js?v=91.38.6"></script>
   <script src="quality-v88.js?v=88"></script>
   <script src="quality-signals-v89.js?v=89"></script>
   <script src="visual-stability-v91.8.js?v=91.8"></script>
   <script src="navigation-cache-v79.js?v=91.26"></script>
-  <script>
-  (() => {
-    'use strict';
-    const SEEN_KEY = 'news-seen-v77';
-    const MODE_KEY = 'news-since-mode-v79';
-    const observed = new WeakSet();
-    let queued = false;
-
-    function readJson(key, fallback) {
-      try { return JSON.parse(localStorage.getItem(key) || 'null') ?? fallback; }
-      catch { return fallback; }
-    }
-    function writeJson(key, value) {
-      try { localStorage.setItem(key, JSON.stringify(value)); } catch {}
-    }
-    function homeActive() {
-      return Boolean(document.querySelector('.bottom-nav .nav-item.active[data-view="home"]'));
-    }
-    function savedOnlyActive() {
-      const button = document.querySelector('.saved-filter [data-saved-filter]');
-      return /voir toute l.actualit/i.test(String(button?.textContent || ''));
-    }
-    function markSeen(id) {
-      if (!id) return;
-      const current = readJson(SEEN_KEY, {});
-      current[id] = Date.now();
-      const compact = Object.fromEntries(Object.entries(current)
-        .sort((a, b) => Number(b[1] || 0) - Number(a[1] || 0))
-        .slice(0, 1200));
-      writeJson(SEEN_KEY, compact);
-    }
-    function removeStable(card) {
-      if (!card?.isConnected || savedOnlyActive()) return false;
-      const id = String(card.dataset.article || '');
-      if (!id) return false;
-      const next = card.nextElementSibling?.matches?.('.article-card[data-article]') ? card.nextElementSibling : null;
-      const previous = card.previousElementSibling?.matches?.('.article-card[data-article]') ? card.previousElementSibling : null;
-      const reference = next || previous;
-      const before = reference?.getBoundingClientRect().top;
-      markSeen(id);
-      observer.unobserve(card);
-      card.remove();
-      if (reference?.isConnected && Number.isFinite(before)) {
-        const after = reference.getBoundingClientRect().top;
-        const delta = after - before;
-        if (Math.abs(delta) > 1) window.scrollBy(0, delta);
-      }
-      return true;
-    }
-    function forceAllArticles() {
-      try { localStorage.setItem(MODE_KEY, 'all'); } catch {}
-      const all = document.querySelector('[data-since-mode-v79="all"]');
-      if (all && !all.classList.contains('active')) all.click();
-    }
-    function processPassedCards() {
-      queued = false;
-      if (!homeActive() || savedOnlyActive() || document.querySelector('.quick-summary-backdrop')) return;
-      const threshold = Math.min(72, Math.max(24, window.innerHeight * .06));
-      const cards = [...document.querySelectorAll('.page .feed > .article-card[data-article]')];
-      const opened = cards.find(card => card.dataset.openedV90 === '1');
-      if (opened) {
-        removeStable(opened);
-        schedule();
-        return;
-      }
-      const passed = cards.find(card => card.dataset.traversedV90 === '1' && card.getBoundingClientRect().bottom <= threshold);
-      if (passed && removeStable(passed)) schedule();
-    }
-    function schedule() {
-      if (queued) return;
-      queued = true;
-      requestAnimationFrame(processPassedCards);
-    }
-    const observer = new IntersectionObserver(entries => {
-      for (const entry of entries) {
-        if (entry.intersectionRatio >= .55) entry.target.dataset.traversedV90 = '1';
-      }
-    }, { threshold: [0, .25, .55, .8] });
-
-    function bindCards() {
-      forceAllArticles();
-      if (!homeActive()) return;
-      for (const card of document.querySelectorAll('.page .feed > .article-card[data-article]')) {
-        if (observed.has(card)) continue;
-        observed.add(card);
-        observer.observe(card);
-      }
-      schedule();
-    }
-
-    document.addEventListener('click', event => {
-      const card = event.target.closest?.('.article-card[data-article]');
-      if (!card || !homeActive() || savedOnlyActive()) return;
-      if (event.target.closest('button,a,input,select,textarea,label,[data-save],[data-category]')) return;
-      const id = String(card.dataset.article || '');
-      if (!id) return;
-      markSeen(id);
-      card.dataset.openedV90 = '1';
-      setTimeout(schedule, 180);
-    }, true);
-
-    window.addEventListener('scroll', schedule, { passive: true });
-    window.addEventListener('resize', schedule, { passive: true });
-    window.addEventListener('focus', bindCards);
-    document.addEventListener('visibilitychange', () => { if (!document.hidden) bindCards(); });
-    document.addEventListener('DOMContentLoaded', () => {
-      new MutationObserver(bindCards).observe(document.body, { childList: true, subtree: true });
-      bindCards();
-    }, { once: true });
-  })();
-  </script>
-  <script src="feed-stability-v91.38.js?v=1"></script>
-  <script src="ui-summary-fixes-v91.38.js?v=91.38"></script>
-  <script src="view-stability-v91.38.js?v=1"></script>
-  <script src="feedly-continuous-v91.38.js?v=1"></script>
+  <script src="feed-stability-v91.38.js?v=91.38.6"></script>
+  <script src="ui-summary-fixes-v91.38.js?v=91.38.6"></script>
+  <script src="view-stability-v91.38.js?v=91.38.6"></script>
+  <script src="feedly-continuous-v91.38.js?v=91.38.6"></script>
   <script type="module" src="app.js?v=68"></script>
   <script type="module" src="feedly-runtime.js?v=64"></script>
   <script type="module" src="summary-fixes.js?v=44"></script>
