@@ -1,6 +1,6 @@
 (() => {
 'use strict';
-const RELEASE='91.39',SETTINGS='news-settings',KEYWORDS='news-keywords',HOME='news-home-topics-v9138';
+const RELEASE='91.40',SETTINGS='news-settings',KEYWORDS='news-keywords',HOME='news-home-topics-v9138';
 const HOME_CATS=new Set(['IA','Tech','Smartphones','VR','Automobile','Énergie']);
 const read=(k,f)=>{try{return JSON.parse(localStorage.getItem(k)||'null')??f}catch{return f}};
 const write=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v))}catch{}};

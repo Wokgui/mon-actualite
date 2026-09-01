@@ -6,6 +6,8 @@ const index = read('index.html');
 const app = read('app.js');
 const prefetch = read('feed-stability-v91.38.js');
 const quickview = read('article-quickview.js');
+const intelligence76 = read('content-intelligence-v76.js');
+const personalization = read('personalization-learning-v91.js');
 const release = read('release-watch.js');
 const version = JSON.parse(read('version.json'));
 const legacyDecorators = [
@@ -46,8 +48,12 @@ for (const file of legacyDecorators) {
 }
 assert.match(prefetch, /news-article-summaries-v8/, 'idle prefetch must write the quick-view cache');
 assert.match(quickview, /news-article-summaries-v8/, 'quick view must read the idle-prefetch cache');
-assert.match(release, /PAGE_RELEASE = '91\.39'/, 'release watcher must not reload 91.39 as if it were stale');
-assert.equal(version.codeRelease, '91.39');
-assert.equal(version.version, '66');
+assert.match(app, /Array\.isArray\(article\.tags\)/, 'old malformed tag fields must not break navigation');
+assert.match(app, /try \{ learned = Number\(personalizationScore\(article\)/, 'old personalization data must not break ranking');
+assert.match(intelligence76, /Array\.isArray\(article\.matches\)/, 'legacy matches must not interrupt background intelligence');
+assert.match(personalization, /Array\.isArray\(article\.tags\)/, 'legacy tags must not interrupt personalization');
+assert.match(release, /PAGE_RELEASE = '91\.40'/, 'release watcher must not reload 91.40 as if it were stale');
+assert.equal(version.codeRelease, '91.40');
+assert.equal(version.version, '67');
 
-console.log('v91.39 structural single-render checks passed.');
+console.log('v91.40 structural single-render checks passed.');

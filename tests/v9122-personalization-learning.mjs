@@ -70,6 +70,6 @@ assert.match(quickview, /recordFeedback\(article, next, previous\)/, 'suivre et 
 assert.match(app, /updateWatchTopic\(value, remove = false\)[\s\S]*state\.settings\.briefWatchTopics = remove/, 'retirer une veille doit être traité par le propriétaire unique');
 assert.match(pipeline, /NewsPersonalizationV91\?\.learnedSignal/, 'l’ouverture éditoriale doit tenir compte de l’apprentissage plafonné');
 assert.ok(index.indexOf('personalization-learning-v91.js') < index.indexOf('news-pipeline-v88.js'), 'l’apprentissage doit être chargé avant le rééquilibrage');
-assert.match(sw, /personalization-learning-v91\.js\?v=91\.22/, 'le service worker doit précacher le moteur d’apprentissage');
+assert.match(sw, /personalization-learning-v91\.js\?v=91\.40/, 'le service worker doit précacher le moteur d’apprentissage');
 
 console.log('v91.22 bounded personalization learning passed.');

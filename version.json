@@ -1,6 +1,6 @@
 {
-  "version": "66",
-  "codeRelease": "91.39",
+  "version": "67",
+  "codeRelease": "91.40",
   "release": "2026-09-01",
-  "label": "v91.39 (socle v89) : rendu unique et stable, navigation immédiate, Accueil append-only, images prioritaires et résumés IA pré-calculés au repos"
+  "label": "v91.40 (socle v89) : rendu unique stable, navigation protégée contre les anciennes données, Accueil append-only, images prioritaires et résumés IA pré-calculés au repos"
 }

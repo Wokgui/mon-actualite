@@ -59,7 +59,7 @@ const codeRelease = String(version.codeRelease || '').trim();
 const cacheSlug = codeRelease.replace(/\./g, '-');
 if (!codeRelease || !new RegExp(`mon-actualite-v${cacheSlug}-core-r\\d+`).test(sw)) fail(`service worker cache does not match codeRelease ${codeRelease || '(missing)'}`);
 else ok(`service worker cache matches codeRelease ${codeRelease}`);
-for (const asset of ['personalization-learning-v91.js?v=91.22', 'news-pipeline-v88.js?v=88.10', 'quality-signals-v89.js?v=89', 'quality-signals-v89.css?v=89']) {
+for (const asset of ['personalization-learning-v91.js?v=91.40', 'news-pipeline-v88.js?v=88.10', 'quality-signals-v89.js?v=89', 'quality-signals-v89.css?v=89']) {
   if (!sw.includes(asset)) fail(`service worker does not precache ${asset}`);
   else ok(`service worker precaches ${asset}`);
 }

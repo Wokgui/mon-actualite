@@ -4,7 +4,7 @@ import { articleVisualUrl, hasPreparedVisual, sourceTileUrl } from './services/a
 const $ = (selector, root = document) => root.querySelector(selector);
 const app = $('#app');
 const toastEl = $('#toast');
-const APP_VERSION = '66';
+const APP_VERSION = '67';
 const APP_RELEASE = '1er septembre 2026';
 document.documentElement.dataset.appVersion = APP_VERSION;
 
@@ -160,7 +160,8 @@ function timeLabel(dateString) {
 
 function badgeFor(article) {
   if (article.customSource) return 'Source suivie';
-  if ((article.tags || []).some(tag => state.keywords.includes(tag))) return 'À suivre';
+  const tags = Array.isArray(article.tags) ? article.tags : (typeof article.tags === 'string' ? [article.tags] : []);
+  if (tags.some(tag => state.keywords.includes(tag))) return 'À suivre';
   if ((article.score || 0) >= 130) return 'Important';
   return 'Nouveau';
 }
@@ -178,21 +179,24 @@ function visibleArticles() {
     state.settings.generalCategories
   ) || (() => 0);
   return state.articles
+    .filter(article => article && typeof article === 'object')
     .filter(article => {
       if (state.feedback[article.id] === 'not') return false;
       if (!blocked.length) return true;
-      const text = normalizeTopic([article.title, article.summary, article.detail, article.category, article.source, ...(article.tags || [])].filter(Boolean).join(' '));
+      const tags = Array.isArray(article.tags) ? article.tags : (typeof article.tags === 'string' ? [article.tags] : []);
+      const text = normalizeTopic([article.title, article.summary, article.detail, article.category, article.source, ...tags].filter(Boolean).join(' '));
       return !blocked.some(term => text.includes(term));
     })
     .slice()
     .sort((a, b) => {
       const feedbackScore = article => ({ more: 24, less: -20, follow: 38 }[state.feedback[article.id]] || 0);
       const topicScore = article => {
-        const learned = personalizationScore(article);
+        let learned = 0;
+        try { learned = Number(personalizationScore(article) || 0); } catch {}
         const chosen = state.settings.interests.includes(article.category) ? 22 : state.settings.generalCategories.includes(article.category) ? 8 : 0;
         return learned + chosen;
       };
-      return ((b.score || 0) + feedbackScore(b) + topicScore(b)) - ((a.score || 0) + feedbackScore(a) + topicScore(a));
+      return ((Number(b.score) || 0) + feedbackScore(b) + topicScore(b)) - ((Number(a.score) || 0) + feedbackScore(a) + topicScore(a));
     });
 }
 
@@ -352,7 +356,9 @@ function uniqueTopics(values = []) {
 function watchMatches(article, topic) {
   const wanted = normalizeTopic(topic);
   if (normalizeTopic(article.category) === wanted) return true;
-  const text = ` ${normalizeTopic([article.title, article.summary, article.detail, article.category, article.source, ...(article.tags || []), ...(article.matches || [])].filter(Boolean).join(' '))} `;
+  const tags = Array.isArray(article.tags) ? article.tags : (typeof article.tags === 'string' ? [article.tags] : []);
+  const matches = Array.isArray(article.matches) ? article.matches : (typeof article.matches === 'string' ? [article.matches] : []);
+  const text = ` ${normalizeTopic([article.title, article.summary, article.detail, article.category, article.source, ...tags, ...matches].filter(Boolean).join(' '))} `;
   return uniqueTopics([wanted, ...(WATCH_ALIASES[wanted] || [])]).map(normalizeTopic).some(term => term.length <= 3 && !term.includes(' ') ? text.includes(` ${term} `) : text.includes(term));
 }
 

@@ -148,7 +148,8 @@
   function mergeCluster(cluster) {
     if (cluster.length === 1) {
       const article = { ...cluster[0] };
-      article.matches = [...new Set([...(article.matches || []), ...semanticSignals(article)])].slice(0, 8);
+      const previousMatches = Array.isArray(article.matches) ? article.matches : (typeof article.matches === 'string' ? [article.matches] : []);
+      article.matches = [...new Set([...previousMatches, ...semanticSignals(article)])].slice(0, 8);
       return article;
     }
 
@@ -180,7 +181,10 @@
     merged.mergedCount = cluster.length;
     merged.publishedAt = cluster.map(item => item.publishedAt).filter(Boolean).sort((a, b) => Date.parse(b) - Date.parse(a))[0] || merged.publishedAt;
     merged.score = Math.max(...cluster.map(item => Number(item.score || 0))) + Math.min(10, (sources.length - 1) * 2);
-    merged.matches = [...new Set(cluster.flatMap(item => [...(item.matches || []), ...semanticSignals(item)]))].slice(0, 10);
+    merged.matches = [...new Set(cluster.flatMap(item => {
+      const previousMatches = Array.isArray(item.matches) ? item.matches : (typeof item.matches === 'string' ? [item.matches] : []);
+      return [...previousMatches, ...semanticSignals(item)];
+    }))].slice(0, 10);
     return merged;
   }
 

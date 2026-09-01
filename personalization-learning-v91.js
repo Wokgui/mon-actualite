@@ -35,7 +35,9 @@
   }
 
   function articleTopics(article = {}) {
-    return [...new Set([article.category, ...(article.tags || []), ...(article.matches || [])]
+    const tags = Array.isArray(article.tags) ? article.tags : (typeof article.tags === 'string' ? [article.tags] : []);
+    const matches = Array.isArray(article.matches) ? article.matches : (typeof article.matches === 'string' ? [article.matches] : []);
+    return [...new Set([article.category, ...tags, ...matches]
       .map(value => String(value || '').trim())
       .filter(value => value && value !== 'À suivre'))].slice(0, 3);
   }

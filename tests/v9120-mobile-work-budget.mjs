@@ -6,7 +6,7 @@ const stability = fs.readFileSync(new URL('../feed-stability-v91.38.js', import.
 const index = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
 
 assert.doesNotMatch(index, /adaptive-preload-v83\.js/, 'the former parallel image preloader must remain retired');
-assert.match(index, /feed-stability-v91\.38\.js\?v=91\.39/, 'one image and idle-summary scheduler must remain loaded');
+assert.match(index, /feed-stability-v91\.38\.js\?v=91\.40/, 'one image and idle-summary scheduler must remain loaded');
 assert.match(stability, /navigator\.connection[\s\S]*saveData[\s\S]*SUMMARY_CONCURRENCY/, 'idle work must stay connection-aware');
 assert.match(stability, /document\.hidden/, 'idle work must pause while the app is hidden');
 assert.match(app, /loading="\$\{index < 4 \? 'eager' : 'lazy'\}"/, 'Home must eagerly load only its first four images');
