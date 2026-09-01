@@ -118,7 +118,7 @@
     const article = body?.article && typeof body.article === 'object' ? body.article : {};
     const articleBody = { ...body, mode: 'article', article };
 
-    // 1. Fast Groq generation from the best material the extractor can obtain.
+    // 1. Fast generated summary from the best source material available.
     const smart = await callGenerated('/api/article-summary-smart?v=7&intent=foreground', {
       ...articleBody,
       lightweight: true,
@@ -126,13 +126,8 @@
     }, 'groq-light');
     if (smart) return smart;
 
-    // 2. Independent Gemini path. This is especially useful if Groq is
-    // rate-limited or its support check rejects the first attempt.
-    const gemini = await callGenerated('/api/article-summary?v=91.46&intent=foreground', articleBody, 'gemini');
-    if (gemini) return gemini;
-
-    // 3. Search/corroboration fallback. It may recover articles whose source
-    // page or feed only exposes a cut-off teaser.
+    // 2. If the source only exposes a cut-off teaser, reconstruct the event
+    // from concordant search results and accept only a generated synthesis.
     return callGenerated('/api/article-summary-multisource?v=91.46&intent=foreground', articleBody, 'groq-multisource');
   }
 
@@ -154,8 +149,8 @@
     const reliable = await reliableSummary(body);
     if (reliable) return reliable;
 
-    // Do not turn a cut-off feed teaser into a fake "summary". If all three
-    // generated paths fail, the UI shows that the summary is unavailable.
+    // Do not turn a cut-off feed teaser into a fake "summary". If both
+    // generated paths fail, the UI says that the summary is unavailable.
     return cloneJsonResponse(null, {
       ok: false,
       summary: '',
