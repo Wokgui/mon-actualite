@@ -1,6 +1,11 @@
 (() => {
   'use strict';
 
+  // Capture the real fetch before any later compatibility layer can wrap it.
+  // Release checks must use this reference, otherwise the v91.38 compatibility
+  // shim can make the page look like v91.37 and trigger an endless reload loop.
+  const nativeFetch = window.fetch.bind(window);
+
   const SUMMARY_CACHE_KEY = 'news-live-cache';
   const summaryStats = {
     version: '91.9',
@@ -11,7 +16,7 @@
   window.__summaryQualityV919 = summaryStats;
   document.documentElement.dataset.summaryQualityVersion = '91.9';
 
-  function summaryClean(value = '') {
+  function clean(value = '') {
     return String(value ?? '')
       .replace(/&nbsp;|&#160;|&#x0*a0;/gi, ' ')
       .replace(/&amp;/gi, '&')
@@ -21,8 +26,8 @@
       .trim();
   }
 
-  function summaryNormalize(value = '') {
-    return summaryClean(value)
+  function normalize(value = '') {
+    return clean(value)
       .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
       .replace(/[’']/g, ' ')
       .toLowerCase()
@@ -31,15 +36,15 @@
       .trim();
   }
 
-  function summaryEscapeRegExp(value = '') {
+  function escapeRegExp(value = '') {
     return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
   }
 
   function titleWithoutPublisher(article = {}) {
-    let title = summaryClean(article.title || '');
-    const source = summaryClean(article.source || '');
+    let title = clean(article.title || '');
+    const source = clean(article.source || '');
     if (source) {
-      const stripped = title.replace(new RegExp(`\\s*[-–—|]\\s*${summaryEscapeRegExp(source)}\\s*$`, 'i'), '').trim();
+      const stripped = title.replace(new RegExp(`\\s*[-–—|]\\s*${escapeRegExp(source)}\\s*$`, 'i'), '').trim();
       if (stripped !== title) title = stripped;
     }
     return title;
@@ -56,41 +61,32 @@
   }
 
   function titleRestatement(value = '', article = {}) {
-    const text = summaryNormalize(value);
-    const title = summaryNormalize(titleWithoutPublisher(article));
+    const text = normalize(value);
+    const title = normalize(titleWithoutPublisher(article));
     if (!text || !title) return false;
     const wanted = [...new Set(title.split(' ').filter(word => word.length >= 4))];
     const found = new Set(text.split(' ').filter(word => word.length >= 4));
     if (wanted.length < 3) return false;
     const hits = wanted.filter(word => found.has(word)).length;
-    const coverage = hits / wanted.length;
-    return coverage >= 0.82 && summaryClean(value).length <= Math.max(230, titleWithoutPublisher(article).length * 2.1);
+    return hits / wanted.length >= 0.82 && clean(value).length <= Math.max(230, titleWithoutPublisher(article).length * 2.1);
   }
 
   function googleFeedDescription(value = '', article = {}) {
     const raw = String(value ?? '');
     if (!raw.trim() || !googleNewsRssArticle(article)) return false;
     if (/&nbsp;|&#160;|&#x0*a0;/i.test(raw)) return true;
-    if (/voir plus de titres et de points de vue sur google actualit(?:é|e)s?/i.test(summaryClean(raw))) return true;
-    const source = summaryNormalize(article.source || '');
-    const text = summaryNormalize(raw);
+    if (/voir plus de titres et de points de vue sur google actualit(?:é|e)s?/i.test(clean(raw))) return true;
+    const source = normalize(article.source || '');
+    const text = normalize(raw);
     return Boolean(source && text.includes(source) && titleRestatement(raw, article));
   }
 
-  function sanitizeSummaryArticle(article = {}, origin = 'feed') {
+  function sanitizeArticle(article = {}, origin = 'feed') {
     if (!googleNewsRssArticle(article)) return { article, changed: false };
     const copy = { ...article };
     let changed = false;
-
-    if (googleFeedDescription(copy.summary, copy)) {
-      copy.summary = '';
-      changed = true;
-    }
-    if (googleFeedDescription(copy.detail, copy)) {
-      copy.detail = '';
-      changed = true;
-    }
-
+    if (googleFeedDescription(copy.summary, copy)) { copy.summary = ''; changed = true; }
+    if (googleFeedDescription(copy.detail, copy)) { copy.detail = ''; changed = true; }
     if (!changed) return { article, changed: false };
     copy.summaryQualityV919 = 'google-news-headline-cluster';
     copy.summaryUnavailableV919 = true;
@@ -100,48 +96,42 @@
     return { article: copy, changed: true };
   }
 
-  function sanitizeSummaryPayload(payload, origin = 'feed') {
+  function sanitizePayload(payload, origin = 'feed') {
     if (!payload || !Array.isArray(payload.articles)) return { payload, changed: false };
     let changed = false;
     const articles = payload.articles.map(article => {
-      const result = sanitizeSummaryArticle(article, origin);
-      if (result.changed) changed = true;
+      const result = sanitizeArticle(article, origin);
+      changed ||= result.changed;
       return result.article;
     });
     return { payload: changed ? { ...payload, articles } : payload, changed };
   }
 
-  function sanitizeSummaryCache() {
-    try {
-      const cached = JSON.parse(localStorage.getItem(SUMMARY_CACHE_KEY) || 'null');
-      const result = sanitizeSummaryPayload(cached, 'cache');
-      if (result.changed) localStorage.setItem(SUMMARY_CACHE_KEY, JSON.stringify(result.payload));
-    } catch {}
-  }
+  try {
+    const cached = JSON.parse(localStorage.getItem(SUMMARY_CACHE_KEY) || 'null');
+    const result = sanitizePayload(cached, 'cache');
+    if (result.changed) localStorage.setItem(SUMMARY_CACHE_KEY, JSON.stringify(result.payload));
+  } catch {}
 
-  function responseWithSummaryPayload(response, payload) {
-    const headers = new Headers(response.headers);
-    headers.delete('content-length');
-    headers.delete('content-encoding');
-    headers.set('Content-Type', 'application/json; charset=utf-8');
-    return new Response(JSON.stringify(payload), {
-      status: response.status,
-      statusText: response.statusText,
-      headers
-    });
-  }
-
-  const summaryUpstreamFetch = window.fetch.bind(window);
   window.fetch = async function summaryQualityV919Fetch(input, init) {
-    const response = await summaryUpstreamFetch(input, init);
+    const response = await nativeFetch(input, init);
     if (!response.ok) return response;
     try {
       const raw = typeof input === 'string' ? input : input?.url || '';
       const url = new URL(raw, location.href);
       if (url.origin !== location.origin || url.pathname !== '/api/news') return response;
       const data = await response.clone().json();
-      const result = sanitizeSummaryPayload(data, 'feed');
-      return result.changed ? responseWithSummaryPayload(response, result.payload) : response;
+      const result = sanitizePayload(data, 'feed');
+      if (!result.changed) return response;
+      const headers = new Headers(response.headers);
+      headers.delete('content-length');
+      headers.delete('content-encoding');
+      headers.set('Content-Type', 'application/json; charset=utf-8');
+      return new Response(JSON.stringify(result.payload), {
+        status: response.status,
+        statusText: response.statusText,
+        headers
+      });
     } catch {
       return response;
     }
@@ -160,7 +150,6 @@
     }
   }
 
-  sanitizeSummaryCache();
   document.addEventListener('DOMContentLoaded', () => {
     hideEmptySummaries(document);
     new MutationObserver(mutations => {
@@ -171,12 +160,11 @@
       }
     }).observe(document.body, { childList: true, subtree: true });
   }, { once: true });
-})();
 
-(() => {
-  'use strict';
-
-  const PAGE_RELEASE = '91.37';
+  // Release watcher. This file is part of v91.38, so it must identify itself as
+  // v91.38. Using nativeFetch here prevents later fetch shims from falsifying
+  // the value returned by /version.json.
+  const PAGE_RELEASE = '91.38';
   const RELEASE_DATE = '31 août 2026';
   const VERSION_PATH = '/version.json';
   const CHECK_COOLDOWN_MS = 45_000;
@@ -184,10 +172,6 @@
   let lastCheckedAt = 0;
   let reloadStarted = false;
   let uiScheduled = false;
-
-  function clean(value = '') {
-    return String(value ?? '').trim();
-  }
 
   function showToast(message = '') {
     const toast = document.getElementById('toast');
@@ -219,10 +203,10 @@
   async function publishedRelease() {
     const url = new URL(VERSION_PATH, location.origin);
     url.searchParams.set('release-check', Date.now().toString());
-    const response = await fetch(url, { cache: 'no-store' });
+    const response = await nativeFetch(url, { cache: 'no-store' });
     if (!response.ok) throw new Error(`version HTTP ${response.status}`);
     const meta = await response.json();
-    return clean(meta?.codeRelease || '');
+    return String(meta?.codeRelease || '').trim();
   }
 
   async function activateWaitingWorker() {
@@ -276,9 +260,7 @@
     checkRelease({ force: true, announce: true });
   }, true);
 
-  if (document.body) {
-    new MutationObserver(scheduleVersionUi).observe(document.body, { childList: true, subtree: true });
-  }
+  if (document.body) new MutationObserver(scheduleVersionUi).observe(document.body, { childList: true, subtree: true });
   document.addEventListener('DOMContentLoaded', scheduleVersionUi, { once: true });
   window.addEventListener('focus', () => { scheduleVersionUi(); checkRelease(); });
   window.addEventListener('online', () => checkRelease({ force: true }));
@@ -286,5 +268,5 @@
     if (!document.hidden) { scheduleVersionUi(); checkRelease(); }
   });
   window.setInterval(() => checkRelease(), 5 * 60 * 1000);
-  window.setTimeout(() => { scheduleVersionUi(); checkRelease({ force: true }); }, 900);
+  window.setTimeout(() => { scheduleVersionUi(); checkRelease({ force: true }); }, 1800);
 })();
