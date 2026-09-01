@@ -93,8 +93,10 @@ try {
 
   // The non-AI fallback algorithm itself must produce useful condensed text.
   const extracted = await page.evaluate(item => window.__summaryVisualGuardV9145.extractiveFallback(item), article);
+  const combinedSource = `${article.summary} ${article.detail}`;
   assert.ok(String(extracted || '').length >= 100, 'extractive fallback must contain useful information');
-  assert.doesNotMatch(String(extracted || ''), /^Les chercheurs.*Les premiers.*La méthode.*$/s, 'fallback should rank useful sentences rather than blindly copy an arbitrary raw page prefix');
+  assert.ok(String(extracted || '').length < combinedSource.length * 0.7, 'fallback must condense duplicated source material');
+  assert.doesNotMatch(String(extracted || ''), /newsletter|cookie|abonn|connectez|partager|lire aussi|voir aussi/i, 'fallback must exclude boilerplate');
 
   // 2. Reproduce the real image bug independently from the historical quickview stack:
   // the card owns a late-loaded image, while the article object itself has no image URL.
