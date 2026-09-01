@@ -26,7 +26,7 @@ assert.ok(watcher.includes("document.querySelector('.app-version-section')"), 'r
 assert.ok(watcher.includes('Mon actualité · version ${PAGE_RELEASE}'), 'settings version text must use codeRelease');
 assert.ok(watcher.includes("event.target.closest?.('[data-check-update]')"), 'manual update button must be handled by the release watcher');
 assert.ok(watcher.includes('checkRelease({ force: true, announce: true })'), 'manual update button must force an announced release check');
-assert.ok(sw.includes(`const CACHE = 'mon-actualite-v${slug}-core-r1'`), 'service worker core cache must rotate with codeRelease');
+assert.match(sw, new RegExp(`const CACHE = ['\"]mon-actualite-v${slug}-core-r\\d+['\"]`), 'service worker core cache must track codeRelease and may increment its internal revision');
 
 const criticalScripts = [...index.matchAll(/<script[^>]+src="([^"]+)"/g)]
   .map(match => match[1])

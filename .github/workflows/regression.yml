@@ -53,7 +53,7 @@ jobs:
   mobile-browser:
     needs: static-regression
     runs-on: ubuntu-latest
-    timeout-minutes: 15
+    timeout-minutes: 18
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
@@ -82,3 +82,4 @@ jobs:
           node tests/v9110-brief-dedup.mjs
           node tests/v9111-navigation-performance.mjs
           node tests/v9112-brief-real-feed.mjs
+          node tests/v9144-mobile-stability.mjs

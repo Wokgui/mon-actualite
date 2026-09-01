@@ -1,0 +1,62 @@
+name: Local preview v91.45
+
+on:
+  push:
+    branches:
+      - test-local-validation-v9144
+  workflow_dispatch:
+
+jobs:
+  validate-local-preview:
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+
+      - name: Syntax check local preview files
+        run: |
+          node --check summary-visual-guard-v91.45.js
+          node --check local-preview-v91.45.mjs
+          node --check tests/v9145-summary-visual-browser.mjs
+
+      - name: Install Playwright Chromium
+        run: |
+          npm init -y >/dev/null 2>&1
+          npm install --no-save playwright@1.55.0
+          npx playwright install --with-deps chromium
+
+      - name: Run local Android summary and visual test
+        shell: bash
+        run: |
+          set -euo pipefail
+          node local-preview-v91.45.mjs >/tmp/mon-actualite-local.log 2>&1 &
+          SERVER_PID=$!
+          trap 'kill $SERVER_PID 2>/dev/null || true' EXIT
+          for i in {1..40}; do
+            if curl -fsS http://127.0.0.1:4173/ >/dev/null; then break; fi
+            sleep 0.25
+          done
+          node tests/v9145-summary-visual-browser.mjs
+
+      - name: Build downloadable local package
+        if: success()
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p /tmp/local-package
+          rsync -a --exclude='.git' --exclude='node_modules' --exclude='mon-actualite-local-v91.45.zip' ./ /tmp/local-package/mon-actualite-local-v91.45/
+          cd /tmp/local-package
+          zip -qr "$GITHUB_WORKSPACE/mon-actualite-local-v91.45.zip" mon-actualite-local-v91.45
+
+      - name: Upload local package
+        if: success()
+        uses: actions/upload-artifact@v4
+        with:
+          name: mon-actualite-local-v91.45
+          path: mon-actualite-local-v91.45.zip
+          if-no-files-found: error
+          retention-days: 7
