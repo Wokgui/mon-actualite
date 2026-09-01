@@ -25,37 +25,36 @@
     }
   }
 
-  function rewriteSummaryRequest(input) {
-    const url = requestUrl(input);
-    if (!url || url.origin !== location.origin || url.pathname !== '/api/article-summary-groq') return input;
-    url.pathname = '/api/article-summary-v9141';
-    if (typeof input === 'string') return url.href;
-    if (input instanceof URL) return url;
-    if (input instanceof Request) {
-      try { return new Request(url.href, input); } catch { return url.href; }
-    }
-    return input;
-  }
-
-  window.fetch = function runtimeStableFetch(input, init) {
-    return nativeFetch(rewriteSummaryRequest(input), init);
-  };
-
   function compactText(value = '') {
     return String(value ?? '')
+      .replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1')
+      .replace(/<script\b[\s\S]*?<\/script>/gi, ' ')
+      .replace(/<style\b[\s\S]*?<\/style>/gi, ' ')
+      .replace(/<[^>]+>/g, ' ')
       .replace(/&nbsp;|&#160;|&#x0*a0;/gi, ' ')
       .replace(/&amp;/gi, '&')
-      .replace(/<[^>]+>/g, ' ')
+      .replace(/&quot;/gi, '"')
+      .replace(/&#39;|&apos;/gi, "'")
+      .replace(/&lt;/gi, '<')
+      .replace(/&gt;/gi, '>')
       .replace(/\s+/g, ' ')
       .trim();
   }
 
-  function normalizedWords(value = '') {
+  function normalize(value = '') {
     return compactText(value)
       .normalize('NFD').replace(/[\u0300-\u036f]/g, '')
       .replace(/[’']/g, ' ')
       .toLowerCase().replace(/[^a-z0-9]+/g, ' ')
-      .split(/\s+/).filter(word => word.length >= 4);
+      .replace(/\s+/g, ' ').trim();
+  }
+
+  const SUMMARY_STOP = new Set([
+    'avec','dans','pour','plus','apres','avant','cette','cet','ces','sont','etre','leur','leurs','tout','tous','mais','sans','vers','entre','une','des','les','sur','qui','que','aux','par','son','ses','est','fait','font','comme','dont','elle','elles','ils','nous','vous','notre','votre','aussi','encore','deja','tres','moins','depuis','alors','chez','contre','lors','peut','peuvent','avait','avoir','sera','un','le','la','du','de','au','en','et','ou','ce','se','sa','ne','pas','article','direct','video','selon'
+  ]);
+
+  function normalizedWords(value = '') {
+    return normalize(value).split(/\s+/).filter(word => word.length >= 4 && !SUMMARY_STOP.has(word));
   }
 
   function overlapRatio(a = '', b = '') {
@@ -64,6 +63,133 @@
     if (aa.length < 5 || bb.size < 5) return 0;
     return aa.filter(word => bb.has(word)).length / aa.length;
   }
+
+  function summarySentences(value = '') {
+    return compactText(value).match(/[^.!?]+[.!?]+|[^.!?]+$/g)?.map(sentence => sentence.trim()).filter(Boolean) || [];
+  }
+
+  function summaryBoilerplate(value = '') {
+    const text = normalize(value);
+    return !text || [
+      'connectez vous','abonnez vous','newsletter','acceptez les cookies','voir aussi','lire aussi',
+      'voir plus de titres et de points de vue','partager cet article','retrouvez nous sur','en savoir plus'
+    ].some(term => text.includes(term));
+  }
+
+  function summaryJaccard(a = '', b = '') {
+    const aa = new Set(normalizedWords(a));
+    const bb = new Set(normalizedWords(b));
+    if (!aa.size || !bb.size) return 0;
+    let common = 0;
+    for (const token of aa) if (bb.has(token)) common += 1;
+    return common / Math.max(1, new Set([...aa, ...bb]).size);
+  }
+
+  function summarySentenceScore(sentence, title, index, total) {
+    const words = normalizedWords(sentence);
+    if (words.length < 5 || summaryBoilerplate(sentence)) return -Infinity;
+    const titleSet = new Set(normalizedWords(title));
+    const overlap = words.filter(word => titleSet.has(word)).length;
+    let score = overlap * 7 + Math.min(new Set(words).size, 18) * 0.45;
+    if (/\d/.test(sentence)) score += 3;
+    if (/\b(?:annonce|indique|confirme|prévoit|devrait|pourrait|entraîne|provoque|après|avant|depuis|contre|accord|décision|hausse|baisse|mort|morts|victime|victimes|million|milliard|pour cent|%)\b/i.test(sentence)) score += 2.5;
+    if (/\b[A-ZÀ-ÖØ-Þ][\p{L}'’-]{2,}\b/u.test(sentence)) score += 1.5;
+    const length = compactText(sentence).length;
+    if (length >= 65 && length <= 230) score += 2;
+    if (length > 300) score -= 2;
+    if (index === 0) score += 0.4;
+    if (index >= Math.ceil(total / 2)) score += 0.8;
+    return score;
+  }
+
+  function extractiveDigest(value = '', title = '') {
+    const source = compactText(value);
+    const list = summarySentences(source);
+    const scored = list
+      .map((sentence, index) => ({ sentence, index, score: summarySentenceScore(sentence, title, index, list.length) }))
+      .filter(item => Number.isFinite(item.score));
+    if (!scored.length) return source.length <= 420 ? source : '';
+
+    const ranked = scored.slice().sort((a, b) => b.score - a.score || a.index - b.index);
+    const chosen = [];
+    let words = 0;
+    for (const item of ranked) {
+      if (chosen.some(previous => summaryJaccard(previous.sentence, item.sentence) >= 0.72)) continue;
+      const count = item.sentence.split(/\s+/).filter(Boolean).length;
+      if (chosen.length >= 2 && words + count > 110) continue;
+      chosen.push(item);
+      words += count;
+      if (chosen.length >= 3 || words >= 85) break;
+    }
+    if (chosen.length === 1 && scored.length > 1) {
+      const second = scored.filter(item => item !== chosen[0] && summaryJaccard(item.sentence, chosen[0].sentence) < 0.72)
+        .sort((a, b) => b.score - a.score)[0];
+      if (second) chosen.push(second);
+    }
+    if (!chosen.length) return '';
+    const lead = chosen.slice().sort((a, b) => b.score - a.score)[0];
+    const rest = chosen.filter(item => item !== lead).sort((a, b) => a.index - b.index);
+    return [lead, ...rest].map(item => compactText(item.sentence)).join(' ').trim();
+  }
+
+  function looksLikeRawBeginning(summary = '', article = {}) {
+    const text = compactText(summary);
+    if (!text) return false;
+    return [article?.summary, article?.detail].map(compactText).filter(value => value.length >= 90).some(value => {
+      const head = value.slice(0, 420);
+      return overlapRatio(text.slice(0, 420), head) >= 0.78 ||
+        normalizedWords(text.slice(0, 260)).join(' ').startsWith(normalizedWords(head).join(' ').slice(0, 90));
+    });
+  }
+
+  async function requestBody(input, init) {
+    try {
+      if (typeof init?.body === 'string') return JSON.parse(init.body);
+      if (input instanceof Request) return await input.clone().json();
+    } catch {}
+    return {};
+  }
+
+  async function improveSummaryResponse(response, body = {}) {
+    if (!response.ok) return response;
+    try {
+      const payload = await response.clone().json();
+      if (body?.mode === 'category' || payload?.unavailable || !payload?.summary) return response;
+      const article = body?.article && typeof body.article === 'object' ? body.article : {};
+      const factualFallback = String(payload.provider || '').toLowerCase() === 'factual' || payload.ai === false;
+      if (!factualFallback && !looksLikeRawBeginning(payload.summary, article)) return response;
+
+      const digest = extractiveDigest(payload.summary, article.title || '');
+      const originalWords = compactText(payload.summary).split(/\s+/).filter(Boolean).length;
+      const digestWords = digest.split(/\s+/).filter(Boolean).length;
+      if (digest.length < 55 || (originalWords >= 55 && digestWords > Math.max(44, Math.floor(originalWords * 0.78)))) return response;
+
+      const improved = {
+        ...payload,
+        summary: digest,
+        unavailable: false,
+        provider: factualFallback ? 'factual-extractive' : payload.provider,
+        finalSummaryV9141: true,
+        summaryModeV9141: factualFallback ? 'extractive-fallback' : 'anti-copy-condense'
+      };
+      const headers = new Headers(response.headers);
+      headers.delete('content-length');
+      headers.delete('content-encoding');
+      headers.set('Content-Type', 'application/json; charset=utf-8');
+      return new Response(JSON.stringify(improved), { status: response.status, statusText: response.statusText, headers });
+    } catch {
+      return response;
+    }
+  }
+
+  window.fetch = async function runtimeStableFetch(input, init) {
+    const url = requestUrl(input);
+    const summaryRequest = Boolean(url && url.origin === location.origin && url.pathname === '/api/article-summary-groq');
+    const bodyPromise = summaryRequest ? requestBody(input, init) : Promise.resolve({});
+    const response = await nativeFetch(input, init);
+    if (!summaryRequest) return response;
+    return improveSummaryResponse(response, await bodyPromise);
+  };
 
   function readNewsCache() {
     try {
@@ -87,14 +213,7 @@
         if (!match || !entry?.summary) continue;
         const article = map.get(String(match[1]));
         if (!article) continue;
-        const summary = compactText(entry.summary);
-        const inputs = [article.summary, article.detail].map(compactText).filter(text => text.length >= 90);
-        const copied = inputs.some(text => {
-          const head = text.slice(0, 420);
-          return overlapRatio(summary.slice(0, 420), head) >= 0.78 ||
-            normalizedWords(summary.slice(0, 260)).join(' ').startsWith(normalizedWords(head).join(' ').slice(0, 90));
-        });
-        if (!copied) continue;
+        if (!looksLikeRawBeginning(entry.summary, article)) continue;
         delete cache[key];
         delete attempts[String(match[1])];
         changed = true;
@@ -167,7 +286,7 @@
     document.querySelectorAll('.article-card[data-article]').forEach(card => {
       if (String(card.dataset.article || '') !== String(id)) return;
       const img = card.querySelector('img.article-image, img');
-      if (!img || (!neutralImage(img) && String(img.currentSrc || img.src || '').includes('/api/article-thumbnail'))) return;
+      if (!img || !neutralImage(img)) return;
       promoteImage(img, true);
       img.classList.remove('source-tile-visual');
       img.classList.add('prepared-visual');
