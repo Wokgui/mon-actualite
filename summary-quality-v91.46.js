@@ -42,8 +42,7 @@
   function cacheEntryBad(entry = {}) {
     const text = clean(entry?.summary || '');
     if (truncated(text)) return true;
-    // The detail sheet must contain an actual generated summary, not a raw
-    // RSS/page excerpt that was merely marked as grounded upstream.
+    // A raw RSS/page extract is not a final summary for the detail sheet.
     if (entry?.ai !== true) return true;
     return false;
   }
@@ -83,34 +82,58 @@
     });
   }
 
-  function goodReliable(data = {}) {
+  function goodGenerated(data = {}) {
     const text = clean(data?.summary || data?.text || '');
     return Boolean(data && data?.ai === true && !data?.unavailable && !truncated(text));
   }
 
-  async function reliableSummary(body, originalResponse = null) {
+  async function callGenerated(path, body, source) {
     try {
-      const response = await baseFetch('/api/article-summary-reliable?v=91.46&intent=foreground', {
+      const response = await baseFetch(path, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         cache: 'no-store',
-        body: JSON.stringify({ ...body, mode: 'article' })
+        body: JSON.stringify(body)
       });
       const data = response.ok ? await response.json().catch(() => null) : null;
-      if (!goodReliable(data)) return null;
+      if (!goodGenerated(data)) return null;
       const text = clean(data.summary || data.text || '');
-      return cloneJsonResponse(originalResponse || response, {
+      return cloneJsonResponse(response, {
         ...data,
         summary: text,
         text,
         ai: true,
         grounded: true,
         unavailable: false,
-        reliableSummaryV9146: true
+        provider: clean(data.provider || data.origin || source),
+        reliableSummaryV9146: true,
+        reliableSourceV9146: source
       });
     } catch {
       return null;
     }
+  }
+
+  async function reliableSummary(body) {
+    const article = body?.article && typeof body.article === 'object' ? body.article : {};
+    const articleBody = { ...body, mode: 'article', article };
+
+    // 1. Fast Groq generation from the best material the extractor can obtain.
+    const smart = await callGenerated('/api/article-summary-smart?v=7&intent=foreground', {
+      ...articleBody,
+      lightweight: true,
+      intent: 'foreground'
+    }, 'groq-light');
+    if (smart) return smart;
+
+    // 2. Independent Gemini path. This is especially useful if Groq is
+    // rate-limited or its support check rejects the first attempt.
+    const gemini = await callGenerated('/api/article-summary?v=91.46&intent=foreground', articleBody, 'gemini');
+    if (gemini) return gemini;
+
+    // 3. Search/corroboration fallback. It may recover articles whose source
+    // page or feed only exposes a cut-off teaser.
+    return callGenerated('/api/article-summary-multisource?v=91.46&intent=foreground', articleBody, 'groq-multisource');
   }
 
   window.fetch = async function summaryQualityForegroundFetch(input, init) {
@@ -131,30 +154,22 @@
     const reliable = await reliableSummary(body);
     if (reliable) return reliable;
 
-    // Last resort: keep the existing request path, but never allow an obvious
-    // truncated/placeholder response to be treated as a valid summary.
-    const response = await baseFetch(input, init);
-    try {
-      const data = await response.clone().json();
-      const text = clean(data?.summary || data?.text || '');
-      if (data?.ai === true && !data?.unavailable && !truncated(text)) return response;
-      return cloneJsonResponse(response, {
-        ...data,
-        summary: '',
-        text: '',
-        ai: false,
-        grounded: false,
-        unavailable: true,
-        provider: data?.provider || 'summary-quality-rejected-v91.46',
-        qualityRejectedV9146: true
-      });
-    } catch {
-      return response;
-    }
+    // Do not turn a cut-off feed teaser into a fake "summary". If all three
+    // generated paths fail, the UI shows that the summary is unavailable.
+    return cloneJsonResponse(null, {
+      ok: false,
+      summary: '',
+      text: '',
+      ai: false,
+      grounded: false,
+      unavailable: true,
+      provider: 'summary-quality-unavailable-v91.46',
+      qualityRejectedV9146: true
+    });
   };
 
-  // Clean old v91.44/v91.45 entries immediately. This is important because
-  // article-quickview reads the cache before issuing any network request.
+  // Old v91.44/v91.45 entries can otherwise be displayed before any network
+  // request, so purge non-generated and visibly truncated entries immediately.
   evictBadCache();
 
   document.addEventListener('pointerdown', event => {
