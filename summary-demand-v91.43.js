@@ -107,22 +107,25 @@
     };
   }
 
-  function goodAi(data) {
+  function goodSummary(data) {
     const text = clean(data?.text || data?.summary || '');
-    if (!data || data.ai !== true || text.length < 55) return null;
+    const trustedFallback = data?.grounded === true
+      && (data?.fallbackQuality === 'trusted' || data?.diagnostics?.fallbackQuality === 'trusted');
+    if (!data || data?.unavailable || text.length < 55 || (data.ai !== true && !trustedFallback)) return null;
     return { ...data, text };
   }
 
   function cacheAi(article, data) {
-    const good = goodAi(data);
+    const good = goodSummary(data);
     if (!article?.id || !good) return false;
     const cache = readJson(SUMMARY_CACHE_KEY, {});
     cache[`article:${article.id}`] = {
       summary: good.text,
-      ai: true,
+      ai: Boolean(good.ai),
       grounded: Boolean(good.grounded),
+      fallbackQuality: good.ai === true ? 'trusted' : clean(good.fallbackQuality || good.diagnostics?.fallbackQuality || 'trusted'),
       provider: clean(good.origin || good.provider || 'groq-light'),
-      model: clean(good.model || 'openai/gpt-oss-20b'),
+      model: clean(good.model || (good.ai === true ? 'openai/gpt-oss-20b' : '')),
       unavailable: false,
       savedAt: Date.now(),
       progressiveV9144: true
@@ -140,11 +143,12 @@
     const cache = readJson(SUMMARY_CACHE_KEY, {});
     const item = cache[`article:${article.id}`];
     const text = clean(item?.summary || '');
-    if (item?.ai !== true || item?.unavailable || text.length < 55) return null;
+    if ((item?.ai !== true && item?.grounded !== true) || item?.unavailable || text.length < 55) return null;
     const data = {
       text,
-      ai: true,
+      ai: Boolean(item.ai),
       grounded: Boolean(item.grounded),
+      fallbackQuality: clean(item.fallbackQuality || 'trusted'),
       origin: clean(item.provider || 'cache'),
       model: clean(item.model || '')
     };
@@ -179,7 +183,7 @@
         });
         if (!response.ok) return null;
         const data = await response.json().catch(() => null);
-        const good = goodAi(data);
+        const good = goodSummary(data);
         if (!good) return null;
         readyByKey.set(key, good);
         return good;
@@ -219,10 +223,10 @@
       return jsonResponse({
         summary: ready.text,
         unavailable: false,
-        ai: true,
+        ai: Boolean(ready.ai),
         grounded: Boolean(ready.grounded),
         provider: ready.origin || ready.provider || 'progressive-cache',
-        model: ready.model || 'openai/gpt-oss-20b',
+        model: ready.model || (ready.ai === true ? 'openai/gpt-oss-20b' : ''),
         summaryDemandV9144: true
       });
     }
@@ -232,10 +236,10 @@
       return jsonResponse({
         summary: fast.text,
         unavailable: false,
-        ai: true,
+        ai: Boolean(fast.ai),
         grounded: Boolean(fast.grounded),
         provider: fast.origin || 'groq-light',
-        model: fast.model || 'openai/gpt-oss-20b',
+        model: fast.model || (fast.ai === true ? 'openai/gpt-oss-20b' : ''),
         summaryDemandV9144: true
       });
     }
@@ -243,7 +247,7 @@
     const response = await upstreamFetch(input, init);
     try {
       const data = await response.clone().json();
-      if (data?.ai === true && clean(data.summary || '').length >= 55) return response;
+      if (goodSummary(data)) return response;
       return jsonResponse({
         ...data,
         summary: '',
@@ -288,7 +292,7 @@
     if (!id) return false;
     const cache = readJson(SUMMARY_CACHE_KEY, {});
     const item = cache[`article:${id}`];
-    return Boolean(item?.ai === true && !item?.unavailable && clean(item?.summary || '').length >= 55);
+    return Boolean((item?.ai === true || item?.grounded === true) && !item?.unavailable && clean(item?.summary || '').length >= 55);
   }
 
   function sleep(ms) {

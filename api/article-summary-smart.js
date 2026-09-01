@@ -181,7 +181,7 @@ async function generateLightSummary({ key, model, title, factual }) {
   if (!response.ok) {
     return {
       ok: false,
-      error: response.status === 429 ? 'rate-limit' : 'groq-error',
+      error: response.status === 429 ? 'rate-limit' : response.status >= 500 ? 'groq-server-error' : 'groq-error',
       retryAfterMs: retryAfterMs(response, payload),
       detail: String(payload?.error?.message || `HTTP ${response.status}`).replace(/gsk_[A-Za-z0-9_-]+/g, '[clé masquée]').slice(0, 240)
     };
@@ -208,45 +208,79 @@ async function handler(req, res) {
   const title = clean(article.title || '');
   if (!title) return send(res, 200, { ok: false, text: '', ai: false, origin: 'unavailable', error: 'title-missing' });
 
-  const key = groqKey();
-  if (!key) return send(res, 200, { ok: false, text: '', ai: false, origin: 'unavailable', error: 'groq-key-missing' });
-
   let factual = '';
+  let base = {};
   try {
     const legacy = await captureLegacy(req);
-    const base = JSON.parse(legacy.body || '{}');
+    base = JSON.parse(legacy.body || '{}');
     factual = sanitizeFactual(base?.summary || '');
   } catch {}
   if (factual.length < 80) factual = sanitizeFactual([article.summary, article.detail].filter(Boolean).join(' '));
   if (factual.length < 60) {
-    return send(res, 200, { ok: false, text: '', ai: false, origin: 'unavailable', error: 'not-enough-source' });
+    return send(res, 200, {
+      ok: false,
+      text: '',
+      ai: false,
+      grounded: false,
+      origin: 'unavailable',
+      error: 'not-enough-source',
+      diagnostics: { ...(base?.diagnostics || {}), fallbackQuality: 'unavailable', summaryStage: 'source-material' }
+    });
   }
+
+  const factualFallback = (error = '', extra = {}) => ({
+    ok: true,
+    text: trimFactual(factual, 1200),
+    ai: false,
+    grounded: true,
+    unavailable: false,
+    origin: 'factual-fallback',
+    provider: 'factual',
+    fallbackQuality: base?.diagnostics?.fallbackQuality || 'trusted',
+    error,
+    model: '',
+    sourceChars: clean(factual).length,
+    ...extra,
+    diagnostics: {
+      ...(base?.diagnostics || {}),
+      fallbackQuality: base?.diagnostics?.fallbackQuality || 'trusted',
+      summaryStage: 'factual-fallback',
+      groqError: error,
+      ...(extra.diagnostics || {})
+    }
+  });
+
+  const key = groqKey();
+  if (!key) return send(res, 200, factualFallback('groq-key-missing'));
 
   const model = groqModel();
   let result;
-  try {
-    result = await generateLightSummary({ key, model, title, factual });
-  } catch (error) {
-    return send(res, 200, {
-      ok: false,
-      text: '',
-      ai: false,
-      origin: 'unavailable',
-      error: 'timeout-or-network',
-      detail: String(error?.message || error).slice(0, 180)
-    });
+  const attempts = [];
+  for (let attempt = 0; attempt < 2; attempt++) {
+    const startedAt = Date.now();
+    try {
+      result = await generateLightSummary({ key, model, title, factual });
+      attempts.push({ attempt: attempt + 1, ok: Boolean(result.ok), error: result.error || '', retryAfterMs: Number(result.retryAfterMs || 0), elapsedMs: Date.now() - startedAt });
+    } catch (error) {
+      attempts.push({ attempt: attempt + 1, ok: false, error: /timeout|abort/i.test(`${error?.name || ''} ${error?.message || ''}`) ? 'timeout' : 'network-error', elapsedMs: Date.now() - startedAt });
+      result = { ok: false, error: attempts.at(-1).error, detail: String(error?.message || error).slice(0, 180), retryAfterMs: 0 };
+    }
+    const shortRetry = attempt === 0
+      && ['rate-limit', 'groq-server-error'].includes(result?.error)
+      && Number(result?.retryAfterMs || 0) <= 900;
+    if (!shortRetry) break;
+    await new Promise(resolve => setTimeout(resolve, Math.max(180, Number(result.retryAfterMs || 260))));
   }
 
-  if (!result.ok) return send(res, 200, { ...result, text: '', ai: false, origin: 'unavailable', model });
+  if (!result?.ok) return send(res, 200, factualFallback(result?.error || 'groq-error', {
+    retryAfterMs: Number(result?.retryAfterMs || 0),
+    detail: result?.detail || '',
+    diagnostics: { groqAttempts: attempts }
+  }));
   if (titleRestatement(result.text, title) || !supportedSummary(result.text, factual, title)) {
-    return send(res, 200, {
-      ok: false,
-      text: '',
-      ai: false,
-      origin: 'unavailable',
-      model,
-      error: titleRestatement(result.text, title) ? 'title-restatement' : 'support-check'
-    });
+    return send(res, 200, factualFallback(titleRestatement(result.text, title) ? 'title-restatement' : 'support-check', {
+      diagnostics: { groqAttempts: attempts }
+    }));
   }
 
   return send(res, 200, {
@@ -257,6 +291,13 @@ async function handler(req, res) {
     origin: 'groq-light',
     model,
     sourceChars: Math.min(clean(factual).length, MAX_FACTUAL_CHARS),
+    fallbackQuality: 'trusted',
+    diagnostics: {
+      ...(base?.diagnostics || {}),
+      fallbackQuality: 'trusted',
+      summaryStage: 'groq-light',
+      groqAttempts: attempts
+    },
     progressiveV9144: true
   });
 }

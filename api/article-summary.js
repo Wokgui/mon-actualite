@@ -2,6 +2,8 @@ const dns = require('node:dns').promises;
 const net = require('node:net');
 
 const TIMEOUT_MS = 9000;
+const SEARCH_TIMEOUT_MS = 5500;
+const SEARCH_BUDGET_MS = 6500;
 const GEMINI_TIMEOUT_MS = 18000;
 const MAX_HTML_BYTES = 2_000_000;
 const UA = 'Mozilla/5.0 (Linux; Android 16) AppleWebKit/537.36 Chrome/140 Safari/537.36';
@@ -15,8 +17,17 @@ const GEMINI_MODELS = [...new Set([
 function send(res, status, payload) {
   res.statusCode = status;
   res.setHeader('Content-Type', 'application/json; charset=utf-8');
-  res.setHeader('Cache-Control', status === 200 ? 'private, max-age=0, s-maxage=21600' : 'no-store');
+  const transientFailure = Boolean(payload?.unavailable)
+    || /indisponible/i.test(String(payload?.summary || ''))
+    || ['timeout', 'fetch-error', 'anti-bot-or-rate-limit'].includes(payload?.diagnostics?.failureType);
+  res.setHeader('Cache-Control', status === 200 && !transientFailure
+    ? 'private, max-age=0, s-maxage=900'
+    : 'no-store');
   res.end(JSON.stringify(payload));
+}
+
+function wait(ms) {
+  return new Promise(resolve => setTimeout(resolve, ms));
 }
 
 function isPrivateIp(address) {
@@ -136,10 +147,33 @@ function decodeBuffer(buffer, contentType = '') {
 }
 
 async function fetchHtml(rawUrl) {
+  const startedAt = Date.now();
   let current = rawUrl;
+  let retryCount = 0;
   for (let i = 0; i < 6; i++) {
     const url = await assertPublicUrl(current);
-    const response = await fetch(url, { redirect: 'manual', signal: AbortSignal.timeout(TIMEOUT_MS), headers: { 'User-Agent': UA, 'Accept': 'text/html,application/xhtml+xml' } });
+    let response;
+    let lastError;
+    for (let attempt = 0; attempt < 2; attempt++) {
+      try {
+        response = await fetch(url, { redirect: 'manual', signal: AbortSignal.timeout(TIMEOUT_MS), headers: { 'User-Agent': UA, 'Accept': 'text/html,application/xhtml+xml', 'Accept-Language': 'fr-FR,fr;q=0.9,en;q=0.5' } });
+        if (attempt === 0 && (response.status === 429 || response.status >= 500)) {
+          retryCount += 1;
+          const retryAfter = Number(response.headers.get('retry-after') || 0) * 1000;
+          await wait(Math.min(900, Math.max(180, retryAfter || 260)));
+          continue;
+        }
+        break;
+      } catch (error) {
+        lastError = error;
+        if (attempt === 0) {
+          retryCount += 1;
+          await wait(220);
+          continue;
+        }
+      }
+    }
+    if (!response) throw lastError || new Error('fetch unavailable');
     if (response.status >= 300 && response.status < 400 && response.headers.get('location')) {
       current = new URL(response.headers.get('location'), url).href;
       continue;
@@ -149,7 +183,15 @@ async function fetchHtml(rawUrl) {
     if (!type.includes('text/html') && !type.includes('application/xhtml+xml')) throw new Error('not html');
     const buffer = Buffer.from(await response.arrayBuffer());
     if (buffer.byteLength > MAX_HTML_BYTES) throw new Error('page too large');
-    return { html: decodeBuffer(buffer, type), finalUrl: url.href };
+    return {
+      html: decodeBuffer(buffer, type),
+      finalUrl: url.href,
+      httpStatus: response.status,
+      contentType: type,
+      htmlBytes: buffer.byteLength,
+      fetchMs: Date.now() - startedAt,
+      retryCount
+    };
   }
   throw new Error('too many redirects');
 }
@@ -157,6 +199,8 @@ async function fetchHtml(rawUrl) {
 function decodeHtml(value = '') {
   return repairMojibake(value
     .replace(/&nbsp;/gi, ' ')
+    .replace(/&hellip;/gi, '…').replace(/&ndash;/gi, '–').replace(/&mdash;/gi, '—')
+    .replace(/&rsquo;/gi, '’').replace(/&lsquo;/gi, '‘').replace(/&ldquo;/gi, '“').replace(/&rdquo;/gi, '”')
     .replace(/&amp;/gi, '&').replace(/&quot;/gi, '"').replace(/&#39;|&apos;/gi, "'")
     .replace(/&lt;/gi, '<').replace(/&gt;/gi, '>')
     .replace(/&#(\d+);/g, (_, n) => String.fromCodePoint(Number(n)))
@@ -175,16 +219,20 @@ function chooseArticleRegion(html) {
   return html;
 }
 
-function extractArticleText(html) {
-  const region = chooseArticleRegion(html)
+function cleanArticleRegion(region = '') {
+  return region
     .replace(/<script\b[\s\S]*?<\/script>/gi, ' ')
     .replace(/<style\b[\s\S]*?<\/style>/gi, ' ')
     .replace(/<noscript\b[\s\S]*?<\/noscript>/gi, ' ')
     .replace(/<(nav|header|footer|aside|form|svg)\b[\s\S]*?<\/\1>/gi, ' ')
     .replace(/<[^>]+(?:class|id)=["'][^"']*(?:related|recommend|newsletter|advert|promo|sidebar|share|social)[^"']*["'][^>]*>[\s\S]*?<\/[^>]+>/gi, ' ');
+}
+
+function extractParagraphText(region = '') {
+  const cleaned = cleanArticleRegion(region);
   const paragraphs = [];
   const seen = new Set();
-  for (const match of region.matchAll(/<p\b[^>]*>([\s\S]*?)<\/p>/gi)) {
+  for (const match of cleaned.matchAll(/<p\b[^>]*>([\s\S]*?)<\/p>/gi)) {
     const text = cleanText(match[1]);
     if (text.length < 55) continue;
     if (/cookies?|abonnez|inscrivez|newsletter|publicit|©|tous droits|javascript|lire aussi|à lire aussi|articles? similaires?/i.test(text)) continue;
@@ -195,6 +243,78 @@ function extractArticleText(html) {
     if (paragraphs.join(' ').length > 14000) break;
   }
   return paragraphs.join('\n').slice(0, 14000);
+}
+
+function jsonLdNodes(value) {
+  const output = [];
+  const visit = node => {
+    if (!node || typeof node !== 'object') return;
+    output.push(node);
+    if (Array.isArray(node)) node.forEach(visit);
+    else Object.values(node).forEach(child => {
+      if (child && typeof child === 'object') visit(child);
+    });
+  };
+  visit(value);
+  return output;
+}
+
+function extractJsonLd(html = '') {
+  let bestBody = '';
+  let bestDescription = '';
+  for (const match of html.matchAll(/<script\b[^>]*type=["']application\/ld\+json[^"']*["'][^>]*>([\s\S]*?)<\/script>/gi)) {
+    const raw = String(match[1] || '').trim();
+    if (!raw) continue;
+    let parsed;
+    try { parsed = JSON.parse(raw); }
+    catch {
+      try { parsed = JSON.parse(decodeHtml(raw)); } catch { continue; }
+    }
+    for (const node of jsonLdNodes(parsed)) {
+      const body = cleanText(String(node.articleBody || node.text || ''));
+      if (body.length > bestBody.length) bestBody = body;
+      const description = cleanText(String(node.description || ''));
+      if (description.length > bestDescription.length) bestDescription = description;
+    }
+  }
+  return { body: bestBody.slice(0, 14000), description: bestDescription.slice(0, 1800) };
+}
+
+function metaContent(html = '', key = '') {
+  const escaped = key.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  const patterns = [
+    new RegExp(`<meta\\b[^>]*(?:name|property)=["']${escaped}["'][^>]*content=["']([^"']+)["'][^>]*>`, 'i'),
+    new RegExp(`<meta\\b[^>]*content=["']([^"']+)["'][^>]*(?:name|property)=["']${escaped}["'][^>]*>`, 'i')
+  ];
+  for (const pattern of patterns) {
+    const value = cleanText((html.match(pattern) || [])[1] || '');
+    if (value) return value;
+  }
+  return '';
+}
+
+function extractArticleContent(html = '') {
+  const structured = extractJsonLd(html);
+  if (structured.body.length >= 180) return { text: structured.body, method: 'json-ld-articleBody', fullText: true };
+
+  const preferred = extractParagraphText(chooseArticleRegion(html));
+  if (preferred.length >= 180) return { text: preferred, method: 'article-paragraphs', fullText: true };
+
+  const broad = extractParagraphText(html);
+  if (broad.length >= 220) return { text: broad, method: 'document-paragraphs', fullText: true };
+
+  const description = [
+    structured.description,
+    metaContent(html, 'og:description'),
+    metaContent(html, 'twitter:description'),
+    metaContent(html, 'description')
+  ].map(cleanText).sort((a, b) => b.length - a.length)[0] || '';
+  if (description.length >= 60) return { text: description, method: 'page-metadata', fullText: false };
+  return { text: '', method: 'none', fullText: false };
+}
+
+function extractArticleText(html) {
+  return extractArticleContent(html).text;
 }
 
 function sentences(text = '') {
@@ -236,17 +356,243 @@ function summarySupported(summary, source) {
   return supported / generated.length >= 0.28;
 }
 
+function normalizedWords(value = '') {
+  const stop = new Set(['avec','dans','pour','plus','apres','avant','cette','sont','etre','leur','leurs','tout','mais','sans','vers','entre','une','des','les','sur','qui','que','aux','par','son','ses','est','fait','article','direct']);
+  return [...new Set(repairMojibake(String(value || '')).normalize('NFD').replace(/[\u0300-\u036f]/g, '')
+    .toLowerCase().replace(/[^a-z0-9]+/g, ' ').split(/\s+/).filter(word => word.length >= 3 && !stop.has(word)))];
+}
+
+function titleAgreement(candidate = '', expected = '') {
+  const wanted = normalizedWords(expected);
+  const found = new Set(normalizedWords(candidate));
+  if (!wanted.length || !found.size) return 0;
+  return wanted.filter(word => found.has(word)).length / Math.max(1, Math.min(wanted.length, found.size));
+}
+
+function xmlValue(block = '', name = '') {
+  const escaped = name.replace(':', '\\:');
+  const match = block.match(new RegExp(`<${escaped}(?:\\s[^>]*)?>([\\s\\S]*?)<\\/${escaped}>`, 'i'));
+  return match ? cleanText(match[1].replace(/<!\[CDATA\[([\s\S]*?)\]\]>/g, '$1')) : '';
+}
+
+function googleNewsUrl(rawUrl = '') {
+  try {
+    const host = new URL(rawUrl).hostname.toLowerCase();
+    return host === 'news.google.com' || host.endsWith('.news.google.com');
+  } catch { return false; }
+}
+
+function trustedFeedFallback(article = {}, fallback = '') {
+  const text = cleanText(fallback);
+  if (text.length < 55 || googleNewsUrl(article?.url || '')) return '';
+  return text;
+}
+
+function searchQueries(title = '') {
+  const stripped = cleanText(title).replace(/\s+[-–—|]\s+[^-–—|]{2,70}$/, '').slice(0, 220);
+  const words = stripped.split(/\s+/).filter(Boolean);
+  const tokens = normalizedWords(stripped).filter(word => word.length >= 4);
+  return [...new Set([
+    `"${stripped}"`,
+    words.length > 10 ? words.slice(0, 9).join(' ') : stripped,
+    tokens.slice(0, 8).join(' '),
+    tokens.slice(0, 6).join(' ')
+  ].filter(value => value && normalizedWords(value).length >= 3))];
+}
+
+function cleanSearchSnippet(value = '', title = '') {
+  let text = cleanText(value)
+    .replace(/^.{0,40}\b(?:lire la suite|read full story)\b\s*[:–—-]?\s*/i, '')
+    .replace(/\s+(?:lire la suite|read full story)\s*$/i, '')
+    .trim();
+  const normalizedTitle = cleanText(title).replace(/\s+[-–—|]\s+[^-–—|]{2,70}$/, '').trim();
+  if (normalizedTitle && text.toLowerCase().startsWith(normalizedTitle.toLowerCase())) {
+    text = text.slice(normalizedTitle.length).replace(/^[\s:–—-]+/, '').trim();
+  }
+  const relatedCut = text.search(/\s*(?:\.{3}|…|&hellip;|·)\s*/i);
+  if (relatedCut >= 70) {
+    const prefix = text.slice(0, relatedCut).trim();
+    const complete = prefix.match(/^[\s\S]*[.!?](?=\s|$)/)?.[0]?.trim() || '';
+    if (complete.length >= 55) text = complete;
+    else return '';
+  }
+  const selected = [];
+  for (const sentence of sentences(text)) {
+    if (selected.length && titleAgreement(sentence, title) >= 0.72) break;
+    selected.push(sentence);
+    if (selected.length >= 2 || selected.join(' ').length >= 520) break;
+  }
+  if (selected.join(' ').length >= 55) text = selected.join(' ');
+  return text.slice(0, 1800);
+}
+
+function googleAggregateHeadlines(value = '') {
+  const parts = decodeHtml(String(value || '')).split(/\s{2,}/).map(cleanText).filter(Boolean);
+  if (parts.length < 4) return [];
+  return parts.filter((_, index) => index % 2 === 0).slice(0, 5);
+}
+
+async function fetchSearchFallback(article = {}) {
+  const title = cleanText(article.title || '');
+  if (normalizedWords(title).length < 3) return { text: '', evidenceCount: 0, source: '', error: 'search-title-too-short' };
+  const expectedSource = cleanText(article.source || '').toLowerCase();
+  const candidates = [];
+  let lastError = '';
+  const searchStartedAt = Date.now();
+  const subjects = [title, ...(googleNewsUrl(article.url || '') ? googleAggregateHeadlines(article.summary || article.detail || '').slice(1, 4) : [])];
+  const searches = subjects.flatMap(subject => searchQueries(subject).map(query => ({ query, subject }))).slice(0, 10);
+  for (const { query, subject } of searches) {
+    const remainingMs = SEARCH_BUDGET_MS - (Date.now() - searchStartedAt);
+    if (remainingMs < 300) {
+      lastError = lastError || 'search-budget-exhausted';
+      break;
+    }
+    try {
+      const url = new URL('https://www.bing.com/news/search');
+      url.search = new URLSearchParams({ q: query, format: 'RSS', qft: 'sortbydate="1"' }).toString();
+      const response = await fetch(url, {
+        redirect: 'follow',
+        signal: AbortSignal.timeout(Math.min(SEARCH_TIMEOUT_MS, remainingMs)),
+        headers: { 'User-Agent': UA, 'Accept': 'application/rss+xml,application/xml,text/xml,*/*;q=0.5', 'Accept-Language': 'fr-FR,fr;q=0.9' }
+      });
+      if (!response.ok) { lastError = `search HTTP ${response.status}`; continue; }
+      const xml = await response.text();
+      for (const item of (xml.match(/<item\b[\s\S]*?<\/item>/gi) || []).slice(0, 30)) {
+        const itemTitle = xmlValue(item, 'title');
+        const agreement = titleAgreement(itemTitle, subject);
+        if (agreement < 0.56) continue;
+        const snippet = cleanSearchSnippet(xmlValue(item, 'News:Description') || xmlValue(item, 'description'), itemTitle);
+        if (snippet.length < 55
+          || /^(?:découvrez|voici|comment|tout savoir|ce qu[’']il faut savoir)\b/i.test(snippet)
+          || /\b(?:fait le point pour vous|cet article explore|pourraient? influencer votre santé)\b/i.test(snippet)
+          || titleAgreement(snippet, title) > 0.96 && snippet.length < 120) continue;
+        const source = xmlValue(item, 'News:Source') || xmlValue(item, 'source');
+        const sourceBonus = expectedSource && source.toLowerCase().includes(expectedSource) ? 0.18 : 0;
+        candidates.push({ text: snippet, source, score: agreement + sourceBonus, subject });
+      }
+      if (candidates.length) break;
+    } catch (error) {
+      lastError = String(error?.message || error).slice(0, 160);
+    }
+  }
+  candidates.sort((a, b) => b.score - a.score || b.text.length - a.text.length);
+  const best = candidates[0];
+  return best
+    ? { text: best.text, evidenceCount: candidates.length, source: best.source, queryTitle: best.subject, error: '' }
+    : { text: '', evidenceCount: 0, source: '', error: lastError || 'search-no-match' };
+}
+
 async function getArticleMaterial(article) {
+  const startedAt = Date.now();
   const rawUrl = String(article?.url || '').slice(0, 2000);
-  const fallback = repairMojibake(String(article?.summary || ''));
+  const rawFallback = repairMojibake(String(article?.summary || article?.detail || ''));
+  const feedFallback = trustedFeedFallback(article, rawFallback);
   const title = repairMojibake(String(article?.title || ''));
-  if (!rawUrl) return { title, text: '', fallback, finalUrl: '' };
+  const searchOrFeed = async () => {
+    if (feedFallback) return {
+      fallback: feedFallback,
+      materialSource: 'rss',
+      fallbackType: 'rss',
+      fallbackQuality: 'trusted',
+      search: { text: '', evidenceCount: 0, source: '', error: '' }
+    };
+    const search = await fetchSearchFallback(article).catch(error => ({ text: '', evidenceCount: 0, source: '', error: String(error?.message || error).slice(0, 160) }));
+    if (search.text) return { fallback: search.text, materialSource: 'search-snippet', fallbackType: 'search-snippet', fallbackQuality: 'trusted', search };
+    return { fallback: '', materialSource: 'none', fallbackType: googleNewsUrl(rawUrl) && rawFallback ? 'google-news-aggregate-rejected' : 'none', fallbackQuality: 'unavailable', search };
+  };
+  if (!rawUrl) {
+    const recovered = await searchOrFeed();
+    return {
+      title,
+      text: '',
+      fallback: recovered.fallback,
+      finalUrl: '',
+      diagnostics: {
+        materialSource: recovered.materialSource,
+        contentChars: 0,
+        sourceChars: recovered.fallback.length,
+        fallbackChars: recovered.fallback.length,
+        rawFallbackChars: rawFallback.length,
+        fallbackType: recovered.fallbackType,
+        fallbackQuality: recovered.fallbackQuality,
+        searchEvidenceCount: recovered.search.evidenceCount,
+        searchSource: recovered.search.source,
+        searchError: recovered.search.error,
+        failureType: 'url-missing',
+        elapsedMs: Date.now() - startedAt
+      }
+    };
+  }
   try {
     const decoded = googleNewsArticleId(rawUrl) ? await decodeGoogleNewsUrl(rawUrl) : rawUrl;
-    const { html, finalUrl } = await fetchHtml(decoded);
-    return { title, text: extractArticleText(html), fallback, finalUrl };
-  } catch {
-    return { title, text: '', fallback, finalUrl: rawUrl };
+    const page = await fetchHtml(decoded);
+    const extracted = extractArticleContent(page.html);
+    const recovered = extracted.text ? null : await searchOrFeed();
+    const text = extracted.text;
+    const fallback = recovered?.fallback || feedFallback;
+    const materialSource = text
+      ? (extracted.fullText ? 'full-text' : 'page-snippet')
+      : recovered.materialSource;
+    return {
+      title,
+      text,
+      fallback,
+      finalUrl: page.finalUrl,
+      diagnostics: {
+        materialSource,
+        contentChars: text.length,
+        sourceChars: (text || fallback).length,
+        fallbackChars: fallback.length,
+        rawFallbackChars: rawFallback.length,
+        extractionMethod: extracted.method,
+        fallbackType: text ? (extracted.fullText ? 'none' : 'page-metadata') : recovered.fallbackType,
+        fallbackQuality: text || fallback ? 'trusted' : 'unavailable',
+        googleNewsDecoded: decoded !== rawUrl,
+        httpStatus: page.httpStatus,
+        contentType: page.contentType,
+        htmlBytes: page.htmlBytes,
+        retryCount: page.retryCount,
+        searchEvidenceCount: recovered?.search?.evidenceCount || 0,
+        searchSource: recovered?.search?.source || '',
+        searchError: recovered?.search?.error || '',
+        failureType: text ? '' : 'extraction-empty',
+        fetchMs: page.fetchMs,
+        elapsedMs: Date.now() - startedAt
+      }
+    };
+  } catch (error) {
+    const message = String(error?.message || error).slice(0, 180);
+    const failureType = /timeout|abort/i.test(`${error?.name || ''} ${message}`) ? 'timeout'
+      : /HTTP\s+401|HTTP\s+403|HTTP\s+429/i.test(message) ? 'anti-bot-or-rate-limit'
+        : /Google (?:params|decode)/i.test(message) ? 'google-news-decode'
+          : /not html/i.test(message) ? 'non-html'
+            : /too large/i.test(message) ? 'page-too-large'
+              : /private address|local host|unsupported protocol/i.test(message) ? 'blocked-url'
+                : 'fetch-error';
+    const recovered = await searchOrFeed();
+    return {
+      title,
+      text: '',
+      fallback: recovered.fallback,
+      finalUrl: rawUrl,
+      diagnostics: {
+        materialSource: recovered.materialSource,
+        contentChars: 0,
+        sourceChars: recovered.fallback.length,
+        fallbackChars: recovered.fallback.length,
+        rawFallbackChars: rawFallback.length,
+        extractionMethod: 'none',
+        fallbackType: recovered.fallbackType,
+        fallbackQuality: recovered.fallbackQuality,
+        googleNewsDecoded: false,
+        searchEvidenceCount: recovered.search.evidenceCount,
+        searchSource: recovered.search.source,
+        searchError: recovered.search.error,
+        failureType,
+        error: message,
+        elapsedMs: Date.now() - startedAt
+      }
+    };
   }
 }
 
@@ -340,11 +686,28 @@ module.exports = async function handler(req, res) {
   let generated = aiResult.text;
   if (generated && !summarySupported(generated, `${material.title}\n${source}`)) generated = '';
   const summary = paragraphize(generated || sentenceFallback(material.text, material.fallback), 2);
+  const unavailable = !summary || /résumé indisponible/i.test(summary);
   return send(res, 200, {
     summary,
     ai: Boolean(generated),
+    grounded: !unavailable && source.length >= 55,
+    unavailable,
     provider: generated ? 'gemini' : 'extractif',
     model: generated ? aiResult.model : '',
-    articleUrl: material.finalUrl || String(article?.url || '')
+    articleUrl: material.finalUrl || String(article?.url || ''),
+    diagnostics: {
+      ...(material.diagnostics || {}),
+      fallbackUsed: material.diagnostics?.materialSource !== 'full-text',
+      fallbackQuality: unavailable ? 'unavailable' : (material.diagnostics?.fallbackQuality || 'trusted'),
+      generatedByAi: Boolean(generated),
+      summaryChars: summary.length
+    }
   });
 };
+
+module.exports.getArticleMaterial = getArticleMaterial;
+module.exports.extractArticleText = extractArticleText;
+module.exports.extractArticleContent = extractArticleContent;
+module.exports.sentenceFallback = sentenceFallback;
+module.exports.trustedFeedFallback = trustedFeedFallback;
+module.exports.cleanSearchSnippet = cleanSearchSnippet;

@@ -49,6 +49,7 @@ jobs:
           node tests/v9137-category-context.mjs
           node tests/v9137-significance-context.mjs
           node tests/v9137-brief-war-context.mjs
+          node tests/v9145-summary-resilience.mjs
 
   mobile-browser:
     needs: static-regression

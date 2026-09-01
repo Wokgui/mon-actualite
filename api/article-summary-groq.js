@@ -345,7 +345,11 @@ function googleAggregateRisk(article = {}, payload = {}, corroboratingHeadlines 
   let host = '';
   try { host = new URL(String(article.url || '')).hostname.toLowerCase(); } catch {}
   const google = source === 'google news' || host === 'news.google.com' || host.endsWith('.news.google.com');
-  return google && String(payload.provider || '').toLowerCase() === 'factual' && corroboratingHeadlines.length > 0;
+  const materialSource = String(payload?.diagnostics?.materialSource || '');
+  const unsafeMaterial = materialSource === 'rss'
+    || String(payload?.diagnostics?.fallbackType || '').includes('google-news-aggregate')
+    || (!materialSource && corroboratingHeadlines.length > 0);
+  return google && String(payload.provider || '').toLowerCase() === 'factual' && unsafeMaterial;
 }
 
 function finalizeArticleSummary(body = {}, payload = {}, corroboratingHeadlines = []) {
@@ -393,6 +397,7 @@ function promptFor(body, factual, corroborated = false) {
 }
 
 async function generateWithGroq(model, key, prompt, minLength = 60) {
+  const startedAt = Date.now();
   const isGptOss = model.startsWith('openai/gpt-oss-');
   const body = {
     model,
@@ -406,31 +411,72 @@ async function generateWithGroq(model, key, prompt, minLength = 60) {
     body.include_reasoning = false;
     body.reasoning_effort = 'low';
   }
-  const response = await fetch(GROQ_ENDPOINT, {
-    method: 'POST',
-    signal: AbortSignal.timeout(GROQ_TIMEOUT_MS),
-    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
-    body: JSON.stringify(body)
-  });
+  let response;
+  try {
+    response = await fetch(GROQ_ENDPOINT, {
+      method: 'POST',
+      signal: AbortSignal.timeout(GROQ_TIMEOUT_MS),
+      headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
+      body: JSON.stringify(body)
+    });
+  } catch (cause) {
+    const error = new Error(`${model}: ${/timeout|abort/i.test(`${cause?.name || ''} ${cause?.message || ''}`) ? 'timeout' : 'network-error'}`);
+    error.code = /timeout|abort/i.test(`${cause?.name || ''} ${cause?.message || ''}`) ? 'timeout' : 'network-error';
+    error.retryable = true;
+    error.elapsedMs = Date.now() - startedAt;
+    throw error;
+  }
   const payload = await response.json().catch(() => ({}));
-  if (!response.ok) throw new Error(`${model}: ${payload?.error?.message || `HTTP ${response.status}`}`);
+  if (!response.ok) {
+    const error = new Error(`${model}: ${payload?.error?.message || `HTTP ${response.status}`}`);
+    error.code = response.status === 429 ? 'rate-limit' : response.status >= 500 ? 'groq-server-error' : 'groq-error';
+    error.retryable = response.status === 429 || response.status >= 500;
+    const header = Number(response.headers.get('retry-after') || 0);
+    const match = String(payload?.error?.message || '').match(/try again in\s+([0-9.]+)s/i);
+    error.retryAfterMs = header > 0 ? Math.ceil(header * 1000) : match ? Math.ceil(Number(match[1]) * 1000) : 0;
+    error.elapsedMs = Date.now() - startedAt;
+    throw error;
+  }
   const text = decodeEntities(payload?.choices?.[0]?.message?.content || '');
-  if (text.length < minLength) throw new Error(`${model}: réponse trop courte`);
+  if (text.length < minLength) {
+    const error = new Error(`${model}: réponse trop courte`);
+    error.code = 'response-too-short';
+    error.elapsedMs = Date.now() - startedAt;
+    throw error;
+  }
   return text;
 }
 
 async function generateWithFallback(key, prompt, factual = '', minLength = 60) {
   let lastError = '';
+  const attempts = [];
   for (const model of GROQ_MODELS) {
-    try {
-      const text = await generateWithGroq(model, key, prompt, minLength);
-      if (factual && !summarySupported(text, factual)) throw new Error(`${model}: résumé insuffisamment étayé par la source`);
-      return { text, model };
-    } catch (error) {
-      lastError = String(error?.message || error).slice(0, 360);
+    for (let attempt = 0; attempt < 2; attempt++) {
+      const startedAt = Date.now();
+      try {
+        const text = await generateWithGroq(model, key, prompt, minLength);
+        if (factual && !summarySupported(text, factual)) {
+          const error = new Error(`${model}: résumé insuffisamment étayé par la source`);
+          error.code = 'support-check';
+          throw error;
+        }
+        attempts.push({ model, attempt: attempt + 1, ok: true, elapsedMs: Date.now() - startedAt });
+        return { text, model, attempts };
+      } catch (error) {
+        lastError = String(error?.message || error).slice(0, 360);
+        attempts.push({ model, attempt: attempt + 1, ok: false, error: String(error?.code || 'groq-error'), retryAfterMs: Number(error?.retryAfterMs || 0), elapsedMs: Number(error?.elapsedMs || Date.now() - startedAt) });
+        const shortRetry = attempt === 0 && error?.retryable && Number(error?.retryAfterMs || 0) <= 900 && error?.code !== 'timeout';
+        if (shortRetry) {
+          await new Promise(resolve => setTimeout(resolve, Math.max(180, Number(error?.retryAfterMs || 260))));
+          continue;
+        }
+        break;
+      }
     }
   }
-  throw new Error(lastError || 'Aucun modèle Groq disponible');
+  const error = new Error(lastError || 'Aucun modèle Groq disponible');
+  error.attempts = attempts;
+  throw error;
 }
 
 async function probeGroq(key) {
@@ -474,9 +520,10 @@ async function handler(req, res) {
   if (mode === 'article' && factual.length < 80) {
     factual = sanitizeFactual([body?.article?.summary, body?.article?.title].filter(Boolean).join('\n'));
   }
+  const primaryFactual = factual;
 
   let corroboratingHeadlines = [];
-  if (mode === 'article' && factual.length < 300 && body?.article?.title) {
+  if (key && mode === 'article' && factual.length < 300 && body?.article?.title) {
     corroboratingHeadlines = await fetchGoogleNewsHeadlines(body.article.title, body.article.source).catch(() => []);
     if (corroboratingHeadlines.length) {
       const headlineFacts = corroboratingHeadlines.map(headline => /[.!?]$/.test(headline) ? headline : `${headline}.`).join('\n');
@@ -493,11 +540,17 @@ async function handler(req, res) {
       provider: 'unavailable',
       model: '',
       corroborated: false,
+      apiError: 'not-enough-source',
+      diagnostics: {
+        ...(base?.diagnostics || {}),
+        fallbackQuality: 'unavailable',
+        summaryStage: 'source-material'
+      },
       qualityV9112: mode === 'article' ? 'unavailable' : undefined
     });
   }
 
-  const safeFallback = paragraphize(factual, 2);
+  const safeFallback = paragraphize(primaryFactual, 2);
   if (!key) {
     const payload = {
       ...base,
@@ -506,7 +559,17 @@ async function handler(req, res) {
       unavailable: false,
       provider: 'factual',
       model: '',
-      corroborated: corroboratingHeadlines.length > 0
+      grounded: true,
+      fallbackQuality: base?.diagnostics?.fallbackQuality || 'trusted',
+      apiError: 'groq-key-missing',
+      corroborated: corroboratingHeadlines.length > 0,
+      diagnostics: {
+        ...(base?.diagnostics || {}),
+        fallbackQuality: base?.diagnostics?.fallbackQuality || 'trusted',
+        summaryStage: 'factual-fallback',
+        groqError: 'key-missing',
+        groqAttempts: []
+      }
     };
     return send(res, 200, finalizeArticleSummary(body, payload, corroboratingHeadlines));
   }
@@ -528,7 +591,15 @@ async function handler(req, res) {
       unavailable: false,
       provider: 'groq',
       model: aiResult.model,
-      corroborated: corroboratingHeadlines.length > 0
+      grounded: true,
+      fallbackQuality: 'trusted',
+      corroborated: corroboratingHeadlines.length > 0,
+      diagnostics: {
+        ...(base?.diagnostics || {}),
+        fallbackQuality: 'trusted',
+        summaryStage: 'groq',
+        groqAttempts: aiResult.attempts || []
+      }
     };
     return send(res, 200, finalizeArticleSummary(body, payload, corroboratingHeadlines));
   } catch (error) {
@@ -541,7 +612,17 @@ async function handler(req, res) {
       unavailable: false,
       provider: 'factual',
       model: '',
-      corroborated: corroboratingHeadlines.length > 0
+      grounded: true,
+      fallbackQuality: base?.diagnostics?.fallbackQuality || 'trusted',
+      apiError: error?.attempts?.at(-1)?.error || 'groq-error',
+      corroborated: corroboratingHeadlines.length > 0,
+      diagnostics: {
+        ...(base?.diagnostics || {}),
+        fallbackQuality: base?.diagnostics?.fallbackQuality || 'trusted',
+        summaryStage: 'factual-fallback',
+        groqError: error?.attempts?.at(-1)?.error || 'groq-error',
+        groqAttempts: error?.attempts || []
+      }
     };
     return send(res, 200, finalizeArticleSummary(body, payload, corroboratingHeadlines));
   }

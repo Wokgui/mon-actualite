@@ -1,6 +1,10 @@
 {
   "name": "mon-actualite",
   "private": true,
+  "scripts": {
+    "audit:summaries": "node scripts/audit-summaries.mjs",
+    "test:summary": "node tests/v9112-summary-gate.mjs && node tests/v9136-ranking-summary-quality.mjs && node tests/v9145-summary-resilience.mjs"
+  },
   "dependencies": {
     "@google/genai": "^2.17.1",
     "@vercel/functions": "latest"

@@ -103,6 +103,11 @@ function quickGoodSummary(value = '', article = {}) {
   return text.length >= 55 && !quickUnavailable(text) && !quickLooksLikeTitleRestatement(text, article);
 }
 
+function quickTrustedResult(data = {}) {
+  return data?.ai === true || (data?.grounded === true
+    && (data?.fallbackQuality === 'trusted' || data?.diagnostics?.fallbackQuality === 'trusted'));
+}
+
 function quickProvisionalSummary() {
   return 'Résumé IA en cours de préparation…';
 }
@@ -220,6 +225,7 @@ function quickCacheSummary(key, summary, data = {}) {
     summary,
     ai: Boolean(data.ai),
     grounded: Boolean(data.grounded),
+    fallbackQuality: quickClean(data.fallbackQuality || data.diagnostics?.fallbackQuality || ''),
     provider: quickClean(data.provider || data.origin || ''),
     unavailable: false,
     savedAt: Date.now()
@@ -232,7 +238,7 @@ async function quickLoadSummary(article, modal) {
   const cache = quickReadJson(QUICK_CACHE_KEY, {});
   const text = modal.querySelector('[data-quick-summary-text]');
   const cached = cache[key];
-  if (cached?.ai === true && cached?.summary && !cached.unavailable && quickGoodSummary(cached.summary, article)) {
+  if ((cached?.ai === true || cached?.grounded === true) && cached?.summary && !cached.unavailable && quickGoodSummary(cached.summary, article)) {
     text.textContent = quickClean(cached.summary);
     return;
   }
@@ -253,7 +259,7 @@ async function quickLoadSummary(article, modal) {
   if (!modal.isConnected) return;
 
   const groqSummary = quickClean(data?.summary || '');
-  if (data?.ai === true && !data?.unavailable && quickGoodSummary(groqSummary, article)) {
+  if (quickTrustedResult(data) && !data?.unavailable && quickGoodSummary(groqSummary, article)) {
     text.textContent = groqSummary;
     quickCacheSummary(key, groqSummary, data || {});
     return;

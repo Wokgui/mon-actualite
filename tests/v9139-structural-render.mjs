@@ -52,8 +52,8 @@ assert.match(app, /Array\.isArray\(article\.tags\)/, 'old malformed tag fields m
 assert.match(app, /try \{ learned = Number\(personalizationScore\(article\)/, 'old personalization data must not break ranking');
 assert.match(intelligence76, /Array\.isArray\(article\.matches\)/, 'legacy matches must not interrupt background intelligence');
 assert.match(personalization, /Array\.isArray\(article\.tags\)/, 'legacy tags must not interrupt personalization');
-assert.match(release, /PAGE_RELEASE = '91\.40'/, 'release watcher must not reload 91.40 as if it were stale');
-assert.equal(version.codeRelease, '91.40');
-assert.equal(version.version, '67');
+assert.match(release, /PAGE_RELEASE = '91\.45'/, 'release watcher must not reload 91.45 as if it were stale');
+assert.equal(version.codeRelease, '91.45');
+assert.equal(version.version, '68');
 
-console.log('v91.40 structural single-render checks passed.');
+console.log('v91.45 structural single-render checks passed.');
