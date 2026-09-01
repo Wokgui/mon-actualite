@@ -91,9 +91,17 @@ try {
   assert.equal(retryResult.retryV9145, true, 'successful second attempt must be marked as the v91.45 retry');
   assert.equal(smartCalls, 2, 'support-check recovery must use exactly one retry');
 
+  // The non-AI fallback algorithm itself must produce useful condensed text.
+  const extracted = await page.evaluate(item => window.__summaryVisualGuardV9145.extractiveFallback(item), article);
+  assert.ok(String(extracted || '').length >= 100, 'extractive fallback must contain useful information');
+  assert.doesNotMatch(String(extracted || ''), /^Les chercheurs.*Les premiers.*La méthode.*$/s, 'fallback should rank useful sentences rather than blindly copy an arbitrary raw page prefix');
+
   // 2. Reproduce the real image bug independently from the historical quickview stack:
   // the card owns a late-loaded image, while the article object itself has no image URL.
   await page.evaluate(item => {
+    localStorage.setItem('news-live-cache', JSON.stringify({
+      fetchedAt: new Date().toISOString(), stats: { feedsSucceeded: 1 }, articles: [item]
+    }));
     document.querySelector('#local-v9145-controlled-card')?.remove();
     document.querySelector('#local-v9145-controlled-modal')?.remove();
 
@@ -103,8 +111,6 @@ try {
     card.dataset.article = item.id;
     card.innerHTML = '<img class="late-card-visual" src="/test-card-image.svg" alt=""><h2>Carte locale 91.45</h2>';
     document.body.appendChild(card);
-
-    // Let the guard remember the exact rendered card/image.
     card.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, pointerId: 1, pointerType: 'touch' }));
 
     const modal = document.createElement('div');
@@ -121,12 +127,22 @@ try {
   const modalImage = await page.locator('#local-v9145-controlled-modal .quick-summary-image').getAttribute('src');
   assert.match(String(modalImage || ''), /test-card-image\.svg/, 'summary modal must reuse the image already rendered on the article card');
 
-  // 3. An unavailable AI summary must not leave a blank/dead card and must never be mislabeled as AI.
+  // 3. Reassert the failure state and mutate the modal to trigger the guard after all
+  // historical layers have seen it. The guard must replace it with a clearly non-AI fallback.
+  await page.evaluate(item => {
+    localStorage.setItem('news-live-cache', JSON.stringify({
+      fetchedAt: new Date().toISOString(), stats: { feedsSucceeded: 1 }, articles: [item]
+    }));
+    const modal = document.querySelector('#local-v9145-controlled-modal');
+    const box = modal?.querySelector('[data-quick-summary-text]');
+    if (box) box.textContent = 'Résumé IA momentanément indisponible pour cet article.';
+    modal?.appendChild(document.createElement('i'));
+  }, article);
+
   await page.waitForFunction(() => {
     const modal = document.querySelector('#local-v9145-controlled-modal');
     const text = modal?.querySelector('[data-quick-summary-text]')?.textContent || '';
-    const status = modal?.querySelector('.quick-summary-status-v9138')?.textContent || '';
-    return text.length >= 100 && status === 'Résumé automatique';
+    return text.length >= 100 && !/momentanément indisponible/i.test(text);
   }, null, { timeout: 5000 });
 
   const fallback = await page.evaluate(() => ({
@@ -135,9 +151,8 @@ try {
     localFallback: document.querySelector('#local-v9145-controlled-modal')?.dataset.localFallbackV9145 || ''
   }));
   assert.ok(fallback.text.length >= 100, 'automatic fallback must contain useful information');
-  assert.equal(fallback.status, 'Résumé automatique', 'non-AI fallback must be clearly labeled');
+  assert.equal(fallback.status, 'Résumé automatique', `non-AI fallback must be clearly labeled, got ${fallback.status}`);
   assert.equal(fallback.localFallback, '1', 'fallback must expose the local v91.45 marker');
-  assert.doesNotMatch(fallback.text, /momentanément indisponible/i);
 
   console.log('v91.45 local summary + visual mobile checks passed.', JSON.stringify({
     smartCalls,
