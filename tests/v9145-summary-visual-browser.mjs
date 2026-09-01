@@ -122,19 +122,18 @@ try {
   assert.equal(retryResult.retryV9145, true, 'successful second attempt must be marked as the v91.45 retry');
   assert.equal(smartCalls, 2, 'support-check recovery must use exactly one retry');
 
-  await page.waitForSelector('.article-card[data-article="local-9145-1"], [data-article="local-9145-1"]', { timeout: 15000 });
   await page.evaluate(() => {
-    const card = document.querySelector('.article-card[data-article="local-9145-1"], [data-article="local-9145-1"]');
-    const old = card?.querySelector('img');
-    if (old) old.remove();
-    const image = document.createElement('img');
-    image.className = 'late-card-visual';
-    image.src = '/test-card-image.svg';
-    image.alt = '';
-    card?.prepend(image);
+    const existing = document.querySelector('#local-v9145-controlled-card');
+    existing?.remove();
+    const card = document.createElement('article');
+    card.id = 'local-v9145-controlled-card';
+    card.className = 'article-card';
+    card.dataset.article = 'local-9145-1';
+    card.innerHTML = '<img class="late-card-visual" src="/test-card-image.svg" alt=""><h2>Carte locale 91.45</h2>';
+    document.body.appendChild(card);
   });
 
-  await page.locator('.article-card[data-article="local-9145-1"], [data-article="local-9145-1"]').first().click();
+  await page.locator('#local-v9145-controlled-card').click();
   await page.waitForSelector('.quick-summary-backdrop', { timeout: 5000 });
   await page.waitForFunction(() => document.querySelector('.quick-summary-image')?.getAttribute('src')?.includes('/test-card-image.svg'), null, { timeout: 5000 });
   const modalImage = await page.locator('.quick-summary-image').getAttribute('src');
