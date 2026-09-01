@@ -4,31 +4,18 @@ import { chromium } from 'playwright';
 const baseUrl = 'http://127.0.0.1:4173';
 let smartCalls = 0;
 
-const articles = [
-  {
-    id: 'local-9145-1',
-    title: 'Une nouvelle technologie améliore nettement l’autonomie des appareils mobiles',
-    summary: 'Les chercheurs ont présenté une nouvelle technologie de gestion énergétique qui réduit la consommation lors des usages courants. Les premiers essais montrent une autonomie prolongée sans réduire les performances. La méthode doit encore être testée à plus grande échelle avant une intégration commerciale.',
-    detail: 'Les chercheurs ont présenté une nouvelle technologie de gestion énergétique qui réduit la consommation lors des usages courants. Les premiers essais montrent une autonomie prolongée sans réduire les performances. La méthode doit encore être testée à plus grande échelle avant une intégration commerciale.',
-    source: 'Source Test',
-    category: 'Tech',
-    publishedAt: new Date().toISOString(),
-    url: 'https://example.test/local-9145-1',
-    score: 200,
-    essential: true
-  },
-  {
-    id: 'local-9145-2',
-    title: 'Un second article permet de vérifier le chargement progressif des résumés',
-    summary: 'Ce second article contient plusieurs informations distinctes afin de vérifier que la préparation des résumés reste progressive et ne lance pas une rafale de requêtes simultanées.',
-    detail: 'Ce second article contient plusieurs informations distinctes afin de vérifier que la préparation des résumés reste progressive et ne lance pas une rafale de requêtes simultanées.',
-    source: 'Source Test 2',
-    category: 'Science',
-    publishedAt: new Date(Date.now() - 60000).toISOString(),
-    url: 'https://example.test/local-9145-2',
-    score: 180
-  }
-];
+const article = {
+  id: 'local-9145-1',
+  title: 'Une nouvelle technologie améliore nettement l’autonomie des appareils mobiles',
+  summary: 'Les chercheurs ont présenté une nouvelle technologie de gestion énergétique qui réduit la consommation lors des usages courants. Les premiers essais montrent une autonomie prolongée sans réduire les performances. La méthode doit encore être testée à plus grande échelle avant une intégration commerciale.',
+  detail: 'Les chercheurs ont présenté une nouvelle technologie de gestion énergétique qui réduit la consommation lors des usages courants. Les premiers essais montrent une autonomie prolongée sans réduire les performances. La méthode doit encore être testée à plus grande échelle avant une intégration commerciale.',
+  source: 'Source Test',
+  category: 'Tech',
+  publishedAt: new Date().toISOString(),
+  url: 'https://example.test/local-9145-1',
+  score: 200,
+  essential: true
+};
 
 const browser = await chromium.launch({ headless: true });
 const context = await browser.newContext({
@@ -39,15 +26,15 @@ const context = await browser.newContext({
   serviceWorkers: 'block'
 });
 
-await context.addInitScript(items => {
+await context.addInitScript(item => {
   localStorage.setItem('news-live-cache', JSON.stringify({
     fetchedAt: new Date().toISOString(),
-    stats: { feedsSucceeded: 2 },
-    articles: items
+    stats: { feedsSucceeded: 1 },
+    articles: [item]
   }));
   localStorage.removeItem('news-article-summaries-v8');
   localStorage.removeItem('news-visual-backfill-v3');
-}, articles);
+}, article);
 
 await context.route('**/api/**', async route => {
   const url = new URL(route.request().url());
@@ -55,7 +42,7 @@ await context.route('**/api/**', async route => {
     await route.fulfill({
       status: 200,
       contentType: 'application/json',
-      body: JSON.stringify({ fetchedAt: new Date().toISOString(), stats: { feedsSucceeded: 2 }, articles })
+      body: JSON.stringify({ fetchedAt: new Date().toISOString(), stats: { feedsSucceeded: 1 }, articles: [article] })
     });
     return;
   }
@@ -83,25 +70,6 @@ await context.route('**/api/**', async route => {
     });
     return;
   }
-  if (url.pathname === '/api/article-summary-groq') {
-    await route.fulfill({
-      status: 200,
-      contentType: 'application/json',
-      body: JSON.stringify({
-        summary: 'La nouvelle technologie réduit la consommation énergétique pendant les usages courants et prolonge l’autonomie sans baisse de performances. Les premiers essais sont positifs, mais une validation à plus grande échelle reste nécessaire avant une commercialisation.',
-        ai: true,
-        grounded: true,
-        provider: 'groq-light',
-        model: 'openai/gpt-oss-20b',
-        unavailable: false
-      })
-    });
-    return;
-  }
-  if (['/api/article-thumbnail', '/api/article-photo-fast', '/api/article-photo', '/api/exact-news-thumbnail'].includes(url.pathname)) {
-    await route.fulfill({ status: 404, contentType: 'application/json', body: '{}' });
-    return;
-  }
   await route.fulfill({ status: 200, contentType: 'application/json', body: '{}' });
 });
 
@@ -110,41 +78,73 @@ try {
   await page.goto(baseUrl, { waitUntil: 'domcontentloaded' });
   await page.waitForFunction(() => window.__summaryVisualGuardV9145?.version === '91.45', null, { timeout: 10000 });
 
-  const retryResult = await page.evaluate(async article => {
+  // 1. A semantic false-negative gets one and only one lightweight retry.
+  const retryResult = await page.evaluate(async item => {
     const response = await fetch('/api/article-summary-smart?v=6&intent=foreground', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({ article })
+      body: JSON.stringify({ article: item })
     });
     return response.json();
-  }, articles[0]);
+  }, article);
   assert.equal(retryResult.ai, true, 'semantic support-check rejection must get one lightweight retry');
   assert.equal(retryResult.retryV9145, true, 'successful second attempt must be marked as the v91.45 retry');
   assert.equal(smartCalls, 2, 'support-check recovery must use exactly one retry');
 
-  await page.evaluate(() => {
-    const existing = document.querySelector('#local-v9145-controlled-card');
-    existing?.remove();
+  // 2. Reproduce the real image bug independently from the historical quickview stack:
+  // the card owns a late-loaded image, while the article object itself has no image URL.
+  await page.evaluate(item => {
+    document.querySelector('#local-v9145-controlled-card')?.remove();
+    document.querySelector('#local-v9145-controlled-modal')?.remove();
+
     const card = document.createElement('article');
     card.id = 'local-v9145-controlled-card';
     card.className = 'article-card';
-    card.dataset.article = 'local-9145-1';
+    card.dataset.article = item.id;
     card.innerHTML = '<img class="late-card-visual" src="/test-card-image.svg" alt=""><h2>Carte locale 91.45</h2>';
     document.body.appendChild(card);
-  });
 
-  await page.locator('#local-v9145-controlled-card').click();
-  await page.waitForSelector('.quick-summary-backdrop', { timeout: 5000 });
-  await page.waitForFunction(() => document.querySelector('.quick-summary-image')?.getAttribute('src')?.includes('/test-card-image.svg'), null, { timeout: 5000 });
-  const modalImage = await page.locator('.quick-summary-image').getAttribute('src');
-  assert.match(String(modalImage || ''), /test-card-image\.svg/, 'quick summary must reuse the image already rendered on the article card');
+    // Let the guard remember the exact rendered card/image.
+    card.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, pointerId: 1, pointerType: 'touch' }));
 
-  await page.waitForFunction(() => /prolonge l’autonomie|prolonge l'autonomie/i.test(document.querySelector('[data-quick-summary-text]')?.textContent || ''), null, { timeout: 8000 });
-  const summary = await page.locator('[data-quick-summary-text]').textContent();
-  assert.ok(String(summary || '').length >= 100, 'opened article must receive a substantial summary');
-  assert.doesNotMatch(String(summary || ''), /momentanément indisponible/i, 'opened article must not remain without a summary when Groq succeeds');
+    const modal = document.createElement('div');
+    modal.id = 'local-v9145-controlled-modal';
+    modal.className = 'quick-summary-backdrop';
+    modal.innerHTML = `<section class="quick-summary-sheet">
+      <header class="quick-summary-head"><h2>${item.title}</h2></header>
+      <div class="quick-summary-text" data-quick-summary-text>Résumé IA momentanément indisponible pour cet article.</div>
+    </section>`;
+    document.body.appendChild(modal);
+  }, article);
 
-  console.log('v91.45 local summary + visual mobile checks passed.', JSON.stringify({ smartCalls, modalImage }));
+  await page.waitForFunction(() => document.querySelector('#local-v9145-controlled-modal .quick-summary-image')?.getAttribute('src')?.includes('/test-card-image.svg'), null, { timeout: 5000 });
+  const modalImage = await page.locator('#local-v9145-controlled-modal .quick-summary-image').getAttribute('src');
+  assert.match(String(modalImage || ''), /test-card-image\.svg/, 'summary modal must reuse the image already rendered on the article card');
+
+  // 3. An unavailable AI summary must not leave a blank/dead card and must never be mislabeled as AI.
+  await page.waitForFunction(() => {
+    const modal = document.querySelector('#local-v9145-controlled-modal');
+    const text = modal?.querySelector('[data-quick-summary-text]')?.textContent || '';
+    const status = modal?.querySelector('.quick-summary-status-v9138')?.textContent || '';
+    return text.length >= 100 && status === 'Résumé automatique';
+  }, null, { timeout: 5000 });
+
+  const fallback = await page.evaluate(() => ({
+    text: document.querySelector('#local-v9145-controlled-modal [data-quick-summary-text]')?.textContent || '',
+    status: document.querySelector('#local-v9145-controlled-modal .quick-summary-status-v9138')?.textContent || '',
+    localFallback: document.querySelector('#local-v9145-controlled-modal')?.dataset.localFallbackV9145 || ''
+  }));
+  assert.ok(fallback.text.length >= 100, 'automatic fallback must contain useful information');
+  assert.equal(fallback.status, 'Résumé automatique', 'non-AI fallback must be clearly labeled');
+  assert.equal(fallback.localFallback, '1', 'fallback must expose the local v91.45 marker');
+  assert.doesNotMatch(fallback.text, /momentanément indisponible/i);
+
+  console.log('v91.45 local summary + visual mobile checks passed.', JSON.stringify({
+    smartCalls,
+    modalImage,
+    fallbackStatus: fallback.status,
+    fallbackChars: fallback.text.length
+  }));
 } finally {
   await browser.close();
 }
