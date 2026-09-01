@@ -1,7 +1,10 @@
 (() => {
 'use strict';
 const app=document.getElementById('app');if(!app)return;
-let allowUntil=Date.now()+2200,restoringUntil=0,transition=null;
+// Do not grant a 2.2 s free-render window at startup. The first cached Home
+// render is the one the user sees; a silent sync arriving just afterwards must
+// not be allowed to rebuild it underneath the Android launch transition.
+let allowUntil=Date.now()+80,restoringUntil=0,transition=null;
 const allowRender=(ms=500)=>{allowUntil=Math.max(allowUntil,Date.now()+Math.min(1200,Math.max(120,ms)))};
 const allowed=()=>Date.now()<=allowUntil;
 const restoring=()=>Date.now()<=restoringUntil;
@@ -50,6 +53,30 @@ function startTransition(target){
 }
 function targetFrom(el){if(el.matches?.('[data-brief-mode="watches"]'))return'watches';if(el.matches?.('[data-brief-mode="essential"]'))return'essential';const v=el.dataset?.view;if(v==='home')return'home';if(v==='brief')return'brief';return''}
 
+// A recovered thumbnail may be better for the next render, but replacing a
+// photo that is already loaded and visible causes the abrupt image switches in
+// the recording. Keep the current valid bitmap for this DOM node. The recovery
+// code still stores its better URL in the article cache, so it is used naturally
+// the next time that card is created. Failed/placeholder images remain replaceable.
+try{
+  const src=Object.getOwnPropertyDescriptor(HTMLImageElement.prototype,'src');
+  if(src?.get&&src?.set&&!HTMLImageElement.prototype.__newsStableVisibleSrcV9139){
+    Object.defineProperty(HTMLImageElement.prototype,'__newsStableVisibleSrcV9139',{value:true,configurable:false});
+    Object.defineProperty(HTMLImageElement.prototype,'src',{
+      configurable:src.configurable,enumerable:src.enumerable,
+      get(){return src.get.call(this)},
+      set(value){
+        const next=String(value||'');
+        const current=String(src.get.call(this)||'');
+        const card=this.closest?.('.article-card[data-article],.brief-point[data-article]');
+        const failed=card?.classList?.contains('v42-image-failed')||current.startsWith('data:image/svg+xml')||!this.complete||this.naturalWidth<2||this.naturalHeight<2;
+        if(this.isConnected&&card&&!failed&&current&&next&&next!==current){this.dataset.deferredVisualSrcV9139=next;return}
+        src.set.call(this,value);
+      }
+    });
+  }
+}catch{}
+
 document.addEventListener('pointerdown',e=>{
   const nav=e.target.closest?.('[data-view],[data-brief-mode]');if(nav){const target=targetFrom(nav);if(target)startTransition(target);return}
   if(e.target.closest?.('[data-home-more],[data-saved-filter],[data-refresh],[data-feedback],[data-topic-feedback],[data-direct-topic-add],[data-direct-topic-remove],[data-general-category],[data-interest],[data-brief-essential],[data-brief-watch],[data-dismiss-sheet],[data-close-sheet],[data-open-settings]'))allowRender(450);
@@ -74,6 +101,13 @@ const observer=new MutationObserver(records=>{
 observer.observe(app,{childList:true,subtree:true});
 window.NewsViewStabilityV9138=Object.freeze({allowRender});
 const style=document.createElement('style');style.textContent=`
+/* The final three-button geometry exists before feedly-runtime adds nav-three,
+   so the centre Personnaliser button cannot jump after first paint. */
+.page{animation:none!important}
+.bottom-nav{grid-template-columns:repeat(3,1fr)!important;padding-left:max(18px,env(safe-area-inset-left))!important;padding-right:max(18px,env(safe-area-inset-right))!important}
+.bottom-nav .nav-item.plus{order:2!important;justify-self:center!important;transform:translateY(-13px)!important}
+.bottom-nav [data-view="home"]{order:1!important}.bottom-nav [data-view="brief"]{order:3!important}
+.bottom-nav,.bottom-nav .nav-item{transition:none!important}
 .stable-view-overlay-v9139{position:fixed;z-index:10050;inset:0;overflow:hidden;background:#fbfaff;pointer-events:none}.stable-view-clone-v9139{position:absolute!important;left:0;right:0;width:100%;min-height:100vh}.stable-view-overlay-v9139 .bottom-nav{pointer-events:none!important}.brief-switching-v9138 .runtime-brief-content{visibility:visible!important}
 `;document.head.appendChild(style);
 })();
