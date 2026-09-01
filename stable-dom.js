@@ -84,18 +84,34 @@
       if (!image) return;
       const target = card.querySelector('img.article-image, img.brief-thumb, img.original-article-image, .article-placeholder, .brief-thumb.article-placeholder');
       if (target && target !== image) target.replaceWith(image);
-      // The image node keeps its v42Loaded marker, but the surrounding card is
-      // new. Restore the visual state as well or performance-v42 will consider
-      // the image configured while CSS keeps it hidden.
       card.classList.remove('v42-image-pending', 'v42-image-failed');
       card.classList.add('v42-image-loaded');
     });
+  }
+
+  function activeView(root) {
+    return root?.querySelector?.('.bottom-nav .nav-item.active[data-view]')?.dataset?.view || '';
+  }
+
+  function explicitRenderAllowed() {
+    try { return Boolean(window.NewsViewStabilityV9138?.isRenderAllowed?.()); }
+    catch { return false; }
+  }
+
+  function keepCurrentAppRoot(element, nextRoot) {
+    if (element.id !== APP_ID || explicitRenderAllowed()) return false;
+    if (!element.querySelector('[data-article]')) return false;
+    const currentView = activeView(element);
+    const nextView = activeView(nextRoot);
+    if (!currentView || currentView !== nextView) return false;
+    return currentView === 'home' || currentView === 'brief';
   }
 
   function shouldPreserve(element, value) {
     if (parsing || typeof value !== 'string' || !value.includes('data-article=')) return false;
     if (element.id === APP_ID && element.querySelector('[data-article]')) return true;
     if (element.classList?.contains('feed') && element.querySelector('[data-article]')) return true;
+    if (element.classList?.contains('runtime-brief-content') && element.querySelector('[data-article]')) return true;
     return false;
   }
 
@@ -116,6 +132,13 @@
       } finally {
         parsing = false;
       }
+
+      // Background refreshes update state/cache, but an already visible Home or
+      // Brief must not be destroyed and rebuilt. The fresh state is naturally
+      // used on the next explicit navigation or refresh. This removes the
+      // startup "second paint", sudden scroll/geometry changes and photo swaps.
+      if (keepCurrentAppRoot(this, template.content)) return;
+
       transplantLoadedImages(this, template.content);
       this.replaceChildren(...template.content.childNodes);
     }
