@@ -1,6 +1,11 @@
+const legacyHandler = require('./article-summary.js');
+
 const GROQ_ENDPOINT = 'https://api.groq.com/openai/v1/chat/completions';
-const GROQ_MODEL = String(process.env.GROQ_FAST_MODEL || 'openai/gpt-oss-20b').trim();
-const TIMEOUT_MS = 12000;
+const DEFAULT_MODEL = 'openai/gpt-oss-20b';
+const RETIRED_MODELS = new Set(['llama-3.1-8b-instant', 'llama-3.3-70b-versatile']);
+const GROQ_TIMEOUT_MS = 14000;
+const MAX_FACTUAL_CHARS = 2400;
+const MAX_COMPLETION_TOKENS = 320;
 
 function send(res, status, payload) {
   res.statusCode = status;
@@ -19,17 +24,17 @@ function decodeEntities(value = '') {
     .replace(/&lt;/gi, '<')
     .replace(/&gt;/gi, '>')
     .replace(/&#(\d+);/g, (_, n) => { try { return String.fromCodePoint(Number(n)); } catch { return _; } })
-    .replace(/&#x([0-9a-f]+);/gi, (_, n) => { try { return String.fromCodePoint(parseInt(n, 16)); } catch { return _; } });
-}
-
-function clean(value = '') {
-  return decodeEntities(String(value ?? '')
-    .replace(/<script\b[\s\S]*?<\/script>/gi, ' ')
-    .replace(/<style\b[\s\S]*?<\/style>/gi, ' ')
-    .replace(/<[^>]+>/g, ' '))
+    .replace(/&#x([0-9a-f]+);/gi, (_, n) => { try { return String.fromCodePoint(parseInt(n, 16)); } catch { return _; } })
     .replace(/\uFFFD+/g, '')
     .replace(/\s+/g, ' ')
     .trim();
+}
+
+function clean(value = '') {
+  return decodeEntities(String(value || '')
+    .replace(/<script\b[\s\S]*?<\/script>/gi, ' ')
+    .replace(/<style\b[\s\S]*?<\/style>/gi, ' ')
+    .replace(/<[^>]+>/g, ' '));
 }
 
 function normalize(value = '') {
@@ -40,56 +45,41 @@ function normalize(value = '') {
     .replace(/\s+/g, ' ').trim();
 }
 
-const STOP = new Set([
-  'avec','dans','pour','plus','apres','avant','cette','cet','ces','sont','etre','leur','leurs','tout','tous','mais','sans','vers','entre','une','des','les','sur','qui','que','aux','par','son','ses','est','fait','font','comme','dont','elle','elles','ils','nous','vous','notre','votre','aussi','encore','deja','tres','moins','depuis','alors','chez','contre','lors','peut','peuvent','avait','avoir','sera','article','direct','video'
-]);
-
-function tokens(value = '') {
-  return normalize(value).split(' ').filter(token => token.length >= 4 && !STOP.has(token));
+function sentences(value = '') {
+  return clean(value).match(/[^.!?]+[.!?]+|[^.!?]+$/g)?.map(item => item.trim()).filter(Boolean) || [];
 }
 
-function fuzzy(token = '') {
-  if (/^\d+$/.test(token)) return token;
-  if (token.length <= 6) return token;
-  return token.slice(0, token.length >= 10 ? 6 : 5);
+function isBoilerplate(value = '') {
+  const text = normalize(value);
+  if (!text) return true;
+  return [
+    'connectez vous','abonnez vous','newsletter','acceptez les cookies','gestion des cookies',
+    'partager cet article','partager la publication','lire aussi','voir aussi','en savoir plus',
+    'ajouter cet article','activer les notifications','retrouvez nous sur'
+  ].some(term => text.includes(term));
 }
 
-function numberClaims(value = '') {
-  const text = normalize(value).replace(/[\u202f\u00a0]/g, ' ');
-  const values = text.match(/\b\d{1,3}(?:[ .]\d{3})*(?:[,.]\d+)?\b|\b\d{4}\b/g) || [];
-  return [...new Set(values.map(value => value.replace(/[ .]/g, '').replace(',', '.')))];
+function sanitizeFactual(value = '') {
+  return sentences(value)
+    .filter(sentence => sentence.length >= 28 && !isBoilerplate(sentence))
+    .slice(0, 16)
+    .join(' ')
+    .slice(0, 5200)
+    .trim();
 }
 
-function titleRestatement(summary = '', title = '') {
-  const text = clean(summary);
-  const heading = clean(title);
-  if (!text || !heading) return false;
-  if (/^(?:cet article|l[’']article|ce texte|cette publication)\s+(?:porte sur|parle de|évoque|présente|explique|concerne)\b/i.test(text)) return true;
-  const wanted = tokens(heading);
-  const found = new Set(tokens(text));
-  if (wanted.length < 4 || !found.size) return false;
-  const coverage = wanted.filter(token => found.has(token)).length / wanted.length;
-  return coverage >= 0.88 && text.length <= Math.max(190, heading.length * 1.65);
-}
-
-function supported(summary = '', source = '', title = '') {
-  const text = clean(summary);
-  if (text.length < 55 || text.length > 900) return false;
-  if (/résumé indisponible|aucune information|ouvrez? l[’']article|abonnez[- ]?vous|connectez[- ]?vous/i.test(text)) return false;
-  if (titleRestatement(text, title)) return false;
-
-  const support = `${clean(source)} ${clean(title)}`;
-  const sourceNumbers = new Set(numberClaims(support));
-  if (numberClaims(text).some(value => !sourceNumbers.has(value))) return false;
-
-  const generated = tokens(text);
-  const sourceTokens = tokens(support);
-  if (generated.length < 6 || sourceTokens.length < 3) return false;
-  const exactSet = new Set(sourceTokens);
-  const fuzzySet = new Set(sourceTokens.map(fuzzy));
-  const exact = generated.filter(token => exactSet.has(token)).length;
-  const fuzzyHits = generated.filter(token => fuzzySet.has(fuzzy(token))).length;
-  return exact >= 3 || fuzzyHits >= 4 || exact / generated.length >= 0.08 || fuzzyHits / generated.length >= 0.18;
+function trimFactual(value = '', limit = MAX_FACTUAL_CHARS) {
+  const list = sentences(value);
+  const kept = [];
+  let length = 0;
+  for (const sentence of list) {
+    if (length + sentence.length + 1 > limit && kept.length >= 2) break;
+    kept.push(sentence);
+    length += sentence.length + 1;
+    if (length >= limit) break;
+  }
+  const result = kept.join(' ').trim();
+  return result || clean(value).slice(0, limit);
 }
 
 function groqKey() {
@@ -99,28 +89,90 @@ function groqKey() {
   return key;
 }
 
-function promptFor(article = {}, source = '', strict = false) {
-  const title = clean(article.title || '').slice(0, 300);
-  const publisher = clean(article.source || '').slice(0, 100);
-  const rule = strict
-    ? 'Reste encore plus près des formulations du texte fourni. N’introduis aucun terme factuel important qui n’y figure pas.'
-    : 'Reformule naturellement sans recopier le début du texte.';
-  return `Rédige un vrai résumé journalistique en français de 2 ou 3 phrases, environ 45 à 80 mots. Commence directement par l'information principale. Utilise UNIQUEMENT les faits explicitement présents dans le TITRE et le TEXTE ci-dessous. N'ajoute aucun nom, chiffre, date, lieu, version, cause, conséquence ou contexte extérieur. Ne dis pas « cet article ». ${rule}\n\nSOURCE : ${publisher}\nTITRE : ${title}\nTEXTE : ${source}`;
+function groqModel() {
+  const configured = String(process.env.GROQ_MODEL || '').trim();
+  if (configured && !RETIRED_MODELS.has(configured) && configured.startsWith('openai/gpt-oss-')) return configured;
+  return DEFAULT_MODEL;
 }
 
-async function callGroq(key, prompt, temperature = 0.1, maxTokens = 300) {
+function captureLegacy(req) {
+  return new Promise((resolve, reject) => {
+    const headers = {};
+    const capture = {
+      statusCode: 200,
+      setHeader(name, value) { headers[String(name).toLowerCase()] = value; },
+      end(body = '') { resolve({ statusCode: this.statusCode || 200, headers, body: String(body || '') }); }
+    };
+    const factualReq = Object.create(req || null);
+    factualReq.method = 'POST';
+    factualReq.query = req?.query || {};
+    factualReq.body = { ...(req?.body && typeof req.body === 'object' ? req.body : {}), factualOnly: true };
+    Promise.resolve(legacyHandler(factualReq, capture)).catch(reject);
+  });
+}
+
+function meaningfulTokens(value = '') {
+  const stop = new Set(['alors','apres','avant','avec','avoir','cette','comme','dans','depuis','devrait','elles','entre','faire','leurs','mais','meme','moins','notamment','nous','plus','pour','sans','selon','sont','sous','tout','toute','toutes','tous','tres','vers','votre','ainsi','cela','celui','celle','etre','fait','faits','article']);
+  return normalize(value).split(' ').filter(token => token.length >= 4 && !stop.has(token));
+}
+
+function fuzzyToken(token = '') {
+  if (/^\d+$/.test(token)) return token;
+  if (token.length <= 6) return token;
+  return token.slice(0, token.length >= 10 ? 6 : 5);
+}
+
+function numericClaims(value = '') {
+  const text = normalize(value).replace(/[\u202f\u00a0]/g, ' ');
+  const claims = text.match(/\b\d{1,3}(?:[ .]\d{3})*(?:[,.]\d+)?\b|\b\d{4}\b/g) || [];
+  return [...new Set(claims.map(number => number.replace(/[ .]/g, '').replace(',', '.')))];
+}
+
+function supportedSummary(summary = '', source = '', title = '') {
+  const text = clean(summary);
+  if (text.length < 55 || isBoilerplate(text)) return false;
+  const sourceText = `${source}\n${title}`;
+  const sourceNumbers = new Set(numericClaims(sourceText));
+  if (numericClaims(text).some(number => !sourceNumbers.has(number))) return false;
+
+  const generated = meaningfulTokens(text);
+  const original = meaningfulTokens(sourceText);
+  if (generated.length < 7 || original.length < 4) return false;
+  const exactSet = new Set(original);
+  const fuzzySet = new Set(original.map(fuzzyToken));
+  const exact = generated.filter(token => exactSet.has(token)).length;
+  const fuzzy = generated.filter(token => fuzzySet.has(fuzzyToken(token))).length;
+  return exact >= 3 || fuzzy >= 5 || exact / generated.length >= 0.12 || fuzzy / generated.length >= 0.22;
+}
+
+function titleRestatement(summary = '', title = '') {
+  const a = meaningfulTokens(summary);
+  const b = meaningfulTokens(title);
+  if (a.length < 4 || b.length < 4) return false;
+  const set = new Set(a);
+  const hits = b.filter(token => set.has(token)).length;
+  return clean(summary).length < 180 && hits / b.length >= 0.86 && a.length <= b.length + 4;
+}
+
+function retryAfterMs(response, payload = {}) {
+  const header = Number(response?.headers?.get?.('retry-after') || 0);
+  if (Number.isFinite(header) && header > 0) return Math.ceil(header * 1000);
+  const message = String(payload?.error?.message || '');
+  const match = message.match(/try again in\s+([0-9.]+)s/i);
+  return match ? Math.ceil(Number(match[1]) * 1000) : 0;
+}
+
+async function generateLightSummary({ key, model, title, factual }) {
+  const prompt = `Résume l'article ci-dessous en français en 2 à 4 phrases, environ 55 à 90 mots. Commence directement par l'information principale. Reformule au lieu de recopier le début de l'article. Utilise uniquement les faits présents dans le texte fourni. N'ajoute aucun nom, chiffre, date, cause, conséquence ou contexte absent. Ignore les phrases d'abonnement, connexion, cookies, partage et navigation.\n\nTITRE : ${clean(title)}\n\nTEXTE FACTUEL :\n${trimFactual(factual)}`;
   const response = await fetch(GROQ_ENDPOINT, {
     method: 'POST',
-    signal: AbortSignal.timeout(TIMEOUT_MS),
-    headers: {
-      'Content-Type': 'application/json',
-      'Authorization': `Bearer ${key}`
-    },
+    signal: AbortSignal.timeout(GROQ_TIMEOUT_MS),
+    headers: { 'Content-Type': 'application/json', 'Authorization': `Bearer ${key}` },
     body: JSON.stringify({
-      model: GROQ_MODEL,
-      messages: [{ role: 'user', content: prompt }],
-      temperature,
-      max_completion_tokens: maxTokens,
+      model,
+      messages: [{ role: 'user', content: `Tu es un rédacteur de presse factuel. Ne complète jamais les informations manquantes.\n\n${prompt}` }],
+      temperature: 0.2,
+      max_completion_tokens: MAX_COMPLETION_TOKENS,
       include_reasoning: false,
       reasoning_effort: 'low'
     })
@@ -129,58 +181,84 @@ async function callGroq(key, prompt, temperature = 0.1, maxTokens = 300) {
   if (!response.ok) {
     return {
       ok: false,
-      rateLimited: response.status === 429,
-      retryAfter: clean(response.headers.get('retry-after') || ''),
-      error: clean(payload?.error?.message || `HTTP ${response.status}`).slice(0, 320)
+      error: response.status === 429 ? 'rate-limit' : 'groq-error',
+      retryAfterMs: retryAfterMs(response, payload),
+      detail: String(payload?.error?.message || `HTTP ${response.status}`).replace(/gsk_[A-Za-z0-9_-]+/g, '[clé masquée]').slice(0, 240)
     };
   }
   const text = clean(payload?.choices?.[0]?.message?.content || '');
-  return text ? { ok: true, text } : { ok: false, error: 'Réponse vide' };
+  return { ok: true, text, model };
 }
 
-async function summarize(article = {}) {
-  const title = clean(article.title || '');
-  const source = clean(article.summary || article.detail || article.description || '').slice(0, 2600);
-  if (!title) return { ok: false, reason: 'title-missing' };
-  if (source.length < 60) return { ok: false, reason: 'source-too-short' };
-
-  const key = groqKey();
-  if (!key) return { ok: false, reason: 'groq-key-missing' };
-
-  const first = await callGroq(key, promptFor(article, source, false), 0.1, 300);
-  if (first.ok && supported(first.text, source, title)) {
-    return { ok: true, text: first.text, ai: true, grounded: true, origin: 'groq-fast', model: GROQ_MODEL };
-  }
-  if (first.rateLimited) return { ok: false, rateLimited: true, retryAfter: first.retryAfter || '', reason: 'rate-limit' };
-
-  const second = await callGroq(key, promptFor(article, source, true), 0, 240);
-  if (second.ok && supported(second.text, source, title)) {
-    return { ok: true, text: second.text, ai: true, grounded: true, origin: 'groq-fast-retry', model: GROQ_MODEL };
-  }
-  if (second.rateLimited) return { ok: false, rateLimited: true, retryAfter: second.retryAfter || '', reason: 'rate-limit' };
-  return { ok: false, reason: 'validation', error: clean(second.error || first.error || '').slice(0, 240) };
-}
-
-module.exports = async function handler(req, res) {
+async function handler(req, res) {
   if (req.method === 'GET' && String(req.query?.status || '') === '1') {
     return send(res, 200, {
       ok: true,
-      provider: 'groq-fast',
-      model: GROQ_MODEL,
+      provider: 'groq-light',
+      model: groqModel(),
       hasGroqKey: Boolean(groqKey()),
-      maxCompletionTokens: 300,
-      onDemandOnly: true,
-      version: '91.43'
+      maxCompletionTokens: MAX_COMPLETION_TOKENS,
+      progressiveReadyV9144: true
     });
   }
   if (req.method !== 'POST') return send(res, 405, { error: 'Méthode non autorisée' });
-  const input = req.body && typeof req.body === 'object' ? req.body : {};
-  const article = input.article && typeof input.article === 'object' ? input.article : input;
+
+  const body = req.body && typeof req.body === 'object' ? req.body : {};
+  const article = body.article && typeof body.article === 'object' ? body.article : body;
+  const title = clean(article.title || '');
+  if (!title) return send(res, 200, { ok: false, text: '', ai: false, origin: 'unavailable', error: 'title-missing' });
+
+  const key = groqKey();
+  if (!key) return send(res, 200, { ok: false, text: '', ai: false, origin: 'unavailable', error: 'groq-key-missing' });
+
+  let factual = '';
   try {
-    const result = await summarize(article);
-    return send(res, 200, result);
-  } catch (error) {
-    console.error('Fast Groq summary failed:', clean(error?.message || error).slice(0, 240));
-    return send(res, 200, { ok: false, reason: 'exception' });
+    const legacy = await captureLegacy(req);
+    const base = JSON.parse(legacy.body || '{}');
+    factual = sanitizeFactual(base?.summary || '');
+  } catch {}
+  if (factual.length < 80) factual = sanitizeFactual([article.summary, article.detail].filter(Boolean).join(' '));
+  if (factual.length < 60) {
+    return send(res, 200, { ok: false, text: '', ai: false, origin: 'unavailable', error: 'not-enough-source' });
   }
-};
+
+  const model = groqModel();
+  let result;
+  try {
+    result = await generateLightSummary({ key, model, title, factual });
+  } catch (error) {
+    return send(res, 200, {
+      ok: false,
+      text: '',
+      ai: false,
+      origin: 'unavailable',
+      error: 'timeout-or-network',
+      detail: String(error?.message || error).slice(0, 180)
+    });
+  }
+
+  if (!result.ok) return send(res, 200, { ...result, text: '', ai: false, origin: 'unavailable', model });
+  if (titleRestatement(result.text, title) || !supportedSummary(result.text, factual, title)) {
+    return send(res, 200, {
+      ok: false,
+      text: '',
+      ai: false,
+      origin: 'unavailable',
+      model,
+      error: titleRestatement(result.text, title) ? 'title-restatement' : 'support-check'
+    });
+  }
+
+  return send(res, 200, {
+    ok: true,
+    text: result.text,
+    ai: true,
+    grounded: true,
+    origin: 'groq-light',
+    model,
+    sourceChars: Math.min(clean(factual).length, MAX_FACTUAL_CHARS),
+    progressiveV9144: true
+  });
+}
+
+module.exports = handler;
