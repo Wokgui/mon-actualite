@@ -220,6 +220,7 @@
   function decorateCards() {
     const map = articleMap();
     document.querySelectorAll('.article-card[data-article]').forEach(card => {
+      if (card.closest('.stable-owned-list')) return;
       const article = map.get(String(card.dataset.article || ''));
       if (article) ensureTrustLine(card, article);
     });

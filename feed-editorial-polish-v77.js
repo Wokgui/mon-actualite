@@ -128,6 +128,9 @@
     if (!isHomeView()) return;
     const feed = document.querySelector('.page .feed');
     if (!feed) return;
+    // The v91.39 renderer owns Home ordering. Seen-state is represented by the
+    // grey class; removing cards after paint would make the list jump.
+    if (feed.classList.contains('stable-owned-list')) return;
     const page = feed.closest('.page');
     const savedOnly = savedOnlyActive();
     const map = articleMap();

@@ -452,6 +452,7 @@
   function decorateCards() {
     const map = new Map(cachedArticles().map(article => [String(article.id || ''), article]));
     document.querySelectorAll('.article-card[data-article]').forEach(card => {
+      if (card.closest('.stable-owned-list')) return;
       const article = map.get(String(card.dataset.article || ''));
       if (!article) return;
       const chipText = storyChip(article);

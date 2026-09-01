@@ -8,7 +8,8 @@ assert.match(app, /function applyDownloadedNews\(payload\)/, 'app must accept an
 assert.match(app, /Array\.isArray\(payload\.articles\)/, 'payload application must reject malformed article lists');
 assert.match(app, /window\.__applyNewsPayloadV9128 = applyDownloadedNews/, 'the pending-update bridge must be exposed after app startup');
 assert.match(app, /state\.articles = payload\.articles\.map\(applyRememberedVisual\)/, 'the bridge must update live app state and preserve recovered visuals');
-assert.match(app, /persistCache\(\);\s*render\(\);\s*scheduleVisualBackfill\(\);/, 'the applied payload must persist and render immediately');
+assert.match(app, /persistCache\(\);\s*refreshAfterNewsChange\(\);/, 'the applied payload must persist without rebuilding an already displayed list');
+assert.match(app, /function refreshAfterNewsChange\(\)[\s\S]{0,500}?state\.view === 'home'[\s\S]{0,500}?appendHomeToLimit/, 'Home updates must be append-only after a downloaded payload');
 
 const directApply = experience.indexOf('window.__applyNewsPayloadV9128?.(payload)');
 const refreshFallback = experience.indexOf("document.querySelector('[data-refresh]')");

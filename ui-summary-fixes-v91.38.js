@@ -1,6 +1,6 @@
 (() => {
 'use strict';
-const RELEASE='91.38',SETTINGS='news-settings',KEYWORDS='news-keywords',HOME='news-home-topics-v9138';
+const RELEASE='91.39',SETTINGS='news-settings',KEYWORDS='news-keywords',HOME='news-home-topics-v9138';
 const HOME_CATS=new Set(['IA','Tech','Smartphones','VR','Automobile','Énergie']);
 const read=(k,f)=>{try{return JSON.parse(localStorage.getItem(k)||'null')??f}catch{return f}};
 const write=(k,v)=>{try{localStorage.setItem(k,JSON.stringify(v))}catch{}};
@@ -53,7 +53,7 @@ function versionUi(){
   const s=document.querySelector('.app-version-section');if(!s)return;
   const title=s.querySelector('.app-version-row strong'),rel=s.querySelector('.app-version-row span:not(.app-version-badge)'),badge=s.querySelector('.app-version-badge');
   if(title&&title.textContent!==`Mon actualité · version ${RELEASE}`)title.textContent=`Mon actualité · version ${RELEASE}`;
-  if(rel&&rel.textContent!=='Publication du 31 août 2026')rel.textContent='Publication du 31 août 2026';
+  if(rel&&rel.textContent!=='Publication du 1er septembre 2026')rel.textContent='Publication du 1er septembre 2026';
   if(badge&&badge.textContent!==`v${RELEASE}`)badge.textContent=`v${RELEASE}`;s.dataset.codeRelease=RELEASE;
 }
 

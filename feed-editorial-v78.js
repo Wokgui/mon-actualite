@@ -167,6 +167,7 @@
     const articleMap = cachedArticleMap();
 
     document.querySelectorAll('.feed').forEach(feed => {
+      if (feed.matches('.stable-owned-list')) return;
       const cards = [...feed.querySelectorAll(':scope > .article-card[data-article]')];
       if (!cards.length) {
         feed.querySelector(':scope > .essential-separator-v78')?.remove();

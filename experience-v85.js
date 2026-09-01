@@ -121,6 +121,7 @@
   function decorateCards() {
     const map = articleMap();
     document.querySelectorAll('.article-card[data-article]').forEach(card => {
+      if (card.closest('.stable-owned-list')) return;
       const article = map.get(String(card.dataset.article || ''));
       if (!article || card.querySelector('[data-why-v85]')) return;
       const button = document.createElement('button');

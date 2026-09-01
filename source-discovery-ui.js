@@ -54,6 +54,7 @@ function filterDiscoverySourceArticles() {
   }
 
   document.querySelectorAll('[data-article]').forEach(card => {
+    if (card.closest('.stable-owned-list')) return;
     const article = cache.articles.find(item => String(item?.id || '') === String(card.dataset.article || ''));
     if (article?.customSource && !discoveryArticleRelevant(article, themes)) card.remove();
   });

@@ -4,8 +4,8 @@ import { articleVisualUrl, hasPreparedVisual, sourceTileUrl } from './services/a
 const $ = (selector, root = document) => root.querySelector(selector);
 const app = $('#app');
 const toastEl = $('#toast');
-const APP_VERSION = '65';
-const APP_RELEASE = '31 août 2026';
+const APP_VERSION = '66';
+const APP_RELEASE = '1er septembre 2026';
 document.documentElement.dataset.appVersion = APP_VERSION;
 
 const GENERAL_CATEGORIES = ['Politique', 'International', 'Économie', 'Société', 'Santé', 'Environnement', 'Science', 'Culture', 'Éducation', 'Europe'];
@@ -62,6 +62,7 @@ const cache = safeJson('news-live-cache', { articles: [], fetchedAt: null });
 const visualBackfills = safeJson(VISUAL_BACKFILL_KEY, {});
 const state = {
   view: 'home', previous: [], category: 'Politique', categoryTab: 'brief', articleId: null,
+  briefMode: 'essential', homeLimit: 36, homeOrder: [],
   saved: new Set(safeJson('news-saved', [])),
   feedback: safeJson('news-feedback', {}),
   topicPreferences: safeJson('news-topic-preferences-v1', {}),
@@ -129,6 +130,14 @@ function escapeHtml(value) {
   return String(value ?? '').replace(/[&<>'"]/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[char]));
 }
 
+function displayTitle(article = {}) {
+  const title = String(article.title || '').replace(/\s+/g, ' ').trim();
+  const source = String(article.source || '').replace(/\s+/g, ' ').trim();
+  if (!title || !source) return title;
+  const escapedSource = source.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+  return title.replace(new RegExp(`\\s*(?:[-–—|·:]\\s*)${escapedSource}\\s*$`, 'i'), '').trim();
+}
+
 function todayOffset(days) {
   const d = new Date(); d.setDate(d.getDate() + days);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
@@ -163,12 +172,18 @@ function articleVisual(article, index = 0) {
 }
 
 function visibleArticles() {
+  const blocked = safeJson('news-blocked-terms-v1', []).map(normalizeTopic).filter(term => term.length >= 2);
   const personalizationScore = window.NewsPersonalizationV91?.createRanker(
     state.topicPreferences,
     state.settings.generalCategories
   ) || (() => 0);
   return state.articles
-    .filter(article => state.feedback[article.id] !== 'not')
+    .filter(article => {
+      if (state.feedback[article.id] === 'not') return false;
+      if (!blocked.length) return true;
+      const text = normalizeTopic([article.title, article.summary, article.detail, article.category, article.source, ...(article.tags || [])].filter(Boolean).join(' '));
+      return !blocked.some(term => text.includes(term));
+    })
     .slice()
     .sort((a, b) => {
       const feedbackScore = article => ({ more: 24, less: -20, follow: 38 }[state.feedback[article.id]] || 0);
@@ -181,6 +196,43 @@ function visibleArticles() {
     });
 }
 
+function diversifyBySource(articles) {
+  const groups = new Map();
+  articles.forEach((article, index) => {
+    const source = normalizeTopic(article.source || article.feedTitle || 'source') || 'source';
+    if (!groups.has(source)) groups.set(source, { first: index, items: [] });
+    groups.get(source).items.push(article);
+  });
+  if (groups.size < 2) return articles;
+  const queue = [...groups.values()].sort((a, b) => a.first - b.first);
+  const result = [];
+  while (queue.length) {
+    const group = queue.shift();
+    const article = group.items.shift();
+    if (article) result.push(article);
+    if (group.items.length) queue.push(group);
+  }
+  return result;
+}
+
+function reconcileHomeOrder({ reset = false } = {}) {
+  const ranked = diversifyBySource(visibleArticles());
+  const byId = new Map(ranked.map(article => [String(article.id), article]));
+  const nextIds = ranked.map(article => String(article.id));
+  if (reset || !state.homeOrder.length) {
+    state.homeOrder = nextIds;
+  } else {
+    const kept = state.homeOrder.filter(id => byId.has(String(id)));
+    const known = new Set(kept.map(String));
+    state.homeOrder = [...kept, ...nextIds.filter(id => !known.has(String(id)))];
+  }
+  return state.homeOrder.map(id => byId.get(String(id))).filter(Boolean);
+}
+
+function stableHomeArticles() {
+  return reconcileHomeOrder();
+}
+
 function nav(active = state.view) {
   const items = [['home', 'home', 'Accueil'], ['sheet', 'plus', 'Personnaliser'], ['brief', 'brief', 'Brief']];
   return `<nav class="bottom-nav" aria-label="Navigation principale">${items.map(([view, ic, label]) => `<button class="nav-item ${view === 'sheet' ? 'plus' : ''} ${active === view ? 'active' : ''}" data-view="${view}" aria-label="${label}">${icon(ic)}<span>${label}</span></button>`).join('')}</nav>`;
@@ -189,12 +241,13 @@ function nav(active = state.view) {
 function articleCard(article, index = 0) {
   const saved = state.saved.has(article.id);
   const badge = badgeFor(article);
-  return `<article class="article-card" data-article="${escapeHtml(article.id)}" tabindex="0" aria-label="Lire : ${escapeHtml(article.title)}">
+  const title = displayTitle(article);
+  return `<article class="article-card" data-article="${escapeHtml(article.id)}" tabindex="0" aria-label="Lire : ${escapeHtml(title)}">
     ${articleVisual(article, index)}
     <div class="article-body">
       <button class="save-btn ${saved ? 'saved' : ''}" data-save="${escapeHtml(article.id)}" aria-label="${saved ? 'Retirer des sauvegardes' : 'Sauvegarder l’article'}">${icon('bookmark', saved)}</button>
       <div class="card-top"><span class="badge ${badge === 'Important' ? 'important' : ''}">${badge}</span></div>
-      <h2>${escapeHtml(article.title)}</h2>
+      <h2>${escapeHtml(title)}</h2>
       <p class="summary">${escapeHtml(article.summary)}</p>
       <div class="meta"><span class="source">${escapeHtml(article.source)}</span><i class="dot"></i><span>${timeLabel(article.publishedAt)}</span><i class="dot"></i><button class="category-link" data-category="${escapeHtml(article.category)}">${escapeHtml(article.category)}</button></div>
     </div>
@@ -211,13 +264,14 @@ function syncStrip() {
 }
 
 function renderHome() {
-  const all = visibleArticles();
-  const feed = state.savedOnly ? all.filter(article => state.saved.has(article.id)) : all.slice(0, 12);
-  return `<main class="page">
+  const all = stableHomeArticles();
+  const filtered = state.savedOnly ? all.filter(article => state.saved.has(article.id)) : all;
+  const feed = filtered.slice(0, state.homeLimit);
+  const remaining = Math.max(0, filtered.length - feed.length);
+  return `<button type="button" class="top-reset-icon-v9138" data-reset-read aria-label="Réinitialiser les articles parcourus" title="Réinitialiser">↻</button><main class="page">
     <header class="hero-header"><div class="hero-mark"></div><span class="eyebrow">${escapeHtml(dateLabel())}</span><h1>Mon actualité</h1><p>Tous les articles, classés selon vos centres d’intérêt</p></header>
-    ${syncStrip()}
     ${state.saved.size ? `<div class="saved-filter"><button class="text-btn" data-saved-filter>${state.savedOnly ? 'Voir toute l’actualité' : 'Articles sauvegardés'}</button></div>` : ''}
-    <section class="feed">${feed.length ? feed.map(articleCard).join('') : emptyState(state.syncStatus === 'error' ? 'Impossible de charger l’actualité' : 'Actualisation en cours', state.syncError || 'Les nouveaux articles apparaîtront ici dès que les sources auront répondu.')}</section>
+    <section class="feed stable-owned-list" data-stable-home-feed>${feed.length ? feed.map(articleCard).join('') : emptyState(state.syncStatus === 'error' ? 'Impossible de charger l’actualité' : 'Actualisation en cours', state.syncError || 'Les nouveaux articles apparaîtront ici dès que les sources auront répondu.')}${remaining ? `<button type="button" class="home-more" data-home-more>Afficher ${Math.min(36, remaining)} articles de plus <small>${remaining} encore disponibles</small></button>` : ''}</section>
   </main>${nav('home')}`;
 }
 
@@ -262,6 +316,124 @@ function renderDetail() {
       ${article.sources?.length > 1 ? `<div class="source-list detail-sources">${article.sources.map(source => `<span class="source-chip">${escapeHtml(source)}</span>`).join('')}</div>` : ''}
     </article>
   </main>${nav('')}`;
+}
+
+const WATCH_ALIASES = {
+  'recherche scientifique': ['recherche', 'science', 'scientifique', 'laboratoire', 'etude', 'decouverte'],
+  innovations: ['innovation', 'startup', 'brevet', 'recherche', 'nouvelle technologie'],
+  innovation: ['innovation', 'startup', 'brevet', 'recherche', 'nouvelle technologie'],
+  'progres humains': ['progres', 'avancee', 'decouverte', 'qualite de vie', 'education', 'droits humains'],
+  medecine: ['medecine', 'medical', 'sante', 'traitement', 'therapie', 'vaccin', 'chirurgie'],
+  espace: ['espace', 'spatial', 'astronomie', 'nasa', 'esa', 'satellite', 'lune', 'mars'],
+  energie: ['energie', 'electricite', 'nucleaire', 'solaire', 'eolien', 'batterie', 'hydrogene'],
+  environnement: ['environnement', 'climat', 'biodiversite', 'pollution', 'ecologie'],
+  education: ['education', 'ecole', 'universite', 'apprentissage', 'formation'],
+  vr: ['vr', 'realite virtuelle', 'virtual reality', 'quest', 'steamvr'],
+  ia: ['ia', 'intelligence artificielle', 'openai', 'chatgpt', 'gemini', 'anthropic']
+};
+
+function normalizeTopic(value = '') {
+  return String(value || '').normalize('NFD').replace(/[\u0300-\u036f]/g, '').replace(/[’']/g, ' ').toLowerCase().replace(/[^a-z0-9]+/g, ' ').replace(/\s+/g, ' ').trim();
+}
+
+function uniqueTopics(values = []) {
+  const result = [];
+  const seen = new Set();
+  for (const raw of Array.isArray(values) ? values : []) {
+    const value = String(raw || '').replace(/\s+/g, ' ').trim();
+    const key = normalizeTopic(value);
+    if (!value || !key || seen.has(key)) continue;
+    seen.add(key);
+    result.push(value);
+  }
+  return result;
+}
+
+function watchMatches(article, topic) {
+  const wanted = normalizeTopic(topic);
+  if (normalizeTopic(article.category) === wanted) return true;
+  const text = ` ${normalizeTopic([article.title, article.summary, article.detail, article.category, article.source, ...(article.tags || []), ...(article.matches || [])].filter(Boolean).join(' '))} `;
+  return uniqueTopics([wanted, ...(WATCH_ALIASES[wanted] || [])]).map(normalizeTopic).some(term => term.length <= 3 && !term.includes(' ') ? text.includes(` ${term} `) : text.includes(term));
+}
+
+function dayDelta(value) {
+  const date = new Date(value);
+  const now = new Date();
+  if (Number.isNaN(date.getTime())) return 999;
+  return Math.round((new Date(now.getFullYear(), now.getMonth(), now.getDate()) - new Date(date.getFullYear(), date.getMonth(), date.getDate())) / 86400000);
+}
+
+function fullDay(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  const label = new Intl.DateTimeFormat('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' }).format(date);
+  return label.charAt(0).toUpperCase() + label.slice(1);
+}
+
+function dayLabel(value) {
+  const delta = dayDelta(value);
+  if (delta === 0) return 'Aujourd’hui';
+  if (delta === 1) return 'Hier';
+  if (delta === 2) return 'Avant-hier';
+  return fullDay(value);
+}
+
+function dayKey(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return 'unknown';
+  return `${date.getFullYear()}-${String(date.getMonth() + 1).padStart(2, '0')}-${String(date.getDate()).padStart(2, '0')}`;
+}
+
+function clockLabel(value) {
+  const date = new Date(value);
+  return Number.isNaN(date.getTime()) ? '' : new Intl.DateTimeFormat('fr-FR', { hour: '2-digit', minute: '2-digit' }).format(date);
+}
+
+function compactArticleRow(article, index = 0) {
+  const title = displayTitle(article);
+  return `<article class="article-card runtime-row" data-article="${escapeHtml(article.id)}" tabindex="0" aria-label="Lire : ${escapeHtml(title)}">
+    ${articleVisual(article, index)}
+    <div class="article-body"><h2>${escapeHtml(title)}</h2><div class="meta"><span class="source">${escapeHtml(article.source || 'Source')}</span><span>${escapeHtml(clockLabel(article.publishedAt))}</span></div></div>
+  </article>`;
+}
+
+function historyBriefMarkup() {
+  const major = /guerre|attaque|cessez-le-feu|élection|gouvernement|président|premier ministre|attentat|catastrophe|séisme|inondation|incendie|crise|accord|sommet|justice|condamn|budget|déficit|croissance|inflation|chômage|épidémie|climat|diplomatie|nucléaire|réforme|retraite/i;
+  const low = /football|match|mercato|tennis|formule 1|promotion|bon plan|soldes|réduction|console|jeu vidéo|gta|people|célébrité|télé-réalité/i;
+  const editorial = new Set(['Politique', 'International', 'Europe', 'Économie', 'Société', 'Santé', 'Environnement', 'Science']);
+  const impact = article => Number(article.score || 0) + (editorial.has(article.category) ? 65 : 0) + (major.test(`${article.title || ''} ${article.summary || ''}`) ? 80 : 0) + Math.max(0, (article.sources?.length || 1) - 1) * 25 - (low.test(`${article.title || ''} ${article.summary || ''}`) ? 180 : 0);
+  const days = new Map();
+  for (const article of state.articles) {
+    const delta = dayDelta(article.publishedAt);
+    if (delta < 1 || delta > 8 || state.feedback[article.id] === 'not') continue;
+    const key = dayKey(article.publishedAt);
+    if (!days.has(key)) days.set(key, []);
+    days.get(key).push(article);
+  }
+  return [...days.entries()].sort((a, b) => b[0].localeCompare(a[0])).slice(0, 7).map(([, items], dayIndex) => {
+    const selected = items.sort((a, b) => impact(b) - impact(a)).slice(0, 5);
+    return `<section class="brief-history-day-v9138"><div class="brief-history-date-v9138">${escapeHtml(dayLabel(selected[0]?.publishedAt))}${dayDelta(selected[0]?.publishedAt) <= 2 ? ` · ${escapeHtml(fullDay(selected[0]?.publishedAt))}` : ''}</div><div class="feed stable-owned-list">${selected.map((article, index) => compactArticleRow(article, dayIndex * 10 + index)).join('')}</div></section>`;
+  }).join('');
+}
+
+function renderWatchesFinal() {
+  const topics = uniqueTopics(state.settings.briefWatchTopics || []);
+  const recent = state.articles.filter(article => state.feedback[article.id] !== 'not').slice().sort((a, b) => Date.parse(b.publishedAt || 0) - Date.parse(a.publishedAt || 0)).slice(0, 220);
+  const order = [];
+  const days = new Map();
+  for (const article of recent) {
+    const key = dayKey(article.publishedAt);
+    if (!days.has(key)) { days.set(key, []); order.push(key); }
+    days.get(key).push(article);
+  }
+  const groups = order.slice(0, 9).map((key, dayIndex) => {
+    const dayArticles = days.get(key) || [];
+    const watched = topics.length ? dayArticles.filter(article => topics.some(topic => watchMatches(article, topic))) : [];
+    const filtered = watched.length ? `<div class="feed stable-owned-list watch-filtered-feed-v9138">${watched.slice(0, 30).map((article, index) => compactArticleRow(article, dayIndex * 40 + index)).join('')}</div>` : '<p class="watch-empty-day-v9138">Aucune nouvelle de vos veilles ce jour-là.</p>';
+    const all = `<div class="feed stable-owned-list watch-all-feed-v9138" hidden>${dayArticles.map((article, index) => compactArticleRow(article, dayIndex * 40 + index)).join('')}</div>`;
+    return `<section class="watch-day-v9138"><h3>${escapeHtml(dayLabel(dayArticles[0]?.publishedAt))}</h3>${filtered}<button type="button" class="watch-all-band-v9138" data-watch-all-toggle><span>Toute l’actualité</span><small>${dayArticles.length} article${dayArticles.length > 1 ? 's' : ''}</small></button>${all}</section>`;
+  }).join('');
+  return `<section class="watches-by-day-v9138 watch-layout-v9138"><div class="watches-head-v9138"><strong>Mes veilles</strong><button type="button" class="watch-edit-button-v9138" data-watch-edit-open>Modifier veilles</button></div>${groups || '<p class="muted-note">Aucune actualité récente.</p>'}</section>`;
 }
 
 function renderBrief() {
@@ -324,11 +496,10 @@ function renderBrief() {
     if (picks.length >= 5) break;
     if (!picks.includes(candidate)) picks.push(candidate);
   }
-  const global = picks.length ? `Ces cinq événements sont retenus pour leur portée nationale ou internationale, leur gravité, leur actualité et leur confirmation par les sources disponibles.` : 'Le brief se construira après la première synchronisation.';
-  return `<main class="page">${topbar('Brief du jour', false)}${syncStrip()}
-    <section class="date-card"><span class="date">${escapeHtml(dateLabel())}</span><h2>Les 5 événements majeurs France & Monde</h2></section>
-    <ol class="brief-points">${picks.map(({ article, scope }, index) => `<li class="brief-point" data-article="${escapeHtml(article.id)}" data-index="${index + 1}"><small class="brief-scope">${scope}</small><strong>${escapeHtml(article.title)}</strong><span>${escapeHtml(article.summary)}</span></li>`).join('')}</ol>
-    <section class="brief-card"><span class="brief-label">Sélection éditoriale</span><h2>À la une d’un journal télévisé</h2><p>${escapeHtml(global)}</p><div class="source-list"><span class="source-chip">${state.stats?.feedsSucceeded ?? '—'} flux lus</span><span class="source-chip">5 faits maximum</span><span class="source-chip">France + Monde</span></div></section>
+  const essential = `<section class="journal-section"><div class="brief-day-v9138">${escapeHtml(fullDay(new Date()))}</div><h2 class="brief-section-title">Les 5 événements majeurs</h2><div class="feed stable-owned-list">${picks.length ? picks.map(({ article }, index) => compactArticleRow(article, index)).join('') : '<p class="muted-note">Aucune information majeure récente.</p>'}</div></section><section class="brief-history-v9138">${historyBriefMarkup()}</section>`;
+  return `<button type="button" class="top-reset-icon-v9138" data-reset-read aria-label="Réinitialiser les articles parcourus" title="Réinitialiser">↻</button><main class="page">${topbar('Brief du jour', false)}
+    <div class="brief-mode-tabs"><button class="brief-mode-tab ${state.briefMode === 'essential' ? 'active' : ''}" data-brief-mode="essential">L’essentiel</button><button class="brief-mode-tab ${state.briefMode === 'watches' ? 'active' : ''}" data-brief-mode="watches">Mes veilles</button></div>
+    <div class="runtime-brief-content" data-stable-brief-content>${state.briefMode === 'essential' ? essential : renderWatchesFinal()}</div>
   </main>${nav('brief')}`;
 }
 
@@ -423,11 +594,98 @@ function render({ resetScroll = false, scrollTop = null } = {}) {
   app.innerHTML = (views[state.view] || renderHome)() + renderSheet();
   window.scrollTo({ top: preservedScroll, behavior: 'instant' });
   if (preservedScroll > 0) requestAnimationFrame(() => window.scrollTo({ top: preservedScroll, behavior: 'instant' }));
+  notifyStableRender('view');
+}
+
+function notifyStableRender(reason = 'update') {
+  window.dispatchEvent(new CustomEvent('news:stable-render', { detail: { reason, view: state.view } }));
+  scheduleVisualBackfill(80);
+}
+
+function refreshSheet() {
+  const current = app.querySelector('.sheet-backdrop');
+  if (!state.sheet) { current?.remove(); return; }
+  const template = document.createElement('template');
+  template.innerHTML = renderSheet();
+  const next = template.content.firstElementChild;
+  if (!next) return;
+  if (current) current.replaceWith(next); else app.appendChild(next);
+  notifyStableRender('sheet');
+}
+
+function openSheet() {
+  state.sheet = true;
+  refreshSheet();
+}
+
+function closeSheet() {
+  state.sheet = false;
+  app.querySelector('.sheet-backdrop')?.remove();
+  notifyStableRender('sheet-close');
+}
+
+function watchEditorMarkup() {
+  const topics = uniqueTopics(state.settings.briefWatchTopics || []);
+  return `<div class="watch-editor-form-v9138"><input class="text-input" data-watch-editor-input maxlength="80" autocomplete="off" placeholder="Ex. fusion nucléaire, Alzheimer, Quest 4…"><button type="button" class="small-primary-btn" data-watch-editor-add>Ajouter</button></div><div class="watch-editor-list-v9138">${topics.length ? topics.map(topic => `<div class="watch-editor-item-v9138"><span>${escapeHtml(topic)}</span><button type="button" data-watch-editor-remove="${escapeHtml(topic)}" aria-label="Supprimer ${escapeHtml(topic)}">×</button></div>`).join('') : '<p class="muted-note">Aucune veille définie.</p>'}</div>`;
+}
+
+function openWatchEditor() {
+  app.querySelector('.watch-editor-backdrop-v9138')?.remove();
+  const backdrop = document.createElement('div');
+  backdrop.className = 'watch-editor-backdrop-v9138';
+  backdrop.innerHTML = `<section class="watch-editor-sheet-v9138" role="dialog" aria-modal="true"><header><div><span>Mes veilles</span><h2>Modifier veilles</h2></div><button type="button" data-watch-editor-close aria-label="Fermer">×</button></header><p>Ajoutez ou retirez ici les sujets suivis.</p><div data-watch-editor-body>${watchEditorMarkup()}</div></section>`;
+  app.appendChild(backdrop);
+  backdrop.querySelector('[data-watch-editor-input]')?.focus({ preventScroll: true });
+}
+
+function updateWatchTopic(value, remove = false) {
+  const topic = String(value || '').replace(/\s+/g, ' ').trim();
+  if (!topic) return;
+  const key = normalizeTopic(topic);
+  const topics = uniqueTopics(state.settings.briefWatchTopics || []);
+  state.settings.briefWatchTopics = remove ? topics.filter(item => normalizeTopic(item) !== key) : uniqueTopics([...topics, topic]);
+  state.keywords = remove ? state.keywords.filter(item => normalizeTopic(item) !== key) : uniqueTopics([...state.keywords, topic]);
+  persist();
+  const body = app.querySelector('[data-watch-editor-body]');
+  if (body) body.innerHTML = watchEditorMarkup();
+}
+
+function appendHomeToLimit({ increment = false } = {}) {
+  if (increment) state.homeLimit += 36;
+  const feed = app.querySelector('[data-stable-home-feed]');
+  if (!feed || state.view !== 'home') return;
+  const articles = (state.savedOnly ? stableHomeArticles().filter(article => state.saved.has(article.id)) : stableHomeArticles()).slice(0, state.homeLimit);
+  const currentIds = new Set([...feed.querySelectorAll(':scope > .article-card[data-article]')].map(card => String(card.dataset.article || '')));
+  feed.querySelector(':scope > [data-home-more]')?.remove();
+  if (!currentIds.size && articles.length) feed.replaceChildren();
+  const template = document.createElement('template');
+  template.innerHTML = articles.filter(article => !currentIds.has(String(article.id))).map((article, index) => articleCard(article, currentIds.size + index)).join('');
+  feed.append(...template.content.childNodes);
+  const remaining = Math.max(0, (state.savedOnly ? stableHomeArticles().filter(article => state.saved.has(article.id)) : stableHomeArticles()).length - articles.length);
+  if (remaining) {
+    const button = document.createElement('button');
+    button.type = 'button';
+    button.className = 'home-more';
+    button.dataset.homeMore = '';
+    button.innerHTML = `Afficher ${Math.min(36, remaining)} articles de plus <small>${remaining} encore disponibles</small>`;
+    feed.appendChild(button);
+  }
+  notifyStableRender('home-append');
+}
+
+function refreshAfterNewsChange() {
+  reconcileHomeOrder();
+  if (state.view === 'home') {
+    appendHomeToLimit();
+    return;
+  }
+  if (state.view === 'brief' && app.querySelector('.article-card[data-article]')) return;
+  render();
 }
 
 function navigate(view, additions = {}) {
   if (view !== state.view) state.previous.push({ view: state.view, category: state.category, articleId: state.articleId, categoryTab: state.categoryTab, scrollTop: window.scrollY });
-  Object.assign(state, { view, ...additions });
+  Object.assign(state, { view, sheet: false, ...additions });
   render({ resetScroll: true });
 }
 
@@ -471,8 +729,7 @@ function applyDownloadedNews(payload) {
   state.syncStatus = 'idle';
   state.syncError = '';
   persistCache();
-  render();
-  scheduleVisualBackfill();
+  refreshAfterNewsChange();
   return true;
 }
 
@@ -625,18 +882,8 @@ function scheduleVisualBackfill(delay = 350) {
   visualBackfillTimer = setTimeout(() => backfillVisibleVisuals(), delay);
 }
 
-const visualBackfillObserver = new MutationObserver(mutations => {
-  const addedArticleCards = mutations.some(mutation => [...mutation.addedNodes].some(node =>
-    node.nodeType === Node.ELEMENT_NODE
-    && (node.matches?.('.article-card[data-article]') || node.querySelector?.('.article-card[data-article]'))
-  ));
-  if (addedArticleCards) scheduleVisualBackfill();
-});
-visualBackfillObserver.observe(app, { childList: true, subtree: true });
-
-// Image errors do not add/remove DOM nodes, so the observer above cannot see
-// them. Capture the failure and immediately schedule the same-origin recovery
-// used for articles that arrived without a prepared visual.
+// Image errors do not add/remove DOM nodes. Capture the failure and immediately
+// schedule the same-origin recovery used for articles without a prepared visual.
 document.addEventListener('error', event => {
   const image = event.target;
   if (image instanceof HTMLImageElement && image.closest('.article-card[data-article]')) {
@@ -649,7 +896,7 @@ async function syncNews({ silent = false } = {}) {
   state.syncStatus = 'loading'; state.syncError = '';
   // Background refreshes keep the current DOM in place until fresh data is
   // ready. Re-rendering here made every cached thumbnail disappear briefly.
-  if (!silent) render();
+  if (!silent && !app.querySelector('[data-article]')) render();
   syncPromise = (async () => {
     try {
       const result = await fetchLiveNews({
@@ -664,13 +911,12 @@ async function syncNews({ silent = false } = {}) {
       state.stats = result.stats || null;
       state.syncStatus = 'idle';
       persistCache();
-      render();
-      scheduleVisualBackfill();
+      refreshAfterNewsChange();
       if (!silent) toast(`${state.articles.length} article${state.articles.length > 1 ? 's' : ''} actualisé${state.articles.length > 1 ? 's' : ''}`);
     } catch (error) {
       state.syncStatus = 'error';
       state.syncError = error?.message || 'Connexion impossible';
-      render();
+      if (!['home', 'brief'].includes(state.view) || !app.querySelector('[data-article]')) render();
       if (!silent) toast('Actualisation impossible');
     } finally {
       syncPromise = null;
@@ -694,7 +940,7 @@ function addKeyword() {
   if (state.keywords.some(keyword => keyword.toLowerCase() === value.toLowerCase())) return toast('Ce mot-clé est déjà suivi');
   state.keywords.push(value);
   if (!state.settings.briefWatchTopics.includes(value)) state.settings.briefWatchTopics.push(value);
-  persist(); render(); toast('Centre d’intérêt ajouté'); syncNews({ silent: true });
+  persist(); state.sheet ? refreshSheet() : render(); toast('Centre d’intérêt ajouté'); syncNews({ silent: true });
 }
 
 async function checkAppUpdate({ announce = false } = {}) {
@@ -724,6 +970,45 @@ async function checkAppUpdate({ announce = false } = {}) {
 }
 
 app.addEventListener('click', async event => {
+  if (event.target.closest('[data-reset-read]')) {
+    event.preventDefault();
+    greyArticleIds.clear();
+    localStorage.setItem('news-grey-after-scroll-v9138-v1', '[]');
+    document.querySelectorAll('.article-card.read-passed-v9138').forEach(card => card.classList.remove('read-passed-v9138'));
+    return;
+  }
+  const more = event.target.closest('[data-home-more]');
+  if (more) { event.preventDefault(); event.stopPropagation(); appendHomeToLimit({ increment: true }); return; }
+  const briefMode = event.target.closest('[data-brief-mode]');
+  if (briefMode) { event.preventDefault(); state.briefMode = briefMode.dataset.briefMode === 'watches' ? 'watches' : 'essential'; render({ scrollTop: 0 }); return; }
+  const watchAll = event.target.closest('[data-watch-all-toggle]');
+  if (watchAll) {
+    event.preventDefault();
+    const day = watchAll.closest('.watch-day-v9138');
+    const filtered = day?.querySelector('.watch-filtered-feed-v9138');
+    const empty = day?.querySelector('.watch-empty-day-v9138');
+    const all = day?.querySelector('.watch-all-feed-v9138');
+    const opening = Boolean(all?.hidden);
+    if (all) all.hidden = !opening;
+    if (filtered) filtered.hidden = opening;
+    if (empty) empty.hidden = opening;
+    watchAll.classList.toggle('open', opening);
+    const label = watchAll.querySelector('span');
+    if (label) label.textContent = opening ? 'Mes veilles seulement' : 'Toute l’actualité';
+    notifyStableRender('watch-toggle');
+    return;
+  }
+  if (event.target.closest('[data-watch-edit-open]')) { event.preventDefault(); openWatchEditor(); return; }
+  if (event.target.closest('[data-watch-editor-close]') || event.target.classList.contains('watch-editor-backdrop-v9138')) { event.preventDefault(); app.querySelector('.watch-editor-backdrop-v9138')?.remove(); if (state.view === 'brief') render({ scrollTop: 0 }); return; }
+  if (event.target.closest('[data-watch-editor-add]')) {
+    event.preventDefault();
+    const input = app.querySelector('[data-watch-editor-input]');
+    updateWatchTopic(input?.value || '');
+    if (input) input.value = '';
+    return;
+  }
+  const watchRemove = event.target.closest('[data-watch-editor-remove]');
+  if (watchRemove) { event.preventDefault(); updateWatchTopic(watchRemove.dataset.watchEditorRemove || '', true); return; }
   const save = event.target.closest('[data-save]');
   if (save) {
     event.preventDefault(); event.stopPropagation();
@@ -743,11 +1028,11 @@ app.addEventListener('click', async event => {
   const viewButton = event.target.closest('[data-view]');
   if (viewButton) {
     const view = viewButton.dataset.view;
-    if (view === 'sheet') { state.sheet = true; render(); } else navigate(view, { savedOnly: false });
+    if (view === 'sheet') openSheet(); else navigate(view, { savedOnly: false });
     return;
   }
   if (event.target.closest('[data-back]')) { goBack(); return; }
-  if (event.target.closest('[data-dismiss-sheet]')) { state.sheet = false; render(); return; }
+  if (event.target.closest('[data-dismiss-sheet]')) { closeSheet(); return; }
   if (event.target.closest('[data-open-settings]')) { state.sheet = false; navigate('settings', { savedOnly: false }); return; }
   if (event.target.closest('[data-check-update]')) { await checkAppUpdate({ announce: true }); return; }
   if (event.target.closest('[data-refresh]')) { await syncNews(); return; }
@@ -781,13 +1066,13 @@ app.addEventListener('click', async event => {
   const toggle = event.target.closest('[data-setting-toggle]');
   if (toggle) { const key = toggle.dataset.settingToggle; state.settings[key] = !state.settings[key]; persist(); render(); if (['webSearch', 'sourcePriority'].includes(key)) syncNews({ silent: true }); return; }
   const interest = event.target.closest('[data-interest]');
-  if (interest) { const name = interest.dataset.interest; const current = new Set(state.settings.interests); current.has(name) ? current.delete(name) : current.add(name); state.settings.interests = [...current]; persist(); render(); syncNews({ silent: true }); return; }
+  if (interest) { const name = interest.dataset.interest; const current = new Set(state.settings.interests); current.has(name) ? current.delete(name) : current.add(name); state.settings.interests = [...current]; persist(); reconcileHomeOrder({ reset: true }); state.sheet ? refreshSheet() : render(); syncNews({ silent: true }); return; }
   const general = event.target.closest('[data-general-category]');
-  if (general) { const name = general.dataset.generalCategory; const current = new Set(state.settings.generalCategories); current.has(name) ? current.delete(name) : current.add(name); state.settings.generalCategories = [...current]; persist(); render(); return; }
+  if (general) { const name = general.dataset.generalCategory; const current = new Set(state.settings.generalCategories); current.has(name) ? current.delete(name) : current.add(name); state.settings.generalCategories = [...current]; persist(); reconcileHomeOrder({ reset: true }); state.sheet ? refreshSheet() : render(); return; }
   const briefEssential = event.target.closest('[data-brief-essential]');
-  if (briefEssential) { const name = briefEssential.dataset.briefEssential; const current = new Set(state.settings.briefEssentialCategories); current.has(name) ? current.delete(name) : current.add(name); state.settings.briefEssentialCategories = [...current]; persist(); render(); return; }
+  if (briefEssential) { const name = briefEssential.dataset.briefEssential; const current = new Set(state.settings.briefEssentialCategories); current.has(name) ? current.delete(name) : current.add(name); state.settings.briefEssentialCategories = [...current]; persist(); state.sheet ? refreshSheet() : render(); return; }
   const briefWatch = event.target.closest('[data-brief-watch]');
-  if (briefWatch) { const name = briefWatch.dataset.briefWatch; const current = new Set(state.settings.briefWatchTopics); current.has(name) ? current.delete(name) : current.add(name); state.settings.briefWatchTopics = [...current]; persist(); render(); return; }
+  if (briefWatch) { const name = briefWatch.dataset.briefWatch; const current = new Set(state.settings.briefWatchTopics); current.has(name) ? current.delete(name) : current.add(name); state.settings.briefWatchTopics = [...current]; persist(); state.sheet ? refreshSheet() : render(); return; }
   if (event.target.closest('[data-saved-filter]')) { state.savedOnly = !state.savedOnly; render(); return; }
   if (event.target.closest('[data-reset]')) { state.settings = { ...defaultSettings, generalCategories: [...GENERAL_CATEGORIES], interests: [...PERSONAL_THEMES], briefEssentialCategories: [...GENERAL_CATEGORIES], briefWatchTopics: [...DEFAULT_WATCH_TOPICS] }; state.keywords = []; state.topicPreferences = {}; window.NewsPersonalizationV91?.reset(); persist(); render(); toast('Préférences réinitialisées'); syncNews({ silent: true }); return; }
   if (event.target.closest('[data-install]')) {
@@ -796,7 +1081,7 @@ app.addEventListener('click', async event => {
     else toast('Dans Chrome : menu ⋮ puis Installer l’application');
     return;
   }
-  if (event.target.closest('[data-close-sheet]') && !event.target.closest('[data-sheet-panel]')) { state.sheet = false; render(); }
+  if (event.target.closest('[data-close-sheet]') && !event.target.closest('[data-sheet-panel]')) closeSheet();
 });
 
 app.addEventListener('change', async event => {
@@ -821,8 +1106,65 @@ app.addEventListener('keydown', event => {
   if ((event.key === 'Enter' || event.key === ' ') && event.target.matches('[data-article]')) event.target.click();
   if (event.key === 'Enter' && event.target.id === 'keyword-input') addKeyword();
   if (event.key === 'Enter' && event.target.id === 'source-url') addSource();
-  if (event.key === 'Escape' && state.sheet) { state.sheet = false; render(); }
+  if (event.key === 'Escape' && state.sheet) closeSheet();
 });
+
+const greyArticleIds = new Set(safeJson('news-grey-after-scroll-v9138-v1', []).map(String));
+const observedGreyCards = new WeakSet();
+let scrollingDown = false;
+let lastScrollY = window.scrollY;
+let scrollFrame = 0;
+let continuousBusy = false;
+const greyObserver = new IntersectionObserver(entries => entries.forEach(entry => {
+  if (entry.intersectionRatio >= .55) entry.target.dataset.greyEligibleV9138 = '1';
+}), { threshold: [.55] });
+
+function bindStableCards() {
+  document.querySelectorAll('.stable-owned-list .article-card[data-article]').forEach(card => {
+    if (!observedGreyCards.has(card)) { observedGreyCards.add(card); greyObserver.observe(card); }
+    card.classList.toggle('read-passed-v9138', greyArticleIds.has(String(card.dataset.article || '')));
+  });
+}
+
+function markPassedCards() {
+  if (!scrollingDown || document.querySelector('.quick-summary-backdrop')) return;
+  let changed = false;
+  document.querySelectorAll('.stable-owned-list .article-card[data-grey-eligible-v9138="1"]:not(.read-passed-v9138)').forEach(card => {
+    const rect = card.getBoundingClientRect();
+    if (rect.top < 0 && rect.bottom <= Math.max(20, innerHeight * .05)) {
+      const id = String(card.dataset.article || '');
+      if (id) { greyArticleIds.add(id); card.classList.add('read-passed-v9138'); changed = true; }
+    }
+  });
+  if (changed) localStorage.setItem('news-grey-after-scroll-v9138-v1', JSON.stringify([...greyArticleIds].slice(-1600)));
+}
+
+function pumpContinuousHome() {
+  if (continuousBusy || state.view !== 'home' || document.hidden) return;
+  if (document.documentElement.scrollHeight - (window.scrollY + innerHeight) >= Math.max(2200, innerHeight * 3.6)) return;
+  if (!app.querySelector('[data-home-more]')) return;
+  continuousBusy = true;
+  appendHomeToLimit({ increment: true });
+  requestAnimationFrame(() => { continuousBusy = false; pumpContinuousHome(); });
+}
+
+window.addEventListener('news:stable-render', () => {
+  bindStableCards();
+  requestAnimationFrame(pumpContinuousHome);
+});
+window.addEventListener('scroll', () => {
+  const y = window.scrollY;
+  scrollingDown = y > lastScrollY + 1 ? true : y < lastScrollY - 1 ? false : scrollingDown;
+  lastScrollY = y;
+  if (scrollFrame) return;
+  scrollFrame = requestAnimationFrame(() => {
+    scrollFrame = 0;
+    bindStableCards();
+    markPassedCards();
+    pumpContinuousHome();
+  });
+}, { passive: true });
+window.addEventListener('resize', () => requestAnimationFrame(pumpContinuousHome), { passive: true });
 
 let serviceWorkerRefreshing = false;
 if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
@@ -840,7 +1182,11 @@ window.addEventListener('beforeinstallprompt', event => {
 });
 window.addEventListener('appinstalled', () => { deferredInstallPrompt = null; isInstalled = true; render(); toast('Mon actualité est installée'); });
 window.addEventListener('online', () => syncNews({ silent: true }));
-window.addEventListener('focus', () => { if (!state.lastSync || Date.now() - Date.parse(state.lastSync) > 5 * 60 * 1000) syncNews({ silent: true }); });
+window.addEventListener('focus', () => {
+  state.feedback = safeJson('news-feedback', state.feedback);
+  state.topicPreferences = safeJson('news-topic-preferences-v1', state.topicPreferences);
+  if (!state.lastSync || Date.now() - Date.parse(state.lastSync) > 5 * 60 * 1000) syncNews({ silent: true });
+});
 window.addEventListener('news-topic-preferences-changed', event => {
   state.topicPreferences = event.detail && typeof event.detail === 'object'
     ? { ...event.detail }

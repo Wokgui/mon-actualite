@@ -154,7 +154,7 @@ try {
 
   await page.locator('.bottom-nav [data-view="brief"]').click();
   await page.waitForSelector('.bottom-nav [data-view="brief"].active', { timeout: 5000 });
-  await page.waitForSelector('.brief-smart-v87', { timeout: 7000 });
+  await page.waitForSelector('[data-stable-brief-content]', { timeout: 7000 });
 
   await page.locator('.bottom-nav [data-view="home"]').click();
   await page.waitForSelector('.bottom-nav [data-view="home"].active', { timeout: 5000 });

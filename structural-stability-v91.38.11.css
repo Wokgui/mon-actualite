@@ -22,3 +22,129 @@
   transition: none !important;
   animation: none !important;
 }
+
+.article-card.read-passed-v9138 {
+  opacity: .5 !important;
+  filter: saturate(.55) !important;
+  transition: none !important;
+}
+.article-card.read-passed-v9138 h2,
+.article-card.read-passed-v9138 .meta { color: #918c96 !important; }
+.article-card.read-passed-v9138 img { filter: grayscale(.35) saturate(.65) !important; }
+.top-reset-icon-v9138 {
+  position: fixed;
+  z-index: 1100;
+  top: max(2px, env(safe-area-inset-top));
+  left: 50%;
+  transform: translateX(-50%);
+  width: 30px;
+  height: 28px;
+  padding: 0;
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: #6d55d8;
+  font-size: 22px;
+  font-weight: 800;
+  line-height: 28px;
+}
+.journal-section .brief-section-title {
+  margin: 2px 0 14px !important;
+  text-align: center !important;
+  font-size: 18px !important;
+}
+.journal-section .brief-day-v9138 {
+  margin: 0 0 5px;
+  color: #756d7e;
+  text-align: center;
+  text-transform: capitalize;
+  font-size: 11px;
+  font-weight: 800;
+}
+.brief-history-v9138 { margin-top: 20px; }
+.brief-history-day-v9138 { margin-top: 22px; }
+.brief-history-date-v9138 {
+  margin: 0 0 10px;
+  color: #5f5869;
+  text-align: center;
+  font-size: 13px;
+  font-weight: 900;
+}
+.brief-history-day-v9138 .feed { display: grid; gap: 10px; }
+.watches-head-v9138 { display: flex; align-items: center; justify-content: space-between; gap: 12px; }
+.watch-edit-button-v9138 {
+  border: 0;
+  border-radius: 999px;
+  padding: 9px 13px;
+  background: #eee9ff;
+  color: #5d48c9;
+  font-size: 11px;
+  font-weight: 850;
+}
+.watch-day-v9138 { margin-top: 18px; }
+.watch-day-v9138 > h3 { margin: 0 0 9px; color: #4f4956; font-size: 15px; font-weight: 900; }
+.watch-all-band-v9138 {
+  width: 100%;
+  margin: 11px 0 4px;
+  padding: 12px 14px;
+  border: 1px solid #e2ddec;
+  border-radius: 14px;
+  background: #fff;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  color: #5d48c9;
+  font-weight: 850;
+  text-align: left;
+}
+.watch-all-band-v9138 small { color: #8b8591; font-size: 10px; }
+.watch-all-band-v9138.open { background: #f1edff; }
+.watch-empty-day-v9138 { margin: 8px 0 10px; color: #918b96; font-size: 11px; }
+.watch-editor-backdrop-v9138 {
+  position: fixed;
+  inset: 0;
+  z-index: 10050;
+  padding: 16px;
+  background: rgba(28, 23, 39, .28);
+  display: flex;
+  align-items: flex-end;
+  justify-content: center;
+}
+.watch-editor-sheet-v9138 {
+  width: min(680px, 100%);
+  max-height: 82vh;
+  overflow: auto;
+  border-radius: 24px 24px 18px 18px;
+  padding: 18px;
+  background: #faf9fd;
+  box-shadow: 0 18px 60px rgba(40, 30, 70, .24);
+}
+.watch-editor-sheet-v9138 header { display: flex; justify-content: space-between; gap: 12px; }
+.watch-editor-sheet-v9138 header > button {
+  width: 40px;
+  height: 40px;
+  border: 0;
+  border-radius: 14px;
+  background: #eeeaf3;
+  font-size: 24px;
+}
+.watch-editor-form-v9138 { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: 8px; }
+.watch-editor-list-v9138 { display: grid; gap: 7px; margin-top: 12px; }
+.watch-editor-item-v9138 {
+  display: grid;
+  grid-template-columns: minmax(0, 1fr) 36px;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 6px 6px 12px;
+  border: 1px solid #e5e1ea;
+  border-radius: 13px;
+  background: #fff;
+}
+.watch-editor-item-v9138 button {
+  width: 34px;
+  height: 34px;
+  border: 0;
+  border-radius: 10px;
+  background: #f1eef5;
+  font-size: 20px;
+}

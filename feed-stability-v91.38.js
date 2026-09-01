@@ -16,8 +16,8 @@ const byId=id=>articles().find(a=>String(a.id||'')===String(id||''))||null;
 function cached(a){if(!a?.id)return false;const x=read(QUICK,{})[`article:${a.id}`];return Boolean(x?.summary&&!x?.unavailable&&good(x.summary))}
 function save(a,summary,data={}){if(!a?.id||!good(summary))return;const k=`article:${a.id}`,q=read(QUICK,{});q[k]={summary:clean(summary),ai:Boolean(data.ai||data.grounded),unavailable:false,savedAt:Date.now()};write(QUICK,Object.fromEntries(Object.entries(q).slice(-220)))}
 
-/* Images first. MutationObserver callbacks run before the next paint, so new
-   rows get eager/high priority before the user sees their first frame. */
+/* Images first. The single renderer announces complete/append-only commits, so
+   image priority is set immediately without observing every DOM mutation. */
 function prepareImages(){
  const imgs=[...document.querySelectorAll('.article-card:not([hidden]) img.article-image,.brief-point:not([hidden]) img.brief-thumb')];let rank=0;
  for(const img of imgs){const r=img.getBoundingClientRect();if(r.bottom<-400||r.top>innerHeight*3.5)continue;img.loading='eager';img.decoding='async';if('fetchPriority'in img)img.fetchPriority=rank<12?'high':'auto';rank++;
@@ -48,13 +48,11 @@ function runIdleSummaries(){
  const queue=visibleCandidates();for(const a of queue){if(summaryActive>=SUMMARY_CONCURRENCY)break;fetchSummary(a)}
 }
 function scheduleIdleSummaries(delay=650){clearTimeout(idleTimer);idleTimer=setTimeout(()=>{const ric=window.requestIdleCallback||((cb)=>setTimeout(()=>cb({timeRemaining:()=>25,didTimeout:false}),0));ric(runIdleSummaries,{timeout:900})},delay)}
-function interact(){lastInteraction=Date.now();scheduleIdleSummaries(700)}
-
 /* pointerdown gives a non-cached article a head start before the click opens it. */
 document.addEventListener('pointerdown',e=>{lastInteraction=Date.now();const card=e.target.closest?.('.article-card[data-article]');if(card)fetchSummary(byId(card.dataset.article));}, {capture:true,passive:true});
 window.addEventListener('scroll',()=>{lastInteraction=Date.now();prepareImages();scheduleIdleSummaries(800)},{passive:true});
 window.addEventListener('resize',()=>{prepareImages();scheduleIdleSummaries(700)},{passive:true});
 document.addEventListener('visibilitychange',()=>{if(!document.hidden){prepareImages();scheduleIdleSummaries(500)}});
-const app=document.getElementById('app');if(app)new MutationObserver(()=>{prepareImages();scheduleIdleSummaries(650)}).observe(app,{childList:true,subtree:true});
+ window.addEventListener('news:stable-render',()=>{prepareImages();scheduleIdleSummaries(650)});
 if(document.readyState==='loading')document.addEventListener('DOMContentLoaded',()=>{prepareImages();scheduleIdleSummaries(550)},{once:true});else{prepareImages();scheduleIdleSummaries(550)}
 })();

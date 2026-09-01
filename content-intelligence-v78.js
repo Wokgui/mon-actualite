@@ -428,6 +428,7 @@
     decorateQueued = false;
     const map = new Map(cachedArticles().map(article => [String(article.id || ''), article]));
     document.querySelectorAll('.article-card[data-article]').forEach(card => {
+      if (card.closest('.stable-owned-list')) return;
       const article = map.get(String(card.dataset.article || ''));
       if (!article?.whyV78) return;
       let node = card.querySelector('.why-v78');

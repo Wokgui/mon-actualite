@@ -331,6 +331,7 @@
     if (!feeds.length) return;
 
     for (const feed of feeds) {
+      if (feed.matches('.stable-owned-list')) continue;
       const cards = [...feed.querySelectorAll(':scope > .article-card[data-article]')];
       if (!cards.length) continue;
       const freshCards = cards.filter(card => isFreshArticle(map.get(String(card.dataset.article || ''))));

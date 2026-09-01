@@ -178,6 +178,7 @@ function applyBlockedCards() {
   const terms = blockedTerms();
   if (!terms.length) return;
   document.querySelectorAll('[data-article]').forEach(card => {
+    if (card.closest('.stable-owned-list')) return;
     const article = articleById(card.dataset.article);
     const term = blockedBy(article, terms);
     if (!term) return;
@@ -197,6 +198,7 @@ function canonicalArticleUrl(article) {
 
 function removeDuplicateCards() {
   document.querySelectorAll('.feed').forEach(feed => {
+    if (feed.classList.contains('stable-owned-list')) return;
     const seenTitles = new Set();
     const seenUrls = new Set();
     [...feed.querySelectorAll(':scope > .article-card[data-article], :scope > .brief-point[data-article]')].forEach(card => {
@@ -219,6 +221,7 @@ function diversifyHome() {
   if (!document.querySelector('.nav-item.active[data-view="home"]')) return;
   const feed = document.querySelector('.page .feed');
   if (!feed) return;
+  if (feed.classList.contains('stable-owned-list')) return;
   const cards = [...feed.children].filter(node => node.matches?.('.article-card[data-article]'));
   const trailingControls = [...feed.children].filter(node => !node.matches?.('.article-card[data-article]'));
   if (cards.length < 3) return;

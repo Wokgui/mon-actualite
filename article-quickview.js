@@ -162,6 +162,7 @@ function quickTime(value) {
 
 function enhanceArticleTitlesAndTabs() {
   document.querySelectorAll('[data-article]').forEach(card => {
+    if (card.closest('.stable-owned-list')) return;
     const article = quickArticle(card.dataset.article);
     if (!article) return;
     const cleanTitle = titleWithoutSource(article.title, article.source);
@@ -378,7 +379,6 @@ function scheduleQuickEnhance() {
   });
 }
 
-const quickRoot = document.getElementById('app');
-if (quickRoot) new MutationObserver(scheduleQuickEnhance).observe(quickRoot, { childList: true, subtree: true });
+window.addEventListener('news:stable-render', scheduleQuickEnhance);
 window.addEventListener('focus', scheduleQuickEnhance);
 scheduleQuickEnhance();

@@ -164,8 +164,8 @@
   // Release watcher. This file is part of v91.38, so it must identify itself as
   // v91.38. Using nativeFetch here prevents later fetch shims from falsifying
   // the value returned by /version.json.
-  const PAGE_RELEASE = '91.38';
-  const RELEASE_DATE = '31 août 2026';
+  const PAGE_RELEASE = '91.39';
+  const RELEASE_DATE = '1er septembre 2026';
   const VERSION_PATH = '/version.json';
   const CHECK_COOLDOWN_MS = 45_000;
   let checking = false;

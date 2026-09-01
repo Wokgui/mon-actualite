@@ -368,6 +368,7 @@
     const seen = seenState();
 
     for (const feed of feeds) {
+      if (feed.matches('.stable-owned-list')) continue;
       const cards = [...feed.querySelectorAll(':scope > .article-card[data-article]')];
       if (!cards.length) continue;
 

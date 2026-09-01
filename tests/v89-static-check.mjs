@@ -39,7 +39,7 @@ order('diagnostic-metrics-v91.js', 'feed-intelligence-v81.js');
 order('feed-experience-v79.js', 'news-pipeline-v88.js');
 order('experience-v85.js', 'news-pipeline-v88.js');
 order('personalization-learning-v91.js', 'news-pipeline-v88.js');
-order('news-pipeline-v88.js', 'brief-smart-v87.js');
+order('news-pipeline-v88.js', 'article-ui-v91.38.3.js');
 order('quality-v88.js', 'quality-signals-v89.js');
 
 const retired = [

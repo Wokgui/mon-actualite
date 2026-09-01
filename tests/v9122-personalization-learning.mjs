@@ -61,14 +61,13 @@ assert.ok(
 
 const app = fs.readFileSync(new URL('../app.js', import.meta.url), 'utf8');
 const quickview = fs.readFileSync(new URL('../article-quickview.js', import.meta.url), 'utf8');
-const runtime = fs.readFileSync(new URL('../feedly-runtime.js', import.meta.url), 'utf8');
 const pipeline = fs.readFileSync(new URL('../news-pipeline-v88.js', import.meta.url), 'utf8');
 const index = fs.readFileSync(new URL('../index.html', import.meta.url), 'utf8');
 const sw = fs.readFileSync(new URL('../sw.js', import.meta.url), 'utf8');
 
 assert.match(app, /recordFeedback\(article, next, previous\)/, 'les quatre choix de la fiche article doivent alimenter l’apprentissage');
 assert.match(quickview, /recordFeedback\(article, next, previous\)/, 'suivre et ignorer depuis le résumé rapide doivent alimenter l’apprentissage');
-assert.match(runtime, /recordFeedback\(article, '', feedback\[id\]/, 'retirer un suivi doit annuler son signal appris');
+assert.match(app, /updateWatchTopic\(value, remove = false\)[\s\S]*state\.settings\.briefWatchTopics = remove/, 'retirer une veille doit être traité par le propriétaire unique');
 assert.match(pipeline, /NewsPersonalizationV91\?\.learnedSignal/, 'l’ouverture éditoriale doit tenir compte de l’apprentissage plafonné');
 assert.ok(index.indexOf('personalization-learning-v91.js') < index.indexOf('news-pipeline-v88.js'), 'l’apprentissage doit être chargé avant le rééquilibrage');
 assert.match(sw, /personalization-learning-v91\.js\?v=91\.22/, 'le service worker doit précacher le moteur d’apprentissage');

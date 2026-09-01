@@ -1,6 +1,6 @@
 {
-  "version": "65",
-  "codeRelease": "91.38",
-  "release": "2026-08-31",
-  "label": "v91.38 (socle v89) : vrais résumés IA à l’ouverture, distinction claire avec les extraits source et suppression des encadrés mauves inexpliqués"
+  "version": "66",
+  "codeRelease": "91.39",
+  "release": "2026-09-01",
+  "label": "v91.39 (socle v89) : rendu unique et stable, navigation immédiate, Accueil append-only, images prioritaires et résumés IA pré-calculés au repos"
 }

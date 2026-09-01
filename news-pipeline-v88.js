@@ -504,6 +504,7 @@
   function decorateDiscovery() {
     const map = articleMap();
     document.querySelectorAll('.article-card[data-article]').forEach(card => {
+      if (card.closest('.stable-owned-list')) return;
       const article = map.get(String(card.dataset.article || ''));
       if (!article?.discoveryV87 || card.querySelector('.discovery-chip-v87')) return;
       const chip = document.createElement('span');
