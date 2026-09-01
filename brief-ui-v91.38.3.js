@@ -2,7 +2,7 @@
 'use strict';
 const CACHE='news-live-cache';
 const read=(k,f)=>{try{return JSON.parse(localStorage.getItem(k)||'null')??f}catch{return f}},clean=v=>String(v??'').replace(/\s+/g,' ').trim(),esc=v=>clean(v).replace(/[&<>'"]/g,c=>({'&':'&amp;','<':'&lt;','>':'&gt;',"'":'&#39;','"':'&quot;'}[c]));
-const brief=()=>!!document.querySelector('.nav-item.active[data-view="brief"]'),essential=()=>!!document.querySelector('.brief-mode-tab.active[data-brief-mode="essential"]'),watch=()=>!!document.querySelector('.brief-mode-tab.active[data-brief-mode="watches"]');
+const brief=()=>!!document.querySelector('.nav-item.active[data-view="brief"]'),essential=()=>!!document.querySelector('.brief-mode-tab.active[data-brief-mode="essential"]');
 const articles=()=>{const c=read(CACHE,{});return Array.isArray(c.articles)?c.articles:[]};
 const day0=v=>{const d=new Date(v),n=new Date();if(Number.isNaN(d.getTime()))return 999;return Math.round((new Date(n.getFullYear(),n.getMonth(),n.getDate())-new Date(d.getFullYear(),d.getMonth(),d.getDate()))/86400000)};
 const full=v=>{const d=new Date(v);if(Number.isNaN(d.getTime()))return'';const x=new Intl.DateTimeFormat('fr-FR',{weekday:'long',day:'numeric',month:'long'}).format(d);return x[0].toUpperCase()+x.slice(1)};
@@ -31,15 +31,14 @@ function polishEssential(){
     if(h)h.replaceWith(next);else j.after(next);
   }finally{applying=false}
 }
-let quiet=0,max=0,raf=0;
-function begin(){clearTimeout(quiet);clearTimeout(max);document.body.classList.add('brief-switching-v9138');max=setTimeout(()=>document.body.classList.remove('brief-switching-v9138'),800)}
-function settle(){clearTimeout(quiet);quiet=setTimeout(()=>{polishEssential();requestAnimationFrame(()=>document.body.classList.remove('brief-switching-v9138'))},160)}
-function schedule(){if(raf)return;raf=requestAnimationFrame(()=>{raf=0;if(!brief())return;polishEssential();if(document.body.classList.contains('brief-switching-v9138'))settle()})}
-document.addEventListener('pointerdown',e=>{if(e.target.closest?.('[data-view="brief"],[data-brief-mode]')){begin();setTimeout(schedule,0);setTimeout(schedule,120);setTimeout(schedule,360)}},true);
-const root=document.getElementById('app')||document.body;
-new MutationObserver(records=>{if(applying||!brief())return;if(records.some(r=>r.addedNodes.length||r.removedNodes.length))schedule()}).observe(root,{childList:true,subtree:true});
-setTimeout(schedule,0);
+let timers=[];
+function scheduleBurst(){timers.forEach(clearTimeout);timers=[0,60,160,360,700].map(ms=>setTimeout(polishEssential,ms))}
+document.addEventListener('pointerdown',e=>{if(e.target.closest?.('[data-view="brief"],[data-brief-mode="essential"]'))scheduleBurst()},true);
+document.addEventListener('click',e=>{if(e.target.closest?.('[data-view="brief"],[data-brief-mode="essential"]'))scheduleBurst()},true);
+window.addEventListener('focus',()=>{if(brief()&&essential())scheduleBurst()});
+document.addEventListener('visibilitychange',()=>{if(!document.hidden&&brief()&&essential())scheduleBurst()});
+setTimeout(polishEssential,0);
 const s=document.createElement('style');s.textContent=`
-.brief-switching-v9138 .runtime-brief-content{visibility:hidden!important}.journal-section>.muted-note,.brief-scope{display:none!important}.journal-section .brief-section-title{text-align:center!important;font-size:18px!important;margin:2px 0 14px!important}.journal-section .brief-day-v9138{text-align:center!important;margin:0 0 5px!important;color:#756d7e!important;font-size:11px!important;font-weight:800!important;text-transform:capitalize!important}.brief-history-v9138{margin-top:20px}.brief-history-day-v9138{margin-top:22px}.brief-history-date-v9138{text-align:center;margin:0 0 10px;color:#5f5869;font-size:13px;font-weight:900;text-transform:capitalize}.brief-history-day-v9138 .feed{display:grid;gap:10px}
+.brief-switching-v9138 .runtime-brief-content{visibility:visible!important}.journal-section>.muted-note,.brief-scope{display:none!important}.journal-section .brief-section-title{text-align:center!important;font-size:18px!important;margin:2px 0 14px!important}.journal-section .brief-day-v9138{text-align:center!important;margin:0 0 5px!important;color:#756d7e!important;font-size:11px!important;font-weight:800!important;text-transform:capitalize!important}.brief-history-v9138{margin-top:20px}.brief-history-day-v9138{margin-top:22px}.brief-history-date-v9138{text-align:center;margin:0 0 10px;color:#5f5869;font-size:13px;font-weight:900;text-transform:capitalize}.brief-history-day-v9138 .feed{display:grid;gap:10px}
 `;document.head.appendChild(s);
 })();
