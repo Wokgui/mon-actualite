@@ -9,7 +9,7 @@
   <meta name="apple-mobile-web-app-capable" content="yes" />
   <meta name="apple-mobile-web-app-status-bar-style" content="default" />
   <meta name="apple-mobile-web-app-title" content="Actualité" />
-  <link rel="manifest" href="manifest.webmanifest?v=91.37" />
+  <link rel="manifest" href="manifest.webmanifest?v=91.38" />
   <link rel="icon" href="assets/app-icon-192.png?v=57" type="image/png" sizes="192x192" />
   <link rel="apple-touch-icon" href="assets/apple-touch-icon-180.png?v=57" sizes="180x180" />
   <link rel="stylesheet" href="styles.css?v=53" />
@@ -19,10 +19,10 @@
   <link rel="stylesheet" href="ui-fixes-v2.css?v=43" />
   <link rel="stylesheet" href="article-quickview.css?v=53" />
   <link rel="stylesheet" href="feed-quality.css?v=43" />
-  <link rel="stylesheet" href="performance-v42.css?v=45" />
+  <link rel="stylesheet" href="performance-v42.css?v=46" />
   <link rel="stylesheet" href="personalization-v44.css?v=53" />
   <link rel="stylesheet" href="feed-editorial-v78.css?v=78.1" />
-  <link rel="stylesheet" href="feed-experience-v79.css?v=79" />
+  <link rel="stylesheet" href="feed-experience-v79.css?v=79.1" />
   <link rel="stylesheet" href="feed-experience-v80.css?v=80" />
   <link rel="stylesheet" href="feed-intelligence-v81.css?v=81" />
   <link rel="stylesheet" href="source-quality-v82.css?v=82" />
@@ -45,14 +45,18 @@
     .contradiction-panel-v81,
     .runtime-category-summary { display:none !important; }
 
+    .article-card.new-since-visit-v79::after,
+    .article-card.essential-v77::before,
+    .article-card.essential-v77::after {
+      content: none !important;
+      display: none !important;
+    }
     .article-card.essential-v77 {
-      border-color: rgba(104,78,205,.30) !important;
-      background: linear-gradient(145deg, rgba(247,243,255,.99), rgba(235,228,255,.96)) !important;
-      box-shadow: 0 7px 22px rgba(75,54,155,.11), inset 4px 0 0 rgba(103,78,205,.32) !important;
+      border: 0 !important;
+      background: transparent !important;
+      box-shadow: none !important;
     }
-    .article-card.essential-v77 .article-body {
-      background: linear-gradient(180deg, rgba(249,247,255,.60), rgba(236,230,255,.74)) !important;
-    }
+    .article-card.essential-v77 .article-body { background: transparent !important; }
   </style>
   <title>Mon actualité</title>
 </head>
@@ -61,7 +65,7 @@
   <div class="ambient ambient-two"></div>
   <div id="app" class="app-shell" aria-live="polite"></div>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
-  <script src="release-watch.js?v=91.37"></script>
+  <script src="release-watch.js?v=91.38.1"></script>
   <script src="bootstrap-v42.js?v=54"></script>
   <script src="stable-dom.js?v=44"></script>
   <script src="content-intelligence-v76.js?v=76"></script>
@@ -201,6 +205,7 @@
     }, { once: true });
   })();
   </script>
+  <script src="feed-stability-v91.38.js?v=1"></script>
   <script src="ui-summary-fixes-v91.38.js?v=91.38"></script>
   <script type="module" src="app.js?v=68"></script>
   <script type="module" src="feedly-runtime.js?v=64"></script>

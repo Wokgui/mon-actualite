@@ -6,8 +6,10 @@
   touch-action: manipulation;
 }
 .article-card {
-  content-visibility: auto;
-  contain-intrinsic-size: 75px;
+  /* v91.38 stability: do not use content-visibility here. The compact rows are
+     taller than the old 75px intrinsic placeholder, which caused visible
+     vertical jumps while Android progressively rendered the feed. */
+  content-visibility: visible;
   contain: layout paint style;
   user-select: none;
   -webkit-user-select: none;
