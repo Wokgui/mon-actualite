@@ -1,0 +1,24 @@
+/* Final mobile geometry must exist before any runtime enhancement. */
+.page { animation: none !important; }
+.bottom-nav {
+  grid-template-columns: repeat(3, 1fr) !important;
+  padding-left: max(18px, env(safe-area-inset-left)) !important;
+  padding-right: max(18px, env(safe-area-inset-right)) !important;
+  transition: none !important;
+}
+.bottom-nav .nav-item { transition: none !important; }
+.bottom-nav [data-view="home"] { order: 1 !important; }
+.bottom-nav .nav-item.plus,
+.bottom-nav [data-view="sheet"] {
+  order: 2 !important;
+  justify-self: center !important;
+  transform: translateY(-13px) !important;
+}
+.bottom-nav [data-view="brief"] { order: 3 !important; }
+
+/* Existing visible thumbnails must never fade or animate when more rows arrive. */
+.article-card .article-image,
+.brief-point .brief-thumb {
+  transition: none !important;
+  animation: none !important;
+}
