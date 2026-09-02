@@ -1,4 +1,4 @@
-/* v91.50 — simplification des résumés et du Brief */
+/* v91.51 — simplification des résumés, du Brief et de Personnaliser */
 .quick-summary-text[data-summary-state="ready"]::before {
   content: none !important;
   display: none !important;
@@ -18,6 +18,15 @@
   margin-top: 20px !important;
 }
 
+/* Icônes des deux choix d'article légèrement plus grandes. */
+.quick-feedback-secondary .quick-feedback-symbol {
+  flex-basis: 40px !important;
+  width: 40px !important;
+  height: 40px !important;
+  border-radius: 13px !important;
+  font-size: 24px !important;
+}
+
 /* « Ne plus afficher un thème ou un mot » doit être centré partout où il apparaît. */
 .center-topic-word-v9150 {
   display: block !important;
@@ -32,29 +41,143 @@
   display: none !important;
 }
 
-/* Géométrie du haut du Brief : plus d'air sous Réinitialiser, moins avant le contenu. */
-body.brief-view-v9150 .page > .topbar {
-  margin-top: 18px !important;
+/* Géométrie du haut du Brief : moitié moins d'espace ajouté sous Réinitialiser. */
+body.brief-view-v9150 .page > .topbar,
+body.brief-view-v9151 .page > .topbar {
+  margin-top: 9px !important;
   margin-bottom: 2px !important;
 }
 
-body.brief-view-v9150 .runtime-brief-content {
+body.brief-view-v9150 .runtime-brief-content,
+body.brief-view-v9151 .runtime-brief-content {
   margin-top: 0 !important;
   padding-top: 0 !important;
 }
 
-body.brief-view-v9150 .journal-section {
+body.brief-view-v9150 .journal-section,
+body.brief-view-v9151 .journal-section {
   margin-top: 0 !important;
   padding-top: 0 !important;
 }
 
-body.brief-view-v9150 .journal-section .brief-day-v9138 {
-  margin-top: 0 !important;
+/* La date est désormais directement dans le titre « Brief du jour ». */
+body.brief-view-v9151 .page > .topbar h1::after {
+  content: ' - ' attr(data-brief-date);
+  font-weight: inherit;
+}
+
+body.brief-view-v9151 .brief-day-v9138,
+body.brief-view-v9151 .journal-section .brief-section-title {
+  display: none !important;
+}
+
+/* Enlever heures et jours relatifs des cartes et de la vue résumé. */
+.article-card .meta > span:not(.source) {
+  display: none !important;
+}
+
+.article-card .meta > .source + .dot {
+  display: none !important;
+}
+
+.quick-summary-meta > span:nth-child(2) {
+  display: none !important;
+}
+
+/* Bouton + seul, centré verticalement dans le bandeau. */
+.bottom-nav [data-view="sheet"] > span,
+.bottom-nav .nav-item.plus::after,
+.bottom-nav [data-view="sheet"]::after {
+  display: none !important;
+  content: none !important;
+}
+
+.bottom-nav .nav-item.plus,
+.bottom-nav [data-view="sheet"] {
+  transform: none !important;
+  align-self: center !important;
+  justify-self: center !important;
+}
+
+/* Personnaliser devient une vraie page plein écran, pas une fenêtre modale. */
+.sheet-backdrop.personalize-tab-v9151 {
+  z-index: 15 !important;
+  inset: 0 !important;
+  align-items: stretch !important;
+  justify-content: center !important;
+  padding: 0 !important;
+  background: #f7f5fc !important;
+  backdrop-filter: none !important;
+}
+
+.sheet-backdrop.personalize-tab-v9151 .personalization-sheet {
+  width: min(100%, 480px) !important;
+  height: 100dvh !important;
+  max-height: none !important;
+  margin: 0 auto !important;
+  overflow-y: auto !important;
+  padding: max(18px, env(safe-area-inset-top)) 18px calc(var(--nav-height) + 34px + env(safe-area-inset-bottom)) !important;
+  border-radius: 0 !important;
+  background: #f7f5fc !important;
+  box-shadow: none !important;
+}
+
+.sheet-backdrop.personalize-tab-v9151 .sheet-handle,
+.sheet-backdrop.personalize-tab-v9151 .personalize-close {
+  display: none !important;
+}
+
+body.personalize-page-v9151 .bottom-nav {
+  z-index: 20 !important;
+}
+
+body.personalize-page-v9151 .bottom-nav [data-view="sheet"] {
+  color: #fff !important;
+  background: linear-gradient(145deg,#8c78f2,#6652da) !important;
+}
+
+/* Titre Personnaliser centré, sans « Votre sélection ». */
+.personalize-head-v9151 {
+  display: block !important;
+  margin: 4px 0 14px !important;
+  text-align: center !important;
+}
+
+.personalize-head-v9151 > div {
+  width: 100% !important;
+}
+
+.personalize-head-v9151 span {
+  display: none !important;
+}
+
+.personalize-head-v9151 h2 {
+  width: 100% !important;
+  margin: 0 !important;
+  text-align: center !important;
+  font-size: 21px !important;
+}
+
+/* Réglages avancés remonté juste sous le titre. */
+.sheet-backdrop.personalize-tab-v9151 .personalize-settings {
+  width: 100% !important;
+  margin: 0 0 18px !important;
+}
+
+/* Centrer uniquement les intitulés Brief · Essentiel / Brief · Mes veilles. */
+.personalize-brief-section-v9151 > h3 {
+  text-align: center !important;
 }
 
 @media (max-width: 380px) {
-  body.brief-view-v9150 .page > .topbar {
-    margin-top: 16px !important;
+  body.brief-view-v9150 .page > .topbar,
+  body.brief-view-v9151 .page > .topbar {
+    margin-top: 8px !important;
     margin-bottom: 0 !important;
+  }
+
+  .sheet-backdrop.personalize-tab-v9151 .personalization-sheet {
+    padding-left: 14px !important;
+    padding-right: 14px !important;
   }
 }
