@@ -1,0 +1,172 @@
+/* v91.59 — Réinitialiser dans la barre basse + Personnaliser final */
+
+/* L'ancien bouton flottant disparaît complètement. */
+.global-reset-v9154,
+.top-reset-icon-v9138 {
+  display: none !important;
+}
+
+/* Réinitialiser remplace le + au centre de la barre uniquement sur les vues d'articles. */
+.bottom-nav .reset-nav-v9159 {
+  display: grid !important;
+  place-items: center !important;
+  width: 58px !important;
+  height: 58px !important;
+  min-width: 58px !important;
+  min-height: 58px !important;
+  margin: -18px auto 0 !important;
+  padding: 0 !important;
+  border-radius: 50% !important;
+  background: linear-gradient(145deg, #7561e8, #6551d8) !important;
+  color: white !important;
+  box-shadow: 0 9px 22px rgba(89, 70, 190, .24) !important;
+}
+
+.bottom-nav .reset-nav-glyph-v9159 {
+  display: block !important;
+  font-size: 31px !important;
+  line-height: 1 !important;
+  font-weight: 700 !important;
+  transform: translateY(-1px) !important;
+}
+
+.bottom-nav .reset-nav-text-v9159 {
+  display: none !important;
+}
+
+body.quick-summary-open .bottom-nav .reset-nav-v9159 {
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+/* Accueil : un peu plus d'air autour de la date et de Mon actualité. */
+body.home-spacing-v9159 .hero-header {
+  padding-top: 22px !important;
+  padding-bottom: 25px !important;
+}
+
+body.home-spacing-v9159 .hero-header .eyebrow {
+  margin-bottom: 13px !important;
+}
+
+/* Personnaliser : titres principaux centrés et contenus fondus dans le fond. */
+body.personalize-page-v9157 .personalize-accordion-head-v9157 h3,
+body.personalize-page-v9157 .personalize-accordion-head-v9157 p,
+body.personalize-page-v9157 .added-watches-v9159 h4,
+body.personalize-page-v9157 .personalize-blocked-footer-v9159 h4,
+body.personalize-page-v9157 .personalize-advanced-page-v9159 h2 {
+  text-align: center !important;
+}
+
+body.personalize-page-v9157 .personalize-chip-group-v9159 {
+  padding-top: 10px !important;
+  padding-bottom: 10px !important;
+  border-top: 0 !important;
+}
+
+body.personalize-page-v9157 .personalize-chip-group-v9159 + .personalize-chip-group-v9159 {
+  margin-top: 7px !important;
+  padding-top: 17px !important;
+  border-top: 1px solid rgba(103,83,216,.08) !important;
+}
+
+/* Liste explicite des veilles déjà actives. */
+body.personalize-page-v9157 .added-watches-v9159 {
+  margin-top: 16px !important;
+  padding: 15px 2px 3px !important;
+  border-top: 1px solid rgba(103,83,216,.08) !important;
+}
+
+body.personalize-page-v9157 .added-watches-v9159 h4 {
+  margin: 0 0 10px !important;
+  font-size: 13.5px !important;
+  color: #51486a !important;
+}
+
+body.personalize-page-v9157 .added-watches-list-v9159 {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  justify-content: center !important;
+  gap: 7px !important;
+}
+
+body.personalize-page-v9157 .added-watches-list-v9159 button {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 7px !important;
+  padding: 7px 9px 7px 11px !important;
+  border: 0 !important;
+  border-radius: 999px !important;
+  background: rgba(103,83,216,.09) !important;
+  color: #51486a !important;
+  font-size: 11.5px !important;
+  font-weight: 750 !important;
+}
+
+body.personalize-page-v9157 .added-watches-list-v9159 button b {
+  font-size: 15px !important;
+  font-weight: 700 !important;
+  color: #6652da !important;
+}
+
+/* Réglages avancés s'ouvre directement : pas de bouton intermédiaire. */
+body.personalize-page-v9157 .personalize-advanced-page-v9159 {
+  width: 100% !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  background: transparent !important;
+}
+
+body.personalize-page-v9157 .personalize-advanced-page-v9159 .settings-section,
+body.personalize-page-v9157 .personalize-advanced-page-v9159 .maintenance-v84 {
+  margin: 0 !important;
+  padding: 15px 2px 17px !important;
+  border: 0 !important;
+  border-bottom: 1px solid rgba(89,75,133,.09) !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+body.personalize-page-v9157 .personalize-advanced-page-v9159 .maintenance-v84 {
+  order: -1 !important;
+}
+
+body.personalize-page-v9157 .personalize-advanced-page-v9159 .settings-section > p,
+body.personalize-page-v9157 .personalize-advanced-page-v9159 .maintenance-v84 > p,
+body.personalize-page-v9157 .personalize-advanced-page-v9159 .setting-label span,
+body.personalize-page-v9157 .personalize-blocked-footer-v9159 > p {
+  text-align: justify !important;
+  text-justify: inter-word !important;
+  line-height: 1.48 !important;
+}
+
+body.personalize-page-v9157 .personalize-advanced-page-v9159 .settings-section > h2,
+body.personalize-page-v9157 .personalize-advanced-page-v9159 .maintenance-v84 > h2 {
+  width: 100% !important;
+  margin: 0 0 9px !important;
+  text-align: center !important;
+}
+
+body.personalize-page-v9157 .reset-preferences-v9159 {
+  width: 100% !important;
+  margin: 16px 0 4px !important;
+  justify-content: center !important;
+}
+
+/* Ne plus afficher sort des accordéons et reste tout en bas de Personnaliser. */
+body.personalize-page-v9157 .personalize-blocked-footer-v9159 {
+  margin: 18px 0 8px !important;
+  padding: 18px 2px 2px !important;
+  border: 0 !important;
+  border-top: 1px solid rgba(103,83,216,.11) !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+body.personalize-page-v9157 .personalize-blocked-footer-v9159 > h4 {
+  margin: 0 0 10px !important;
+  color: #51486a !important;
+  font-size: 14px !important;
+  font-weight: 800 !important;
+}
