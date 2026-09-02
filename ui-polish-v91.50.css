@@ -1,0 +1,60 @@
+/* v91.50 — simplification des résumés et du Brief */
+.quick-summary-text[data-summary-state="ready"]::before {
+  content: none !important;
+  display: none !important;
+}
+
+/* Ne plus afficher les mentions de vérification dans la vue résumé. */
+.verification-note-v83 {
+  display: none !important;
+}
+
+/* Le texte explicatif « Choix sur cet article » disparaît, les deux actions restent. */
+.quick-feedback-help {
+  display: none !important;
+}
+
+.quick-feedback-grid.quick-feedback-secondary {
+  margin-top: 20px !important;
+}
+
+/* « Ne plus afficher un thème ou un mot » doit être centré partout où il apparaît. */
+.center-topic-word-v9150 {
+  display: block !important;
+  width: 100% !important;
+  text-align: center !important;
+}
+
+/* Le Brief ne propose plus de sous-onglet Mes veilles. */
+.brief-mode-tabs,
+.watch-edit-button-v9138,
+.watches-head-v9138 {
+  display: none !important;
+}
+
+/* Géométrie du haut du Brief : plus d'air sous Réinitialiser, moins avant le contenu. */
+body.brief-view-v9150 .page > .topbar {
+  margin-top: 18px !important;
+  margin-bottom: 2px !important;
+}
+
+body.brief-view-v9150 .runtime-brief-content {
+  margin-top: 0 !important;
+  padding-top: 0 !important;
+}
+
+body.brief-view-v9150 .journal-section {
+  margin-top: 0 !important;
+  padding-top: 0 !important;
+}
+
+body.brief-view-v9150 .journal-section .brief-day-v9138 {
+  margin-top: 0 !important;
+}
+
+@media (max-width: 380px) {
+  body.brief-view-v9150 .page > .topbar {
+    margin-top: 16px !important;
+    margin-bottom: 0 !important;
+  }
+}
