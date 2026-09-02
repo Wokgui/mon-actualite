@@ -1,15 +1,13 @@
-/* v91.51 — simplification des résumés, du Brief et de Personnaliser */
+/* v91.52 — simplification des résumés, du Brief et de Personnaliser */
 .quick-summary-text[data-summary-state="ready"]::before {
   content: none !important;
   display: none !important;
 }
 
-/* Ne plus afficher les mentions de vérification dans la vue résumé. */
 .verification-note-v83 {
   display: none !important;
 }
 
-/* Le texte explicatif « Choix sur cet article » disparaît, les deux actions restent. */
 .quick-feedback-help {
   display: none !important;
 }
@@ -18,7 +16,6 @@
   margin-top: 20px !important;
 }
 
-/* Icônes des deux choix d'article légèrement plus grandes. */
 .quick-feedback-secondary .quick-feedback-symbol {
   flex-basis: 40px !important;
   width: 40px !important;
@@ -27,57 +24,136 @@
   font-size: 24px !important;
 }
 
-/* « Ne plus afficher un thème ou un mot » doit être centré partout où il apparaît. */
 .center-topic-word-v9150 {
   display: block !important;
   width: 100% !important;
   text-align: center !important;
 }
 
-/* Le Brief ne propose plus de sous-onglet Mes veilles. */
 .brief-mode-tabs,
 .watch-edit-button-v9138,
 .watches-head-v9138 {
   display: none !important;
 }
 
-/* Géométrie du haut du Brief : moitié moins d'espace ajouté sous Réinitialiser. */
+/* Un peu plus d'air entre Réinitialiser et le titre, sans rallonger la page. */
 body.brief-view-v9150 .page > .topbar,
-body.brief-view-v9151 .page > .topbar {
-  margin-top: 9px !important;
+body.brief-view-v9151 .page > .topbar,
+body.brief-view-v9152 .page > .topbar {
+  margin-top: 14px !important;
   margin-bottom: 2px !important;
 }
 
 body.brief-view-v9150 .runtime-brief-content,
-body.brief-view-v9151 .runtime-brief-content {
+body.brief-view-v9151 .runtime-brief-content,
+body.brief-view-v9152 .runtime-brief-content {
   margin-top: 0 !important;
   padding-top: 0 !important;
 }
 
 body.brief-view-v9150 .journal-section,
-body.brief-view-v9151 .journal-section {
+body.brief-view-v9151 .journal-section,
+body.brief-view-v9152 .journal-section {
   margin-top: 0 !important;
   padding-top: 0 !important;
 }
 
-/* La date est désormais directement dans le titre « Brief du jour ». */
-body.brief-view-v9151 .page > .topbar h1::after {
-  content: ' - ' attr(data-brief-date);
-  font-weight: inherit;
-}
-
-body.brief-view-v9151 .brief-day-v9138,
-body.brief-view-v9151 .journal-section .brief-section-title {
+/* Le titre redevient simplement « Brief du jour ». */
+body.brief-view-v9151 .page > .topbar h1::after,
+body.brief-view-v9152 .page > .topbar h1::after {
+  content: none !important;
   display: none !important;
 }
 
-/* Enlever heures et jours relatifs des cartes. La vue résumé est nettoyée en JS. */
+body.brief-view-v9152 .brief-day-v9138,
+body.brief-view-v9152 .journal-section .brief-section-title {
+  display: none !important;
+}
+
+/* Suppression des heures/jours relatifs des cartes. */
 .article-card .meta > span:not(.source) {
   display: none !important;
 }
 
 .article-card .meta > .source + .dot {
   display: none !important;
+}
+
+/* Dans le Brief, le titre est réellement centré verticalement face à la photo. */
+body.brief-view-v9152 .runtime-row .article-body {
+  justify-content: center !important;
+  padding-top: 12px !important;
+  padding-bottom: 12px !important;
+}
+
+body.brief-view-v9152 .runtime-row .article-body h2 {
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+}
+
+body.brief-view-v9152 .runtime-row .meta {
+  display: none !important;
+}
+
+/* Les cinq choix du Brief sont visuellement prioritaires sans ajouter de texte. */
+body.brief-view-v9152 .brief-major-v9152 {
+  border: 1px solid rgba(112, 91, 214, .16) !important;
+  background: linear-gradient(90deg, rgba(120, 98, 232, .075), rgba(255, 255, 255, .98) 34%) !important;
+  box-shadow: inset 4px 0 0 rgba(111, 88, 222, .78), 0 7px 22px rgba(70, 55, 118, .07) !important;
+}
+
+/* Les veilles sont intégrées sous les cinq articles du jour concerné. */
+.brief-integrated-watches-v9152 {
+  margin: 17px 0 4px;
+}
+
+.brief-watch-separator-v9152 {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin: 4px 0 10px;
+  color: #827b8d;
+  font-size: 10px;
+  font-weight: 850;
+  letter-spacing: .08em;
+  text-transform: uppercase;
+}
+
+.brief-watch-separator-v9152::before,
+.brief-watch-separator-v9152::after {
+  content: '';
+  height: 1px;
+  flex: 1;
+  background: rgba(116, 101, 145, .14);
+}
+
+body.brief-view-v9152 .brief-watch-feed-v9152 {
+  gap: 9px !important;
+}
+
+body.brief-view-v9152 .brief-watch-row-v9152 {
+  grid-template-columns: 112px minmax(0, 1fr) !important;
+  min-height: 132px !important;
+  border: 1px solid rgba(123, 113, 142, .09) !important;
+  border-radius: 18px !important;
+  background: rgba(255, 255, 255, .62) !important;
+  box-shadow: none !important;
+}
+
+body.brief-view-v9152 .brief-watch-row-v9152 .article-image {
+  min-height: 132px !important;
+}
+
+body.brief-view-v9152 .brief-watch-row-v9152 h2 {
+  font-size: 13px !important;
+  line-height: 1.34 !important;
+  font-weight: 720 !important;
+}
+
+.brief-watch-placeholder-v9152 {
+  display: flex !important;
+  align-items: center !important;
+  justify-content: center !important;
 }
 
 /* Bouton + seul, centré verticalement dans le bandeau. */
@@ -96,7 +172,8 @@ body.brief-view-v9151 .journal-section .brief-section-title {
 }
 
 /* Personnaliser devient une vraie page plein écran, pas une fenêtre modale. */
-.sheet-backdrop.personalize-tab-v9151 {
+.sheet-backdrop.personalize-tab-v9151,
+.sheet-backdrop.personalize-tab-v9152 {
   z-index: 15 !important;
   inset: 0 !important;
   align-items: stretch !important;
@@ -106,7 +183,8 @@ body.brief-view-v9151 .journal-section .brief-section-title {
   backdrop-filter: none !important;
 }
 
-.sheet-backdrop.personalize-tab-v9151 .personalization-sheet {
+.sheet-backdrop.personalize-tab-v9151 .personalization-sheet,
+.sheet-backdrop.personalize-tab-v9152 .personalization-sheet {
   width: min(100%, 480px) !important;
   height: 100dvh !important;
   max-height: none !important;
@@ -119,61 +197,84 @@ body.brief-view-v9151 .journal-section .brief-section-title {
 }
 
 .sheet-backdrop.personalize-tab-v9151 .sheet-handle,
-.sheet-backdrop.personalize-tab-v9151 .personalize-close {
+.sheet-backdrop.personalize-tab-v9151 .personalize-close,
+.sheet-backdrop.personalize-tab-v9152 .sheet-handle,
+.sheet-backdrop.personalize-tab-v9152 .personalize-close {
   display: none !important;
 }
 
-body.personalize-page-v9151 .bottom-nav {
+body.personalize-page-v9151 .bottom-nav,
+body.personalize-page-v9152 .bottom-nav {
   z-index: 20 !important;
 }
 
-body.personalize-page-v9151 .bottom-nav [data-view="sheet"] {
+body.personalize-page-v9151 .bottom-nav [data-view="sheet"],
+body.personalize-page-v9152 .bottom-nav [data-view="sheet"] {
   color: #fff !important;
   background: linear-gradient(145deg,#8c78f2,#6652da) !important;
 }
 
-/* Titre Personnaliser centré, sans « Votre sélection ». */
-.personalize-head-v9151 {
+.personalize-head-v9151,
+.personalize-head-v9152 {
   display: block !important;
   margin: 4px 0 14px !important;
   text-align: center !important;
 }
 
-.personalize-head-v9151 > div {
+/* Quand Réinitialiser est visible au-dessus, on triple l'espace jusqu'à Personnaliser. */
+body.personalize-page-v9152 .personalize-head-v9152 {
+  margin-top: 54px !important;
+}
+
+.personalize-head-v9151 > div,
+.personalize-head-v9152 > div {
   width: 100% !important;
 }
 
-.personalize-head-v9151 span {
+.personalize-head-v9151 span,
+.personalize-head-v9152 span {
   display: none !important;
 }
 
-.personalize-head-v9151 h2 {
+.personalize-head-v9151 h2,
+.personalize-head-v9152 h2 {
   width: 100% !important;
   margin: 0 !important;
   text-align: center !important;
   font-size: 21px !important;
 }
 
-/* Réglages avancés remonté juste sous le titre. */
-.sheet-backdrop.personalize-tab-v9151 .personalize-settings {
+.sheet-backdrop.personalize-tab-v9151 .personalize-settings,
+.sheet-backdrop.personalize-tab-v9152 .personalize-settings {
   width: 100% !important;
   margin: 0 0 18px !important;
 }
 
-/* Centrer uniquement les intitulés Brief · Essentiel / Brief · Mes veilles. */
-.personalize-brief-section-v9151 > h3 {
+.personalize-brief-section-v9151 > h3,
+.personalize-home-section-v9152 > h3 {
   text-align: center !important;
 }
 
 @media (max-width: 380px) {
   body.brief-view-v9150 .page > .topbar,
-  body.brief-view-v9151 .page > .topbar {
-    margin-top: 8px !important;
+  body.brief-view-v9151 .page > .topbar,
+  body.brief-view-v9152 .page > .topbar {
+    margin-top: 13px !important;
     margin-bottom: 0 !important;
   }
 
-  .sheet-backdrop.personalize-tab-v9151 .personalization-sheet {
+  .sheet-backdrop.personalize-tab-v9151 .personalization-sheet,
+  .sheet-backdrop.personalize-tab-v9152 .personalization-sheet {
     padding-left: 14px !important;
     padding-right: 14px !important;
+  }
+
+  body.brief-view-v9152 .brief-watch-row-v9152 {
+    grid-template-columns: 102px minmax(0, 1fr) !important;
+    min-height: 122px !important;
+  }
+
+  body.brief-view-v9152 .brief-watch-row-v9152 .article-image {
+    min-height: 122px !important;
   }
 }
