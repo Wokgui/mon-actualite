@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const RELEASE = '91.53';
+  const RELEASE = '91.54';
   const CACHE_KEY = 'news-live-cache';
   const upstreamFetch = window.fetch.bind(window);
   let briefRetrying = false;
@@ -126,6 +126,7 @@
     document.body.classList.toggle('brief-view-v9151', brief);
     document.body.classList.toggle('brief-view-v9152', brief);
     document.body.classList.toggle('brief-view-v9153', brief);
+    document.body.classList.toggle('brief-view-v9154', brief);
     if (!brief) return;
 
     document.querySelectorAll('.brief-integrated-watches-v9152').forEach(node => node.remove());
@@ -134,8 +135,24 @@
 
     const briefTab = document.querySelector('[data-brief-mode="essential"]');
     const watchTab = document.querySelector('[data-brief-mode="watches"]');
-    if (briefTab) briefTab.textContent = 'Brief';
-    if (watchTab) watchTab.textContent = 'Veille';
+    if (briefTab && clean(briefTab.textContent || '') !== 'Brief') briefTab.textContent = 'Brief';
+    if (watchTab && clean(watchTab.textContent || '') !== 'Veille') watchTab.textContent = 'Veille';
+  }
+
+  function ensureGlobalReset() {
+    const app = document.querySelector('#app');
+    if (!app) return;
+    let button = app.querySelector('.global-reset-v9154');
+    if (!button) {
+      button = document.createElement('button');
+      button.type = 'button';
+      button.className = 'top-reset-icon-v9138 global-reset-v9154';
+      button.dataset.resetRead = '';
+      button.setAttribute('aria-label', 'Réinitialiser les articles parcourus');
+      button.title = 'Réinitialiser';
+      button.textContent = '↻';
+      app.appendChild(button);
+    }
   }
 
   function decorateArticleTimes(root = document) {
@@ -161,14 +178,15 @@
     const active = Boolean(sheet);
     document.body.classList.toggle('personalize-page-v9151', active);
     document.body.classList.toggle('personalize-page-v9152', active);
+    document.body.classList.toggle('personalize-page-v9154', active);
     if (!sheet) return;
 
-    sheet.closest('.sheet-backdrop')?.classList.add('personalize-tab-v9151', 'personalize-tab-v9152');
+    sheet.closest('.sheet-backdrop')?.classList.add('personalize-tab-v9151', 'personalize-tab-v9152', 'personalize-tab-v9154');
     sheet.querySelector('.sheet-handle')?.remove();
 
     const head = sheet.querySelector('.personalize-head');
     if (head) {
-      head.classList.add('personalize-head-v9151', 'personalize-head-v9152');
+      head.classList.add('personalize-head-v9151', 'personalize-head-v9152', 'personalize-head-v9154');
       const eyebrow = [...head.querySelectorAll('span')].find(node => /^Votre sélection$/i.test(clean(node.textContent || '')));
       eyebrow?.remove();
     }
@@ -185,13 +203,14 @@
     });
   }
 
-  function setBriefIntent(duration = 8000) {
-    briefIntentUntil = Math.max(briefIntentUntil, Date.now() + duration);
+  function setBriefIntent(duration = 700) {
+    briefIntentUntil = Date.now() + duration;
   }
 
   function ensureBriefNavigation() {
     if (Date.now() > briefIntentUntil) return;
     if (isBriefView()) {
+      briefIntentUntil = 0;
       decorateBrief();
       return;
     }
@@ -199,15 +218,19 @@
     if (!button || briefRetrying) return;
     briefRetrying = true;
     try { button.click(); } finally {
-      setTimeout(() => { briefRetrying = false; }, 55);
+      setTimeout(() => { briefRetrying = false; }, 45);
     }
   }
 
   function scheduleBriefRecovery() {
-    [30, 90, 180, 320, 520, 800, 1200, 1800, 2600, 3600, 5000, 6500, 7800].forEach(delay => setTimeout(ensureBriefNavigation, delay));
+    [60, 180, 420, 680].forEach(delay => setTimeout(ensureBriefNavigation, delay));
   }
 
   document.addEventListener('pointerdown', event => {
+    if (event.target.closest?.('.article-card[data-article]')) {
+      briefIntentUntil = 0;
+      return;
+    }
     const navButton = event.target.closest?.('.bottom-nav [data-view]');
     if (!navButton || event.isTrusted === false) return;
     if (navButton.dataset.view === 'brief') {
@@ -219,13 +242,6 @@
   }, true);
 
   document.addEventListener('click', event => {
-    const navButton = event.target.closest?.('.bottom-nav [data-view]');
-    if (navButton && navButton.dataset.view !== 'brief' && Date.now() <= briefIntentUntil && !event.isTrusted) {
-      event.preventDefault();
-      event.stopImmediatePropagation();
-      return;
-    }
-
     const button = event.target.closest?.('.bottom-nav [data-view="brief"]');
     if (!button || briefRetrying) return;
     setBriefIntent();
@@ -237,6 +253,7 @@
     decorateArticleTimes(root);
     decoratePersonalize();
     decorateBrief();
+    ensureGlobalReset();
     if (Date.now() <= briefIntentUntil && !isBriefView()) ensureBriefNavigation();
   }
 
@@ -260,6 +277,7 @@
       if (needsGlobal) polishText(document);
       decoratePersonalize();
       decorateBrief();
+      ensureGlobalReset();
       if (Date.now() <= briefIntentUntil && !isBriefView()) ensureBriefNavigation();
     });
     observer.observe(document.body, { childList: true, subtree: true, characterData: true });
