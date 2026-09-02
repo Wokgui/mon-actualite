@@ -53,6 +53,23 @@ body.home-view-v9156 .hero-header p {
   display: none !important;
 }
 
+/* Mon actualité conserve le même centrage vertical des titres que Brief / Veille. */
+body.home-view-v9156 [data-stable-home-feed] .article-body {
+  justify-content: center !important;
+  padding-top: 12px !important;
+  padding-bottom: 12px !important;
+}
+
+body.home-view-v9156 [data-stable-home-feed] .card-top,
+body.home-view-v9156 [data-stable-home-feed] .summary,
+body.home-view-v9156 [data-stable-home-feed] .meta {
+  display: none !important;
+}
+
+body.home-view-v9156 [data-stable-home-feed] .article-card h2 {
+  margin: 0 !important;
+}
+
 /* Même taille de Réinitialiser partout. */
 .global-reset-v9154 {
   width: 38px !important;
@@ -94,6 +111,45 @@ body.home-view-v9156 .hero-header p {
   margin: 0 !important;
 }
 
+body.brief-view-v9156 .runtime-brief-content .feed {
+  gap: 13px !important;
+}
+
+/* Veille reste exclusivement la veille : pas de Aujourd'hui ni de bascule vers toute l'actualité. */
+body.brief-watch-active-v9156 .watch-day-v9138:first-of-type > h3,
+body.brief-watch-active-v9156 .watch-all-band-v9138,
+body.brief-watch-active-v9156 .watch-all-feed-v9138 {
+  display: none !important;
+}
+
+body.brief-watch-active-v9156 .watch-day-v9138:first-of-type {
+  padding-top: 0 !important;
+  margin-top: 0 !important;
+}
+
+/* Personnaliser est plein écran dès la première frame, sans flash de feuille modale. */
+.sheet-backdrop:has(.personalization-sheet) {
+  z-index: 15 !important;
+  inset: 0 !important;
+  align-items: stretch !important;
+  justify-content: center !important;
+  padding: 0 !important;
+  background: #f7f5fc !important;
+  backdrop-filter: none !important;
+}
+
+.sheet-backdrop:has(.personalization-sheet) .personalization-sheet {
+  width: min(100%, 480px) !important;
+  height: 100dvh !important;
+  max-height: none !important;
+  margin: 0 auto !important;
+  overflow-y: auto !important;
+  padding: max(12px, env(safe-area-inset-top)) 18px calc(var(--nav-height) + 38px + env(safe-area-inset-bottom)) !important;
+  border-radius: 0 !important;
+  background: #f7f5fc !important;
+  box-shadow: none !important;
+}
+
 /* Personnaliser : entête plus calme, puis trois accordéons homogènes. */
 body.personalize-page-v9156 .personalize-head-v9156 {
   margin-top: 14px !important;
@@ -119,7 +175,7 @@ body.personalize-page-v9156 .personalize-accordion-head-v9156 {
   width: 100% !important;
   min-height: 68px !important;
   display: block !important;
-  padding: 13px 48px 13px 48px !important;
+  padding: 13px 48px !important;
   border: 0 !important;
   background: linear-gradient(145deg, rgba(255,255,255,.98), rgba(248,246,253,.98)) !important;
   color: #3f394d !important;
