@@ -71,16 +71,12 @@ body.brief-view-v9151 .journal-section .brief-section-title {
   display: none !important;
 }
 
-/* Enlever heures et jours relatifs des cartes et de la vue résumé. */
+/* Enlever heures et jours relatifs des cartes. La vue résumé est nettoyée en JS. */
 .article-card .meta > span:not(.source) {
   display: none !important;
 }
 
 .article-card .meta > .source + .dot {
-  display: none !important;
-}
-
-.quick-summary-meta > span:nth-child(2) {
   display: none !important;
 }
 
