@@ -1,10 +1,11 @@
 (() => {
   'use strict';
 
-  const RELEASE = '91.50';
+  const RELEASE = '91.51';
   const CACHE_KEY = 'news-live-cache';
   const upstreamFetch = window.fetch.bind(window);
   let briefRetrying = false;
+  let briefIntentUntil = 0;
 
   document.documentElement.dataset.uxGuardVersion = RELEASE;
 
@@ -85,10 +86,6 @@
     return response;
   };
 
-  function exactText(node, regex) {
-    return node instanceof Element && regex.test(clean(node.textContent || ''));
-  }
-
   function polishText(root = document) {
     const nodes = [];
     if (root instanceof Element) nodes.push(root);
@@ -121,9 +118,31 @@
     return clean(document.querySelector('.page > .topbar h1')?.textContent || '') === 'Brief du jour';
   }
 
+  function todayLabel() {
+    const raw = new Intl.DateTimeFormat('fr-FR', {
+      weekday: 'long',
+      day: 'numeric',
+      month: 'long',
+      year: 'numeric'
+    }).format(new Date());
+    return raw ? raw.charAt(0).toUpperCase() + raw.slice(1) : '';
+  }
+
+  function decorateBrief() {
+    const brief = isBriefView();
+    document.body.classList.toggle('brief-view-v9150', brief);
+    document.body.classList.toggle('brief-view-v9151', brief);
+    if (!brief) return;
+
+    const title = document.querySelector('.page > .topbar h1');
+    if (title) title.dataset.briefDate = todayLabel();
+    document.querySelectorAll('.brief-day-v9138, .journal-section .brief-section-title').forEach(node => node.remove());
+  }
+
   function enforceBriefState() {
     const brief = isBriefView();
     document.body.classList.toggle('brief-view-v9150', brief);
+    document.body.classList.toggle('brief-view-v9151', brief);
     if (!brief) return;
 
     const watches = document.querySelector('[data-brief-mode="watches"].active');
@@ -134,30 +153,88 @@
     }
 
     document.querySelectorAll('.watch-edit-button-v9138').forEach(node => node.remove());
+    decorateBrief();
+  }
+
+  function decorateArticleTimes(root = document) {
+    root.querySelectorAll?.('.quick-summary-meta').forEach(meta => {
+      if (meta.children.length >= 2) meta.children[1]?.remove();
+    });
+
+    root.querySelectorAll?.('.detail-meta').forEach(meta => {
+      if (meta.dataset.noRelativeTime === '1') return;
+      const category = meta.querySelector('.category-link');
+      if (!category) return;
+      const source = clean((meta.textContent || '').split('·')[0]);
+      meta.replaceChildren();
+      if (source) meta.append(document.createTextNode(source));
+      if (source) meta.append(document.createTextNode(' · '));
+      meta.append(category);
+      meta.dataset.noRelativeTime = '1';
+    });
+  }
+
+  function decoratePersonalize() {
+    const sheet = document.querySelector('.personalization-sheet');
+    const active = Boolean(sheet);
+    document.body.classList.toggle('personalize-page-v9151', active);
+    if (!sheet) return;
+
+    sheet.closest('.sheet-backdrop')?.classList.add('personalize-tab-v9151');
+    sheet.querySelector('.sheet-handle')?.remove();
+
+    const head = sheet.querySelector('.personalize-head');
+    if (head) {
+      head.classList.add('personalize-head-v9151');
+      const eyebrow = [...head.querySelectorAll('span')].find(node => /^Votre sélection$/i.test(clean(node.textContent || '')));
+      eyebrow?.remove();
+    }
+
+    const settings = sheet.querySelector('.personalize-settings');
+    if (head && settings && settings.previousElementSibling !== head) {
+      head.insertAdjacentElement('afterend', settings);
+    }
+
+    sheet.querySelectorAll('.personalize-section').forEach(section => {
+      const title = clean(section.querySelector('h3')?.textContent || '');
+      section.classList.toggle('personalize-brief-section-v9151', /^Brief\s*[·•-]\s*(?:Essentiel|Mes veilles)$/i.test(title));
+    });
   }
 
   function ensureBriefNavigation() {
+    if (Date.now() > briefIntentUntil) return;
     if (isBriefView()) {
       enforceBriefState();
+      decorateBrief();
       return;
     }
     const button = document.querySelector('.bottom-nav [data-view="brief"]');
     if (!button || briefRetrying) return;
     briefRetrying = true;
     try { button.click(); } finally {
-      setTimeout(() => { briefRetrying = false; }, 40);
+      setTimeout(() => { briefRetrying = false; }, 45);
     }
   }
 
   document.addEventListener('click', event => {
+    const navButton = event.target.closest?.('.bottom-nav [data-view]');
+    if (navButton && navButton.dataset.view !== 'brief') {
+      briefIntentUntil = 0;
+      return;
+    }
+
     const button = event.target.closest?.('.bottom-nav [data-view="brief"]');
     if (!button || briefRetrying) return;
-    [70, 220, 520].forEach(delay => setTimeout(ensureBriefNavigation, delay));
+    briefIntentUntil = Date.now() + 3500;
+    [40, 120, 260, 520, 900, 1500, 2400, 3300].forEach(delay => setTimeout(ensureBriefNavigation, delay));
   }, true);
 
   function scan(root = document) {
     polishText(root);
+    decorateArticleTimes(root);
+    decoratePersonalize();
     enforceBriefState();
+    if (Date.now() <= briefIntentUntil && !isBriefView()) ensureBriefNavigation();
   }
 
   function start() {
@@ -171,11 +248,16 @@
           continue;
         }
         mutation.addedNodes?.forEach(node => {
-          if (node instanceof Element) polishText(node);
+          if (node instanceof Element) {
+            polishText(node);
+            decorateArticleTimes(node);
+          }
         });
       }
       if (needsGlobal) polishText(document);
+      decoratePersonalize();
       enforceBriefState();
+      if (Date.now() <= briefIntentUntil && !isBriefView()) ensureBriefNavigation();
     });
     observer.observe(document.body, { childList: true, subtree: true, characterData: true });
   }
