@@ -119,18 +119,50 @@
   color: #c0bac8;
 }
 .quick-summary-text {
-  padding: 16px 17px;
-  border: 1px solid #e8e0f4;
-  border-radius: 16px;
-  background: #f5f1fb;
+  position: relative;
+  padding: 19px 18px 18px;
+  border: 1px solid rgba(110, 88, 176, .16);
+  border-radius: 18px;
+  background: #fff;
   color: #302d35;
-  font-size: 13.5px;
-  line-height: 1.58;
-  white-space: pre-line;
-  text-align: justify;
-  text-justify: inter-word;
-  hyphens: auto;
-  -webkit-hyphens: auto;
+  font-size: 14.5px;
+  line-height: 1.72;
+  letter-spacing: .002em;
+  white-space: normal;
+  text-align: left;
+  text-justify: auto;
+  hyphens: none;
+  -webkit-hyphens: none;
+  box-shadow: 0 5px 20px rgba(67, 49, 104, .055);
+}
+.quick-summary-text[data-summary-state="ready"]::before {
+  content: 'Résumé IA';
+  display: block;
+  margin: 0 0 10px;
+  color: #7059c6;
+  font-size: 10.5px;
+  font-weight: 800;
+  line-height: 1.1;
+  letter-spacing: .075em;
+  text-transform: uppercase;
+}
+.quick-summary-paragraph {
+  margin: 0;
+  padding: 0;
+}
+.quick-summary-paragraph + .quick-summary-paragraph {
+  margin-top: 13px;
+  padding-top: 13px;
+  border-top: 1px solid rgba(117, 96, 167, .10);
+}
+.quick-summary-paragraph.quick-summary-lead {
+  color: #29262f;
+  font-weight: 500;
+}
+.quick-summary-text[data-summary-state="status"] {
+  background: #f7f4fb;
+  color: #6d6675;
+  box-shadow: none;
 }
 .quick-full-article {
   display: flex;
@@ -212,6 +244,10 @@
     border-left: 1px solid rgba(128, 105, 176, .12);
     border-right: 1px solid rgba(128, 105, 176, .12);
   }
+  .quick-summary-text {
+    padding: 21px 22px 20px;
+    font-size: 15px;
+  }
 }
 
 @media (max-width: 380px) {
@@ -220,8 +256,8 @@
     padding-right: 14px;
   }
   .quick-summary-head h2 { font-size: 18px; }
-  .quick-summary-text { font-size: 13px; padding: 14px 15px; }
+  .quick-summary-text { font-size: 14px; padding: 17px 15px 16px; line-height: 1.68; }
+  .quick-summary-paragraph + .quick-summary-paragraph { margin-top: 11px; padding-top: 11px; }
   .quick-feedback-tile { min-height: 68px; padding: 9px; }
   .quick-feedback-tile small { font-size: 9px; }
 }
-
