@@ -1,18 +1,21 @@
 (() => {
   'use strict';
 
-  const RELEASE = '91.67';
+  const RELEASE = '91.68';
   let scheduled = false;
   document.documentElement.dataset.uxPolishV9162 = RELEASE;
 
   function ensureBottomNavAssets() {
-    if (!document.querySelector('link[data-bottom-nav-v9167]')) {
-      const link = document.createElement('link');
+    let link = document.querySelector('link[data-bottom-nav-v9167]');
+    if (!link) {
+      link = document.createElement('link');
       link.rel = 'stylesheet';
-      link.href = 'bottom-nav-v91.67.css?v=91.67';
       link.dataset.bottomNavV9167 = '1';
       document.head.appendChild(link);
     }
+    const cssHref = 'bottom-nav-v91.67.css?v=91.68';
+    if (!String(link.getAttribute('href') || '').includes('v=91.68')) link.href = cssHref;
+
     if (!document.querySelector('script[data-bottom-nav-v9167]')) {
       const script = document.createElement('script');
       script.src = 'bottom-nav-v91.67.js?v=91.67';
@@ -64,7 +67,7 @@
     const app = document.querySelector('#app');
     if (app) new MutationObserver(schedule).observe(app, { childList: true, subtree: true });
     document.addEventListener('news:stable-render', schedule);
-    window.addEventListener('pageshow', schedule);
+    window.addEventListener('pageshow', () => { ensureBottomNavAssets(); schedule(); });
   }
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', start, { once: true });
