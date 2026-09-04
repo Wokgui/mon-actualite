@@ -1,12 +1,8 @@
 (() => {
   'use strict';
 
-  const RELEASE = '91.72';
+  const RELEASE = '91.73';
   let scheduled = false;
-  let instantDispatch = false;
-  let suppressPhysicalClickUntil = 0;
-  let articleOrigin = null;
-
   document.documentElement.dataset.goldenBottomNavV9169 = RELEASE;
 
   const homeIcon = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m3 11 9-8 9 8"/><path d="M5 10v10h14V10"/><path d="M9 20v-6h6v6"/></svg>';
@@ -22,21 +18,7 @@
     const home = Boolean(document.querySelector('#app [data-stable-home-feed]'));
     const brief = Boolean(document.querySelector('#app [data-stable-brief-content], #app .brief-mode-tabs'));
     const watches = Boolean(document.querySelector('#app [data-brief-mode="watches"].active'));
-    return { sheet, quick, nativeDetail, detail, home, brief, watches };
-  }
-
-  function rememberArticleOrigin(target) {
-    const card = target?.closest?.('[data-article]');
-    if (!card || target.closest('button, input, select, textarea, a')) return;
-    const s = pageState();
-    articleOrigin = {
-      home: s.home,
-      brief: s.brief,
-      watches: s.watches,
-      scrollTop: window.scrollY,
-      articleId: card.dataset.article || '',
-      savedAt: Date.now()
-    };
+    return { sheet, detail, home, brief, watches };
   }
 
   function neutralizeFloatingControls() {
@@ -103,105 +85,14 @@
   function schedule() {
     if (scheduled) return;
     scheduled = true;
-    queueMicrotask(rebuild);
-  }
-
-  function closeQuickSummary({ restoreScroll = false } = {}) {
-    const close = document.querySelector('.quick-summary-backdrop [data-quick-close]');
-    if (close) close.click();
-    else {
-      document.querySelector('.quick-summary-backdrop')?.remove();
-      document.body.classList.remove('quick-summary-open');
-    }
-    document.body.classList.remove('article-open-v9171');
-    schedule();
-    if (restoreScroll) {
-      const top = Number(articleOrigin?.scrollTop);
-      if (Number.isFinite(top)) requestAnimationFrame(() => window.scrollTo({ top, left: 0, behavior: 'auto' }));
-    }
-  }
-
-  function dispatchNativeClick(button) {
-    if (!button?.isConnected) return;
-    instantDispatch = true;
-    try { button.click(); }
-    finally { instantDispatch = false; }
-  }
-
-  function switchToEssentialBrief(fallbackButton) {
-    const essential = document.querySelector('#app [data-brief-mode="essential"]');
-    if (essential) dispatchNativeClick(essential);
-    else dispatchNativeClick(fallbackButton);
-  }
-
-  function leaveNativeDetailToOrigin() {
-    const back = document.querySelector('#app [data-back]');
-    if (back) dispatchNativeClick(back);
-  }
-
-  function handleImmediateNav(button) {
-    const wanted = button?.dataset?.view;
-    if (wanted !== 'home' && wanted !== 'brief') return;
-
-    const s = pageState();
-    suppressPhysicalClickUntil = performance.now() + 700;
-
-    if (s.quick) {
-      if (wanted === 'home') {
-        closeQuickSummary({ restoreScroll: true });
-        return;
-      }
-
-      const originWasBrief = Boolean(articleOrigin?.brief);
-      const originWasWatches = Boolean(articleOrigin?.watches);
-      closeQuickSummary({ restoreScroll: originWasBrief && !originWasWatches });
-      if (originWasBrief) {
-        if (originWasWatches) switchToEssentialBrief(button);
-        return;
-      }
-      dispatchNativeClick(button);
-      return;
-    }
-
-    if (s.nativeDetail && wanted === 'home') {
-      leaveNativeDetailToOrigin();
-      return;
-    }
-
-    if (wanted === 'brief' && s.brief) {
-      if (s.watches) switchToEssentialBrief(button);
-      return;
-    }
-
-    dispatchNativeClick(button);
-  }
-
-  function onPointerDown(event) {
-    rememberArticleOrigin(event.target);
-    const button = event.target.closest?.('.golden-bottom-nav-v9169__side[data-view="home"], .golden-bottom-nav-v9169__side[data-view="brief"]');
-    if (!button) return;
-    event.preventDefault();
-    handleImmediateNav(button);
-  }
-
-  function onCapturedClick(event) {
-    const button = event.target.closest?.('.golden-bottom-nav-v9169__side[data-view="home"], .golden-bottom-nav-v9169__side[data-view="brief"]');
-    if (!button || instantDispatch) return;
-    if (performance.now() <= suppressPhysicalClickUntil) {
-      event.preventDefault();
-      event.stopImmediatePropagation();
-    }
+    requestAnimationFrame(rebuild);
   }
 
   function start() {
     schedule();
-    document.addEventListener('pointerdown', onPointerDown, true);
-    document.addEventListener('click', event => rememberArticleOrigin(event.target), true);
-    document.addEventListener('click', onCapturedClick, true);
-
     const app = document.querySelector('#app');
     if (app) new MutationObserver(schedule).observe(app, { childList: true, subtree: true });
-    new MutationObserver(schedule).observe(document.body, { childList: true, subtree: false, attributes: true, attributeFilter: ['class'] });
+    new MutationObserver(schedule).observe(document.body, { attributes: true, attributeFilter: ['class'] });
     document.addEventListener('news:stable-render', schedule);
     window.addEventListener('pageshow', schedule);
   }
