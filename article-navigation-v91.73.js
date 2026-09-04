@@ -1,8 +1,7 @@
 (() => {
   'use strict';
 
-  const RELEASE = '91.74';
-  let settingsDispatch = false;
+  const RELEASE = '91.75';
   document.documentElement.dataset.articleNavigationV9173 = RELEASE;
 
   function closeQuickSummary() {
@@ -24,21 +23,42 @@
 
   function openEssentialBrief() {
     const essential = document.querySelector('#app [data-brief-mode="essential"]');
-    if (essential) essential.click();
+    if (essential && !essential.classList.contains('active')) essential.click();
   }
 
-  // In the settings sheet the DOM can be refreshed between touch-down and the
-  // browser-generated click. Dispatch the navigation on pointer-down only in
-  // this view, so Accueil/Brief reacts immediately and cannot lose the tap.
+  function dispatchViewDirect(view) {
+    const app = document.querySelector('#app');
+    if (!app || (view !== 'home' && view !== 'brief')) return false;
+
+    // Use a short-lived delegated button inside #app instead of re-clicking the
+    // visible bottom-nav node. The personalization sheet is frequently rebuilt
+    // between pointerdown and click on Android, which made that visible node
+    // disappear and lose the navigation event.
+    const proxy = document.createElement('button');
+    proxy.type = 'button';
+    proxy.hidden = true;
+    proxy.tabIndex = -1;
+    proxy.dataset.view = view;
+    app.appendChild(proxy);
+    try { proxy.click(); }
+    finally { proxy.remove(); }
+
+    if (view === 'brief') openEssentialBrief();
+    return true;
+  }
+
+  // In Personnaliser/Réglages, navigate on pointerdown through the stable
+  // delegated proxy. This is synchronous and survives a sheet re-render.
   document.addEventListener('pointerdown', event => {
-    if (settingsDispatch || !document.querySelector('#app .personalization-sheet')) return;
+    if (!document.querySelector('#app .personalization-sheet')) return;
     const button = event.target.closest?.('.golden-bottom-nav-v9169__side[data-view="home"], .golden-bottom-nav-v9169__side[data-view="brief"]');
     if (!button) return;
+    const wanted = button.dataset.view;
+    if (wanted !== 'home' && wanted !== 'brief') return;
+
     event.preventDefault();
     event.stopImmediatePropagation();
-    settingsDispatch = true;
-    try { button.click(); }
-    finally { settingsDispatch = false; }
+    dispatchViewDirect(wanted);
   }, true);
 
   document.addEventListener('click', event => {
