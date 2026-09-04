@@ -1,9 +1,25 @@
 (() => {
   'use strict';
 
-  const RELEASE = '91.62';
+  const RELEASE = '91.66';
   let scheduled = false;
   document.documentElement.dataset.uxPolishV9162 = RELEASE;
+
+  function ensureBottomNavAssets() {
+    if (!document.querySelector('link[data-bottom-nav-v9166]')) {
+      const link = document.createElement('link');
+      link.rel = 'stylesheet';
+      link.href = 'bottom-nav-v91.66.css?v=91.66';
+      link.dataset.bottomNavV9166 = '1';
+      document.head.appendChild(link);
+    }
+    if (!document.querySelector('script[data-bottom-nav-v9166]')) {
+      const script = document.createElement('script');
+      script.src = 'bottom-nav-v91.66.js?v=91.66';
+      script.dataset.bottomNavV9166 = '1';
+      document.head.appendChild(script);
+    }
+  }
 
   function neutralizeFloatingResets() {
     document.querySelectorAll('#app .global-reset-v9154, #app .top-reset-icon-v9138').forEach(button => {
@@ -22,7 +38,6 @@
     const sheet = document.querySelector('#app .personalization-sheet');
     document.body.classList.toggle('settings-open-v9162', Boolean(sheet));
     if (!sheet) return;
-
     const close = sheet.querySelector('.personalize-close');
     if (close) {
       close.hidden = true;
@@ -44,6 +59,7 @@
   }
 
   function start() {
+    ensureBottomNavAssets();
     schedule();
     const app = document.querySelector('#app');
     if (app) new MutationObserver(schedule).observe(app, { childList: true, subtree: true });
