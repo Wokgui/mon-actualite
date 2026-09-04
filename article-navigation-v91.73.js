@@ -1,7 +1,8 @@
 (() => {
   'use strict';
 
-  const RELEASE = '91.73';
+  const RELEASE = '91.74';
+  let settingsDispatch = false;
   document.documentElement.dataset.articleNavigationV9173 = RELEASE;
 
   function closeQuickSummary() {
@@ -25,6 +26,20 @@
     const essential = document.querySelector('#app [data-brief-mode="essential"]');
     if (essential) essential.click();
   }
+
+  // In the settings sheet the DOM can be refreshed between touch-down and the
+  // browser-generated click. Dispatch the navigation on pointer-down only in
+  // this view, so Accueil/Brief reacts immediately and cannot lose the tap.
+  document.addEventListener('pointerdown', event => {
+    if (settingsDispatch || !document.querySelector('#app .personalization-sheet')) return;
+    const button = event.target.closest?.('.golden-bottom-nav-v9169__side[data-view="home"], .golden-bottom-nav-v9169__side[data-view="brief"]');
+    if (!button) return;
+    event.preventDefault();
+    event.stopImmediatePropagation();
+    settingsDispatch = true;
+    try { button.click(); }
+    finally { settingsDispatch = false; }
+  }, true);
 
   document.addEventListener('click', event => {
     const button = event.target.closest?.('.golden-bottom-nav-v9169__side[data-view], .bottom-nav [data-view]');
