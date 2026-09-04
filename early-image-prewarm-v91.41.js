@@ -23,7 +23,7 @@
     return `/api/article-thumbnail?${params}`;
   }
 
-  function preload(src, priority = 'high') {
+  function preload(src, priority = 'low') {
     if (!src || inflight.has(src)) return;
     inflight.add(src);
     try {
@@ -51,42 +51,52 @@
         .filter(([, item]) => item?.url && Date.now() - Number(item.savedAt || 0) < 30 * 86400000)
         .slice(-300);
       localStorage.setItem(VISUAL_KEY, JSON.stringify(Object.fromEntries(recent)));
-      preload(url, 'high');
+      preload(url, 'low');
     } catch {}
   }
 
   function run() {
-    if (!navigator.onLine) return;
+    if (!navigator.onLine || document.hidden) return;
     const payload = read(NEWS_CACHE_KEY, {});
-    const articles = Array.isArray(payload?.articles) ? payload.articles.filter(Boolean).slice(0, 18) : [];
+    const articles = Array.isArray(payload?.articles) ? payload.articles.filter(Boolean).slice(0, 14) : [];
     if (!articles.length) return;
     const visuals = read(VISUAL_KEY, {});
 
-    articles.slice(0, 14).forEach(article => {
+    // Warm only already-known visuals after the UI has painted. Starting a
+    // burst of high-priority image requests before app.js delayed Android PWA
+    // startup and competed with the visible thumbnails.
+    articles.slice(0, 8).forEach(article => {
       const remembered = visuals[String(article.id || '')]?.url;
       const prepared = String(article?.visual?.status || article?.visualStatus || '') === 'ready'
         ? String(article?.visual?.url || article?.image || '')
         : '';
-      preload(remembered || prepared, 'high');
+      preload(remembered || prepared, 'low');
     });
 
     const missing = articles.filter(article => {
       const id = String(article.id || '');
       if (!id || visuals[id]?.url) return false;
       return String(article?.visual?.status || article?.visualStatus || '') !== 'ready';
-    }).slice(0, 4);
+    }).slice(0, 2);
 
-    let cursor = 0;
-    const worker = async () => {
-      while (cursor < missing.length) {
-        const article = missing[cursor++];
+    (async () => {
+      for (const article of missing) {
         await recover(article);
-        await new Promise(resolve => setTimeout(resolve, 450));
+        await new Promise(resolve => setTimeout(resolve, 900));
       }
-    };
-    worker();
-    worker();
+    })();
   }
 
-  run();
+  function schedule() {
+    const launch = () => window.setTimeout(run, 1800);
+    if ('requestIdleCallback' in window) {
+      requestIdleCallback(run, { timeout: 3500 });
+    } else if (document.readyState === 'complete') {
+      launch();
+    } else {
+      window.addEventListener('load', launch, { once: true });
+    }
+  }
+
+  schedule();
 })();
