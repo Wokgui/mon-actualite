@@ -62,22 +62,39 @@
     .article-card.essential-v77::after { content:none !important; display:none !important; }
     .article-card.essential-v77 { border:0 !important; background:transparent !important; box-shadow:none !important; }
     .article-card.essential-v77 .article-body { background:transparent !important; }
+
+    /* First paint for the installed PWA: show the real app shell immediately
+       instead of leaving Android's large-icon splash on screen while scripts load. */
+    .instant-launch-v9174 { min-height:100dvh; padding:54px 24px 120px; box-sizing:border-box; background:#f7f5fc; }
+    .instant-launch-v9174 header { text-align:center; margin-bottom:44px; }
+    .instant-launch-v9174 small { display:block; color:#7461e8; font:700 14px/1.2 system-ui,sans-serif; letter-spacing:.04em; margin-bottom:15px; }
+    .instant-launch-v9174 h1 { margin:0; color:#191722; font:800 32px/1.08 system-ui,sans-serif; }
+    .instant-launch-v9174 .instant-row { display:grid; grid-template-columns:1fr 112px; gap:18px; align-items:center; margin:0 4px 28px; }
+    .instant-launch-v9174 .instant-lines { height:54px; border-radius:10px; background:linear-gradient(#e8e5ee 0 0) 0 0/88% 12px no-repeat,linear-gradient(#eeeaf3 0 0) 0 21px/100% 12px no-repeat,linear-gradient(#f0edf4 0 0) 0 42px/68% 12px no-repeat; }
+    .instant-launch-v9174 .instant-photo { width:112px; height:75px; border-radius:10px; background:#ece9f1; }
   </style>
   <title>Mon actualité</title>
 </head>
 <body>
   <div class="ambient ambient-one"></div>
   <div class="ambient ambient-two"></div>
-  <div id="app" class="app-shell" aria-live="polite"></div>
+  <div id="app" class="app-shell" aria-live="polite">
+    <main class="instant-launch-v9174" aria-hidden="true">
+      <header><small>Mon actualité</small><h1>Mon actualité</h1></header>
+      <div class="instant-row"><div class="instant-lines"></div><div class="instant-photo"></div></div>
+      <div class="instant-row"><div class="instant-lines"></div><div class="instant-photo"></div></div>
+      <div class="instant-row"><div class="instant-lines"></div><div class="instant-photo"></div></div>
+    </main>
+  </div>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
-  <!-- v91.73 stable bottom navigation and deterministic article exit -->
+  <!-- v91.74 fast installed launch, stable photos and reliable settings navigation -->
   <script src="release-watch.js?v=91.45"></script>
   <script src="runtime-stability-v91.41.js?v=91.42"></script>
   <script src="article-access-v91.48.js?v=91.48"></script>
   <script src="ux-guard-v91.56.js?v=91.56"></script>
   <script src="summary-demand-v91.43.js?v=91.45"></script>
   <script src="summary-quality-v91.46.js?v=91.46"></script>
-  <script src="early-image-prewarm-v91.41.js?v=91.41"></script>
+  <script src="early-image-prewarm-v91.41.js?v=91.74"></script>
   <script src="bootstrap-v42.js?v=54"></script>
   <script src="content-intelligence-v76.js?v=91.40"></script>
   <script src="feed-editorial-v77.js?v=77"></script>
@@ -113,7 +130,8 @@
   <script src="ux-polish-v91.57.js?v=91.57"></script>
   <script src="ux-polish-v91.60.js?v=91.60"></script>
   <script src="ux-polish-v91.61.js?v=91.61"></script>
-  <script src="bottom-nav-golden-v91.69.js?v=91.73"></script>
-  <script src="article-navigation-v91.73.js?v=91.73"></script>
+  <script src="bottom-nav-golden-v91.69.js?v=91.74"></script>
+  <script src="article-navigation-v91.73.js?v=91.74"></script>
+  <script src="image-stability-v91.74.js?v=91.74"></script>
 </body>
 </html>
