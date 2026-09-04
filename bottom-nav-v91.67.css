@@ -1,0 +1,235 @@
+/* v91.67 — bottom navigation center matched to the approved cradle model */
+.bottom-nav-final {
+  --nav-purple: #6753d8;
+  --nav-muted: #9a95a5;
+  position: fixed !important;
+  left: max(12px, env(safe-area-inset-left)) !important;
+  right: max(12px, env(safe-area-inset-right)) !important;
+  bottom: max(8px, env(safe-area-inset-bottom)) !important;
+  z-index: 10030 !important;
+  width: auto !important;
+  max-width: 456px !important;
+  height: 88px !important;
+  margin: 0 auto !important;
+  padding: 0 !important;
+  display: grid !important;
+  grid-template-columns: 1fr 92px 1fr !important;
+  align-items: stretch !important;
+  overflow: visible !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  backdrop-filter: none !important;
+  -webkit-backdrop-filter: none !important;
+}
+
+.bottom-nav-final::before,
+.bottom-nav-final::after {
+  content: none !important;
+  display: none !important;
+}
+
+.bottom-nav-final__shape {
+  position: absolute !important;
+  inset: 0 !important;
+  z-index: 0 !important;
+  width: 100% !important;
+  height: 100% !important;
+  overflow: visible !important;
+  pointer-events: none !important;
+  filter: drop-shadow(0 10px 23px rgba(68,55,111,.12)) !important;
+}
+
+.bottom-nav-final__side {
+  position: relative !important;
+  z-index: 3 !important;
+  width: 100% !important;
+  height: 60px !important;
+  min-height: 60px !important;
+  margin: 20px 0 0 !important;
+  padding: 6px 4px 4px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 4px !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+  color: var(--nav-muted) !important;
+  transform: none !important;
+  font-size: 11.5px !important;
+  font-weight: 750 !important;
+  line-height: 1 !important;
+  -webkit-tap-highlight-color: transparent !important;
+}
+
+.bottom-nav-final__side.active {
+  background: transparent !important;
+  color: var(--nav-purple) !important;
+}
+
+.bottom-nav-final__side svg {
+  width: 23px !important;
+  height: 23px !important;
+  margin: 0 !important;
+  stroke-width: 1.9 !important;
+}
+
+.bottom-nav-final__side span { display: block !important; }
+.bottom-nav-final__home { grid-column: 1 !important; }
+.bottom-nav-final__brief { grid-column: 3 !important; }
+
+.bottom-nav-final__center {
+  position: relative !important;
+  z-index: 4 !important;
+  grid-column: 2 !important;
+  width: 92px !important;
+  height: 88px !important;
+  justify-self: center !important;
+  overflow: visible !important;
+  pointer-events: none !important;
+}
+
+/* Real U-shaped cradle: visible only on the lower sides and under the reset. */
+.bottom-nav-final__cradle {
+  position: absolute !important;
+  left: 50% !important;
+  top: -16px !important;
+  z-index: 1 !important;
+  width: 104px !important;
+  height: 100px !important;
+  transform: translateX(-50%) !important;
+  overflow: visible !important;
+  pointer-events: none !important;
+  filter: drop-shadow(0 0 1px rgba(116,97,232,.18)) drop-shadow(0 4px 10px rgba(78,65,126,.07)) !important;
+}
+
+/* No full ring around the reset. */
+.bottom-nav-final__halo { display: none !important; }
+
+.bottom-nav-final__reset {
+  position: absolute !important;
+  left: 50% !important;
+  top: -22px !important;
+  z-index: 5 !important;
+  width: 60px !important;
+  height: 60px !important;
+  min-width: 60px !important;
+  min-height: 60px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  transform: translateX(-50%) !important;
+  display: grid !important;
+  place-items: center !important;
+  border: 0 !important;
+  border-radius: 50% !important;
+  background: linear-gradient(145deg,#7864eb,#6550d8) !important;
+  color: #fff !important;
+  box-shadow: 0 8px 18px rgba(89,70,190,.23) !important;
+  pointer-events: auto !important;
+  -webkit-tap-highlight-color: transparent !important;
+}
+
+.bottom-nav-final__reset:active {
+  transform: translateX(-50%) scale(.96) !important;
+}
+
+.bottom-nav-final__reset-glyph {
+  display: block !important;
+  font-size: 32px !important;
+  line-height: 1 !important;
+  font-weight: 600 !important;
+  transform: translateY(-1px) !important;
+}
+
+/* The gear is inside the cradle itself, not in its own floating tile. */
+.bottom-nav-final__gear {
+  position: absolute !important;
+  left: 50% !important;
+  top: 54px !important;
+  z-index: 6 !important;
+  width: 34px !important;
+  height: 24px !important;
+  min-width: 34px !important;
+  min-height: 24px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  transform: translateX(-50%) !important;
+  display: grid !important;
+  place-items: center !important;
+  border: 0 !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  color: #746e83 !important;
+  box-shadow: none !important;
+  pointer-events: auto !important;
+  -webkit-tap-highlight-color: transparent !important;
+}
+
+.bottom-nav-final__gear:active {
+  transform: translateX(-50%) scale(.94) !important;
+  color: var(--nav-purple) !important;
+}
+
+.bottom-nav-final__gear svg {
+  width: 17px !important;
+  height: 17px !important;
+}
+
+.bottom-nav-final--simple,
+body.settings-open-v9162 .bottom-nav-final,
+body.quick-summary-open .bottom-nav-final,
+body:has(.detail-page) .bottom-nav-final {
+  grid-template-columns: 1fr 1fr !important;
+}
+
+.bottom-nav-final--simple .bottom-nav-final__center,
+body.settings-open-v9162 .bottom-nav-final__center,
+body.quick-summary-open .bottom-nav-final__center,
+body:has(.detail-page) .bottom-nav-final__center {
+  display: none !important;
+}
+
+.bottom-nav-final--simple .bottom-nav-final__brief,
+body.settings-open-v9162 .bottom-nav-final__brief,
+body.quick-summary-open .bottom-nav-final__brief,
+body:has(.detail-page) .bottom-nav-final__brief {
+  grid-column: 2 !important;
+}
+
+.bottom-nav-final .reset-nav-v9160,
+.bottom-nav-final .nav-gear-v9160 {
+  display: none !important;
+}
+
+@media (max-width: 380px) {
+  .bottom-nav-final {
+    grid-template-columns: 1fr 88px 1fr !important;
+    height: 86px !important;
+  }
+
+  .bottom-nav-final__center {
+    width: 88px !important;
+    height: 86px !important;
+  }
+
+  .bottom-nav-final__cradle {
+    width: 100px !important;
+    height: 96px !important;
+    top: -15px !important;
+  }
+
+  .bottom-nav-final__reset {
+    width: 58px !important;
+    height: 58px !important;
+    min-width: 58px !important;
+    min-height: 58px !important;
+    top: -21px !important;
+  }
+
+  .bottom-nav-final__reset-glyph { font-size: 31px !important; }
+  .bottom-nav-final__gear { top: 53px !important; }
+}
