@@ -1,17 +1,18 @@
-/* v91.67 — bottom navigation center matched to the approved cradle model */
-.bottom-nav-final {
+/* v91.68 — bottom navigation center matched to the approved cradle model, isolated from legacy nav rules */
+.bottom-nav.bottom-nav-final {
   --nav-purple: #6753d8;
   --nav-muted: #9a95a5;
   position: fixed !important;
-  left: max(12px, env(safe-area-inset-left)) !important;
-  right: max(12px, env(safe-area-inset-right)) !important;
+  left: 50% !important;
+  right: auto !important;
   bottom: max(8px, env(safe-area-inset-bottom)) !important;
   z-index: 10030 !important;
-  width: auto !important;
+  width: min(calc(100vw - 24px), 456px) !important;
   max-width: 456px !important;
   height: 88px !important;
-  margin: 0 auto !important;
+  margin: 0 !important;
   padding: 0 !important;
+  transform: translateX(-50%) !important;
   display: grid !important;
   grid-template-columns: 1fr 92px 1fr !important;
   align-items: stretch !important;
@@ -22,6 +23,7 @@
   box-shadow: none !important;
   backdrop-filter: none !important;
   -webkit-backdrop-filter: none !important;
+  box-sizing: border-box !important;
 }
 
 .bottom-nav-final::before,
@@ -41,7 +43,7 @@
   filter: drop-shadow(0 10px 23px rgba(68,55,111,.12)) !important;
 }
 
-.bottom-nav-final__side {
+.bottom-nav.bottom-nav-final > .bottom-nav-final__side {
   position: relative !important;
   z-index: 3 !important;
   width: 100% !important;
@@ -53,13 +55,15 @@
   flex-direction: column !important;
   align-items: center !important;
   justify-content: center !important;
+  justify-self: stretch !important;
   gap: 4px !important;
+  order: initial !important;
+  transform: none !important;
   border: 0 !important;
   border-radius: 0 !important;
   background: transparent !important;
   box-shadow: none !important;
   color: var(--nav-muted) !important;
-  transform: none !important;
   font-size: 11.5px !important;
   font-weight: 750 !important;
   line-height: 1 !important;
@@ -79,8 +83,8 @@
 }
 
 .bottom-nav-final__side span { display: block !important; }
-.bottom-nav-final__home { grid-column: 1 !important; }
-.bottom-nav-final__brief { grid-column: 3 !important; }
+.bottom-nav.bottom-nav-final > .bottom-nav-final__home { grid-column: 1 !important; }
+.bottom-nav.bottom-nav-final > .bottom-nav-final__brief { grid-column: 3 !important; }
 
 .bottom-nav-final__center {
   position: relative !important;
@@ -89,6 +93,8 @@
   width: 92px !important;
   height: 88px !important;
   justify-self: center !important;
+  order: initial !important;
+  transform: none !important;
   overflow: visible !important;
   pointer-events: none !important;
 }
@@ -107,7 +113,6 @@
   filter: drop-shadow(0 0 1px rgba(116,97,232,.18)) drop-shadow(0 4px 10px rgba(78,65,126,.07)) !important;
 }
 
-/* No full ring around the reset. */
 .bottom-nav-final__halo { display: none !important; }
 
 .bottom-nav-final__reset {
@@ -145,8 +150,8 @@
   transform: translateY(-1px) !important;
 }
 
-/* The gear is inside the cradle itself, not in its own floating tile. */
-.bottom-nav-final__gear {
+/* Gear stays inside the cradle and explicitly defeats the legacy [data-view=sheet] transform. */
+.bottom-nav.bottom-nav-final .bottom-nav-final__gear[data-view="sheet"] {
   position: absolute !important;
   left: 50% !important;
   top: 54px !important;
@@ -160,6 +165,8 @@
   transform: translateX(-50%) !important;
   display: grid !important;
   place-items: center !important;
+  justify-self: auto !important;
+  order: initial !important;
   border: 0 !important;
   border-radius: 0 !important;
   background: transparent !important;
@@ -169,7 +176,7 @@
   -webkit-tap-highlight-color: transparent !important;
 }
 
-.bottom-nav-final__gear:active {
+.bottom-nav.bottom-nav-final .bottom-nav-final__gear[data-view="sheet"]:active {
   transform: translateX(-50%) scale(.94) !important;
   color: var(--nav-purple) !important;
 }
@@ -179,10 +186,10 @@
   height: 17px !important;
 }
 
-.bottom-nav-final--simple,
-body.settings-open-v9162 .bottom-nav-final,
-body.quick-summary-open .bottom-nav-final,
-body:has(.detail-page) .bottom-nav-final {
+.bottom-nav.bottom-nav-final.bottom-nav-final--simple,
+body.settings-open-v9162 .bottom-nav.bottom-nav-final,
+body.quick-summary-open .bottom-nav.bottom-nav-final,
+body:has(.detail-page) .bottom-nav.bottom-nav-final {
   grid-template-columns: 1fr 1fr !important;
 }
 
@@ -193,10 +200,10 @@ body:has(.detail-page) .bottom-nav-final__center {
   display: none !important;
 }
 
-.bottom-nav-final--simple .bottom-nav-final__brief,
-body.settings-open-v9162 .bottom-nav-final__brief,
-body.quick-summary-open .bottom-nav-final__brief,
-body:has(.detail-page) .bottom-nav-final__brief {
+.bottom-nav.bottom-nav-final.bottom-nav-final--simple > .bottom-nav-final__brief,
+body.settings-open-v9162 .bottom-nav.bottom-nav-final > .bottom-nav-final__brief,
+body.quick-summary-open .bottom-nav.bottom-nav-final > .bottom-nav-final__brief,
+body:has(.detail-page) .bottom-nav.bottom-nav-final > .bottom-nav-final__brief {
   grid-column: 2 !important;
 }
 
@@ -206,7 +213,7 @@ body:has(.detail-page) .bottom-nav-final__brief {
 }
 
 @media (max-width: 380px) {
-  .bottom-nav-final {
+  .bottom-nav.bottom-nav-final {
     grid-template-columns: 1fr 88px 1fr !important;
     height: 86px !important;
   }
@@ -231,5 +238,5 @@ body:has(.detail-page) .bottom-nav-final__brief {
   }
 
   .bottom-nav-final__reset-glyph { font-size: 31px !important; }
-  .bottom-nav-final__gear { top: 53px !important; }
+  .bottom-nav.bottom-nav-final .bottom-nav-final__gear[data-view="sheet"] { top: 53px !important; }
 }
