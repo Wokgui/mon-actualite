@@ -1,22 +1,22 @@
 (() => {
   'use strict';
 
-  const RELEASE = '91.66';
+  const RELEASE = '91.67';
   let scheduled = false;
   document.documentElement.dataset.uxPolishV9162 = RELEASE;
 
   function ensureBottomNavAssets() {
-    if (!document.querySelector('link[data-bottom-nav-v9166]')) {
+    if (!document.querySelector('link[data-bottom-nav-v9167]')) {
       const link = document.createElement('link');
       link.rel = 'stylesheet';
-      link.href = 'bottom-nav-v91.66.css?v=91.66';
-      link.dataset.bottomNavV9166 = '1';
+      link.href = 'bottom-nav-v91.67.css?v=91.67';
+      link.dataset.bottomNavV9167 = '1';
       document.head.appendChild(link);
     }
-    if (!document.querySelector('script[data-bottom-nav-v9166]')) {
+    if (!document.querySelector('script[data-bottom-nav-v9167]')) {
       const script = document.createElement('script');
-      script.src = 'bottom-nav-v91.66.js?v=91.66';
-      script.dataset.bottomNavV9166 = '1';
+      script.src = 'bottom-nav-v91.67.js?v=91.67';
+      script.dataset.bottomNavV9167 = '1';
       document.head.appendChild(script);
     }
   }
