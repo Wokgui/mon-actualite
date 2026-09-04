@@ -1,4 +1,4 @@
-/* v91.70 — isolated golden bottom navigation. No legacy button reset can override component styles. */
+/* v91.71 — isolated bottom navigation + deterministic article state. */
 
 .golden-bottom-nav-v9169 {
   all: initial !important;
@@ -44,8 +44,6 @@
 
 .golden-bottom-nav-v9169::after { content:none !important; display:none !important; }
 
-/* Important: no all:unset here. That rule previously had higher specificity than
-   the reset/gear classes and erased their purple/white styling on the real app. */
 .golden-bottom-nav-v9169 button {
   box-sizing: border-box !important;
   font-family: inherit !important;
@@ -82,9 +80,15 @@
 .golden-bottom-nav-v9169__side.active { color: var(--golden-purple) !important; }
 .golden-bottom-nav-v9169__side:active { transform: scale(.98) !important; }
 .golden-bottom-nav-v9169__side svg {
-  display:block !important; width:22px !important; height:22px !important; margin:0 !important;
-  fill:none !important; stroke:currentColor !important; stroke-width:1.9 !important;
-  stroke-linecap:round !important; stroke-linejoin:round !important;
+  display:block !important;
+  width:22px !important;
+  height:22px !important;
+  margin:0 !important;
+  fill:none !important;
+  stroke:currentColor !important;
+  stroke-width:1.9 !important;
+  stroke-linecap:round !important;
+  stroke-linejoin:round !important;
 }
 .golden-bottom-nav-v9169__side span { display:block !important; margin:0 !important; padding:0 !important; }
 .golden-bottom-nav-v9169__home { grid-column:1 !important; }
@@ -103,8 +107,6 @@
   box-sizing: border-box !important;
 }
 
-/* Page-colour cutout: only its lower overlap with the white bar is visible,
-   producing the U-shaped cradle from the approved reference. */
 .golden-bottom-nav-v9169__center::before {
   content:"" !important;
   position:absolute !important;
@@ -145,9 +147,14 @@
 }
 .golden-bottom-nav-v9169 .golden-bottom-nav-v9169__reset:active { transform:translateX(-50%) scale(.96) !important; }
 .golden-bottom-nav-v9169 .golden-bottom-nav-v9169__reset svg {
-  display:block !important; width:29px !important; height:29px !important;
-  fill:none !important; stroke:#fff !important; stroke-width:2.35 !important;
-  stroke-linecap:round !important; stroke-linejoin:round !important;
+  display:block !important;
+  width:29px !important;
+  height:29px !important;
+  fill:none !important;
+  stroke:#fff !important;
+  stroke-width:2.35 !important;
+  stroke-linecap:round !important;
+  stroke-linejoin:round !important;
 }
 
 .golden-bottom-nav-v9169 .golden-bottom-nav-v9169__gear {
@@ -175,26 +182,79 @@
 }
 .golden-bottom-nav-v9169 .golden-bottom-nav-v9169__gear:active { transform:translateX(-50%) scale(.94) !important; }
 .golden-bottom-nav-v9169 .golden-bottom-nav-v9169__gear svg {
-  display:block !important; width:17px !important; height:17px !important;
-  fill:none !important; stroke:currentColor !important; stroke-width:1.85 !important;
-  stroke-linecap:round !important; stroke-linejoin:round !important;
+  display:block !important;
+  width:17px !important;
+  height:17px !important;
+  fill:none !important;
+  stroke:currentColor !important;
+  stroke-width:1.85 !important;
+  stroke-linecap:round !important;
+  stroke-linejoin:round !important;
 }
 
-.golden-bottom-nav-v9169--simple { grid-template-columns:1fr 1fr !important; }
-.golden-bottom-nav-v9169--simple .golden-bottom-nav-v9169__center { display:none !important; }
-.golden-bottom-nav-v9169--simple .golden-bottom-nav-v9169__brief { grid-column:2 !important; }
+/* On settings and every article view, the centre controls are absent immediately. */
+.golden-bottom-nav-v9169--simple,
+body.quick-summary-open .golden-bottom-nav-v9169,
+body.article-open-v9171 .golden-bottom-nav-v9169,
+body:has(#app .detail-page) .golden-bottom-nav-v9169 {
+  grid-template-columns:1fr 1fr !important;
+}
+
+.golden-bottom-nav-v9169--simple .golden-bottom-nav-v9169__center,
+body.quick-summary-open .golden-bottom-nav-v9169__center,
+body.article-open-v9171 .golden-bottom-nav-v9169__center,
+body:has(#app .detail-page) .golden-bottom-nav-v9169__center {
+  display:none !important;
+  visibility:hidden !important;
+  pointer-events:none !important;
+}
+
+.golden-bottom-nav-v9169--simple .golden-bottom-nav-v9169__brief,
+body.quick-summary-open .golden-bottom-nav-v9169__brief,
+body.article-open-v9171 .golden-bottom-nav-v9169__brief,
+body:has(#app .detail-page) .golden-bottom-nav-v9169__brief {
+  grid-column:2 !important;
+}
+
+/* The article is exited with the bottom navigation; the old X is no longer part of the UI. */
+.quick-summary-close,
+[data-quick-close] {
+  display:none !important;
+  visibility:hidden !important;
+  pointer-events:none !important;
+}
+.quick-summary-head h2 {
+  padding-left:4px !important;
+  padding-right:4px !important;
+}
+
+/* Native nav exists only for a microtask while app.js renders; never flash it to the user. */
+html[data-golden-bottom-nav-v9169] #app .bottom-nav:not(.golden-bottom-nav-v9169) {
+  visibility:hidden !important;
+  pointer-events:none !important;
+}
 
 #app > .global-reset-v9154,
 #app > .top-reset-icon-v9138,
 #app main > .top-reset-icon-v9138,
 .global-reset-v9154.reset-draggable-v9157,
 .top-reset-icon-v9138:not(.golden-bottom-nav-v9169__reset) {
-  display:none !important; visibility:hidden !important; pointer-events:none !important;
+  display:none !important;
+  visibility:hidden !important;
+  pointer-events:none !important;
 }
 
-body.settings-open-v9169 .personalize-close { display:none !important; visibility:hidden !important; pointer-events:none !important; }
+body.settings-open-v9169 .personalize-close {
+  display:none !important;
+  visibility:hidden !important;
+  pointer-events:none !important;
+}
 
 @media (max-width:380px) {
   .golden-bottom-nav-v9169 { grid-template-columns:minmax(0,1fr) 88px minmax(0,1fr) !important; }
   .golden-bottom-nav-v9169__center { width:88px !important; }
+  .golden-bottom-nav-v9169--simple,
+  body.quick-summary-open .golden-bottom-nav-v9169,
+  body.article-open-v9171 .golden-bottom-nav-v9169,
+  body:has(#app .detail-page) .golden-bottom-nav-v9169 { grid-template-columns:1fr 1fr !important; }
 }
