@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const RELEASE = '91.71';
+  const RELEASE = '91.72';
   let scheduled = false;
   let instantDispatch = false;
   let suppressPhysicalClickUntil = 0;
@@ -97,7 +97,7 @@
     nav.innerHTML = `
       <button type="button" class="golden-bottom-nav-v9169__side golden-bottom-nav-v9169__home ${s.home && !s.detail ? 'active' : ''}" data-view="home" aria-label="Accueil">${homeIcon}<span>Accueil</span></button>
       ${centerVisible ? centerMarkup() : ''}
-      <button type="button" class="golden-bottom-nav-v9169__side golden-bottom-nav-v9169__brief ${s.brief && !s.detail ? 'active' : ''}" data-view="brief" aria-label="Brief">${briefIcon}<span>Brief</span></button>`;
+      <button type="button" class="golden-bottom-nav-v9169__side golden-bottom-nav-v9169__brief ${s.brief && !s.detail && !s.watches ? 'active' : ''}" data-view="brief" aria-label="Brief">${briefIcon}<span>Brief</span></button>`;
   }
 
   function schedule() {
@@ -108,9 +108,8 @@
 
   function closeQuickSummary({ restoreScroll = false } = {}) {
     const close = document.querySelector('.quick-summary-backdrop [data-quick-close]');
-    if (close) {
-      close.click();
-    } else {
+    if (close) close.click();
+    else {
       document.querySelector('.quick-summary-backdrop')?.remove();
       document.body.classList.remove('quick-summary-open');
     }
@@ -127,6 +126,12 @@
     instantDispatch = true;
     try { button.click(); }
     finally { instantDispatch = false; }
+  }
+
+  function switchToEssentialBrief(fallbackButton) {
+    const essential = document.querySelector('#app [data-brief-mode="essential"]');
+    if (essential) dispatchNativeClick(essential);
+    else dispatchNativeClick(fallbackButton);
   }
 
   function leaveNativeDetailToOrigin() {
@@ -148,14 +153,23 @@
       }
 
       const originWasBrief = Boolean(articleOrigin?.brief);
-      closeQuickSummary({ restoreScroll: originWasBrief });
-      if (originWasBrief) return;
+      const originWasWatches = Boolean(articleOrigin?.watches);
+      closeQuickSummary({ restoreScroll: originWasBrief && !originWasWatches });
+      if (originWasBrief) {
+        if (originWasWatches) switchToEssentialBrief(button);
+        return;
+      }
       dispatchNativeClick(button);
       return;
     }
 
     if (s.nativeDetail && wanted === 'home') {
       leaveNativeDetailToOrigin();
+      return;
+    }
+
+    if (wanted === 'brief' && s.brief) {
+      if (s.watches) switchToEssentialBrief(button);
       return;
     }
 
