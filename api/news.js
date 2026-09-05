@@ -1,13 +1,25 @@
 'use strict';
 
 const coreHandler = require('../lib/news-core');
+const fastNewsHandler = require('../lib/news-fast');
 const { mergeEventVariants } = require('../lib/news-dedup');
 const { rankCatalogArticles } = require('../lib/news-significance');
 const { suppressCorePrewarmRequest, scheduleFinalImagePrewarm } = require('../lib/final-image-prewarm');
 
 const CATALOG_LIMIT = 90;
 
+function wantsFastMode(req) {
+  if (String(req.query?.fast || '') === '1') return true;
+  try {
+    return new URL(req.url || '/', 'https://local.invalid').searchParams.get('fast') === '1';
+  } catch {
+    return false;
+  }
+}
+
 module.exports = async function handler(req, res) {
+  if (req.method === 'GET' && wantsFastMode(req)) return fastNewsHandler(req, res);
+
   let statusCode = 200;
   let body = '';
   const headers = new Map();
