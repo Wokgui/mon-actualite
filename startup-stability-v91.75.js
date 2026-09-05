@@ -19,29 +19,13 @@
     }
   }
 
-  function requestInterests(url, init) {
-    const fromQuery = String(url?.searchParams?.get('interests') || '').trim();
-    if (fromQuery) return fromQuery;
-    try {
-      if (typeof init?.body !== 'string') return '';
-      const body = JSON.parse(init.body);
-      return Array.isArray(body?.preferredCategories)
-        ? body.preferredCategories.map(String).filter(Boolean).join(',')
-        : '';
-    } catch {
-      return '';
-    }
-  }
-
   window.fetch = async function fastStartupFetch(input, init) {
     const url = newsRequestUrl(input);
     const isNewsRequest = url && url.origin === location.origin && url.pathname === '/api/news';
     if (!startupNewsRequestHandled && isNewsRequest && url.searchParams.get('fast') !== '1') {
       startupNewsRequestHandled = true;
-      const interests = requestInterests(url, init);
       const fastUrl = new URL('/api/news', location.origin);
       fastUrl.searchParams.set('fast', '1');
-      if (interests) fastUrl.searchParams.set('interests', interests);
 
       const controller = new AbortController();
       const timer = window.setTimeout(() => controller.abort(), 3200);
