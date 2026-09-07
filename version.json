@@ -1,6 +1,6 @@
 {
-  "version": "69",
-  "codeRelease": "91.78",
+  "version": "70",
+  "codeRelease": "91.79",
   "release": "2026-09-07",
-  "label": "v91.78 : chargement complet, photos éditeur fiables et date précise sous la photo"
+  "label": "v91.79 : affichage instantané du cache, démarrage parallèle et nouveautés classées chronologiquement"
 }
