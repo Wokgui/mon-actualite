@@ -1,6 +1,6 @@
 {
-  "version": "68",
-  "codeRelease": "91.45",
-  "release": "2026-09-01",
-  "label": "v91.45 (socle v89) : résumés résilients, fallbacks factuels fiables, retries bornés et diagnostics exploitables"
+  "version": "69",
+  "codeRelease": "91.77",
+  "release": "2026-09-07",
+  "label": "v91.77 : démarrage rapide suivi du catalogue complet, photos éditeur plus fiables et date précise des articles"
 }

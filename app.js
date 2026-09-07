@@ -4,8 +4,8 @@ import { articleVisualUrl, hasPreparedVisual, sourceTileUrl } from './services/a
 const $ = (selector, root = document) => root.querySelector(selector);
 const app = $('#app');
 const toastEl = $('#toast');
-const APP_VERSION = '68';
-const APP_RELEASE = '1er septembre 2026';
+const APP_VERSION = '69';
+const APP_RELEASE = '7 septembre 2026';
 document.documentElement.dataset.appVersion = APP_VERSION;
 
 const GENERAL_CATEGORIES = ['Politique', 'International', 'Économie', 'Société', 'Santé', 'Environnement', 'Science', 'Culture', 'Éducation', 'Europe'];
@@ -156,6 +156,17 @@ function timeLabel(dateString) {
   if (diffMinutes < 24 * 60) return `Il y a ${Math.floor(diffMinutes / 60)} h`;
   if (diffMinutes < 48 * 60) return `Hier, ${new Intl.DateTimeFormat('fr-FR', { hour: '2-digit', minute: '2-digit' }).format(date)}`;
   return new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'short' }).format(date);
+}
+
+function articleDateTimeLabel(dateString) {
+  const date = new Date(dateString);
+  if (Number.isNaN(date.getTime())) return '';
+  const day = new Intl.DateTimeFormat('fr-FR', {
+    weekday: 'long', day: 'numeric', month: 'long',
+    ...(date.getFullYear() !== new Date().getFullYear() ? { year: 'numeric' } : {})
+  }).format(date);
+  const time = new Intl.DateTimeFormat('fr-FR', { hour: '2-digit', minute: '2-digit' }).format(date);
+  return `${day.charAt(0).toUpperCase()}${day.slice(1)} à ${time}`;
 }
 
 function badgeFor(article) {
@@ -311,7 +322,7 @@ function renderDetail() {
   return `<main class="page detail-page">${topbar('Article', true, `<button class="icon-btn save-btn-detail ${saved ? 'saved' : ''}" data-save="${escapeHtml(article.id)}" aria-label="Sauvegarder">${icon('bookmark', saved)}</button>`)}
     <div class="detail-hero article-placeholder">${icon(meta.icon)}<span>${escapeHtml(article.category)}</span></div>
     <article class="detail-content"><span class="badge ${badgeFor(article) === 'Important' ? 'important' : ''}">${badgeFor(article)}</span><h1>${escapeHtml(article.title)}</h1>
-      <div class="detail-meta">${escapeHtml(article.source)} · ${timeLabel(article.publishedAt)} · <button class="category-link" data-category="${escapeHtml(article.category)}">${escapeHtml(article.category)}</button></div>
+      <div class="detail-meta">${escapeHtml(article.source)} · ${articleDateTimeLabel(article.publishedAt)} · <button class="category-link" data-category="${escapeHtml(article.category)}">${escapeHtml(article.category)}</button></div>
       <section class="ai-summary"><strong>${icon('sparkles')} Synthèse</strong><p>${escapeHtml(article.detail || article.summary)}</p></section>
       <div class="tags">${(article.tags || [article.category]).map(tag => `<span class="tag">${escapeHtml(tag)}</span>`).join('')}</div>
       <a class="primary-btn" href="${escapeHtml(article.url)}" target="_blank" rel="noopener noreferrer">Lire l’article original ${icon('external')}</a>
@@ -919,6 +930,7 @@ async function syncNews({ silent = false } = {}) {
       persistCache();
       refreshAfterNewsChange();
       if (!silent) toast(`${state.articles.length} article${state.articles.length > 1 ? 's' : ''} actualisé${state.articles.length > 1 ? 's' : ''}`);
+      return result;
     } catch (error) {
       state.syncStatus = 'error';
       state.syncError = error?.message || 'Connexion impossible';
@@ -1204,5 +1216,11 @@ setInterval(() => { if (state.settings.autoRefresh && !document.hidden && naviga
 
 render();
 scheduleVisualBackfill();
-syncNews({ silent: true });
+syncNews({ silent: true }).then(result => {
+  // The fast catalogue makes the first screen useful quickly. It is only a
+  // starter: follow it with the complete personalised catalogue in the
+  // background so all three article views receive the new stories.
+  if (result?.stats?.mode !== 'fast-startup' || !navigator.onLine) return;
+  window.setTimeout(() => syncNews({ silent: true }), 250);
+}).catch(() => {});
 window.setTimeout(() => checkAppUpdate(), 1200);

@@ -116,6 +116,19 @@ function quickUnavailableSummary() {
   return 'Résumé IA momentanément indisponible pour cet article.';
 }
 
+function quickDateTime(value) {
+  const date = new Date(value);
+  if (Number.isNaN(date.getTime())) return '';
+  const day = new Intl.DateTimeFormat('fr-FR', {
+    weekday: 'long',
+    day: 'numeric',
+    month: 'long',
+    ...(date.getFullYear() !== new Date().getFullYear() ? { year: 'numeric' } : {})
+  }).format(date);
+  const time = new Intl.DateTimeFormat('fr-FR', { hour: '2-digit', minute: '2-digit' }).format(date);
+  return `${day.charAt(0).toUpperCase()}${day.slice(1)} à ${time}`;
+}
+
 function escapeRegExp(value = '') {
   return String(value).replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
 }
@@ -319,7 +332,7 @@ function openQuickSummary(article) {
       <button type="button" class="quick-summary-close" data-quick-close aria-label="Fermer">×</button>
     </header>
     ${visualUrl ? `<img class="quick-summary-image" src="${quickEsc(visualUrl)}" alt="" referrerpolicy="no-referrer" decoding="async">` : ''}
-    <div class="quick-summary-meta"><span>${quickEsc(article.source || '')}</span><span>${quickEsc(quickTime(article.publishedAt))}</span><span>${quickEsc(article.category || '')}</span></div>
+    <div class="quick-summary-meta"><span>${quickEsc(article.source || '')}</span><span>${quickEsc(quickDateTime(article.publishedAt))}</span><span>${quickEsc(article.category || '')}</span></div>
     <div class="quick-summary-text" data-quick-summary-text>${quickEsc(immediate)}</div>
     <a class="quick-full-article" href="${quickEsc(article.url || '#')}" target="_blank" rel="noopener noreferrer">Lire l’article complet <span aria-hidden="true">↗</span></a>
     ${quickTopicFeedbackMarkup(article)}

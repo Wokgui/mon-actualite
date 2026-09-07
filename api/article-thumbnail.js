@@ -1,8 +1,8 @@
 const dns = require('node:dns').promises;
 const net = require('node:net');
 
-const HTML_TIMEOUT_MS = 3200;
-const IMAGE_TIMEOUT_MS = 2600;
+const HTML_TIMEOUT_MS = 5200;
+const IMAGE_TIMEOUT_MS = 4200;
 const SEARCH_TIMEOUT_MS = 3200;
 const MAX_HTML_BYTES = 2_200_000;
 const MAX_SEARCH_BYTES = 2_500_000;
@@ -190,9 +190,40 @@ async function fetchHtml(rawUrl) {
   if (!/text\/html|application\/xhtml\+xml/i.test(type)) throw new Error('not html');
   const length = Number(response.headers.get('content-length') || 0);
   if (length > MAX_HTML_BYTES) throw new Error('page too large');
-  const buffer = Buffer.from(await response.arrayBuffer());
+  const buffer = await readUsefulHtml(response);
   if (!buffer.length || buffer.byteLength > MAX_HTML_BYTES) throw new Error('page too large');
   return { html: decodeBuffer(buffer, type), finalUrl };
+}
+
+async function readUsefulHtml(response) {
+  if (!response.body?.getReader) return Buffer.from(await response.arrayBuffer());
+
+  const reader = response.body.getReader();
+  const chunks = [];
+  let total = 0;
+  let probe = '';
+  try {
+    while (total <= MAX_HTML_BYTES) {
+      const { done, value } = await reader.read();
+      if (done) break;
+      const chunk = Buffer.from(value);
+      chunks.push(chunk);
+      total += chunk.byteLength;
+      if (total > MAX_HTML_BYTES) throw new Error('page too large');
+
+      // Covers are normally declared in the document head. Once that head is
+      // complete, do not wait for ads, trackers and the paywalled body.
+      if (probe.length < 600_000) probe += chunk.toString('utf8');
+      if (/<\/head\s*>/i.test(probe)
+        && /<(?:meta|link)\b[^>]*(?:og:image|twitter:image|image_src|thumbnail)/i.test(probe)) {
+        await reader.cancel().catch(() => {});
+        break;
+      }
+    }
+  } finally {
+    reader.releaseLock();
+  }
+  return Buffer.concat(chunks, total);
 }
 
 function googleNewsArticleId(rawUrl) {
