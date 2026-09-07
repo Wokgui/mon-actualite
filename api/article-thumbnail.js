@@ -4,6 +4,7 @@ const net = require('node:net');
 const HTML_TIMEOUT_MS = 5200;
 const IMAGE_TIMEOUT_MS = 4200;
 const SEARCH_TIMEOUT_MS = 3200;
+const METADATA_TIMEOUT_MS = 12000;
 const MAX_HTML_BYTES = 2_200_000;
 const MAX_SEARCH_BYTES = 2_500_000;
 const MAX_IMAGE_BYTES = 7_000_000;
@@ -399,6 +400,37 @@ async function firstValidImage(candidates, referer, status) {
   return null;
 }
 
+function needsRenderedMetadata(rawUrl = '') {
+  try {
+    const host = new URL(rawUrl).hostname.toLowerCase();
+    return host === 'leparisien.fr' || host.endsWith('.leparisien.fr');
+  } catch {
+    return false;
+  }
+}
+
+async function renderedMetadataImage(rawUrl) {
+  if (!needsRenderedMetadata(rawUrl)) return null;
+  const endpoint = new URL('https://api.microlink.io/');
+  endpoint.search = new URLSearchParams({ url: rawUrl, filter: 'image.url' }).toString();
+  const { response } = await fetchWithRedirects(endpoint.href, {
+    signal: AbortSignal.timeout(METADATA_TIMEOUT_MS),
+    headers: {
+      'User-Agent': UA,
+      'Accept': 'application/json'
+    }
+  }, 2);
+  if (!response.ok) throw new Error(`metadata HTTP ${response.status}`);
+  const length = Number(response.headers.get('content-length') || 0);
+  if (length > 200_000) throw new Error('metadata too large');
+  const buffer = Buffer.from(await response.arrayBuffer());
+  if (!buffer.length || buffer.byteLength > 200_000) throw new Error('metadata too large');
+  const payload = JSON.parse(buffer.toString('utf8'));
+  const imageUrl = String(payload?.data?.image?.url || '');
+  if (!imageUrl) return null;
+  return fetchImage(imageUrl, rawUrl);
+}
+
 function titleWords(value = '') {
   const stop = new Set(['avec','dans','pour','plus','apres','avant','cette','sont','etre','leur','leurs','tout','mais','sans','vers','entre','une','des','les','sur','qui','que','aux','par','ses','son','ont','est','fait','article','parisien']);
   return [...new Set(normalize(value).replace(/[^a-z0-9]+/g, ' ').split(/\s+/).filter(word => word.length >= 3 && !stop.has(word)))];
@@ -565,5 +597,18 @@ module.exports = async function handler(req, res) {
     if (bingResult.status === 'fulfilled' && bingResult.value) return sendImage(res, bingResult.value, 'bing-news-exact');
   }
 
+  // Some publishers return 403 to datacenter requests even though their page
+  // contains a real Open Graph cover. Use a rendered metadata service only for
+  // those known hosts and only after the cheaper publisher/news paths failed.
+  if (needsRenderedMetadata(publisherUrl)) {
+    try {
+      const recovered = await renderedMetadataImage(publisherUrl);
+      if (recovered) return sendImage(res, recovered, 'publisher-rendered-metadata');
+    } catch (error) {
+      console.warn('rendered metadata image unavailable:', String(error?.message || error).slice(0, 120));
+    }
+  }
+
   return neutral(res, exactOnly);
 };
+
