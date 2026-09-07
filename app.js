@@ -4,7 +4,7 @@ import { articleVisualUrl, hasPreparedVisual, sourceTileUrl } from './services/a
 const $ = (selector, root = document) => root.querySelector(selector);
 const app = $('#app');
 const toastEl = $('#toast');
-const APP_VERSION = '70';
+const APP_VERSION = '71';
 const APP_RELEASE = '7 septembre 2026';
 document.documentElement.dataset.appVersion = APP_VERSION;
 
@@ -682,12 +682,9 @@ function appendHomeToLimit({ increment = false } = {}) {
 }
 
 function refreshAfterNewsChange() {
+  // Rebuild the current view after each fresh payload. Appending only missing
+  // cards left newly published stories at the bottom of an already-open feed.
   reconcileHomeOrder();
-  if (state.view === 'home') {
-    appendHomeToLimit();
-    return;
-  }
-  if (state.view === 'brief' && app.querySelector('.article-card[data-article]')) return;
   render();
 }
 
