@@ -1,6 +1,6 @@
 {
-  "version": "70",
-  "codeRelease": "91.79",
+  "version": "71",
+  "codeRelease": "91.80",
   "release": "2026-09-07",
-  "label": "v91.79 : affichage instantané du cache, démarrage parallèle et nouveautés classées chronologiquement"
+  "label": "v91.80 : affichage immédiat, chargement parallèle et nouveaux articles replacés en tête"
 }
