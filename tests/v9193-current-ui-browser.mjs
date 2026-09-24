@@ -77,6 +77,7 @@ async function snapshot(activeView) {
 
 const states = {};
 for (const view of ['home', 'settings', 'brief']) states[view] = await snapshot(view);
+console.log('UI_STATE_SNAPSHOTS', JSON.stringify(states));
 
 for (const view of ['home', 'settings', 'brief']) {
   const state = states[view];
