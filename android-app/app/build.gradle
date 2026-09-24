@@ -1,0 +1,23 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    namespace 'com.wokgui.monactualite'
+    compileSdk 35
+
+    defaultConfig {
+        applicationId 'com.wokgui.monactualite'
+        minSdk 26
+        targetSdk 35
+        versionCode 82
+        versionName '82.91.93'
+    }
+
+    buildTypes {
+        debug {
+            applicationIdSuffix ''
+            versionNameSuffix ''
+        }
+    }
+}
