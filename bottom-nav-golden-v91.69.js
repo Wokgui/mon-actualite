@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const RELEASE = '91.82';
+  const RELEASE = '91.83';
   let scheduled = false;
   document.documentElement.dataset.goldenBottomNavV9169 = RELEASE;
 
@@ -46,7 +46,7 @@
 
   function centerMarkup() {
     return `<div class="golden-bottom-nav-v9169__center">
-      <button type="button" class="golden-bottom-nav-v9169__gear" data-view="sheet" aria-label="Personnaliser et réglages" title="Réglages">${gearIcon}</button>
+      <button type="button" class="golden-bottom-nav-v9169__gear" data-open-settings aria-label="Réglages">${gearIcon}<span>Réglages</span></button>
     </div>`;
   }
 
