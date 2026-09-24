@@ -4,7 +4,7 @@ import { articleVisualUrl, hasPreparedVisual, sourceTileUrl } from './services/a
 const $ = (selector, root = document) => root.querySelector(selector);
 const app = $('#app');
 const toastEl = $('#toast');
-const APP_VERSION = '72';
+const APP_VERSION = '73';
 const APP_RELEASE = '24 septembre 2026';
 document.documentElement.dataset.appVersion = APP_VERSION;
 
@@ -68,6 +68,12 @@ const state = {
   topicPreferences: safeJson('news-topic-preferences-v1', {}),
   sources: safeJson('news-sources', []),
   keywords: safeJson('news-keywords', []),
+  domains: safeJson('news-domains-v1', []),
+  blockedTerms: safeJson('news-blocked-terms-v1', []),
+  followedSources: new Set(safeJson('news-followed-sources-v1', [])),
+  blockedSources: new Set(safeJson('news-blocked-sources-v1', [])),
+  watchRules: safeJson('news-watch-rules-v1', []),
+  watchLastSeen: Number(localStorage.getItem('news-watch-last-seen-v1') || 0),
   articles: Array.isArray(cache.articles) ? cache.articles : [],
   lastSync: cache.fetchedAt || null,
   syncStatus: 'idle', syncError: '', stats: cache.stats || null,
@@ -183,16 +189,22 @@ function articleVisual(article, index = 0) {
   return `<img class="article-image original-article-image stable-visual ${prepared ? 'prepared-visual' : 'source-tile-visual'}" src="${escapeHtml(tile)}" alt="" width="400" height="224" loading="eager" decoding="async" referrerpolicy="no-referrer" style="background-image:url('${escapeHtml(tile)}');background-size:cover">`;
 }
 
+function sourceIdentity(article = {}) {
+  return normalizeTopic(article.source || article.feedTitle || '');
+}
+
 function visibleArticles() {
-  const blocked = safeJson('news-blocked-terms-v1', []).map(normalizeTopic).filter(term => term.length >= 2);
+  const blockedTerms = (state.blockedTerms || []).map(normalizeTopic).filter(term => term.length >= 2);
+  const blockedSources = state.blockedSources || new Set();
   return state.articles
     .filter(article => article && typeof article === 'object')
     .filter(article => {
       if (state.feedback[article.id] === 'not') return false;
-      if (!blocked.length) return true;
+      if (blockedSources.has(sourceIdentity(article))) return false;
+      if (!blockedTerms.length) return true;
       const tags = Array.isArray(article.tags) ? article.tags : (typeof article.tags === 'string' ? [article.tags] : []);
       const text = normalizeTopic([article.title, article.summary, article.detail, article.category, article.source, ...tags].filter(Boolean).join(' '));
-      return !blocked.some(term => text.includes(term));
+      return !blockedTerms.some(term => text.includes(term));
     })
     .slice()
     .sort((a, b) => {
@@ -233,8 +245,12 @@ function stableHomeArticles() {
 }
 
 function nav(active = state.view) {
-  const items = [['home', 'home', 'Accueil'], ['sheet', 'plus', 'Personnaliser'], ['brief', 'brief', 'Brief']];
-  return `<nav class="bottom-nav" aria-label="Navigation principale">${items.map(([view, ic, label]) => `<button class="nav-item ${view === 'sheet' ? 'plus' : ''} ${active === view ? 'active' : ''}" data-view="${view}" aria-label="${label}">${icon(ic)}<span>${label}</span></button>`).join('')}</nav>`;
+  const watchCount = watchNewCount();
+  return `<nav class="bottom-nav stable-bottom-nav-v9184" aria-label="Navigation principale">
+    <button class="nav-item ${active === 'home' ? 'active' : ''}" data-view="home" aria-label="Accueil">${icon('home')}<span>Accueil</span></button>
+    <button class="nav-item ${active === 'settings' ? 'active' : ''}" data-view="settings" aria-label="Réglages">${icon('settings')}<span>Réglages</span></button>
+    <button class="nav-item ${active === 'brief' ? 'active' : ''}" data-view="brief" aria-label="Brief">${icon('brief')}<span>Brief</span>${watchCount ? `<i class="nav-watch-dot-v9184" aria-label="${watchCount} nouveauté${watchCount > 1 ? 's' : ''} de veille">${watchCount > 9 ? '9+' : watchCount}</i>` : ''}</button>
+  </nav>`;
 }
 
 function articleCard(article, index = 0) {
@@ -268,7 +284,7 @@ function renderHome() {
   const feed = filtered.slice(0, state.homeLimit);
   const remaining = Math.max(0, filtered.length - feed.length);
   return `<button type="button" class="top-reset-icon-v9138" data-reset-read aria-label="Réinitialiser les articles parcourus" title="Réinitialiser">↻</button><main class="page">
-    <header class="hero-header"><div class="hero-mark"></div><span class="eyebrow">${escapeHtml(dateLabel())}</span><h1>Mon actualité</h1><p>Tous les articles, classés selon vos centres d’intérêt</p></header>
+    <header class="hero-header"><div class="hero-mark"></div><span class="eyebrow">${escapeHtml(dateLabel())}</span><h1>Mon actualité</h1></header>
     ${state.saved.size ? `<div class="saved-filter"><button class="text-btn" data-saved-filter>${state.savedOnly ? 'Voir toute l’actualité' : 'Articles sauvegardés'}</button></div>` : ''}
     <section class="feed stable-owned-list" data-stable-home-feed>${feed.length ? feed.map(articleCard).join('') : emptyState(state.syncStatus === 'error' ? 'Impossible de charger l’actualité' : 'Actualisation en cours', state.syncError || 'Les nouveaux articles apparaîtront ici dès que les sources auront répondu.')}${remaining ? `<button type="button" class="home-more" data-home-more>Afficher ${Math.min(36, remaining)} articles de plus <small>${remaining} encore disponibles</small></button>` : ''}</section>
   </main>${nav('home')}`;
@@ -357,6 +373,34 @@ function watchMatches(article, topic) {
   return uniqueTopics([wanted, ...(WATCH_ALIASES[wanted] || [])]).map(normalizeTopic).some(term => term.length <= 3 && !term.includes(' ') ? text.includes(` ${term} `) : text.includes(term));
 }
 
+function activeWatchRules() {
+  const saved = Array.isArray(state.watchRules) ? state.watchRules.filter(rule => rule && String(rule.query || '').trim()) : [];
+  if (saved.length) return saved;
+  return uniqueTopics(state.settings.briefWatchTopics || []).map(query => ({ query, exclude: '' }));
+}
+
+function watchRuleMatches(article, rule = {}) {
+  const text = ` ${normalizeTopic([article.title, article.summary, article.detail, article.category, article.source, ...(article.tags || []), ...(article.matches || [])].filter(Boolean).join(' '))} `;
+  const query = String(rule.query || '').trim();
+  if (!query) return false;
+  const groups = query.split('|').map(part => part.trim()).filter(Boolean);
+  const positive = groups.some(group => group.split('+').map(normalizeTopic).filter(Boolean).every(term => term.length <= 3 && !term.includes(' ') ? text.includes(` ${term} `) : text.includes(term)));
+  if (!positive) return false;
+  const excluded = String(rule.exclude || '').split(/[,|]/).map(normalizeTopic).filter(Boolean);
+  return !excluded.some(term => text.includes(term));
+}
+
+function watchedArticles() {
+  const rules = activeWatchRules();
+  if (!rules.length) return [];
+  return visibleArticles().filter(article => rules.some(rule => watchRuleMatches(article, rule)));
+}
+
+function watchNewCount() {
+  const since = Number(state.watchLastSeen || 0);
+  return watchedArticles().filter(article => (Date.parse(article.publishedAt || 0) || 0) > since).length;
+}
+
 function dayDelta(value) {
   const date = new Date(value);
   const now = new Date();
@@ -418,8 +462,8 @@ function historyBriefMarkup() {
 }
 
 function renderWatchesFinal() {
-  const topics = uniqueTopics(state.settings.briefWatchTopics || []);
-  const recent = state.articles.filter(article => state.feedback[article.id] !== 'not').slice().sort((a, b) => Date.parse(b.publishedAt || 0) - Date.parse(a.publishedAt || 0)).slice(0, 220);
+  const rules = activeWatchRules();
+  const recent = visibleArticles().slice(0, 260);
   const order = [];
   const days = new Map();
   for (const article of recent) {
@@ -429,77 +473,51 @@ function renderWatchesFinal() {
   }
   const groups = order.slice(0, 9).map((key, dayIndex) => {
     const dayArticles = days.get(key) || [];
-    const watched = topics.length ? dayArticles.filter(article => topics.some(topic => watchMatches(article, topic))) : [];
-    const filtered = watched.length ? `<div class="feed stable-owned-list watch-filtered-feed-v9138">${watched.slice(0, 30).map((article, index) => compactArticleRow(article, dayIndex * 40 + index)).join('')}</div>` : '<p class="watch-empty-day-v9138">Aucune nouvelle de vos veilles ce jour-là.</p>';
-    const all = `<div class="feed stable-owned-list watch-all-feed-v9138" hidden>${dayArticles.map((article, index) => compactArticleRow(article, dayIndex * 40 + index)).join('')}</div>`;
-    return `<section class="watch-day-v9138"><h3>${escapeHtml(dayLabel(dayArticles[0]?.publishedAt))}</h3>${filtered}<button type="button" class="watch-all-band-v9138" data-watch-all-toggle><span>Toute l’actualité</span><small>${dayArticles.length} article${dayArticles.length > 1 ? 's' : ''}</small></button>${all}</section>`;
+    const watched = rules.length ? dayArticles.filter(article => rules.some(rule => watchRuleMatches(article, rule))) : [];
+    const filtered = watched.length ? `<div class="feed stable-owned-list watch-filtered-feed-v9138">${watched.slice(0, 30).map((article, index) => compactArticleRow(article, dayIndex * 40 + index)).join('')}</div>` : '<p class="watch-empty-day-v9138">Aucune nouveauté correspondant à vos règles de veille ce jour-là.</p>';
+    return `<section class="watch-day-v9138"><h3>${escapeHtml(dayLabel(dayArticles[0]?.publishedAt))}</h3>${filtered}</section>`;
   }).join('');
-  return `<section class="watches-by-day-v9138 watch-layout-v9138"><div class="watches-head-v9138"><strong>Mes veilles</strong><button type="button" class="watch-edit-button-v9138" data-watch-edit-open>Modifier veilles</button></div>${groups || '<p class="muted-note">Aucune actualité récente.</p>'}</section>`;
+  return `<section class="watches-by-day-v9138 watch-layout-v9138"><div class="watches-head-v9138"><strong>Veille</strong><button type="button" class="watch-edit-button-v9138" data-view="settings">Régler la veille</button></div>${groups || '<p class="muted-note">Aucune actualité récente.</p>'}</section>`;
 }
 
 function renderBrief() {
-  const majorTerms = /guerre|attaque|cessez-le-feu|élection|gouvernement|président|premier ministre|attentat|catastrophe|séisme|inondation|incendie|disparu|crise|accord|sommet|justice|condamn|cour des comptes|budget|retraite|déficit|croissance|inflation|chômage|épidémie|climat|diplomatie|nucléaire/i;
-  const lowPriorityTerms = /\bpsg\b|ligue 1|football|match|composition|mercato|tennis|formule 1|prix en chute|promotion|bon plan|soldes?|réduction|stations?-service|carburant|diesel|essence à \d|console|smartphone|windows|gta|jeu vidéo|montre connectée|audiences? télé|people|célébrité|télé-réalité|pyramide des présidents|classement.{0,30}président|réseau social.{0,80}président/i;
-  const worldTerms = /ukraine|russie|népal|tibet|gaza|israël|iran|chine|états[- ]unis|donald trump|fed\b|otan|onu\b|royaume-uni|allemagne|italie|espagne|autriche|grèce|inde|pakistan|japon|corée|afrique|moyen-orient|amérique|brésil|canada/i;
-  const editorialCategories = new Set(['Politique', 'International', 'Europe', 'Économie', 'Société', 'Santé', 'Environnement']);
-  const scopeOf = article => worldTerms.test(String(article.title || '')) || ['International', 'Europe'].includes(article.category) ? 'Monde' : 'France';
-  const topicWords = article => new Set(String(article.title || '')
-    .normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase()
-    .match(/[a-z0-9]{4,}/g)?.filter(word => !/^(avec|apres|avant|dans|depuis|direct|entre|leurs|nouveau|nouvelle|pour|plus|selon|sont|cette|comme|tout|tous|toute|vers)$/.test(word)) || []);
+  const majorTerms = /guerre|attaque|cessez-le-feu|élection|gouvernement|président|premier ministre|attentat|catastrophe|séisme|inondation|incendie|crise|accord|sommet|justice|budget|déficit|croissance|inflation|chômage|épidémie|climat|diplomatie|nucléaire|sanctions|traité|banque centrale|récession|pandémie/i;
+  const lowPriorityTerms = /\bpsg\b|ligue 1|football|match|mercato|tennis|formule 1|promotion|bon plan|soldes?|réduction|console|smartphone|gta|jeu vidéo|people|célébrité|télé-réalité/i;
+  const globalCategories = new Set(['International', 'Europe', 'Politique', 'Économie', 'Société', 'Santé', 'Environnement', 'Science']);
+  const topicWords = article => new Set(normalizeTopic(article.title || '').split(' ').filter(word => word.length >= 4 && !['avec','apres','avant','dans','depuis','direct','entre','leurs','nouveau','nouvelle','pour','plus','selon','sont','cette','comme','tout','tous','toute','vers'].includes(word)));
   const sameEvent = (left, right) => {
-    const a = topicWords(left);
-    const b = topicWords(right);
+    const a = topicWords(left); const b = topicWords(right);
     const shared = [...a].filter(word => b.has(word)).length;
-    const overlap = shared / Math.max(1, Math.min(a.size, b.size));
-    return (shared >= 2 && overlap >= .38) || (shared >= 3 && overlap >= .24);
+    return shared >= 2 && shared / Math.max(1, Math.min(a.size, b.size)) >= .28;
   };
   const ranked = visibleArticles().map(article => {
-    const haystack = `${article.title || ''} ${article.summary || ''}`;
+    const text = `${article.title || ''} ${article.summary || ''}`;
     const age = Math.max(0, (Date.now() - Date.parse(article.publishedAt || 0)) / 3600000);
-    const editorial = editorialCategories.has(article.category) ? 70 : -35;
-    const corroboration = Math.max(0, (article.sources?.length || 1) - 1) * 30;
-    const headline = majorTerms.test(haystack) ? 55 : 0;
-    const lightweight = lowPriorityTerms.test(haystack) ? -220 : 0;
-    const weakSignal = !majorTerms.test(haystack) && corroboration === 0 ? -65 : 0;
-    // Do not use article.score: it includes personal-source and interest
-    // boosts, while L’essentiel must remain publisher-neutral.
-    return { article, score: 100 + editorial + corroboration + headline + lightweight + weakSignal - Math.min(age, 72), scope: scopeOf(article), newsworthy: headline > 0 || corroboration > 0 };
-  }).sort((a, b) => b.score - a.score);
-  const recent = ranked.filter(item => Date.now() - Date.parse(item.article.publishedAt || 0) <= 72 * 3600000);
-  const candidates = recent.length >= 6 ? recent : ranked;
-  const headlineCandidates = candidates.filter(item => item.newsworthy && item.score >= 150);
-  const primaryCandidates = headlineCandidates.length >= 5 ? headlineCandidates : candidates;
+    const category = globalCategories.has(article.category) ? 55 : -35;
+    const corroboration = Math.max(0, (article.sources?.length || 1) - 1) * 34;
+    const major = majorTerms.test(text) ? 70 : 0;
+    const low = lowPriorityTerms.test(text) ? -240 : 0;
+    return { article, score: 100 + category + corroboration + major + low - Math.min(age * 1.6, 100) };
+  }).filter(item => Date.now() - Date.parse(item.article.publishedAt || 0) <= 72 * 3600000)
+    .sort((a, b) => b.score - a.score);
   const picks = [];
-  for (const scope of ['France', 'Monde']) {
-    const candidate = primaryCandidates.find(item => item.scope === scope && !picks.includes(item));
-    if (candidate) picks.push(candidate);
-  }
   const sourceCounts = new Map();
-  picks.forEach(item => {
-    const source = item.article.source || 'Source';
-    sourceCounts.set(source, Number(sourceCounts.get(source) || 0) + 1);
-  });
-  for (const candidate of primaryCandidates) {
+  for (const candidate of ranked) {
     if (picks.length >= 5) break;
     const source = candidate.article.source || 'Source';
-    if (picks.includes(candidate) || Number(sourceCounts.get(source) || 0) >= 2 || picks.some(item => sameEvent(item.article, candidate.article))) continue;
+    if (Number(sourceCounts.get(source) || 0) >= 2) continue;
+    if (picks.some(item => sameEvent(item.article, candidate.article))) continue;
     picks.push(candidate);
     sourceCounts.set(source, Number(sourceCounts.get(source) || 0) + 1);
   }
-  for (const candidate of candidates) {
-    if (picks.length >= 5) break;
-    const source = candidate.article.source || 'Source';
-    if (picks.includes(candidate) || Number(sourceCounts.get(source) || 0) >= 2) continue;
-    picks.push(candidate);
-    sourceCounts.set(source, Number(sourceCounts.get(source) || 0) + 1);
-  }
-  for (const candidate of candidates) {
+  for (const candidate of ranked) {
     if (picks.length >= 5) break;
     if (!picks.includes(candidate)) picks.push(candidate);
   }
-  const essential = `<section class="journal-section"><div class="brief-day-v9138">${escapeHtml(fullDay(new Date()))}</div><h2 class="brief-section-title">Les 5 événements majeurs</h2><div class="feed stable-owned-list">${picks.length ? picks.map(({ article }, index) => compactArticleRow(article, index)).join('') : '<p class="muted-note">Aucune information majeure récente.</p>'}</div></section><section class="brief-history-v9138">${historyBriefMarkup()}</section>`;
-  return `<button type="button" class="top-reset-icon-v9138" data-reset-read aria-label="Réinitialiser les articles parcourus" title="Réinitialiser">↻</button><main class="page">${topbar('Brief du jour', false)}
-    <div class="brief-mode-tabs"><button class="brief-mode-tab ${state.briefMode === 'essential' ? 'active' : ''}" data-brief-mode="essential">L’essentiel</button><button class="brief-mode-tab ${state.briefMode === 'watches' ? 'active' : ''}" data-brief-mode="watches">Mes veilles</button></div>
+  const essential = `<section class="journal-section"><div class="brief-day-v9138">${escapeHtml(fullDay(new Date()))}</div><h2 class="brief-section-title">Les 5 principales infos dans le monde</h2><div class="feed stable-owned-list">${picks.length ? picks.map(({ article }, index) => compactArticleRow(article, index)).join('') : '<p class="muted-note">Aucune information majeure récente.</p>'}</div></section>`;
+  const watchCount = watchNewCount();
+  return `<main class="page">${topbar('Brief', false)}
+    <div class="brief-mode-tabs"><button class="brief-mode-tab ${state.briefMode === 'essential' ? 'active' : ''}" data-brief-mode="essential">Top 5 monde</button><button class="brief-mode-tab watch-tab-v9184 ${state.briefMode === 'watches' ? 'active' : ''}" data-brief-mode="watches">Veille${watchCount ? `<span class="watch-new-badge-v9184">${watchCount > 9 ? '9+' : watchCount}</span>` : ''}</button></div>
     <div class="runtime-brief-content" data-stable-brief-content>${state.briefMode === 'essential' ? essential : renderWatchesFinal()}</div>
   </main>${nav('brief')}`;
 }
@@ -534,37 +552,110 @@ function settingRow(title, description, key) {
   return `<div class="setting-row"><div class="setting-label"><strong>${title}</strong><span>${description}</span></div><button class="switch ${state.settings[key] ? 'on' : ''}" data-setting-toggle="${key}" role="switch" aria-checked="${state.settings[key]}"></button></div>`;
 }
 
+function normalizeDomain(value = '') {
+  try {
+    const raw = String(value || '').trim();
+    const url = new URL(/^https?:\/\//i.test(raw) ? raw : `https://${raw}`);
+    return url.hostname.toLowerCase().replace(/^www\./, '');
+  } catch { return ''; }
+}
+
+function sourceDirectory() {
+  const map = new Map();
+  for (const article of state.articles) {
+    const name = String(article.source || article.feedTitle || '').trim();
+    if (!name) continue;
+    const key = normalizeTopic(name);
+    if (!map.has(key)) map.set(key, { key, name, count: 0, domains: new Set(), feeds: new Map() });
+    const item = map.get(key);
+    item.count += 1;
+    try { item.domains.add(new URL(article.url).hostname.replace(/^www\./, '')); } catch {}
+    const feedUrl = String(article.feedUrl || '').trim();
+    const feedTitle = String(article.feedTitle || '').trim();
+    if (feedUrl) item.feeds.set(feedUrl, feedTitle || 'Flux');
+  }
+  for (const source of state.sources) {
+    const name = String(source.title || '').trim() || normalizeDomain(source.url);
+    if (!name) continue;
+    const key = normalizeTopic(name);
+    if (!map.has(key)) map.set(key, { key, name, count: 0, domains: new Set(), feeds: new Map() });
+    const item = map.get(key);
+    if (source.url) item.feeds.set(source.url, source.title || 'Flux ajouté');
+    const domain = normalizeDomain(source.htmlUrl || source.url);
+    if (domain) item.domains.add(domain);
+  }
+  return [...map.values()].sort((a, b) => a.name.localeCompare(b.name, 'fr'));
+}
+
 function sourceRows() {
-  if (!state.sources.length) return '<p class="muted-note">Aucune source personnelle ajoutée. Le flux général reste actif.</p>';
-  return `<div class="source-settings-list">${state.sources.map((source, index) => `<div class="source-setting"><button class="source-state ${source.enabled !== false ? 'active' : ''}" data-source-toggle="${index}" aria-label="Activer ou désactiver la source"></button><div><strong>${escapeHtml(source.title)}</strong><span>${escapeHtml(source.url)}</span></div><button class="mini-icon-btn" data-source-delete="${index}" aria-label="Supprimer">${icon('trash')}</button></div>`).join('')}</div>`;
+  if (!state.sources.length) return '<p class="muted-note">Aucun flux personnel ajouté.</p>';
+  return `<div class="source-settings-list">${state.sources.map((source,index) => `<div class="source-setting"><button class="source-state ${source.enabled !== false ? 'active' : ''}" data-source-toggle="${index}" aria-label="Activer ou désactiver la source"></button><div><strong>${escapeHtml(source.title)}</strong><span>${escapeHtml(source.url)}</span></div><button class="mini-icon-btn" data-source-delete="${index}" aria-label="Supprimer">${icon('trash')}</button></div>`).join('')}</div>`;
+}
+
+function sourceDirectoryMarkup() {
+  const items = sourceDirectory();
+  if (!items.length) return '<p class="muted-note">Les sources apparaîtront ici dès que le premier flux sera chargé.</p>';
+  return `<div class="source-directory-v9184">${items.map(item => {
+    const followed = state.followedSources.has(item.key);
+    const blocked = state.blockedSources.has(item.key);
+    const feeds = [...item.feeds.entries()];
+    return `<article class="source-directory-row-v9184 ${blocked ? 'is-blocked' : ''}">
+      <div class="source-directory-main-v9184"><div><strong>${escapeHtml(item.name)}</strong><span>${item.count} article${item.count > 1 ? 's' : ''}${item.domains.size ? ` · ${escapeHtml([...item.domains].slice(0,2).join(', '))}` : ''}</span></div>
+      <div class="source-actions-v9184"><button type="button" class="${followed ? 'active' : ''}" data-source-follow="${escapeHtml(item.key)}">${followed ? 'Suivie' : 'Suivre'}</button><button type="button" class="${blocked ? 'danger active' : 'danger'}" data-source-block="${escapeHtml(item.key)}">${blocked ? 'Débloquer' : 'Bloquer'}</button></div></div>
+      ${feeds.length ? `<details class="source-feeds-v9184"><summary>Flux / sous-flux détectés (${feeds.length})</summary>${feeds.map(([url,title]) => `<div><span>${escapeHtml(title)}</span><small>${escapeHtml(url)}</small></div>`).join('')}</details>` : ''}
+    </article>`;
+  }).join('')}</div>`;
 }
 
 function keywordChips() {
-  return state.keywords.length ? `<div class="keyword-list">${state.keywords.map((keyword, index) => `<span class="keyword-chip">${escapeHtml(keyword)}<button data-keyword-delete="${index}" aria-label="Supprimer ${escapeHtml(keyword)}">×</button></span>`).join('')}</div>` : '<p class="muted-note">Ajoutez par exemple : espace, Allemagne, archéologie, voitures électriques…</p>';
+  return state.keywords.length ? `<div class="keyword-list">${state.keywords.map((keyword, index) => `<span class="keyword-chip">${escapeHtml(keyword)}<button data-keyword-delete="${index}" aria-label="Supprimer ${escapeHtml(keyword)}">×</button></span>`).join('')}</div>` : '<p class="muted-note">Aucun mot-clé suivi.</p>';
+}
+
+function blockedKeywordChips() {
+  return state.blockedTerms.length ? `<div class="keyword-list blocked-keywords-v9184">${state.blockedTerms.map((keyword, index) => `<span class="keyword-chip">${escapeHtml(keyword)}<button data-blocked-keyword-delete="${index}" aria-label="Supprimer ${escapeHtml(keyword)}">×</button></span>`).join('')}</div>` : '<p class="muted-note">Aucun mot-clé évité.</p>';
+}
+
+function domainRows() {
+  return state.domains.length ? `<div class="domain-list-v9184">${state.domains.map((domain,index) => `<div><strong>${escapeHtml(domain)}</strong><button type="button" data-domain-delete="${index}" aria-label="Supprimer ${escapeHtml(domain)}">×</button></div>`).join('')}</div>` : '<p class="muted-note">Aucun domaine ajouté.</p>';
+}
+
+function watchRulesMarkup() {
+  const rules = activeWatchRules();
+  return rules.length ? `<div class="watch-rules-v9184">${rules.map((rule,index) => `<div class="watch-rule-v9184"><div><strong>${escapeHtml(rule.query)}</strong>${rule.exclude ? `<span>Évite : ${escapeHtml(rule.exclude)}</span>` : ''}</div><button type="button" data-watch-rule-delete="${index}" aria-label="Supprimer cette veille">×</button></div>`).join('')}</div>` : '<p class="muted-note">Aucune règle de veille.</p>';
 }
 
 function renderSettings() {
-  return `<main class="page">${topbar('Réglages', false)}
-    <section class="settings-section install-section"><div class="install-app-icon"><img src="assets/app-icon.svg" alt="" /></div><div class="install-copy"><h2>${isInstalled ? 'Application installée' : 'Installer l’application'}</h2><p>${isInstalled ? 'Mon actualité fonctionne comme une application autonome sur cet appareil.' : 'Ajoutez Mon actualité à Android pour l’ouvrir sans la barre de Chrome.'}</p></div><button class="${isInstalled ? 'secondary-btn' : 'primary-btn'}" data-install ${isInstalled ? 'disabled' : ''}>${isInstalled ? `${icon('check')} Déjà installée` : `${icon('install')} Installer sur cet appareil`}</button></section>
+  return `<main class="page settings-page-v9184">${topbar('Réglages', false)}
+    <section class="settings-section"><h2>Sources d’information</h2><p>Toutes les sources actuellement détectées dans votre flux. Vous pouvez les suivre, les bloquer et voir les flux par lesquels elles ont été trouvées.</p>
+      ${sourceDirectoryMarkup()}
+    </section>
 
-    <section class="settings-section"><h2>Actualisation</h2><p>Les nouveaux articles sont chargés au démarrage, au retour dans l’application et périodiquement lorsqu’elle reste ouverte.</p>${settingRow('Actualisation automatique', 'Toutes les 15 minutes quand l’application est ouverte', 'autoRefresh')}<button class="secondary-btn compact-btn" data-refresh>${icon('refresh')} Actualiser maintenant</button></section>
-
-    <section class="settings-section"><h2>Sources personnelles</h2><p>Elles passent avant les sources généralistes. Vous pouvez ajouter directement une adresse RSS/Atom ou importer un fichier OPML.</p>
-      <div class="form-stack"><input id="source-name" class="text-input" type="text" maxlength="80" placeholder="Nom de la source"><input id="source-url" class="text-input" type="url" maxlength="600" placeholder="https://exemple.fr/feed"><button class="secondary-btn" data-add-source>${icon('plus')} Ajouter la source</button></div>
+    <section class="settings-section"><h2>Ajouter une source ou un domaine</h2>
+      <p>Ajoutez un flux RSS/Atom précis, ou simplement un domaine qui vous intéresse.</p>
+      <div class="form-stack"><input id="source-name" class="text-input" type="text" maxlength="80" placeholder="Nom de la source (optionnel)"><input id="source-url" class="text-input" type="url" maxlength="600" placeholder="Adresse RSS / Atom"><button class="secondary-btn" data-add-source>${icon('plus')} Ajouter le flux</button></div>
       ${sourceRows()}
+      <div class="inline-form domain-form-v9184"><input id="domain-input" class="text-input" type="text" maxlength="160" placeholder="exemple.fr"><button class="small-primary-btn" data-add-domain>Ajouter le domaine</button></div>
+      ${domainRows()}
       <div class="import-status">${icon('upload')}<span>${escapeHtml(state.opmlName)}</span></div><label class="secondary-btn" for="opml-input">Importer un fichier OPML</label><input id="opml-input" class="file-input" type="file" accept=".opml,.xml">
-      ${settingRow('Priorité aux sources', 'Vos flux personnels sont remontés dans la sélection', 'sourcePriority')}${settingRow('Recherche web complémentaire', 'Google Actualités complète les sujets et mots-clés manquants', 'webSearch')}
     </section>
 
-    <section class="settings-section"><h2>Actualité générale</h2><p>Ces rubriques restent présentes même si elles ne font pas partie de vos centres d’intérêt personnels.</p><div class="interest-grid">${GENERAL_CATEGORIES.map(category => `<button class="interest ${state.settings.generalCategories.includes(category) ? 'active' : ''}" data-general-category="${category}">${category}</button>`).join('')}</div></section>
+    <section class="settings-section"><h2>Centres d’intérêt</h2><div class="interest-grid centered-interest-grid-v9184">${PERSONAL_THEMES.map(theme => `<button class="interest ${state.settings.interests.includes(theme) ? 'active' : ''}" data-interest="${theme}">${theme}</button>`).join('')}</div></section>
 
-    <section class="settings-section"><h2>Centres d’intérêt</h2><p>Ils servent à mettre certains sujets davantage en avant, sans supprimer l’actualité générale.</p><div class="interest-grid">${PERSONAL_THEMES.map(theme => `<button class="interest ${state.settings.interests.includes(theme) ? 'active' : ''}" data-interest="${theme}">${theme}</button>`).join('')}</div>
-      <div class="inline-form"><input id="keyword-input" class="text-input" type="text" maxlength="70" placeholder="Ajouter un mot-clé"><button class="small-primary-btn" data-add-keyword>Ajouter</button></div>${keywordChips()}
+    <section class="settings-section"><h2>Mots-clés à surveiller</h2>
+      <div class="inline-form"><input id="keyword-input" class="text-input" type="text" maxlength="70" placeholder="Ex. fusion nucléaire"><button class="small-primary-btn" data-add-keyword>Ajouter</button></div>${keywordChips()}
+      <h3 class="settings-subtitle-v9184">Mots-clés à éviter</h3>
+      <div class="inline-form"><input id="blocked-keyword-input" class="text-input" type="text" maxlength="70" placeholder="Ex. football"><button class="small-primary-btn" data-add-blocked-keyword>Éviter</button></div>${blockedKeywordChips()}
     </section>
 
-    <section class="settings-section"><h2>Notifications</h2>${settingRow('Brief du matin', 'Préférence conservée pour les futures notifications push', 'notifications')}</section>
-    <section class="settings-section app-version-section"><h2>Version de l’application</h2><p>Ce numéro permet de vérifier immédiatement que le smartphone utilise bien la dernière publication.</p><div class="app-version-row"><div><strong>Mon actualité · version ${APP_VERSION}</strong><span>Publication du ${APP_RELEASE}</span></div><span class="app-version-badge">v${APP_VERSION}</span></div><button class="secondary-btn compact-btn" data-check-update>${icon('refresh')} Vérifier et mettre à jour</button></section>
-    <button class="secondary-btn" data-reset>Réinitialiser les préférences</button>
+    <section class="settings-section"><h2>Veille précise</h2><p>Utilisez <strong>+</strong> pour exiger plusieurs termes et <strong>|</strong> pour accepter des alternatives. Exemple : <em>Meta + Quest 4 | Quest 4</em>. Les exclusions sont séparées par des virgules.</p>
+      <div class="form-stack"><input id="watch-query-input" class="text-input" maxlength="160" placeholder="Sujet ou règle précise"><input id="watch-exclude-input" class="text-input" maxlength="160" placeholder="À exclure : rumeur, promotion…"><button class="secondary-btn" data-add-watch-rule>${icon('plus')} Ajouter la veille</button></div>
+      ${watchRulesMarkup()}
+    </section>
+
+    <section class="settings-section"><h2>Actualité générale</h2><div class="interest-grid centered-interest-grid-v9184">${GENERAL_CATEGORIES.map(category => `<button class="interest ${state.settings.generalCategories.includes(category) ? 'active' : ''}" data-general-category="${category}">${category}</button>`).join('')}</div></section>
+
+    <section class="settings-section"><h2>Fonctionnement</h2>${settingRow('Actualisation automatique', 'Charge les nouveautés en arrière-plan sans faire clignoter la liste', 'autoRefresh')}${settingRow('Recherche web complémentaire', 'Complète les flux avec Google Actualités', 'webSearch')}</section>
+    <section class="settings-section app-version-section"><h2>Version</h2><div class="app-version-row"><div><strong>Mon actualité · version ${APP_VERSION}</strong><span>Publication du ${APP_RELEASE}</span></div><span class="app-version-badge">v${APP_VERSION}</span></div><button class="secondary-btn compact-btn" data-check-update>${icon('refresh')} Vérifier la mise à jour</button></section>
   </main>${nav('settings')}`;
 }
 
@@ -685,15 +776,43 @@ function appendHomeToLimit({ increment = false } = {}) {
   notifyStableRender('home-append');
 }
 
+function patchHomeFeedPreservingCards() {
+  const feed = app.querySelector('[data-stable-home-feed]');
+  if (!feed) return render({ scrollTop: window.scrollY });
+  const articles = (state.savedOnly ? stableHomeArticles().filter(article => state.saved.has(article.id)) : stableHomeArticles()).slice(0, state.homeLimit);
+  const existing = new Map([...feed.querySelectorAll(':scope > .article-card[data-article]')].map(card => [String(card.dataset.article || ''), card]));
+  const fragment = document.createDocumentFragment();
+  articles.forEach((article,index) => {
+    let card = existing.get(String(article.id));
+    if (!card) {
+      const template = document.createElement('template');
+      template.innerHTML = articleCard(article,index);
+      card = template.content.firstElementChild;
+    }
+    if (card) fragment.appendChild(card);
+  });
+  const remaining = Math.max(0, stableHomeArticles().length - articles.length);
+  if (remaining) {
+    const button = document.createElement('button');
+    button.type='button'; button.className='home-more'; button.dataset.homeMore='';
+    button.innerHTML=`Afficher ${Math.min(36, remaining)} articles de plus <small>${remaining} encore disponibles</small>`;
+    fragment.appendChild(button);
+  }
+  feed.replaceChildren(fragment);
+  notifyStableRender('home-patch');
+}
+
 function refreshAfterNewsChange() {
   reconcileHomeOrder();
   if (state.view === 'home') {
-    const scrollTop = window.scrollY;
-    render({ scrollTop });
+    patchHomeFeedPreservingCards();
     return;
   }
   if (state.view === 'brief') {
     render({ scrollTop: window.scrollY });
+    return;
+  }
+  if (state.view === 'settings') {
     return;
   }
   render();
@@ -731,6 +850,12 @@ function persist() {
   localStorage.setItem('news-settings', JSON.stringify(state.settings));
   localStorage.setItem('news-sources', JSON.stringify(state.sources));
   localStorage.setItem('news-keywords', JSON.stringify(state.keywords));
+  localStorage.setItem('news-domains-v1', JSON.stringify(state.domains));
+  localStorage.setItem('news-blocked-terms-v1', JSON.stringify(state.blockedTerms));
+  localStorage.setItem('news-followed-sources-v1', JSON.stringify([...state.followedSources]));
+  localStorage.setItem('news-blocked-sources-v1', JSON.stringify([...state.blockedSources]));
+  localStorage.setItem('news-watch-rules-v1', JSON.stringify(state.watchRules));
+  localStorage.setItem('news-watch-last-seen-v1', String(state.watchLastSeen || 0));
 }
 
 function persistCache() {
@@ -893,9 +1018,8 @@ async function backfillVisibleVisuals() {
   }
 }
 
-function scheduleVisualBackfill(delay = 350) {
+function scheduleVisualBackfill() {
   clearTimeout(visualBackfillTimer);
-  visualBackfillTimer = setTimeout(() => backfillVisibleVisuals(), delay);
 }
 
 // Image errors do not add/remove DOM nodes. Capture the failure and immediately
@@ -915,12 +1039,15 @@ async function syncNews({ silent = false } = {}) {
   if (!silent && !app.querySelector('[data-article]')) render();
   syncPromise = (async () => {
     try {
+      const domainQueries = state.domains.map(domain => `site:${domain}`);
+      const followedNames = sourceDirectory().filter(item => state.followedSources.has(item.key)).map(item => item.name).slice(0, 4);
+      const discoveryKeywords = [...new Set([...state.keywords, ...domainQueries, ...followedNames])].slice(0, 12);
       const result = await fetchLiveNews({
         sources: state.sources.filter(source => source.enabled !== false),
-        keywords: state.keywords,
+        keywords: discoveryKeywords,
         preferredCategories: state.settings.interests,
         webSearch: state.settings.webSearch,
-        sourcePriority: state.settings.sourcePriority
+        sourcePriority: false
       });
       state.articles = Array.isArray(result.articles) ? result.articles.map(applyRememberedVisual) : [];
       state.lastSync = result.fetchedAt || new Date().toISOString();
@@ -960,6 +1087,30 @@ function addKeyword() {
   persist(); state.sheet ? refreshSheet() : render(); toast('Centre d’intérêt ajouté'); syncNews({ silent: true });
 }
 
+function addDomain() {
+  const domain = normalizeDomain($('#domain-input')?.value || '');
+  if (!domain) return toast('Domaine invalide');
+  if (state.domains.includes(domain)) return toast('Ce domaine est déjà ajouté');
+  state.domains.push(domain);
+  persist(); render(); toast('Domaine ajouté'); syncNews({ silent: true });
+}
+
+function addBlockedKeyword() {
+  const value = $('#blocked-keyword-input')?.value.trim();
+  if (!value) return;
+  if (state.blockedTerms.some(term => normalizeTopic(term) === normalizeTopic(value))) return toast('Ce mot-clé est déjà évité');
+  state.blockedTerms.push(value);
+  persist(); render(); toast('Mot-clé évité');
+}
+
+function addWatchRule() {
+  const query = $('#watch-query-input')?.value.trim();
+  const exclude = $('#watch-exclude-input')?.value.trim() || '';
+  if (!query) return toast('Indiquez ce que vous voulez surveiller');
+  state.watchRules = [...activeWatchRules().filter(rule => !state.settings.briefWatchTopics.includes(rule.query)), { query, exclude }];
+  persist(); render(); toast('Veille ajoutée'); syncNews({ silent: true });
+}
+
 async function checkAppUpdate({ announce = false } = {}) {
   try {
     const versionUrl = new URL('./version.json', location.href);
@@ -997,7 +1148,13 @@ app.addEventListener('click', async event => {
   const more = event.target.closest('[data-home-more]');
   if (more) { event.preventDefault(); event.stopPropagation(); appendHomeToLimit({ increment: true }); return; }
   const briefMode = event.target.closest('[data-brief-mode]');
-  if (briefMode) { event.preventDefault(); state.briefMode = briefMode.dataset.briefMode === 'watches' ? 'watches' : 'essential'; render({ scrollTop: 0 }); return; }
+  if (briefMode) {
+    event.preventDefault();
+    state.briefMode = briefMode.dataset.briefMode === 'watches' ? 'watches' : 'essential';
+    if (state.briefMode === 'watches') { state.watchLastSeen = Date.now(); persist(); }
+    render({ scrollTop: 0 });
+    return;
+  }
   const watchAll = event.target.closest('[data-watch-all-toggle]');
   if (watchAll) {
     event.preventDefault();
@@ -1055,6 +1212,24 @@ app.addEventListener('click', async event => {
   if (event.target.closest('[data-refresh]')) { await syncNews(); return; }
   if (event.target.closest('[data-add-source]')) { addSource(); return; }
   if (event.target.closest('[data-add-keyword]')) { addKeyword(); return; }
+  if (event.target.closest('[data-add-domain]')) { addDomain(); return; }
+  if (event.target.closest('[data-add-blocked-keyword]')) { addBlockedKeyword(); return; }
+  if (event.target.closest('[data-add-watch-rule]')) { addWatchRule(); return; }
+
+  const sourceFollow = event.target.closest('[data-source-follow]');
+  if (sourceFollow) {
+    const key = sourceFollow.dataset.sourceFollow || '';
+    state.followedSources.has(key) ? state.followedSources.delete(key) : state.followedSources.add(key);
+    state.blockedSources.delete(key);
+    persist(); render(); syncNews({ silent: true }); return;
+  }
+  const sourceBlock = event.target.closest('[data-source-block]');
+  if (sourceBlock) {
+    const key = sourceBlock.dataset.sourceBlock || '';
+    state.blockedSources.has(key) ? state.blockedSources.delete(key) : state.blockedSources.add(key);
+    state.followedSources.delete(key);
+    persist(); render(); return;
+  }
 
   const sourceToggle = event.target.closest('[data-source-toggle]');
   if (sourceToggle) { const source = state.sources[Number(sourceToggle.dataset.sourceToggle)]; if (source) source.enabled = source.enabled === false; persist(); render(); syncNews({ silent: true }); return; }
@@ -1062,6 +1237,12 @@ app.addEventListener('click', async event => {
   if (sourceDelete) { state.sources.splice(Number(sourceDelete.dataset.sourceDelete), 1); persist(); render(); toast('Source supprimée'); syncNews({ silent: true }); return; }
   const keywordDelete = event.target.closest('[data-keyword-delete]');
   if (keywordDelete) { state.keywords.splice(Number(keywordDelete.dataset.keywordDelete), 1); persist(); render(); syncNews({ silent: true }); return; }
+  const blockedKeywordDelete = event.target.closest('[data-blocked-keyword-delete]');
+  if (blockedKeywordDelete) { state.blockedTerms.splice(Number(blockedKeywordDelete.dataset.blockedKeywordDelete), 1); persist(); render(); return; }
+  const domainDelete = event.target.closest('[data-domain-delete]');
+  if (domainDelete) { state.domains.splice(Number(domainDelete.dataset.domainDelete), 1); persist(); render(); syncNews({ silent: true }); return; }
+  const watchRuleDelete = event.target.closest('[data-watch-rule-delete]');
+  if (watchRuleDelete) { state.watchRules.splice(Number(watchRuleDelete.dataset.watchRuleDelete), 1); persist(); render(); return; }
 
   const tab = event.target.closest('[data-tab]');
   if (tab) { state.categoryTab = tab.dataset.tab; render(); return; }
@@ -1091,7 +1272,7 @@ app.addEventListener('click', async event => {
   const briefWatch = event.target.closest('[data-brief-watch]');
   if (briefWatch) { const name = briefWatch.dataset.briefWatch; const current = new Set(state.settings.briefWatchTopics); current.has(name) ? current.delete(name) : current.add(name); state.settings.briefWatchTopics = [...current]; persist(); state.sheet ? refreshSheet() : render(); return; }
   if (event.target.closest('[data-saved-filter]')) { state.savedOnly = !state.savedOnly; render(); return; }
-  if (event.target.closest('[data-reset]')) { state.settings = { ...defaultSettings, generalCategories: [...GENERAL_CATEGORIES], interests: [...PERSONAL_THEMES], briefEssentialCategories: [...GENERAL_CATEGORIES], briefWatchTopics: [...DEFAULT_WATCH_TOPICS] }; state.keywords = []; state.topicPreferences = {}; window.NewsPersonalizationV91?.reset(); persist(); render(); toast('Préférences réinitialisées'); syncNews({ silent: true }); return; }
+  if (event.target.closest('[data-reset]')) { state.settings = { ...defaultSettings, generalCategories: [...GENERAL_CATEGORIES], interests: [...PERSONAL_THEMES], briefEssentialCategories: [...GENERAL_CATEGORIES], briefWatchTopics: [...DEFAULT_WATCH_TOPICS] }; state.keywords = []; state.blockedTerms = []; state.domains = []; state.followedSources.clear(); state.blockedSources.clear(); state.watchRules = []; state.topicPreferences = {}; window.NewsPersonalizationV91?.reset(); persist(); render(); toast('Préférences réinitialisées'); syncNews({ silent: true }); return; }
   if (event.target.closest('[data-install]')) {
     if (isInstalled) return toast('L’application est déjà installée');
     if (deferredInstallPrompt) { deferredInstallPrompt.prompt(); const choice = await deferredInstallPrompt.userChoice; deferredInstallPrompt = null; toast(choice.outcome === 'accepted' ? 'Installation lancée' : 'Installation annulée'); }
@@ -1122,6 +1303,9 @@ app.addEventListener('change', async event => {
 app.addEventListener('keydown', event => {
   if ((event.key === 'Enter' || event.key === ' ') && event.target.matches('[data-article]')) event.target.click();
   if (event.key === 'Enter' && event.target.id === 'keyword-input') addKeyword();
+  if (event.key === 'Enter' && event.target.id === 'blocked-keyword-input') addBlockedKeyword();
+  if (event.key === 'Enter' && event.target.id === 'domain-input') addDomain();
+  if (event.key === 'Enter' && event.target.id === 'watch-query-input') addWatchRule();
   if (event.key === 'Enter' && event.target.id === 'source-url') addSource();
   if (event.key === 'Escape' && state.sheet) closeSheet();
 });
