@@ -29,15 +29,15 @@ await context.addInitScript(payload => {
 }, article);
 
 const page = await context.newPage();
-await page.route('**/api/news**', route => route.fulfill({
-  status: 200,
-  contentType: 'application/json',
-  body: JSON.stringify({ articles: [article], stats: {} })
-}));
 await page.route('**/api/**', route => route.fulfill({
   status: 200,
   contentType: 'application/json',
   body: JSON.stringify({ ok: true })
+}));
+await page.route('**/api/news**', route => route.fulfill({
+  status: 200,
+  contentType: 'application/json',
+  body: JSON.stringify({ articles: [article], fetchedAt: new Date().toISOString(), stats: {} })
 }));
 
 await page.goto('http://127.0.0.1:4173/', { waitUntil: 'domcontentloaded' });
