@@ -321,14 +321,15 @@ export async function fetchLiveNews({ sources = [], keywords = [], preferredCate
   const effectiveSourcePriority = false;
   const useSharedCatalogue = !sources.length && !discoveryKeywords.length && webSearch;
   const endpoint = useSharedCatalogue
-    ? `/api/news?interests=${encodeURIComponent(interests.join(','))}`
+    ? `/api/news?interests=${encodeURIComponent(interests.join(','))}&fresh=${Date.now()}`
     : '/api/news';
   const response = await fetch(endpoint, useSharedCatalogue ? {
     method: 'GET',
-    cache: 'default'
+    cache: 'no-store',
+    headers: { 'Cache-Control': 'no-cache' }
   } : {
     method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
+    headers: { 'Content-Type': 'application/json', 'Cache-Control': 'no-cache' },
     cache: 'no-store',
     body: JSON.stringify({
       sources,
