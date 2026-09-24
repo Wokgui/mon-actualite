@@ -1,0 +1,314 @@
+/* v91.88 — thème bleu professionnel validé.
+   Palette :
+   principal #3F78E8
+   profond   #285FCF
+   accent    #DCE9FF
+   blanc     #FFFFFF
+   texte     #111827
+*/
+
+:root{
+  --news-blue:#3F78E8;
+  --news-blue-deep:#285FCF;
+  --news-blue-soft:#DCE9FF;
+  --news-blue-line:#D7E2F4;
+  --news-ink:#111827;
+  --news-muted:#6F768A;
+  --news-white:#FFFFFF;
+}
+
+/* Base générale : la partie éditoriale reste blanche. */
+html,body,#app,.app-shell{
+  background:var(--news-white)!important;
+  color:var(--news-ink)!important;
+}
+.page{
+  background:var(--news-white)!important;
+}
+
+/* ACCUEIL — grand bandeau bleu plein avec courbes ton sur ton. */
+.hero-header{
+  position:relative!important;
+  isolation:isolate!important;
+  overflow:hidden!important;
+  margin:0 -18px 24px!important;
+  padding:34px 20px 38px!important;
+  border:0!important;
+  border-radius:0!important;
+  background:
+    radial-gradient(115% 80% at -8% 112%, rgba(109,173,255,.78) 0 34%, transparent 35%),
+    radial-gradient(110% 72% at 105% 120%, rgba(95,166,255,.62) 0 36%, transparent 37%),
+    linear-gradient(145deg,var(--news-blue) 0%,#3477E6 52%,var(--news-blue-deep) 100%)!important;
+  box-shadow:none!important;
+}
+.hero-header::before{
+  content:""!important;
+  display:block!important;
+  position:absolute!important;
+  z-index:-1!important;
+  left:-12%!important;
+  right:-12%!important;
+  bottom:-54px!important;
+  height:118px!important;
+  border-radius:50% 50% 0 0 / 70% 70% 0 0!important;
+  background:rgba(32,85,194,.28)!important;
+  transform:rotate(-2deg)!important;
+}
+.hero-header::after{
+  content:""!important;
+  display:block!important;
+  position:absolute!important;
+  z-index:-1!important;
+  left:22%!important;
+  right:-18%!important;
+  bottom:-76px!important;
+  height:122px!important;
+  border-radius:50% 50% 0 0 / 72% 72% 0 0!important;
+  background:rgba(103,178,255,.34)!important;
+  transform:rotate(2deg)!important;
+}
+.hero-header .eyebrow{
+  position:relative!important;
+  z-index:1!important;
+  display:inline-flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  min-height:36px!important;
+  margin:0 0 14px!important;
+  padding:0 18px!important;
+  border:1px solid rgba(255,255,255,.28)!important;
+  border-radius:999px!important;
+  background:rgba(255,255,255,.18)!important;
+  color:#fff!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.12)!important;
+  backdrop-filter:blur(8px)!important;
+  -webkit-backdrop-filter:blur(8px)!important;
+  font-size:13px!important;
+  font-weight:800!important;
+  letter-spacing:.01em!important;
+  text-transform:none!important;
+}
+.hero-header h1{
+  position:relative!important;
+  z-index:1!important;
+  margin:0!important;
+  color:#fff!important;
+  text-shadow:0 2px 12px rgba(17,54,132,.18)!important;
+  font-size:40px!important;
+  line-height:1.03!important;
+  font-weight:880!important;
+  letter-spacing:-.045em!important;
+}
+.hero-header>p{display:none!important}
+
+/* RÉGLAGES + BRIEF — même langage visuel que l'accueil. */
+.settings-page-v9185>.page-masthead-v9186,
+.page:has(.brief-mode-tabs)>.page-masthead-v9186{
+  position:relative!important;
+  isolation:isolate!important;
+  overflow:hidden!important;
+  margin:0 -18px 18px!important;
+  min-height:112px!important;
+  padding:40px 18px 26px!important;
+  border:0!important;
+  background:
+    radial-gradient(100% 75% at -2% 112%, rgba(109,173,255,.68) 0 35%, transparent 36%),
+    radial-gradient(100% 72% at 103% 118%, rgba(93,162,255,.52) 0 38%, transparent 39%),
+    linear-gradient(145deg,var(--news-blue) 0%,#3477E6 52%,var(--news-blue-deep) 100%)!important;
+  box-shadow:none!important;
+}
+.settings-page-v9185>.page-masthead-v9186::before,
+.page:has(.brief-mode-tabs)>.page-masthead-v9186::before{
+  content:""!important;
+  display:block!important;
+  position:absolute!important;
+  z-index:-1!important;
+  left:-12%!important;
+  right:-12%!important;
+  bottom:-58px!important;
+  height:106px!important;
+  border-radius:50% 50% 0 0 / 72% 72% 0 0!important;
+  background:rgba(32,85,194,.25)!important;
+}
+.settings-page-v9185>.page-masthead-v9186::after,
+.page:has(.brief-mode-tabs)>.page-masthead-v9186::after{
+  content:none!important;
+  display:none!important;
+}
+.settings-page-v9185>.page-masthead-v9186 h1,
+.page:has(.brief-mode-tabs)>.page-masthead-v9186 h1{
+  position:relative!important;
+  z-index:1!important;
+  margin:0!important;
+  color:#fff!important;
+  font-size:30px!important;
+  line-height:1.06!important;
+  font-weight:860!important;
+  letter-spacing:-.035em!important;
+  text-shadow:0 2px 10px rgba(17,54,132,.16)!important;
+}
+.page-masthead-v9186 .icon-btn{
+  color:#fff!important;
+  background:rgba(255,255,255,.14)!important;
+  border:1px solid rgba(255,255,255,.16)!important;
+}
+
+/* Suppression définitive des anciens bandeaux mauves. */
+.hero-header + * ,
+.page-masthead-v9186 + *{
+  border-top-color:transparent!important;
+}
+
+/* Articles : blanc pur, traits fins froids, images nettes. */
+.feed,
+.stable-owned-list,
+.article-card{
+  background:var(--news-white)!important;
+}
+.article-card{
+  border:0!important;
+  border-bottom:1px solid #E5EAF2!important;
+  border-radius:0!important;
+  box-shadow:none!important;
+}
+.article-card:last-child{border-bottom:0!important}
+.article-card h2,
+.article-card .article-title{
+  color:var(--news-ink)!important;
+}
+.article-card .article-image{
+  border-radius:10px!important;
+}
+.article-card.read-passed-v9138{
+  opacity:.70!important;
+  filter:saturate(.80)!important;
+}
+
+/* Brief : onglets dans une capsule bleue très claire. */
+.brief-mode-tabs{
+  margin:0 auto 18px!important;
+  max-width:420px!important;
+  padding:4px!important;
+  border:1px solid #C9D9F2!important;
+  border-radius:14px!important;
+  background:#EEF5FF!important;
+}
+.brief-mode-tab{
+  min-height:40px!important;
+  border-radius:10px!important;
+  color:#5E6B83!important;
+}
+.brief-mode-tab.active{
+  background:var(--news-blue)!important;
+  color:#fff!important;
+  box-shadow:0 4px 12px rgba(63,120,232,.18)!important;
+}
+
+/* Réglages : remplacement des accents mauves par le bleu validé. */
+.settings-page-v9185,
+.settings-accordions-v9185,
+.settings-accordion-v9185,
+.settings-accordion-content-v9185{
+  background:var(--news-white)!important;
+}
+.settings-accordion-v9185{
+  border-bottom-color:#E2E8F1!important;
+}
+.settings-accordion-v9185>summary{
+  color:var(--news-ink)!important;
+}
+.settings-accordion-v9185>summary::after{
+  color:var(--news-blue)!important;
+}
+.centered-interest-grid-v9184 .interest.active,
+.source-actions-v9186 button.active,
+.keyword-chip{
+  border-color:#BFD2F4!important;
+  background:var(--news-blue-soft)!important;
+  color:var(--news-blue-deep)!important;
+}
+.interest-suggestions-v9186 button{
+  color:var(--news-blue-deep)!important;
+}
+.switch.on{
+  background:var(--news-blue)!important;
+}
+.small-primary-btn,
+.primary-btn{
+  background:var(--news-blue)!important;
+  color:#fff!important;
+}
+
+/* BARRE BASSE — blanche, active uniquement en bleu clair. */
+.bottom-nav.stable-bottom-nav-v9184{
+  height:calc(76px + env(safe-area-inset-bottom))!important;
+  padding:0!important;
+  display:grid!important;
+  grid-template-columns:repeat(3,minmax(0,1fr))!important;
+  align-items:stretch!important;
+  border-top:1px solid #E1E6EF!important;
+  border-radius:0!important;
+  background:rgba(255,255,255,.97)!important;
+  box-shadow:0 -5px 20px rgba(31,35,51,.07)!important;
+  overflow:hidden!important;
+  backdrop-filter:blur(12px)!important;
+  -webkit-backdrop-filter:blur(12px)!important;
+}
+.bottom-nav.stable-bottom-nav-v9184 .nav-item{
+  width:auto!important;
+  height:calc(76px + env(safe-area-inset-bottom))!important;
+  margin:0!important;
+  padding:9px 4px calc(7px + env(safe-area-inset-bottom))!important;
+  border:0!important;
+  border-radius:0!important;
+  background:transparent!important;
+  color:#697289!important;
+  box-shadow:none!important;
+  transform:none!important;
+}
+.bottom-nav.stable-bottom-nav-v9184 .nav-item.active{
+  margin:7px 7px calc(7px + env(safe-area-inset-bottom))!important;
+  height:62px!important;
+  padding:6px 4px!important;
+  border-radius:24px!important;
+  background:linear-gradient(145deg,#E8F1FF 0%,var(--news-blue-soft) 100%)!important;
+  color:#174FDB!important;
+  box-shadow:none!important;
+}
+.bottom-nav.stable-bottom-nav-v9184 .nav-item.active::before,
+.bottom-nav.stable-bottom-nav-v9184 .nav-item.active::after{
+  content:none!important;
+  display:none!important;
+}
+.bottom-nav.stable-bottom-nav-v9184 .nav-item svg{
+  width:23px!important;
+  height:23px!important;
+  stroke:currentColor!important;
+}
+.bottom-nav.stable-bottom-nav-v9184 .nav-item span{
+  color:inherit!important;
+  font-size:11.5px!important;
+  font-weight:760!important;
+}
+.nav-watch-dot-v9184{
+  background:#EF476F!important;
+  border-color:#fff!important;
+}
+
+/* Espacement bas adapté au bandeau un peu plus haut. */
+#app .page{
+  padding-bottom:calc(96px + env(safe-area-inset-bottom))!important;
+}
+
+@media(max-width:420px){
+  .hero-header{
+    padding-top:30px!important;
+    padding-bottom:34px!important;
+  }
+  .hero-header h1{font-size:37px!important}
+  .settings-page-v9185>.page-masthead-v9186,
+  .page:has(.brief-mode-tabs)>.page-masthead-v9186{
+    min-height:104px!important;
+    padding-top:36px!important;
+  }
+}
