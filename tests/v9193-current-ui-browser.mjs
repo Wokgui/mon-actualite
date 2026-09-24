@@ -120,6 +120,7 @@ assert.ok(parseFloat(headerStyle.marginBottom) >= 14, 'home header must keep bre
 const homeTitlePx = await page.$eval('.hero-header h1', el => parseFloat(getComputedStyle(el).fontSize));
 assert.ok(homeTitlePx <= 32.5, 'home title must stay visually lighter than the previous oversized heading');
 
+await page.waitForSelector('[data-stable-home-feed] .article-card', { timeout: 8000 });
 const rowAlignment = await page.$eval('[data-stable-home-feed] .article-card', card => {
   const img = card.querySelector('.article-image').getBoundingClientRect();
   const title = card.querySelector('h2').getBoundingClientRect();
