@@ -79,11 +79,18 @@
   <div class="ambient ambient-one"></div>
   <div class="ambient ambient-two"></div>
   <div id="app" class="app-shell" aria-live="polite">
-    <main class="instant-launch-v9174" aria-hidden="true">
-      <header><small>Mon actualité</small><h1>Mon actualité</h1></header>
-      <div class="instant-row"><div class="instant-lines"></div><div class="instant-photo"></div></div>
-      <div class="instant-row"><div class="instant-lines"></div><div class="instant-photo"></div></div>
-      <div class="instant-row"><div class="instant-lines"></div><div class="instant-photo"></div></div>
+    <main class="fresh-loading-v9182" role="status" aria-live="polite">
+      <div class="fresh-loading-v9182__brand">Mon actualité</div>
+      <div class="fresh-loading-v9182__spinner" aria-hidden="true"></div>
+      <h1>Chargement des dernières actualités…</h1>
+      <p>Les articles les plus récents arrivent en premier.</p>
+      <div class="fresh-loading-v9182__rows" aria-hidden="true">
+        <div class="fresh-loading-v9182__row" style="--i:0"><div></div><span></span></div>
+        <div class="fresh-loading-v9182__row" style="--i:1"><div></div><span></span></div>
+        <div class="fresh-loading-v9182__row" style="--i:2"><div></div><span></span></div>
+        <div class="fresh-loading-v9182__row" style="--i:3"><div></div><span></span></div>
+        <div class="fresh-loading-v9182__row" style="--i:4"><div></div><span></span></div>
+      </div>
     </main>
   </div>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
@@ -117,7 +124,7 @@
   <script src="quality-signals-v89.js?v=89"></script>
   <script src="feed-stability-v91.38.js?v=91.40"></script>
   <script src="startup-stability-v91.75.js?v=91.76"></script>
-  <script type="module" src="app.js?v=91.82"></script>
+  <script type="module" src="app.js?v=91.82.1"></script>
   <script type="module" src="article-quickview.js?v=91.82"></script>
   <script type="module" src="feed-quality.js?v=45"></script>
   <script type="module" src="source-discovery-ui.js?v=3"></script>
