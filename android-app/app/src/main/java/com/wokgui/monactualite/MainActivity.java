@@ -4,13 +4,16 @@ import android.app.Activity;
 import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.Color;
+import android.graphics.Insets;
 import android.net.Uri;
 import android.os.Build;
 import android.os.Bundle;
 import android.os.Message;
 import android.view.DisplayCutout;
 import android.view.View;
+import android.view.ViewGroup;
 import android.view.WindowInsets;
+import android.widget.FrameLayout;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebSettings;
@@ -20,7 +23,11 @@ import android.webkit.WebViewClient;
 public class MainActivity extends Activity {
     private static final String APP_URL = "https://mon-actualite.vercel.app/";
     private static final String APP_HOST = "mon-actualite.vercel.app";
+
+    private FrameLayout root;
     private WebView webView;
+    private int lastTopInset = -1;
+    private int lastBottomInset = -1;
 
     @Override
     protected void onCreate(Bundle savedInstanceState) {
@@ -32,20 +39,59 @@ public class MainActivity extends Activity {
             View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR | View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR
         );
 
+        root = new FrameLayout(this);
+        root.setBackgroundColor(Color.rgb(247, 248, 255));
+
         webView = new WebView(this);
-        webView.setBackgroundColor(Color.rgb(247, 248, 255));
-        webView.setOnApplyWindowInsetsListener((view, insets) -> {
-            int safeTop = insets.getSystemWindowInsetTop();
-            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
-                DisplayCutout cutout = insets.getDisplayCutout();
-                if (cutout != null) safeTop = Math.max(safeTop, cutout.getSafeInsetTop());
+        webView.setBackgroundColor(Color.WHITE);
+        FrameLayout.LayoutParams webParams = new FrameLayout.LayoutParams(
+            ViewGroup.LayoutParams.MATCH_PARENT,
+            ViewGroup.LayoutParams.MATCH_PARENT
+        );
+        root.addView(webView, webParams);
+
+        root.setOnApplyWindowInsetsListener((view, insets) -> {
+            int safeTop;
+            int safeBottom;
+
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.R) {
+                Insets systemBars = insets.getInsets(
+                    WindowInsets.Type.statusBars()
+                        | WindowInsets.Type.navigationBars()
+                        | WindowInsets.Type.displayCutout()
+                );
+                safeTop = systemBars.top;
+                safeBottom = systemBars.bottom;
+            } else {
+                safeTop = insets.getSystemWindowInsetTop();
+                safeBottom = insets.getSystemWindowInsetBottom();
+                if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                    DisplayCutout cutout = insets.getDisplayCutout();
+                    if (cutout != null) {
+                        safeTop = Math.max(safeTop, cutout.getSafeInsetTop());
+                        safeBottom = Math.max(safeBottom, cutout.getSafeInsetBottom());
+                    }
+                }
             }
+
             int extraTop = Math.round(6f * getResources().getDisplayMetrics().density);
-            view.setPadding(0, safeTop + extraTop, 0, 0);
+            int wantedTop = safeTop + extraTop;
+            int wantedBottom = safeBottom;
+
+            if (wantedTop != lastTopInset || wantedBottom != lastBottomInset) {
+                FrameLayout.LayoutParams params = (FrameLayout.LayoutParams) webView.getLayoutParams();
+                params.topMargin = wantedTop;
+                params.bottomMargin = wantedBottom;
+                webView.setLayoutParams(params);
+                lastTopInset = wantedTop;
+                lastBottomInset = wantedBottom;
+            }
+
             return insets;
         });
-        setContentView(webView);
-        webView.requestApplyInsets();
+
+        setContentView(root);
+        root.requestApplyInsets();
 
         WebSettings settings = webView.getSettings();
         settings.setJavaScriptEnabled(true);
@@ -55,7 +101,7 @@ public class MainActivity extends Activity {
         settings.setMediaPlaybackRequiresUserGesture(false);
         settings.setSupportMultipleWindows(true);
         settings.setJavaScriptCanOpenWindowsAutomatically(true);
-        settings.setUserAgentString(settings.getUserAgentString() + " MonActualiteAndroid/83");
+        settings.setUserAgentString(settings.getUserAgentString() + " MonActualiteAndroid/84");
 
         webView.setWebViewClient(new WebViewClient() {
             @Override
@@ -126,8 +172,8 @@ public class MainActivity extends Activity {
     }
 
     private void applyAndroidHeaderPolish() {
-        String js = "(function(){if(document.getElementById('android-ui-polish-v83'))return;" +
-            "var s=document.createElement('style');s.id='android-ui-polish-v83';" +
+        String js = "(function(){if(document.getElementById('android-ui-polish-v84'))return;" +
+            "var s=document.createElement('style');s.id='android-ui-polish-v84';" +
             "s.textContent='.hero-header h1{font-size:32px!important;line-height:1.08!important;font-weight:840!important;letter-spacing:-.034em!important}" +
             ".page-masthead-v9186 h1,.settings-page-v9185>.page-masthead-v9186 h1,.page:has(.brief-mode-tabs)>.page-masthead-v9186 h1{font-size:25px!important;line-height:1.12!important;font-weight:820!important;letter-spacing:-.026em!important}';" +
             "document.head.appendChild(s);})();";
