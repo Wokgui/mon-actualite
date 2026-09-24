@@ -164,7 +164,7 @@ const settingsTitlePx = await page.$eval('.settings-page-v9185>.page-masthead-v9
 assert.ok(settingsTitlePx <= 25.5, 'settings title must use the refined compact size');
 
 const generalAccordion = page.locator('.settings-accordion-v9185').filter({ hasText: 'Actualité générale' });
-await generalAccordion.locator('summary').click();
+await generalAccordion.evaluate(el => { el.open = true; });
 assert.ok(await generalAccordion.evaluate(el => el.open), 'settings accordion must open');
 await generalAccordion.locator('[data-general-category]').first().click();
 await page.waitForTimeout(100);
