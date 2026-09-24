@@ -117,5 +117,18 @@ assert.equal(headerStyle.borderBottomWidth, '1px', 'home header must have a thin
 assert.notEqual(headerStyle.boxShadow, 'none', 'home header must keep the subtle separator shadow');
 assert.ok(parseFloat(headerStyle.marginBottom) >= 14, 'home header must keep breathing room before the first article');
 
+const homeTitlePx = await page.$eval('.hero-header h1', el => parseFloat(getComputedStyle(el).fontSize));
+assert.ok(homeTitlePx <= 32.5, 'home title must stay visually lighter than the previous oversized heading');
+
+await page.locator('.nav-item[data-view="settings"]').click();
+await page.waitForSelector('.settings-page-v9185>.page-masthead-v9186 h1');
+const settingsTitlePx = await page.$eval('.settings-page-v9185>.page-masthead-v9186 h1', el => parseFloat(getComputedStyle(el).fontSize));
+assert.ok(settingsTitlePx <= 25.5, 'settings title must use the refined compact size');
+
+await page.locator('.nav-item[data-view="brief"]').click();
+await page.waitForSelector('.page:has(.brief-mode-tabs)>.page-masthead-v9186 h1');
+const briefTitlePx = await page.$eval('.page:has(.brief-mode-tabs)>.page-masthead-v9186 h1', el => parseFloat(getComputedStyle(el).fontSize));
+assert.ok(briefTitlePx <= 25.5, 'brief title must use the refined compact size');
+
 await browser.close();
-console.log('v91.93 current UI browser contract passed.');
+console.log('v91.94 current UI browser contract passed.');

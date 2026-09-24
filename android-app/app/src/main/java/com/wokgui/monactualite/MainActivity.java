@@ -5,9 +5,12 @@ import android.content.Intent;
 import android.graphics.Bitmap;
 import android.graphics.Color;
 import android.net.Uri;
+import android.os.Build;
 import android.os.Bundle;
 import android.os.Message;
+import android.view.DisplayCutout;
 import android.view.View;
+import android.view.WindowInsets;
 import android.webkit.WebChromeClient;
 import android.webkit.WebResourceRequest;
 import android.webkit.WebSettings;
@@ -30,7 +33,19 @@ public class MainActivity extends Activity {
         );
 
         webView = new WebView(this);
+        webView.setBackgroundColor(Color.rgb(247, 248, 255));
+        webView.setOnApplyWindowInsetsListener((view, insets) -> {
+            int safeTop = insets.getSystemWindowInsetTop();
+            if (Build.VERSION.SDK_INT >= Build.VERSION_CODES.P) {
+                DisplayCutout cutout = insets.getDisplayCutout();
+                if (cutout != null) safeTop = Math.max(safeTop, cutout.getSafeInsetTop());
+            }
+            int extraTop = Math.round(6f * getResources().getDisplayMetrics().density);
+            view.setPadding(0, safeTop + extraTop, 0, 0);
+            return insets;
+        });
         setContentView(webView);
+        webView.requestApplyInsets();
 
         WebSettings settings = webView.getSettings();
         settings.setJavaScriptEnabled(true);
@@ -40,7 +55,7 @@ public class MainActivity extends Activity {
         settings.setMediaPlaybackRequiresUserGesture(false);
         settings.setSupportMultipleWindows(true);
         settings.setJavaScriptCanOpenWindowsAutomatically(true);
-        settings.setUserAgentString(settings.getUserAgentString() + " MonActualiteAndroid/82");
+        settings.setUserAgentString(settings.getUserAgentString() + " MonActualiteAndroid/83");
 
         webView.setWebViewClient(new WebViewClient() {
             @Override
@@ -58,6 +73,12 @@ public class MainActivity extends Activity {
                 if (APP_HOST.equalsIgnoreCase(uri.getHost())) return false;
                 openExternal(uri);
                 return true;
+            }
+
+            @Override
+            public void onPageFinished(WebView view, String url) {
+                super.onPageFinished(view, url);
+                applyAndroidHeaderPolish();
             }
         });
 
@@ -102,6 +123,15 @@ public class MainActivity extends Activity {
 
         if (savedInstanceState == null) webView.loadUrl(APP_URL);
         else webView.restoreState(savedInstanceState);
+    }
+
+    private void applyAndroidHeaderPolish() {
+        String js = "(function(){if(document.getElementById('android-ui-polish-v83'))return;" +
+            "var s=document.createElement('style');s.id='android-ui-polish-v83';" +
+            "s.textContent='.hero-header h1{font-size:32px!important;line-height:1.08!important;font-weight:840!important;letter-spacing:-.034em!important}" +
+            ".page-masthead-v9186 h1{font-size:25px!important;line-height:1.12!important;font-weight:820!important;letter-spacing:-.026em!important}';" +
+            "document.head.appendChild(s);})();";
+        webView.evaluateJavascript(js, null);
     }
 
     private void openExternal(Uri uri) {

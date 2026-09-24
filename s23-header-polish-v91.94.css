@@ -1,0 +1,39 @@
+/* v91.94 — espace caméra Android et titres plus sobres. */
+
+.hero-header{
+  padding-top:14px!important;
+  padding-bottom:20px!important;
+}
+
+.hero-header h1{
+  font-size:32px!important;
+  line-height:1.08!important;
+  font-weight:840!important;
+  letter-spacing:-.034em!important;
+}
+
+.hero-header .eyebrow{
+  min-height:32px!important;
+  padding-inline:15px!important;
+  font-size:12px!important;
+  font-weight:780!important;
+  letter-spacing:.005em!important;
+}
+
+.settings-page-v9185>.page-masthead-v9186,
+.page:has(.brief-mode-tabs)>.page-masthead-v9186{
+  padding-top:14px!important;
+  padding-bottom:17px!important;
+}
+
+.page-masthead-v9186 h1{
+  font-size:25px!important;
+  line-height:1.12!important;
+  font-weight:820!important;
+  letter-spacing:-.026em!important;
+}
+
+@media(max-width:420px){
+  .hero-header h1{font-size:31px!important}
+  .page-masthead-v9186 h1{font-size:24px!important}
+}
