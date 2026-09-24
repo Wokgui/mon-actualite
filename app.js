@@ -132,6 +132,15 @@ function icon(name, filled = false) {
   return `<svg viewBox="0 0 24 24" aria-hidden="true" fill="${filled ? 'currentColor' : 'none'}" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round">${iconPaths[name] || iconPaths.sparkles}</svg>`;
 }
 
+function navSolidIcon(name) {
+  const paths = {
+    home: '<path d="M12 2.7 2.9 10.35a1 1 0 0 0 .64 1.77H5v8.13A1.75 1.75 0 0 0 6.75 22h3.5v-6.15h3.5V22h3.5A1.75 1.75 0 0 0 19 20.25v-8.13h1.46a1 1 0 0 0 .64-1.77L12 2.7Z"/>',
+    settings: '<path fill-rule="evenodd" d="M10.35 2h3.3l.55 2.16c.55.2 1.07.47 1.55.78l2.1-.64 2.33 2.33-.64 2.1c.31.48.58 1 .78 1.55L22 10.83v3.3l-2.16.55a8.9 8.9 0 0 1-.78 1.55l.64 2.1-2.33 2.33-2.1-.64c-.48.31-1 .58-1.55.78L13.17 23h-3.3l-.55-2.16a8.9 8.9 0 0 1-1.55-.78l-2.1.64-2.33-2.33.64-2.1a8.9 8.9 0 0 1-.78-1.55L1 14.17v-3.3l2.16-.55c.2-.55.47-1.07.78-1.55l-.64-2.1 2.33-2.33 2.1.64c.48-.31 1-.58 1.55-.78L10.35 2Zm1.65 6a4 4 0 1 0 0 8 4 4 0 0 0 0-8Z" clip-rule="evenodd"/>',
+    brief: '<path d="M6.25 2h11.5A2.25 2.25 0 0 1 20 4.25v15.5A2.25 2.25 0 0 1 17.75 22H6.25A2.25 2.25 0 0 1 4 19.75V4.25A2.25 2.25 0 0 1 6.25 2Z"/><path class="nav-solid-cut-v9188" d="M8.5 7.5h7M8.5 11.5h7M8.5 15.5h4.5"/>'
+  };
+  return `<svg class="nav-solid-icon-v9188" viewBox="0 0 24 24" aria-hidden="true">${paths[name] || paths.home}</svg>`;
+}
+
 function escapeHtml(value) {
   return String(value ?? '').replace(/[&<>'"]/g, char => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', "'": '&#39;', '"': '&quot;' }[char]));
 }
@@ -267,9 +276,9 @@ function stableHomeArticles() {
 function nav(active = state.view) {
   const watchCount = watchNewCount();
   return `<nav class="bottom-nav stable-bottom-nav-v9184" aria-label="Navigation principale">
-    <button class="nav-item ${active === 'home' ? 'active' : ''}" data-view="home" aria-label="Accueil">${icon('home')}<span>Accueil</span></button>
-    <button class="nav-item ${active === 'settings' ? 'active' : ''}" data-view="settings" aria-label="Réglages">${icon('settings')}<span>Réglages</span></button>
-    <button class="nav-item ${active === 'brief' ? 'active' : ''}" data-view="brief" aria-label="Brief">${icon('brief')}<span>Brief</span>${watchCount ? `<i class="nav-watch-dot-v9184" aria-label="${watchCount} nouveauté${watchCount > 1 ? 's' : ''} de veille">${watchCount > 9 ? '9+' : watchCount}</i>` : ''}</button>
+    <button class="nav-item ${active === 'home' ? 'active' : ''}" data-view="home" aria-label="Accueil">${navSolidIcon('home')}<span>Accueil</span></button>
+    <button class="nav-item ${active === 'settings' ? 'active' : ''}" data-view="settings" aria-label="Réglages">${navSolidIcon('settings')}<span>Réglages</span></button>
+    <button class="nav-item ${active === 'brief' ? 'active' : ''}" data-view="brief" aria-label="Brief">${navSolidIcon('brief')}<span>Brief</span>${watchCount ? `<i class="nav-watch-dot-v9184" aria-label="${watchCount} nouveauté${watchCount > 1 ? 's' : ''} de veille">${watchCount > 9 ? '9+' : watchCount}</i>` : ''}</button>
   </nav>`;
 }
 
