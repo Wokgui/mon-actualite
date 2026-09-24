@@ -1,13 +1,12 @@
 (() => {
   'use strict';
 
-  const RELEASE = '91.73';
+  const RELEASE = '91.82';
   let scheduled = false;
   document.documentElement.dataset.goldenBottomNavV9169 = RELEASE;
 
   const homeIcon = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="m3 11 9-8 9 8"/><path d="M5 10v10h14V10"/><path d="M9 20v-6h6v6"/></svg>';
   const briefIcon = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M6 3h12v18H6z"/><path d="M9 8h6M9 12h6M9 16h4"/></svg>';
-  const resetIcon = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><path d="M18.4 8.1A7.2 7.2 0 1 0 19.1 14"/><path d="M18.4 3.8v4.3h-4.3"/></svg>';
   const gearIcon = '<svg viewBox="0 0 24 24" aria-hidden="true" focusable="false"><circle cx="12" cy="12" r="3.3"/><path d="M19.2 14.8a1.6 1.6 0 0 0 .32 1.76l.08.08-2.96 2.96-.08-.08a1.6 1.6 0 0 0-1.76-.32 1.6 1.6 0 0 0-.96 1.47V21h-3.72v-.33a1.6 1.6 0 0 0-.96-1.47 1.6 1.6 0 0 0-1.76.32l-.08.08-2.96-2.96.08-.08a1.6 1.6 0 0 0 .32-1.76 1.6 1.6 0 0 0-1.47-.96H3v-3.72h.33a1.6 1.6 0 0 0 1.47-.96 1.6 1.6 0 0 0-.32-1.76l-.08-.08 2.96-2.96.08.08a1.6 1.6 0 0 0 1.76.32 1.6 1.6 0 0 0 .96-1.47V3h3.72v.33a1.6 1.6 0 0 0 .96 1.47 1.6 1.6 0 0 0 1.76-.32l.08-.08 2.96 2.96-.08.08a1.6 1.6 0 0 0-.32 1.76 1.6 1.6 0 0 0 1.47.96H21v3.72h-.33a1.6 1.6 0 0 0-1.47.96Z"/></svg>';
 
   function pageState() {
@@ -47,7 +46,6 @@
 
   function centerMarkup() {
     return `<div class="golden-bottom-nav-v9169__center">
-      <button type="button" class="golden-bottom-nav-v9169__reset" data-reset-read aria-label="Réinitialiser les articles parcourus" title="Réinitialiser">${resetIcon}</button>
       <button type="button" class="golden-bottom-nav-v9169__gear" data-view="sheet" aria-label="Personnaliser et réglages" title="Réglages">${gearIcon}</button>
     </div>`;
   }
