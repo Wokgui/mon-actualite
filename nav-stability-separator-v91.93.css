@@ -120,3 +120,25 @@
   margin:0!important;
   transform:none!important;
 }
+
+
+/* Verrou final : priorité supérieure aux anciens styles avec #app. */
+#app .bottom-nav.stable-bottom-nav-v9184 button.nav-item,
+#app .bottom-nav.stable-bottom-nav-v9184 button.nav-item.active,
+#app .bottom-nav.stable-bottom-nav-v9184 button.nav-item:not(.active),
+#app .bottom-nav.stable-bottom-nav-v9184 button.nav-item:active,
+#app .bottom-nav.stable-bottom-nav-v9184 button.nav-item:focus{
+  width:100%!important;
+  height:calc(74px + env(safe-area-inset-bottom))!important;
+  min-height:calc(74px + env(safe-area-inset-bottom))!important;
+  max-height:calc(74px + env(safe-area-inset-bottom))!important;
+  block-size:calc(74px + env(safe-area-inset-bottom))!important;
+  min-block-size:calc(74px + env(safe-area-inset-bottom))!important;
+  max-block-size:calc(74px + env(safe-area-inset-bottom))!important;
+  margin:0!important;
+  padding:8px 4px calc(7px + env(safe-area-inset-bottom))!important;
+  align-self:stretch!important;
+  justify-self:stretch!important;
+  transform:none!important;
+  translate:none!important;
+}
