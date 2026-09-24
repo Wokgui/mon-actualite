@@ -4,7 +4,7 @@ import { articleVisualUrl, hasPreparedVisual, sourceTileUrl } from './services/a
 const $ = (selector, root = document) => root.querySelector(selector);
 const app = $('#app');
 const toastEl = $('#toast');
-const APP_VERSION = '75';
+const APP_VERSION = '76';
 const APP_RELEASE = '24 septembre 2026';
 document.documentElement.dataset.appVersion = APP_VERSION;
 
@@ -193,11 +193,31 @@ function sourceIdentity(article = {}) {
   return normalizeTopic(article.source || article.feedTitle || '');
 }
 
+function isVideoOnlyArticle(article = {}) {
+  const title = String(article.title || '').trim();
+  const summary = String(article.summary || article.detail || '').replace(/\s+/g, ' ').trim();
+  const type = String(article.type || article.format || article.kind || '').toLowerCase();
+  const explicitVideo = article.video === true || /(^|[-_ ])video($|[-_ ])/i.test(type);
+  let host = '';
+  let path = '';
+  try {
+    const url = new URL(article.url || '');
+    host = url.hostname.toLowerCase().replace(/^www\./, '');
+    path = url.pathname.toLowerCase();
+  } catch {}
+  const videoHost = /(^|\.)(youtube\.com|youtu\.be|dailymotion\.com|vimeo\.com|tiktok\.com|twitch\.tv)$/.test(host);
+  const videoPath = /\/(?:video|videos|watch)(?:\/|$)/.test(path);
+  const videoTitle = /^(?:vid[eé]o|en vid[eé]o|regardez|à voir en vid[eé]o|watch)\b/i.test(title);
+  const sourceVideo = /^(?:youtube|dailymotion|vimeo|tiktok|twitch)$/i.test(String(article.source || '').trim());
+  return explicitVideo || videoHost || sourceVideo || (videoTitle && (videoPath || summary.length < 220));
+}
+
 function visibleArticles() {
   const blockedTerms = (state.blockedTerms || []).map(normalizeTopic).filter(term => term.length >= 2);
   const blockedSources = state.blockedSources || new Set();
   return state.articles
     .filter(article => article && typeof article === 'object')
+    .filter(article => !isVideoOnlyArticle(article))
     .filter(article => {
       if (state.feedback[article.id] === 'not') return false;
       if (blockedSources.has(sourceIdentity(article))) return false;
@@ -1273,16 +1293,39 @@ app.addEventListener('click', async event => {
   const sourceFollow = event.target.closest('[data-source-follow]');
   if (sourceFollow) {
     const key = sourceFollow.dataset.sourceFollow || '';
-    state.followedSources.has(key) ? state.followedSources.delete(key) : state.followedSources.add(key);
+    const row = sourceFollow.closest('.source-directory-row-v9186');
+    const blockButton = row?.querySelector('[data-source-block]');
+    const following = !state.followedSources.has(key);
+    following ? state.followedSources.add(key) : state.followedSources.delete(key);
     state.blockedSources.delete(key);
-    persist(); render(); syncNews({ silent: true }); return;
+    sourceFollow.classList.toggle('active', following);
+    sourceFollow.textContent = following ? 'Suivie' : 'Suivre';
+    if (blockButton) {
+      blockButton.classList.remove('active');
+      blockButton.textContent = 'Bloquer';
+    }
+    row?.classList.remove('is-blocked');
+    persist();
+    syncNews({ silent: true });
+    return;
   }
   const sourceBlock = event.target.closest('[data-source-block]');
   if (sourceBlock) {
     const key = sourceBlock.dataset.sourceBlock || '';
-    state.blockedSources.has(key) ? state.blockedSources.delete(key) : state.blockedSources.add(key);
+    const row = sourceBlock.closest('.source-directory-row-v9186');
+    const followButton = row?.querySelector('[data-source-follow]');
+    const blocking = !state.blockedSources.has(key);
+    blocking ? state.blockedSources.add(key) : state.blockedSources.delete(key);
     state.followedSources.delete(key);
-    persist(); render(); return;
+    sourceBlock.classList.toggle('active', blocking);
+    sourceBlock.textContent = blocking ? 'Débloquer' : 'Bloquer';
+    if (followButton) {
+      followButton.classList.remove('active');
+      followButton.textContent = 'Suivre';
+    }
+    row?.classList.toggle('is-blocked', blocking);
+    persist();
+    return;
   }
 
   const sourceToggle = event.target.closest('[data-source-toggle]');
