@@ -1441,7 +1441,7 @@ async function bootLatestNews() {
     firstScreenShown = true;
   }
 
-  window.clearTimeout(hardStop);
+  if (firstScreenShown) window.clearTimeout(hardStop);
   if (navigator.onLine) {
     window.setTimeout(() => syncNews({ silent: true }), fastPayload?.articles?.length ? 300 : 80);
   }
