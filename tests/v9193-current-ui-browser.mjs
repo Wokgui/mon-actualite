@@ -12,7 +12,7 @@ const context = await browser.newContext({
 
 const article = {
   id: 'ui-contract-1',
-  title: 'Article de contrôle visuel',
+  title: 'Article de contrôle visuel suffisamment long pour occuper trois lignes et vérifier le centrage exact',
   summary: 'Résumé de contrôle pour stabiliser le rendu local du test.',
   source: 'Source test',
   category: 'Tech',
@@ -120,6 +120,18 @@ assert.ok(parseFloat(headerStyle.marginBottom) >= 14, 'home header must keep bre
 const homeTitlePx = await page.$eval('.hero-header h1', el => parseFloat(getComputedStyle(el).fontSize));
 assert.ok(homeTitlePx <= 32.5, 'home title must stay visually lighter than the previous oversized heading');
 
+const rowAlignment = await page.$eval('[data-stable-home-feed] .article-card', card => {
+  const img = card.querySelector('.article-image').getBoundingClientRect();
+  const title = card.querySelector('h2').getBoundingClientRect();
+  return {
+    imageCenter: img.top + img.height / 2,
+    titleCenter: title.top + title.height / 2,
+    imageHeight: img.height
+  };
+});
+assert.ok(Math.abs(rowAlignment.imageCenter - rowAlignment.titleCenter) < 0.75, 'image/title vertical centers must match');
+assert.ok(Math.abs(rowAlignment.imageHeight - 75) < 0.75, 'article image must keep the 75px compact height');
+
 await page.locator('.nav-item[data-view="settings"]').click();
 await page.waitForSelector('.settings-page-v9185>.page-masthead-v9186 h1');
 const settingsTitlePx = await page.$eval('.settings-page-v9185>.page-masthead-v9186 h1', el => parseFloat(getComputedStyle(el).fontSize));
@@ -131,4 +143,4 @@ const briefTitlePx = await page.$eval('.page:has(.brief-mode-tabs)>.page-masthea
 assert.ok(briefTitlePx <= 25.5, 'brief title must use the refined compact size');
 
 await browser.close();
-console.log('v91.94 current UI browser contract passed.');
+console.log('v91.99 current UI browser contract passed.');

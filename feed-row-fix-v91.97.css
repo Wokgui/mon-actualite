@@ -1,23 +1,51 @@
-/* v91.97 — centre les visuels avec leurs titres sans modifier la grille compacte. */
+/* v91.99 — alignement géométrique exact photo / titre. */
 [data-stable-home-feed] .article-card,
 [data-stable-brief-content] .article-card.runtime-row{
+  display:grid!important;
+  grid-template-columns:minmax(0,1fr) 112px!important;
+  grid-template-areas:"body image"!important;
+  grid-template-rows:75px!important;
   align-items:center!important;
+  min-height:75px!important;
 }
+
 [data-stable-home-feed] .article-card .article-image,
 [data-stable-brief-content] .article-card.runtime-row .article-image{
+  grid-area:image!important;
+  width:112px!important;
+  height:75px!important;
+  min-height:75px!important;
+  max-height:75px!important;
   align-self:center!important;
   justify-self:end!important;
+  margin:0!important;
+  object-fit:cover!important;
 }
+
 [data-stable-home-feed] .article-card .article-body,
 [data-stable-brief-content] .article-card.runtime-row .article-body{
-  align-self:center!important;
-  min-height:75px!important;
-  padding-top:0!important;
-  padding-bottom:0!important;
+  grid-area:body!important;
+  display:flex!important;
+  flex-direction:column!important;
   justify-content:center!important;
+  align-self:center!important;
+  height:75px!important;
+  min-height:75px!important;
+  max-height:75px!important;
+  padding:0!important;
+  margin:0!important;
+  box-sizing:border-box!important;
 }
+
+[data-stable-home-feed] .article-card .meta,
+[data-stable-brief-content] .article-card.runtime-row .meta{
+  display:none!important;
+  margin:0!important;
+  padding:0!important;
+}
+
 [data-stable-home-feed] .article-card h2,
 [data-stable-brief-content] .article-card.runtime-row h2{
-  margin-top:0!important;
-  margin-bottom:0!important;
+  margin:0!important;
+  padding:0!important;
 }

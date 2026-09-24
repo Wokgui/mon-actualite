@@ -7,7 +7,7 @@ const { rankCatalogArticles } = require('../lib/news-significance');
 const { suppressCorePrewarmRequest, scheduleFinalImagePrewarm } = require('../lib/final-image-prewarm');
 const articleReaderHandler = require('../lib/article-reader');
 
-const CATALOG_LIMIT = 180;
+const CATALOG_LIMIT = 320;
 
 function wantsReaderMode(req) {
   if (String(req.query?.reader || '') === '1') return true;
@@ -59,7 +59,32 @@ module.exports = async function handler(req, res) {
         const candidateItems = payload.articles.length;
         const uniqueCandidates = mergeEventVariants(payload.articles);
         const rankedCandidates = rankCatalogArticles(uniqueCandidates);
-        const articles = rankedCandidates.slice(0, CATALOG_LIMIT);
+        const articles = [];
+        const articleKeys = new Set();
+        const addArticle = article => {
+          if (!article) return;
+          const key = `${article.id || ''}|${article.url || ''}|${article.title || ''}|${article.publishedAt || ''}`;
+          if (articleKeys.has(key)) return;
+          articleKeys.add(key);
+          articles.push(article);
+        };
+
+        rankedCandidates.slice(0, 120).forEach(addArticle);
+
+        const dayBuckets = new Map();
+        for (const article of rankedCandidates) {
+          const time = Date.parse(article.publishedAt || '');
+          if (!Number.isFinite(time)) continue;
+          const date = new Date(time);
+          const key = `${date.getUTCFullYear()}-${String(date.getUTCMonth() + 1).padStart(2, '0')}-${String(date.getUTCDate()).padStart(2, '0')}`;
+          if (!dayBuckets.has(key)) dayBuckets.set(key, []);
+          const bucket = dayBuckets.get(key);
+          if (bucket.length < 10) bucket.push(article);
+        }
+        [...dayBuckets.keys()].sort((a, b) => b.localeCompare(a)).forEach(key => {
+          dayBuckets.get(key).forEach(addArticle);
+        });
+        articles.splice(CATALOG_LIMIT);
         const prewarmScheduled = await scheduleFinalImagePrewarm(req, articles);
         payload.articles = articles;
         payload.stats = {

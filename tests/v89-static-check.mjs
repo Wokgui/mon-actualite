@@ -78,7 +78,7 @@ for (const asset of [
   'top-continuity-v91.92.css?v=1',
   'nav-stability-separator-v91.93.css?v=2',
   's23-header-polish-v91.94.css?v=2',
-  'feed-row-fix-v91.97.css?v=1'
+  'feed-row-fix-v91.97.css?v=2'
 ]) {
   if (!index.includes(asset)) fail(`final visual layer missing from index: ${asset}`);
   if (!sw.includes(asset)) fail(`service worker does not precache final visual layer: ${asset}`);
@@ -139,3 +139,13 @@ const androidGradle = read('android-app/app/build.gradle');
 const androidActivity = read('android-app/app/src/main/java/com/wokgui/monactualite/MainActivity.java');
 if (!androidGradle.includes('prepareWebAssets') || !androidActivity.includes('WebViewAssetLoader')) fail('Android APK does not bundle the current frontend');
 else ok('Android APK bundles current frontend independently of Vercel frontend deploys');
+
+const coreNews = read('lib/news-core.js');
+const apiNews = read('api/news.js');
+const rowFix = read('feed-row-fix-v91.97.css');
+if (!coreNews.includes('bucket.length < 12') || !coreNews.includes('selected.splice(500)')) fail('historical day coverage is not preserved in news-core');
+else ok('historical day coverage preserved in news-core');
+if (!apiNews.includes('bucket.length < 10') || !apiNews.includes('CATALOG_LIMIT = 320')) fail('historical day coverage is not preserved by API catalogue ranking');
+else ok('historical day coverage preserved by API catalogue ranking');
+if (!rowFix.includes('grid-template-rows:75px') || !rowFix.includes('height:75px!important') || !rowFix.includes('display:none!important')) fail('exact image/title centering contract missing');
+else ok('exact image/title centering contract configured');
