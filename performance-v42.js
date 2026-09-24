@@ -10,6 +10,7 @@ let openedAt = 0;
 let closeGesture = null;
 let closedAt = -Infinity;
 let scanPending = false;
+const USE_NATIVE_READER_V9182 = true;
 
 function readJson(key, fallback) {
   try { return JSON.parse(localStorage.getItem(key) || 'null') ?? fallback; }
@@ -204,8 +205,15 @@ function configureCards() {
     if (configured.has(card)) return;
     configured.add(card);
     card.dataset.v42Index = String(index);
-    if (index < 6 || !viewportObserver) loadCardImage(card, articleById(card.dataset.article), index);
-    else viewportObserver.observe(card);
+    card.classList.add('v42-image-pending');
+    if (index < 18 || !viewportObserver) {
+      window.setTimeout(() => {
+        if (!card.isConnected) return;
+        loadCardImage(card, articleById(card.dataset.article), index);
+      }, Math.min(index * 28, 420));
+    } else {
+      viewportObserver.observe(card);
+    }
   });
 }
 
@@ -323,6 +331,7 @@ function openInstant(card, article) {
 // DOM disappears during pointerdown, the following synthetic click can be
 // retargeted to the article that has just appeared underneath the finger.
 document.addEventListener('pointerdown', event => {
+  if (USE_NATIVE_READER_V9182) { press = null; return; }
   const close = event.target.closest('[data-quick-close]');
   if (close) {
     const modal = close.closest('.quick-summary-backdrop');
@@ -342,6 +351,7 @@ document.addEventListener('pointerdown', event => {
 // Open immediately on pointer-up after a normal tap. This bypasses the slower
 // legacy click path but does not open while the user is scrolling.
 document.addEventListener('pointerup', event => {
+  if (USE_NATIVE_READER_V9182) { press = null; return; }
   if (closeGesture && closeGesture.pointerId === event.pointerId) {
     const { modal } = closeGesture;
     closeGesture = null;
