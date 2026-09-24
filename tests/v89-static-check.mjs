@@ -109,8 +109,8 @@ else ok('article revision detection present');
 if (!pipeline.includes('topicSignal(article) < -0.2')) fail('negative topic feedback guard missing');
 else ok('negative topic feedback guard present');
 
-if (!workflow.includes('v89-mobile-browser.mjs') || !workflow.includes('playwright')) fail('mobile Playwright job missing from regression workflow');
-else ok('mobile Playwright regression job configured');
+if (!workflow.includes('v9193-current-ui-browser.mjs') || !workflow.includes('playwright')) fail('current mobile Playwright UI job missing from regression workflow');
+else ok('current mobile Playwright UI regression job configured');
 
 if (process.exitCode) process.exit(process.exitCode);
 console.log('Current static regression checks passed.');
