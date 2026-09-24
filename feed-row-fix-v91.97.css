@@ -49,3 +49,28 @@
   margin:0!important;
   padding:0!important;
 }
+
+
+/* v92.00 — aucun séparateur entre les articles, sur toutes les vues. */
+.article-card,
+.feed > .article-card,
+.stable-owned-list > .article-card,
+.runtime-brief-content .article-card,
+.watch-filtered-feed-v9138 .article-card,
+.watch-all-feed-v9138 .article-card{
+  border:0!important;
+  border-top:0!important;
+  border-right:0!important;
+  border-bottom:0!important;
+  border-left:0!important;
+  box-shadow:none!important;
+}
+.article-card::before,
+.article-card::after{
+  content:none!important;
+  display:none!important;
+}
+.feed > .article-card + .article-card,
+.stable-owned-list > .article-card + .article-card{
+  border-top:0!important;
+}

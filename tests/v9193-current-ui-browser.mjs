@@ -127,11 +127,15 @@ const rowAlignment = await page.$eval('[data-stable-home-feed] .article-card', c
   return {
     imageCenter: img.top + img.height / 2,
     titleCenter: title.top + title.height / 2,
-    imageHeight: img.height
+    imageHeight: img.height,
+    borderBottomWidth: getComputedStyle(card).borderBottomWidth,
+    borderTopWidth: getComputedStyle(card).borderTopWidth
   };
 });
 assert.ok(Math.abs(rowAlignment.imageCenter - rowAlignment.titleCenter) < 0.75, 'image/title vertical centers must match');
 assert.ok(Math.abs(rowAlignment.imageHeight - 75) < 0.75, 'article image must keep the 75px compact height');
+assert.equal(rowAlignment.borderBottomWidth, '0px', 'articles must not have bottom separators');
+assert.equal(rowAlignment.borderTopWidth, '0px', 'articles must not have top separators');
 
 await page.locator('.nav-item[data-view="settings"]').click();
 await page.waitForSelector('.settings-page-v9185>.page-masthead-v9186 h1');
@@ -144,4 +148,4 @@ const briefTitlePx = await page.$eval('.page:has(.brief-mode-tabs)>.page-masthea
 assert.ok(briefTitlePx <= 25.5, 'brief title must use the refined compact size');
 
 await browser.close();
-console.log('v91.99 current UI browser contract passed.');
+console.log('v92.00 current UI browser contract passed.');

@@ -69,16 +69,16 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          cp android-app/app/build/outputs/apk/debug/app-debug.apk mon-actualite-v89-91.99.apk
+          cp android-app/app/build/outputs/apk/debug/app-debug.apk mon-actualite-v90-92.00.apk
 
       - name: Verify bundled frontend
         shell: bash
         run: |
           set -euo pipefail
-          unzip -p mon-actualite-v89-91.99.apk assets/index.html | grep -q 'app.js?v=91.99'
-          unzip -p mon-actualite-v89-91.99.apk assets/app.js | grep -q 'effectiveWatchRules'
-          unzip -p mon-actualite-v89-91.99.apk assets/app.js | grep -q 'fetchHistoryCoverage'
-          unzip -p mon-actualite-v89-91.99.apk assets/feed-row-fix-v91.97.css | grep -q 'grid-template-rows:75px'
+          unzip -p mon-actualite-v90-92.00.apk assets/index.html | grep -q 'app.js?v=92.00'
+          unzip -p mon-actualite-v90-92.00.apk assets/app.js | grep -q 'effectiveWatchRules'
+          unzip -p mon-actualite-v90-92.00.apk assets/app.js | grep -q 'fetchHistoryCoverage'
+          unzip -p mon-actualite-v90-92.00.apk assets/feed-row-fix-v91.97.css | grep -q 'border-bottom:0!important'
 
       - name: Preserve install key for future updates
         uses: actions/upload-artifact@v4
@@ -94,11 +94,11 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          TAG="v89-91.99"
-          APK="mon-actualite-v89-91.99.apk"
-          NOTES="APK Android installable de Mon Actualité. Version web intégrée : v89 / codeRelease 91.99. Les articles externes s’ouvrent dans le navigateur."
+          TAG="v90-92.00"
+          APK="mon-actualite-v90-92.00.apk"
+          NOTES="APK Android installable de Mon Actualité. Version web intégrée : v90 / codeRelease 92.00. Les articles externes s’ouvrent dans le navigateur."
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release upload "$TAG" "$APK" --clobber
           else
-            gh release create "$TAG" "$APK" --title "Mon Actualité v89 / 91.99" --notes "$NOTES"
+            gh release create "$TAG" "$APK" --title "Mon Actualité v90 / 92.00" --notes "$NOTES"
           fi

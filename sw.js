@@ -1,5 +1,5 @@
-const CACHE = 'mon-actualite-v91-99-core-r1';
-const COMPAT_DIAGNOSTIC = 'v91.99-core';
+const CACHE = 'mon-actualite-v92-00-core-r1';
+const COMPAT_DIAGNOSTIC = 'v92.00-core';
 const THUMB_CACHE = 'mon-actualite-thumbnails-v6-feedly';
 const THUMB_NEGATIVE_TTL_MS = 90 * 1000;
 const thumbnailInflight = new Map();
@@ -15,15 +15,15 @@ const ASSETS = [
   './structural-stability-v91.38.11.css?v=91.40',
   './fresh-ui-v91.82.css?v=91.83',
   './stability-v91.84.css?v=1',
-  './simplify-v91.85.css?v=1', './polish-v91.86.css?v=1', './polish-v91.87.css?v=1', './theme-blue-v91.88.css?v=2', './nav-solid-hardfix-v91.89.css?v=1', './theme-periwinkle-v91.90.css?v=2', './top-continuity-v91.92.css?v=1', './nav-stability-separator-v91.93.css?v=2', './s23-header-polish-v91.94.css?v=2', './feed-row-fix-v91.97.css?v=2',
-  './release-watch.js?v=91.99',
+  './simplify-v91.85.css?v=1', './polish-v91.86.css?v=1', './polish-v91.87.css?v=1', './theme-blue-v91.88.css?v=2', './nav-solid-hardfix-v91.89.css?v=1', './theme-periwinkle-v91.90.css?v=2', './top-continuity-v91.92.css?v=1', './nav-stability-separator-v91.93.css?v=2', './s23-header-polish-v91.94.css?v=2', './feed-row-fix-v91.97.css?v=3',
+  './release-watch.js?v=92.00',
   './article-access-v91.48.js?v=91.88',
   './startup-news-prefetch-v91.83.js?v=91.88',
-  './app.js?v=91.99',
+  './app.js?v=92.00',
   './image-sequence-v91.82.js?v=91.97', './nav-solid-hardfix-v91.89.js?v=1',
   './services/source-connectors.js?v=91.97', './services/article-visuals.js?v=91.97',
   './services/article-visuals.js?v=57',
-  './manifest.webmanifest?v=91.99',
+  './manifest.webmanifest?v=92.00',
   './assets/app-icon-192.png',
   './assets/app-icon-512.png',
   './assets/app-icon-maskable-512.png',

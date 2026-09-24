@@ -78,7 +78,7 @@ for (const asset of [
   'top-continuity-v91.92.css?v=1',
   'nav-stability-separator-v91.93.css?v=2',
   's23-header-polish-v91.94.css?v=2',
-  'feed-row-fix-v91.97.css?v=2'
+  'feed-row-fix-v91.97.css?v=3'
 ]) {
   if (!index.includes(asset)) fail(`final visual layer missing from index: ${asset}`);
   if (!sw.includes(asset)) fail(`service worker does not precache final visual layer: ${asset}`);
@@ -129,8 +129,9 @@ for (const marker of briefWindowChecks) {
 }
 if (!process.exitCode) ok('Brief and watch 10-day window configured');
 
-if (!app.includes('function effectiveWatchRules()') || !app.includes('state.settings.briefWatchTopics')) fail('brief watch topics are not connected to effective watch rules');
-else ok('effective watch rules include brief topics');
+if (!app.includes("function effectiveWatchRules() {\n  return activeWatchRules();\n}")) fail('Veille must use only rules entered in Settings > Veille');
+else ok('Veille uses only Settings > Veille rules');
+if (app.match(/function effectiveWatchRules\(\)[\s\S]{0,500}briefWatchTopics/)) fail('legacy briefWatchTopics still influence Veille');
 if (!app.includes('function fetchHistoryCoverage') || !app.includes("days = topic ? BRIEF_DAYS : 31")) fail('31-day home / 10-day watch historical discovery is missing');
 else ok('31-day home and 10-day watch historical discovery configured');
 if (!app.includes('visualBackfillTimer = window.setTimeout') || !app.includes("image-failed-v9184")) fail('image recovery scheduler is not active');
@@ -149,3 +150,7 @@ if (!apiNews.includes('bucket.length < 10') || !apiNews.includes('CATALOG_LIMIT 
 else ok('historical day coverage preserved by API catalogue ranking');
 if (!rowFix.includes('grid-template-rows:75px') || !rowFix.includes('height:75px!important') || !rowFix.includes('display:none!important')) fail('exact image/title centering contract missing');
 else ok('exact image/title centering contract configured');
+if (!rowFix.includes('border-bottom:0!important')) fail('article separators are still allowed by the final visual layer');
+else ok('article separators disabled globally');
+if (!app.includes('const quota = dayIndex === 0 ? 24 : dayIndex === 1 ? 16 : 8')) fail('home day coverage quota missing');
+else ok('home prioritizes multiple publication days before same-day overflow');

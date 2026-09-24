@@ -4,7 +4,7 @@ import { articleVisualUrl, hasPreparedVisual, sourceTileUrl } from './services/a
 const $ = (selector, root = document) => root.querySelector(selector);
 const app = $('#app');
 const toastEl = $('#toast');
-const APP_VERSION = '89';
+const APP_VERSION = '90';
 const APP_RELEASE = '24 septembre 2026';
 document.documentElement.dataset.appVersion = APP_VERSION;
 
@@ -20,7 +20,7 @@ const VISUAL_BACKFILL_MAX_AGE = 30 * 86400000;
 const VISUAL_BACKFILL_RETRY_DELAY = 90 * 1000;
 const VISUAL_BACKFILL_MAX_ATTEMPTS = 4;
 const BRIEF_DAYS = 10;
-const HISTORY_SYNC_KEY = 'news-history-sync-v9197';
+const HISTORY_SYNC_KEY = 'news-history-sync-v9200';
 const HISTORY_SYNC_MAX_AGE = 2 * 60 * 60 * 1000;
 
 const categoryMeta = {
@@ -266,14 +266,29 @@ function diversifyBySource(articles) {
   return result;
 }
 
-function reconcileHomeOrder() {
+function stableHomeArticles() {
   const ordered = visibleArticles();
-  state.homeOrder = ordered.map(article => String(article.id));
-  return ordered;
+  const days = new Map();
+  for (const article of ordered) {
+    const key = dayKey(article.publishedAt || article.date || '');
+    if (!days.has(key)) days.set(key, []);
+    days.get(key).push(article);
+  }
+
+  const prioritized = [];
+  const overflow = [];
+  [...days.values()].forEach((items, dayIndex) => {
+    const quota = dayIndex === 0 ? 24 : dayIndex === 1 ? 16 : 8;
+    prioritized.push(...items.slice(0, quota));
+    overflow.push(...items.slice(quota));
+  });
+  return [...prioritized, ...overflow];
 }
 
-function stableHomeArticles() {
-  return visibleArticles();
+function reconcileHomeOrder() {
+  const ordered = stableHomeArticles();
+  state.homeOrder = ordered.map(article => String(article.id));
+  return ordered;
 }
 
 function nav(active = state.view) {
@@ -410,15 +425,7 @@ function activeWatchRules() {
 }
 
 function effectiveWatchRules() {
-  const explicit = activeWatchRules();
-  const topics = uniqueTopics(state.settings.briefWatchTopics || []).map(query => ({ query, exclude: '', topicRule: true }));
-  const seen = new Set();
-  return [...explicit, ...topics].filter(rule => {
-    const key = `${normalizeTopic(rule.query || '')}|${normalizeTopic(rule.exclude || '')}`;
-    if (!key || seen.has(key)) return false;
-    seen.add(key);
-    return true;
-  });
+  return activeWatchRules();
 }
 
 function watchRuleMatches(article, rule = {}) {
@@ -734,15 +741,12 @@ function emptyState(title, text) {
 function renderSheet() {
   if (!state.sheet) return '';
   const chips = (items, selected, attribute) => `<div class="personalize-chips">${items.map(item => `<button type="button" class="personalize-chip ${selected.includes(item) ? 'active' : ''}" ${attribute}="${escapeHtml(item)}" aria-pressed="${selected.includes(item)}">${escapeHtml(item)}</button>`).join('')}</div>`;
-  const watchTopics = [...new Set([...WATCH_TOPICS, ...state.keywords])];
   return `<div class="sheet-backdrop" data-close-sheet><section class="sheet personalization-sheet" role="dialog" aria-modal="true" aria-label="Personnaliser mon actualité" data-sheet-panel>
     <div class="sheet-handle"></div>
     <header class="personalize-head"><div><span>Votre sélection</span><h2>Personnaliser</h2></div><button type="button" class="personalize-close" data-dismiss-sheet aria-label="Fermer">×</button></header>
     <section class="personalize-section"><h3>Accueil</h3><p>Tous les articles restent accessibles. Ces choix déterminent ceux qui remontent en premier.</p>${chips(GENERAL_CATEGORIES, state.settings.generalCategories, 'data-general-category')}${chips(PERSONAL_THEMES, state.settings.interests, 'data-interest')}</section>
     <section class="personalize-section"><h3>Brief · Essentiel</h3><p>Choisissez les rubriques utilisées pour le point d’actualité France et Monde.</p>${chips(GENERAL_CATEGORIES, state.settings.briefEssentialCategories, 'data-brief-essential')}</section>
-    <section class="personalize-section"><h3>Brief · Mes veilles</h3><p>Une veille large sur toute la recherche, les innovations de tous domaines et les progrès humains. Affinez librement les thèmes suivis.</p>${chips(watchTopics, state.settings.briefWatchTopics, 'data-brief-watch')}
-      <div class="inline-form personalize-add"><input id="keyword-input" class="text-input" type="text" maxlength="70" placeholder="Ajouter une veille précise"><button class="small-primary-btn" data-add-watch-topic>Ajouter</button></div>
-    </section>
+    <section class="personalize-section"><h3>Brief · Veille</h3><p>La Veille utilise uniquement les règles enregistrées dans Réglages > Veille.</p></section>
     <button type="button" class="secondary-btn personalize-settings" data-open-settings>Réglages avancés</button>
   </section></div>`;
 }
@@ -1105,8 +1109,7 @@ document.addEventListener('error', event => {
 function historicalDiscoveryKeywords(extraTopic = '', days = 31) {
   const recentTopics = uniqueTopics([
     extraTopic,
-    ...(state.settings.briefWatchTopics || []).slice(-2).reverse(),
-    ...activeWatchRules().slice(-1).map(rule => rule.query)
+    ...activeWatchRules().slice(-2).map(rule => rule.query)
   ]).filter(Boolean);
   const broad = ['actualité France', 'actualité monde', 'Union européenne', 'science technologie'];
   return [...new Set([...recentTopics, ...broad])]
