@@ -1,0 +1,59 @@
+/* v91.92 — continuité réelle avec la barre système + respiration sous l'en-tête. */
+
+/* La page ne doit plus créer une bande blanche au-dessus de l'en-tête. */
+#app .page{
+  padding-top:0!important;
+}
+
+/* Accueil : le fond commence immédiatement sous la barre système. */
+.hero-header{
+  margin:0 -18px 18px!important;
+  padding-top:14px!important;
+  border-bottom:0!important;
+  background:#F7F8FF!important;
+}
+
+/* Réglages / Brief : même continuité et même respiration sous l'en-tête. */
+.settings-page-v9185>.page-masthead-v9186,
+.page:has(.brief-mode-tabs)>.page-masthead-v9186{
+  margin:0 -18px 16px!important;
+  border-bottom:0!important;
+  background:#F7F8FF!important;
+}
+
+/* Pas de séparation parasite ajoutée par un ancien thème. */
+.hero-header::before,
+.hero-header::after,
+.settings-page-v9185>.page-masthead-v9186::before,
+.settings-page-v9185>.page-masthead-v9186::after,
+.page:has(.brief-mode-tabs)>.page-masthead-v9186::before,
+.page:has(.brief-mode-tabs)>.page-masthead-v9186::after{
+  content:none!important;
+  display:none!important;
+}
+
+/* Le premier bloc de contenu garde un vrai espace sous l'en-tête. */
+.hero-header + .feed,
+.hero-header + .stable-owned-list,
+.hero-header + [data-stable-home-feed]{
+  margin-top:0!important;
+}
+
+/* Les pages restent blanches à partir du contenu. */
+.page{
+  background:#FFFFFF!important;
+}
+.hero-header,
+.page-masthead-v9186{
+  background:#F7F8FF!important;
+}
+
+@media(max-width:420px){
+  .hero-header{
+    margin-bottom:16px!important;
+  }
+  .settings-page-v9185>.page-masthead-v9186,
+  .page:has(.brief-mode-tabs)>.page-masthead-v9186{
+    margin-bottom:14px!important;
+  }
+}
