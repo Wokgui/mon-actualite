@@ -374,9 +374,7 @@ function watchMatches(article, topic) {
 }
 
 function activeWatchRules() {
-  const saved = Array.isArray(state.watchRules) ? state.watchRules.filter(rule => rule && String(rule.query || '').trim()) : [];
-  if (saved.length) return saved;
-  return uniqueTopics(state.settings.briefWatchTopics || []).map(query => ({ query, exclude: '' }));
+  return Array.isArray(state.watchRules) ? state.watchRules.filter(rule => rule && String(rule.query || '').trim()) : [];
 }
 
 function watchRuleMatches(article, rule = {}) {
@@ -1083,8 +1081,7 @@ function addKeyword() {
   if (!value) return;
   if (state.keywords.some(keyword => keyword.toLowerCase() === value.toLowerCase())) return toast('Ce mot-clé est déjà suivi');
   state.keywords.push(value);
-  if (!state.settings.briefWatchTopics.includes(value)) state.settings.briefWatchTopics.push(value);
-  persist(); state.sheet ? refreshSheet() : render(); toast('Centre d’intérêt ajouté'); syncNews({ silent: true });
+  persist(); state.sheet ? refreshSheet() : render(); toast('Mot-clé suivi'); syncNews({ silent: true });
 }
 
 function addDomain() {
@@ -1107,7 +1104,7 @@ function addWatchRule() {
   const query = $('#watch-query-input')?.value.trim();
   const exclude = $('#watch-exclude-input')?.value.trim() || '';
   if (!query) return toast('Indiquez ce que vous voulez surveiller');
-  state.watchRules = [...activeWatchRules().filter(rule => !state.settings.briefWatchTopics.includes(rule.query)), { query, exclude }];
+  state.watchRules = [...activeWatchRules(), { query, exclude }];
   persist(); render(); toast('Veille ajoutée'); syncNews({ silent: true });
 }
 
