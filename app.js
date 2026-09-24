@@ -1373,7 +1373,7 @@ app.addEventListener('click', async event => {
   const viewButton = event.target.closest('[data-view]');
   if (viewButton) {
     const view = viewButton.dataset.view;
-    if ((view === 'home' || view === 'brief') && Date.now() < navLongPressBlockClickUntil) {
+    if ((view === 'home' || view === 'brief') && view === navLongPressBlockedView && Date.now() < navLongPressBlockClickUntil) {
       event.preventDefault();
       event.stopPropagation();
       return;
@@ -1538,6 +1538,7 @@ app.addEventListener('keydown', event => {
 
 const greyArticleIds = new Set(safeJson('news-grey-after-scroll-v9138-v1', []).map(String));
 let navLongPressBlockClickUntil = 0;
+let navLongPressBlockedView = '';
 let navLongPressTimer = 0;
 let navLongPressButton = null;
 let navLongPressStartX = 0;
@@ -1548,6 +1549,7 @@ function resetReadStateFromNav(view) {
   localStorage.setItem('news-grey-after-scroll-v9138-v1', '[]');
   document.querySelectorAll('.article-card.read-passed-v9138').forEach(card => card.classList.remove('read-passed-v9138'));
   navLongPressBlockClickUntil = Date.now() + 900;
+  navLongPressBlockedView = view;
   if (state.view !== view) {
     state.view = view;
     state.sheet = false;
