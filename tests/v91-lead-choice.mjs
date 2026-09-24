@@ -5,11 +5,8 @@ import vm from 'node:vm';
 const code = fs.readFileSync('lead-choice-v91.js', 'utf8');
 const index = fs.readFileSync('index.html', 'utf8');
 const version = JSON.parse(fs.readFileSync('version.json', 'utf8'));
-const sourcePos = index.indexOf('source-quality-v82.js?v=82');
-const leadPos = index.indexOf('lead-choice-v91.js?v=91.3');
-const mergePos = index.indexOf('feed-experience-v79.js?v=79');
-assert.ok(sourcePos >= 0 && leadPos > sourcePos && mergePos > leadPos, 'v91 must load after source quality and before v79 fusion');
-assert.ok(String(version.label || '').includes('v91'), 'version label must mention v91');
+assert.ok(!index.includes('lead-choice-v91.js'), 'legacy v91 lead-choice layer must stay out of the lean startup path');
+assert.ok(String(version.codeRelease || '').startsWith('91.'), 'current codeRelease must remain in the v91 family');
 
 const context = vm.createContext({ console, URL, Date, globalThis: {} });
 vm.runInContext(code, context, { filename: 'lead-choice-v91.js' });
