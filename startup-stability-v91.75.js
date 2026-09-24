@@ -1,7 +1,7 @@
 (() => {
   'use strict';
 
-  const RELEASE = '91.76';
+  const RELEASE = '91.83';
   document.documentElement.dataset.startupStabilityV9175 = RELEASE;
 
   // The first news synchronisation must never wait for the complete catalogue.
@@ -9,7 +9,7 @@
   // later automatic/manual synchronisations keep using the full personalised
   // pipeline, including imported RSS sources and learned interests.
   const nativeFetch = window.fetch.bind(window);
-  let startupNewsRequestHandled = false;
+  let startupNewsRequestHandled = Boolean(window.__STARTUP_NEWS_V9183);
 
   function newsRequestUrl(input) {
     try {
