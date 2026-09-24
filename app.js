@@ -4,7 +4,7 @@ import { articleVisualUrl, hasPreparedVisual, sourceTileUrl } from './services/a
 const $ = (selector, root = document) => root.querySelector(selector);
 const app = $('#app');
 const toastEl = $('#toast');
-const APP_VERSION = '69';
+const APP_VERSION = '70';
 const APP_RELEASE = '7 septembre 2026';
 document.documentElement.dataset.appVersion = APP_VERSION;
 
@@ -323,7 +323,7 @@ function renderDetail() {
     <div class="detail-hero article-placeholder">${icon(meta.icon)}<span>${escapeHtml(article.category)}</span></div>
     <article class="detail-content"><span class="badge ${badgeFor(article) === 'Important' ? 'important' : ''}">${badgeFor(article)}</span><h1>${escapeHtml(article.title)}</h1>
       <div class="detail-meta">${escapeHtml(article.source)} · ${articleDateTimeLabel(article.publishedAt)} · <button class="category-link" data-category="${escapeHtml(article.category)}">${escapeHtml(article.category)}</button></div>
-      <section class="ai-summary"><strong>${icon('sparkles')} Synthèse</strong><p>${escapeHtml(article.detail || article.summary)}</p></section>
+      <section class="ai-summary source-excerpt"><strong>${icon('book')} Aperçu fourni par la source</strong><p>${escapeHtml(article.summary || 'Consultez l’article original pour lire le contenu complet.')}</p></section>
       <div class="tags">${(article.tags || [article.category]).map(tag => `<span class="tag">${escapeHtml(tag)}</span>`).join('')}</div>
       <a class="primary-btn" href="${escapeHtml(article.url)}" target="_blank" rel="noopener noreferrer">Lire l’article original ${icon('external')}</a>
       <p class="feedback-title">Aidez l’application à mieux hiérarchiser vos sujets</p>
@@ -578,7 +578,6 @@ function renderSettings() {
       <div class="inline-form"><input id="keyword-input" class="text-input" type="text" maxlength="70" placeholder="Ajouter un mot-clé"><button class="small-primary-btn" data-add-keyword>Ajouter</button></div>${keywordChips()}
     </section>
 
-    <section class="settings-section"><h2>Sélection et résumés</h2><div class="setting-row"><div class="setting-label"><strong>Longueur des résumés</strong><span>Format affiché dans les cartes</span></div><select class="select" data-setting-select="summaryLength"><option value="très court" ${state.settings.summaryLength === 'très court' ? 'selected' : ''}>Très court</option><option value="court" ${state.settings.summaryLength === 'court' ? 'selected' : ''}>Court</option><option value="détaillé" ${state.settings.summaryLength === 'détaillé' ? 'selected' : ''}>Détaillé</option></select></div></section>
     <section class="settings-section"><h2>Notifications</h2>${settingRow('Brief du matin', 'Préférence conservée pour les futures notifications push', 'notifications')}</section>
     <section class="settings-section app-version-section"><h2>Version de l’application</h2><p>Ce numéro permet de vérifier immédiatement que le smartphone utilise bien la dernière publication.</p><div class="app-version-row"><div><strong>Mon actualité · version ${APP_VERSION}</strong><span>Publication du ${APP_RELEASE}</span></div><span class="app-version-badge">v${APP_VERSION}</span></div><button class="secondary-btn compact-btn" data-check-update>${icon('refresh')} Vérifier et mettre à jour</button></section>
     <button class="secondary-btn" data-reset>Réinitialiser les préférences</button>
