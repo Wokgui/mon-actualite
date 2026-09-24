@@ -117,9 +117,10 @@ if (process.exitCode) process.exit(process.exitCode);
 console.log('Current static regression checks passed.');
 
 const briefWindowChecks = [
-  "Date.now() - 10 * 24 * 60 * 60 * 1000",
-  "delta > 9",
-  "order.slice(0, 10)",
+  "const BRIEF_DAYS = 10",
+  "delta >= BRIEF_DAYS",
+  "slice(0, BRIEF_DAYS - 1)",
+  "order.slice(0, BRIEF_DAYS)",
   "historyBriefMarkup()"
 ];
 for (const marker of briefWindowChecks) {
