@@ -4,7 +4,7 @@ import { articleVisualUrl, hasPreparedVisual, sourceTileUrl } from './services/a
 const $ = (selector, root = document) => root.querySelector(selector);
 const app = $('#app');
 const toastEl = $('#toast');
-const APP_VERSION = '87';
+const APP_VERSION = '88';
 const APP_RELEASE = '24 septembre 2026';
 document.documentElement.dataset.appVersion = APP_VERSION;
 
@@ -1102,7 +1102,7 @@ document.addEventListener('error', event => {
   }
 }, true);
 
-function historicalDiscoveryKeywords(extraTopic = '') {
+function historicalDiscoveryKeywords(extraTopic = '', days = 31) {
   const recentTopics = uniqueTopics([
     extraTopic,
     ...(state.settings.briefWatchTopics || []).slice(-2).reverse(),
@@ -1111,16 +1111,16 @@ function historicalDiscoveryKeywords(extraTopic = '') {
   const broad = ['actualité France', 'actualité monde', 'Union européenne', 'science technologie'];
   return [...new Set([...recentTopics, ...broad])]
     .slice(0, 6)
-    .map(query => /\bwhen:\d+[dhmy]\b/i.test(query) ? query : `${query} when:${BRIEF_DAYS}d`);
+    .map(query => /\bwhen:\d+[dhmy]\b/i.test(query) ? query : `${query} when:${days}d`);
 }
 
-async function fetchHistoryCoverage({ force = false, topic = '' } = {}) {
+async function fetchHistoryCoverage({ force = false, topic = '', days = topic ? BRIEF_DAYS : 31 } = {}) {
   if (!state.settings.webSearch || !navigator.onLine) return null;
   const last = Number(localStorage.getItem(HISTORY_SYNC_KEY) || 0);
   if (!force && last && Date.now() - last < HISTORY_SYNC_MAX_AGE) return null;
   const history = await fetchLiveNews({
     sources: [],
-    keywords: historicalDiscoveryKeywords(topic),
+    keywords: historicalDiscoveryKeywords(topic, days),
     preferredCategories: [],
     webSearch: true,
     sourcePriority: false
@@ -1128,7 +1128,7 @@ async function fetchHistoryCoverage({ force = false, topic = '' } = {}) {
   if (Array.isArray(history?.articles) && history.articles.length) {
     state.articles = history.articles.map(applyRememberedVisual);
     state.lastSync = history.fetchedAt || state.lastSync || new Date().toISOString();
-    state.stats = { ...(state.stats || {}), ...(history.stats || {}), historyWindowDays: BRIEF_DAYS };
+    state.stats = { ...(state.stats || {}), ...(history.stats || {}), historyWindowDays: days };
     persistCache();
     localStorage.setItem(HISTORY_SYNC_KEY, String(Date.now()));
   }

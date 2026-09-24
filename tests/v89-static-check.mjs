@@ -131,8 +131,8 @@ if (!process.exitCode) ok('Brief and watch 10-day window configured');
 
 if (!app.includes('function effectiveWatchRules()') || !app.includes('state.settings.briefWatchTopics')) fail('brief watch topics are not connected to effective watch rules');
 else ok('effective watch rules include brief topics');
-if (!app.includes('function fetchHistoryCoverage') || !app.includes('when:${BRIEF_DAYS}d')) fail('10-day historical discovery fetch is missing');
-else ok('historical discovery fetch configured');
+if (!app.includes('function fetchHistoryCoverage') || !app.includes("days = topic ? BRIEF_DAYS : 31")) fail('31-day home / 10-day watch historical discovery is missing');
+else ok('31-day home and 10-day watch historical discovery configured');
 if (!app.includes('visualBackfillTimer = window.setTimeout') || !app.includes("image-failed-v9184")) fail('image recovery scheduler is not active');
 else ok('image recovery scheduler active');
 const androidGradle = read('android-app/app/build.gradle');

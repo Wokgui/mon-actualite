@@ -1,5 +1,5 @@
-const CACHE = 'mon-actualite-v91-97-core-r1';
-const COMPAT_DIAGNOSTIC = 'v91.97-core';
+const CACHE = 'mon-actualite-v91-98-core-r1';
+const COMPAT_DIAGNOSTIC = 'v91.98-core';
 const THUMB_CACHE = 'mon-actualite-thumbnails-v6-feedly';
 const THUMB_NEGATIVE_TTL_MS = 90 * 1000;
 const thumbnailInflight = new Map();
@@ -16,14 +16,14 @@ const ASSETS = [
   './fresh-ui-v91.82.css?v=91.83',
   './stability-v91.84.css?v=1',
   './simplify-v91.85.css?v=1', './polish-v91.86.css?v=1', './polish-v91.87.css?v=1', './theme-blue-v91.88.css?v=2', './nav-solid-hardfix-v91.89.css?v=1', './theme-periwinkle-v91.90.css?v=2', './top-continuity-v91.92.css?v=1', './nav-stability-separator-v91.93.css?v=2', './s23-header-polish-v91.94.css?v=2', './feed-row-fix-v91.97.css?v=1',
-  './release-watch.js?v=91.97',
+  './release-watch.js?v=91.98',
   './article-access-v91.48.js?v=91.88',
   './startup-news-prefetch-v91.83.js?v=91.88',
-  './app.js?v=91.97',
+  './app.js?v=91.98',
   './image-sequence-v91.82.js?v=91.97', './nav-solid-hardfix-v91.89.js?v=1',
   './services/source-connectors.js?v=91.97', './services/article-visuals.js?v=91.97',
   './services/article-visuals.js?v=57',
-  './manifest.webmanifest?v=91.97',
+  './manifest.webmanifest?v=91.98',
   './assets/app-icon-192.png',
   './assets/app-icon-512.png',
   './assets/app-icon-maskable-512.png',
