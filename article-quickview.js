@@ -363,7 +363,7 @@ async function quickLoadPublicArticle(article, backdrop) {
   target.innerHTML = quickReaderLoadingMarkup();
 
   try {
-    const response = await fetch('/api/article-reader', {
+    const response = await fetch('/api/news?reader=1', {
       method: 'POST',
       cache: 'no-store',
       headers: { 'Content-Type': 'application/json' },
