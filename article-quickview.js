@@ -1,4 +1,5 @@
 const QUICK_CACHE_KEY = 'news-article-summaries-v8';
+const QUICK_READER_CACHE_KEY = 'news-public-reader-v9183';
 let quickScheduled = false;
 
 function quickReadJson(key, fallback) {
@@ -293,16 +294,96 @@ function quickReaderParagraphs(article = {}) {
   return paragraphs.slice(0, full ? 80 : 4);
 }
 
+function quickReaderParagraphMarkup(paragraphs = [], label = 'Article public · lecture intégrée') {
+  const safe = paragraphs.map(quickClean).filter(Boolean).slice(0, 80);
+  if (!safe.length) return '';
+  return `<article class="quick-reader-body is-full-public">
+    <div class="quick-reader-content-label">${quickEsc(label)}</div>
+    ${safe.map(paragraph => `<p>${quickEsc(paragraph)}</p>`).join('')}
+  </article>`;
+}
+
 function quickReaderBody(article = {}) {
   const paragraphs = quickReaderParagraphs(article);
   if (!paragraphs.length) {
-    return '<p class="quick-reader-empty">La source ne fournit pas le texte de l’article dans son flux. Vous pouvez ouvrir l’original depuis le lien en bas de la page.</p>';
+    return '<p class="quick-reader-empty">Le texte complet n’est pas fourni directement par le flux.</p>';
   }
   const full = Boolean(String(article.contentText || '').trim());
   return `<article class="quick-reader-body ${full ? 'is-full-feed' : 'is-excerpt'}">
     ${full ? '<div class="quick-reader-content-label">Article fourni par le flux de la source</div>' : '<div class="quick-reader-content-label">Aperçu fourni par la source</div>'}
     ${paragraphs.map(paragraph => `<p>${quickEsc(paragraph)}</p>`).join('')}
   </article>`;
+}
+
+function quickCachedPublicArticle(article = {}) {
+  const cache = quickReadJson(QUICK_READER_CACHE_KEY, {});
+  const item = cache[String(article.id || article.url || '')];
+  if (!item || !Array.isArray(item.paragraphs) || Date.now() - Number(item.savedAt || 0) > 24 * 60 * 60 * 1000) return null;
+  return item;
+}
+
+function quickStorePublicArticle(article = {}, data = {}) {
+  const key = String(article.id || article.url || '');
+  if (!key || !Array.isArray(data.paragraphs) || !data.paragraphs.length) return;
+  const cache = quickReadJson(QUICK_READER_CACHE_KEY, {});
+  cache[key] = {
+    paragraphs: data.paragraphs.map(quickClean).filter(Boolean).slice(0, 80),
+    finalUrl: quickClean(data.finalUrl || article.url || ''),
+    savedAt: Date.now()
+  };
+  const entries = Object.entries(cache)
+    .sort((a, b) => Number(a[1]?.savedAt || 0) - Number(b[1]?.savedAt || 0))
+    .slice(-16);
+  quickWriteJson(QUICK_READER_CACHE_KEY, Object.fromEntries(entries));
+}
+
+function quickReaderLoadingMarkup() {
+  return `<div class="quick-reader-loading-v9183" role="status">
+    <span class="quick-reader-loading-v9183__spinner" aria-hidden="true"></span>
+    <span>Chargement de l’article…</span>
+  </div>`;
+}
+
+async function quickLoadPublicArticle(article, backdrop) {
+  const target = backdrop?.querySelector('[data-public-reader-v9183]');
+  if (!target) return;
+
+  const fullFromFeed = quickReaderParagraphs({ ...article, summary: '', contentText: article.contentText || '' });
+  if (String(article.contentText || '').trim().length >= 700 && fullFromFeed.length) {
+    target.innerHTML = quickReaderParagraphMarkup(fullFromFeed, 'Article fourni par le flux de la source');
+    return;
+  }
+
+  const cached = quickCachedPublicArticle(article);
+  if (cached?.paragraphs?.length) {
+    target.innerHTML = quickReaderParagraphMarkup(cached.paragraphs);
+    return;
+  }
+
+  target.innerHTML = quickReaderLoadingMarkup();
+
+  try {
+    const response = await fetch('/api/article-reader', {
+      method: 'POST',
+      cache: 'no-store',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({
+        url: String(article.url || ''),
+        title: titleWithoutSource(article.title, article.source),
+        source: String(article.source || '')
+      })
+    });
+    const data = response.ok ? await response.json() : null;
+    if (!target.isConnected) return;
+    if (data?.ok && Array.isArray(data.paragraphs) && data.paragraphs.length) {
+      quickStorePublicArticle(article, data);
+      target.innerHTML = quickReaderParagraphMarkup(data.paragraphs);
+      return;
+    }
+  } catch {}
+
+  if (!target.isConnected) return;
+  target.innerHTML = quickReaderBody(article);
 }
 
 function openQuickSummary(article) {
@@ -322,11 +403,12 @@ function openQuickSummary(article) {
     <h2>${quickEsc(cleanTitle)}</h2>
     ${visualUrl ? `<img class="quick-summary-image" src="${quickEsc(visualUrl)}" alt="" referrerpolicy="no-referrer" decoding="async">` : ''}
     <div class="quick-summary-meta"><span>${quickEsc(source)}</span><span>${quickEsc(quickDateTime(article.publishedAt))}</span><span>${quickEsc(article.category || '')}</span></div>
-    ${quickReaderBody(article)}
+    <div data-public-reader-v9183>${String(article.contentText || '').trim().length >= 700 ? quickReaderBody(article) : quickReaderLoadingMarkup()}</div>
     <a class="quick-full-article quick-source-link" href="${quickEsc(article.url || '#')}" target="_blank" rel="noopener noreferrer">Voir l’article original sur ${quickEsc(source)} <span aria-hidden="true">↗</span></a>
   </section>`;
   document.body.appendChild(backdrop);
   document.body.classList.add('quick-summary-open');
+  quickLoadPublicArticle(article, backdrop);
 }
 
 document.addEventListener('click', event => {
