@@ -267,10 +267,47 @@ function quickUsefulVisualUrl(raw = '') {
   return value;
 }
 
+function quickReaderParagraphs(article = {}) {
+  const full = String(article.contentText || '').trim();
+  const sourceText = full || quickProvisionalSummary(article);
+  if (!sourceText) return [];
+  const normalized = sourceText
+    .replace(/\r/g, '')
+    .replace(/\n{3,}/g, '\n\n')
+    .trim();
+  let paragraphs = normalized.split(/\n\s*\n+/).map(quickClean).filter(Boolean);
+  if (paragraphs.length <= 1 && normalized.length > 600) {
+    const sentences = normalized.match(/[^.!?…]+(?:[.!?…]+|$)/g)?.map(quickClean).filter(Boolean) || [];
+    paragraphs = [];
+    let current = '';
+    for (const sentence of sentences) {
+      if (current && current.length + sentence.length > 520) {
+        paragraphs.push(current);
+        current = sentence;
+      } else {
+        current = current ? `${current} ${sentence}` : sentence;
+      }
+    }
+    if (current) paragraphs.push(current);
+  }
+  return paragraphs.slice(0, full ? 80 : 4);
+}
+
+function quickReaderBody(article = {}) {
+  const paragraphs = quickReaderParagraphs(article);
+  if (!paragraphs.length) {
+    return '<p class="quick-reader-empty">La source ne fournit pas le texte de l’article dans son flux. Vous pouvez ouvrir l’original depuis le lien en bas de la page.</p>';
+  }
+  const full = Boolean(String(article.contentText || '').trim());
+  return `<article class="quick-reader-body ${full ? 'is-full-feed' : 'is-excerpt'}">
+    ${full ? '<div class="quick-reader-content-label">Article fourni par le flux de la source</div>' : '<div class="quick-reader-content-label">Aperçu fourni par la source</div>'}
+    ${paragraphs.map(paragraph => `<p>${quickEsc(paragraph)}</p>`).join('')}
+  </article>`;
+}
+
 function openQuickSummary(article) {
   closeQuickSummary();
   const cleanTitle = titleWithoutSource(article.title, article.source);
-  const excerpt = quickProvisionalSummary(article);
   const visualUrl = quickUsefulVisualUrl(article.visual?.url)
     || quickUsefulVisualUrl(article.image)
     || quickUsefulVisualUrl(article.quickVisualUrl);
@@ -285,9 +322,8 @@ function openQuickSummary(article) {
     <h2>${quickEsc(cleanTitle)}</h2>
     ${visualUrl ? `<img class="quick-summary-image" src="${quickEsc(visualUrl)}" alt="" referrerpolicy="no-referrer" decoding="async">` : ''}
     <div class="quick-summary-meta"><span>${quickEsc(source)}</span><span>${quickEsc(quickDateTime(article.publishedAt))}</span><span>${quickEsc(article.category || '')}</span></div>
-    ${excerpt ? `<div class="quick-reader-excerpt"><strong>Aperçu fourni par la source</strong>${quickEsc(excerpt)}</div>` : '<p class="quick-reader-empty">L’article est disponible gratuitement sur le site de la source.</p>'}
-    <a class="quick-full-article" href="${quickEsc(article.url || '#')}" target="_blank" rel="noopener noreferrer">Lire l’article gratuitement <span aria-hidden="true">↗</span></a>
-    <p class="quick-reader-free-note">Seuls les articles identifiés comme accessibles sans abonnement sont conservés dans l’application.</p>
+    ${quickReaderBody(article)}
+    <a class="quick-full-article quick-source-link" href="${quickEsc(article.url || '#')}" target="_blank" rel="noopener noreferrer">Voir l’article original sur ${quickEsc(source)} <span aria-hidden="true">↗</span></a>
   </section>`;
   document.body.appendChild(backdrop);
   document.body.classList.add('quick-summary-open');
