@@ -1,6 +1,6 @@
 {
-  "version": "71",
-  "codeRelease": "91.80",
-  "release": "2026-09-07",
-  "label": "v91.80 : affichage immédiat, chargement parallèle et nouveaux articles replacés en tête"
+  "version": "1.0.0",
+  "codeRelease": "feedly-replica-1",
+  "release": "2026-09-24",
+  "label": "Mon Feed 1.0.0 — interface Feedly séparée, moteur Mon actualité"
 }
