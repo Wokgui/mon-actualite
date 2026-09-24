@@ -4,7 +4,7 @@ import { articleVisualUrl, hasPreparedVisual, sourceTileUrl } from './services/a
 const $ = (selector, root = document) => root.querySelector(selector);
 const app = $('#app');
 const toastEl = $('#toast');
-const APP_VERSION = '71';
+const APP_VERSION = '72';
 const APP_RELEASE = '24 septembre 2026';
 document.documentElement.dataset.appVersion = APP_VERSION;
 
@@ -1213,27 +1213,63 @@ document.addEventListener('visibilitychange', () => { if (!document.hidden && (!
 
 setInterval(() => { if (state.settings.autoRefresh && !document.hidden && navigator.onLine) syncNews({ silent: true }); }, 15 * 60 * 1000);
 
+function launchCacheIsFresh(articles = [], fetchedAt = '') {
+  if (!articles.length) return false;
+  const fetched = Date.parse(fetchedAt || '');
+  if (!Number.isFinite(fetched) || Date.now() - fetched > 10 * 60 * 1000) return false;
+  const newest = Math.max(...articles.map(article => Date.parse(article?.publishedAt || 0) || 0));
+  return newest > 0 && Date.now() - newest < 12 * 60 * 60 * 1000;
+}
+
+function applyStartupNews(payload) {
+  if (!payload || !Array.isArray(payload.articles) || !payload.articles.length) return false;
+  state.articles = payload.articles.map(applyRememberedVisual);
+  state.lastSync = payload.fetchedAt || new Date().toISOString();
+  state.stats = payload.stats || null;
+  state.syncStatus = 'idle';
+  state.syncError = '';
+  state.homeOrder = [];
+  persistCache();
+  return true;
+}
+
 async function bootLatestNews() {
-  renderLoadingScreen();
   const cachedArticles = Array.isArray(state.articles) ? state.articles.slice() : [];
   const cachedSync = state.lastSync;
-  state.articles = [];
-  state.homeOrder = [];
-  let result = null;
+  const freshCache = launchCacheIsFresh(cachedArticles, cachedSync);
+
+  if (freshCache) {
+    state.homeOrder = [];
+    render({ resetScroll: true });
+    scheduleVisualBackfill(20);
+  } else {
+    renderLoadingScreen();
+  }
+
+  let fastPayload = null;
   try {
-    result = await syncNews({ silent: true });
+    const startupPromise = window.__STARTUP_NEWS_V9183 || Promise.resolve(null);
+    fastPayload = await Promise.race([
+      startupPromise,
+      new Promise(resolve => window.setTimeout(() => resolve(null), 1800))
+    ]);
   } catch {}
-  if (!state.articles.length && cachedArticles.length) {
+
+  if (applyStartupNews(fastPayload)) {
+    render({ resetScroll: !freshCache });
+    scheduleVisualBackfill(20);
+  } else if (!freshCache && cachedArticles.length) {
     state.articles = cachedArticles;
     state.lastSync = cachedSync;
+    state.homeOrder = [];
+    render({ resetScroll: true });
+    scheduleVisualBackfill(20);
   }
-  state.homeOrder = [];
-  render({ resetScroll: true });
-  scheduleVisualBackfill(40);
-  if (result?.stats?.mode === 'fast-startup' && navigator.onLine) {
-    window.setTimeout(() => syncNews({ silent: true }), 300);
+
+  if (navigator.onLine) {
+    window.setTimeout(() => syncNews({ silent: true }), fastPayload?.articles?.length ? 180 : 40);
   }
 }
 
 bootLatestNews();
-window.setTimeout(() => checkAppUpdate(), 1200);
+window.setTimeout(() => checkAppUpdate(), 1400);
