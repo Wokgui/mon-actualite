@@ -166,8 +166,14 @@ if (!app.includes('settingsOpenAccordions') || !app.includes('captureOpenSetting
 else ok('settings accordion persistence configured');
 if (!app.includes('navLongPressTimer') || !app.includes('resetReadStateFromNav(view)')) fail('long press reset on Home/Brief missing');
 else ok('long press reset on Home/Brief configured');
-if (!app.includes('startImmediately') || !app.includes('fetchpriority=')) fail('immediate high-priority article image loading missing');
+if (!app.includes("const src = real || tile") || !app.includes("index < 24 ? 'eager' : 'lazy'") || !app.includes('fetchpriority=')) fail('immediate high-priority article image loading missing');
 else ok('immediate high-priority article image loading configured');
 const imageSequence = read('image-sequence-v91.82.js');
 if (!imageSequence.includes('started < 4') || !imageSequence.includes('setTimeout(pump, 8)') || !imageSequence.includes('index < 24')) fail('accelerated image sequencing missing');
 else ok('accelerated image sequencing configured');
+
+const visualService = read('services/article-visuals.js');
+if (!visualService.includes('const extracted = extractPreparedImage(rawVisual)') || !visualService.includes("return url.href")) fail('direct external visual fast path missing');
+else ok('direct external visual fast path configured');
+if (!app.includes("app.addEventListener('toggle'") || !app.includes("settingsOpenAccordions.add(title)")) fail('settings accordion toggle persistence missing');
+else ok('settings accordion toggle persistence configured');

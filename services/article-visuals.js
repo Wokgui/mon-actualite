@@ -79,6 +79,20 @@ function feedlyProxyUrl(article = {}) {
 }
 
 export function preparedVisualUrl(article = {}) {
+  const pinned = pinnedProxyUrl(article);
+  if (pinned) return pinned;
+
+  const rawVisual = clean(article.visual?.url || article.image || '');
+  const extracted = extractPreparedImage(rawVisual);
+  if (extracted) return extracted;
+
+  if (rawVisual && !isSameOriginImageProxy(rawVisual)) {
+    try {
+      const url = new URL(rawVisual, location.href);
+      if (['http:', 'https:'].includes(url.protocol)) return url.href;
+    } catch {}
+  }
+
   return feedlyProxyUrl(article);
 }
 

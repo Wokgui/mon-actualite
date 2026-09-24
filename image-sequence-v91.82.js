@@ -1,4 +1,4 @@
-import { preparedVisualUrl, sourceTileUrl } from './services/article-visuals.js?v=91.97';
+import { preparedVisualUrl, sourceTileUrl } from './services/article-visuals.js?v=92.02';
 
 const queued = new WeakSet();
 let queue = [];
@@ -63,8 +63,8 @@ function loadOne(card, article) {
   img.addEventListener('load', onLoad, { once: true });
   img.addEventListener('error', onError, { once: true });
   img.decoding = 'async';
-  img.loading = Number(card.dataset.imageSequenceIndex || 99) < 18 ? 'eager' : 'lazy';
-  if ('fetchPriority' in img) img.fetchPriority = Number(card.dataset.imageSequenceIndex || 99) < 10 ? 'high' : 'auto';
+  img.loading = Number(card.dataset.imageSequenceIndex || 99) < 24 ? 'eager' : 'lazy';
+  if ('fetchPriority' in img) img.fetchPriority = Number(card.dataset.imageSequenceIndex || 99) < 16 ? 'high' : 'auto';
   img.src = wanted;
   if (img.complete && img.naturalWidth > 1) onLoad();
 }
@@ -72,12 +72,12 @@ function loadOne(card, article) {
 function pump() {
   timer = 0;
   let started = 0;
-  while (queue.length && started < 4) {
+  while (queue.length && started < 8) {
     const item = queue.shift();
     if (item) loadOne(item.card, item.article);
     started += 1;
   }
-  if (queue.length) timer = window.setTimeout(pump, 8);
+  if (queue.length) timer = window.setTimeout(pump, 2);
 }
 
 function schedule() {
@@ -85,7 +85,7 @@ function schedule() {
   document.querySelectorAll('.article-card[data-article]').forEach((card, index) => {
     if (queued.has(card)) return;
     const rect = card.getBoundingClientRect();
-    const nearViewport = index < 24 || (rect.bottom >= -400 && rect.top <= window.innerHeight * 3.2);
+    const nearViewport = index < 40 || (rect.bottom >= -600 && rect.top <= window.innerHeight * 5);
     if (!nearViewport) return;
     queued.add(card);
     card.dataset.imageSequenceIndex = String(index);

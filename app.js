@@ -1,10 +1,10 @@
 import { importOpmlPreview, fetchLiveNews } from './services/source-connectors.js?v=91.97';
-import { articleVisualUrl, hasPreparedVisual, sourceTileUrl } from './services/article-visuals.js?v=91.97';
+import { articleVisualUrl, hasPreparedVisual, sourceTileUrl } from './services/article-visuals.js?v=92.02';
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const app = $('#app');
 const toastEl = $('#toast');
-const APP_VERSION = '91';
+const APP_VERSION = '92';
 const APP_RELEASE = '24 septembre 2026';
 document.documentElement.dataset.appVersion = APP_VERSION;
 
@@ -200,10 +200,9 @@ function articleVisual(article, index = 0) {
   const prepared = hasPreparedVisual(article);
   const tile = sourceTileUrl(article);
   const real = articleVisualUrl(article);
-  const startImmediately = Boolean(real) && (prepared || index < 16);
-  const src = startImmediately ? real : tile;
-  const visualClass = startImmediately ? 'direct-visual-v9201' : 'source-tile-visual';
-  return `<img class="article-image original-article-image stable-visual ${prepared ? 'prepared-visual' : visualClass}" src="${escapeHtml(src)}" alt="" width="400" height="224" loading="${index < 20 ? 'eager' : 'lazy'}" fetchpriority="${index < 8 ? 'high' : 'auto'}" decoding="async" referrerpolicy="no-referrer" style="background-image:url('${escapeHtml(tile)}');background-size:cover">`;
+  const src = real || tile;
+  const visualClass = real && real !== tile ? 'direct-visual-v9202' : 'source-tile-visual';
+  return `<img class="article-image original-article-image stable-visual ${prepared ? 'prepared-visual' : visualClass}" src="${escapeHtml(src)}" alt="" width="400" height="224" loading="${index < 24 ? 'eager' : 'lazy'}" fetchpriority="${index < 12 ? 'high' : 'auto'}" decoding="async" referrerpolicy="no-referrer" style="background-image:url('${escapeHtml(tile)}');background-size:cover">`;
 }
 function sourceIdentity(article = {}) {
   return normalizeTopic(article.source || article.feedTitle || '');
@@ -1521,6 +1520,15 @@ app.addEventListener('change', async event => {
     }
   }
 });
+
+app.addEventListener('toggle', event => {
+  const details = event.target.closest?.('.settings-accordion-v9185');
+  if (!details) return;
+  const title = details.querySelector(':scope > summary')?.textContent?.trim();
+  if (!title) return;
+  if (details.open) settingsOpenAccordions.add(title);
+  else settingsOpenAccordions.delete(title);
+}, true);
 
 app.addEventListener('keydown', event => {
   if ((event.key === 'Enter' || event.key === ' ') && event.target.matches('[data-article]')) event.target.click();
