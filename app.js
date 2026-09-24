@@ -19,6 +19,7 @@ const VISUAL_BACKFILL_KEY = 'news-visual-backfill-v3';
 const VISUAL_BACKFILL_MAX_AGE = 30 * 86400000;
 const VISUAL_BACKFILL_RETRY_DELAY = 90 * 1000;
 const VISUAL_BACKFILL_MAX_ATTEMPTS = 2;
+const BRIEF_DAYS = 10;
 
 const categoryMeta = {
   Politique: { icon: 'landmark', label: 'Politique' },
@@ -420,7 +421,7 @@ function watchRuleMatches(article, rule = {}) {
 function watchedArticles() {
   const rules = activeWatchRules();
   if (!rules.length) return [];
-  const cutoff = Date.now() - 10 * 24 * 60 * 60 * 1000;
+  const cutoff = Date.now() - BRIEF_DAYS * 24 * 60 * 60 * 1000;
   return visibleArticles().filter(article => (Date.parse(article.publishedAt || 0) || 0) >= cutoff && rules.some(rule => watchRuleMatches(article, rule)));
 }
 
@@ -476,9 +477,9 @@ function historyBriefMarkup() {
   const editorial = new Set(['Politique', 'International', 'Europe', 'Économie', 'Société', 'Santé', 'Environnement', 'Science']);
   const impact = article => Number(article.score || 0) + (editorial.has(article.category) ? 65 : 0) + (major.test(`${article.title || ''} ${article.summary || ''}`) ? 80 : 0) + Math.max(0, (article.sources?.length || 1) - 1) * 25 - (low.test(`${article.title || ''} ${article.summary || ''}`) ? 180 : 0);
   const days = new Map();
-  for (const article of state.articles) {
+  for (const article of visibleArticles()) {
     const delta = dayDelta(article.publishedAt);
-    if (delta < 1 || delta > 9 || state.feedback[article.id] === 'not') continue;
+    if (delta < 1 || delta >= BRIEF_DAYS || state.feedback[article.id] === 'not') continue;
     const key = dayKey(article.publishedAt);
     if (!days.has(key)) days.set(key, []);
     days.get(key).push(article);
@@ -491,7 +492,7 @@ function historyBriefMarkup() {
 
 function renderWatchesFinal() {
   const rules = activeWatchRules();
-  const cutoff = Date.now() - 10 * 24 * 60 * 60 * 1000;
+  const cutoff = Date.now() - BRIEF_DAYS * 24 * 60 * 60 * 1000;
   const recent = visibleArticles().filter(article => (Date.parse(article.publishedAt || 0) || 0) >= cutoff).slice(0, 500);
   const order = [];
   const days = new Map();
@@ -500,7 +501,7 @@ function renderWatchesFinal() {
     if (!days.has(key)) { days.set(key, []); order.push(key); }
     days.get(key).push(article);
   }
-  const groups = order.slice(0, 10).map((key, dayIndex) => {
+  const groups = order.slice(0, BRIEF_DAYS).map((key, dayIndex) => {
     const dayArticles = days.get(key) || [];
     const watched = rules.length ? dayArticles.filter(article => rules.some(rule => watchRuleMatches(article, rule))) : [];
     const filtered = watched.length ? `<div class="feed stable-owned-list watch-filtered-feed-v9138">${watched.slice(0, 30).map((article, index) => compactArticleRow(article, dayIndex * 40 + index)).join('')}</div>` : '<p class="watch-empty-day-v9138">Aucune nouveauté correspondant à vos règles de veille ce jour-là.</p>';
