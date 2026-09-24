@@ -1,10 +1,10 @@
-import { importOpmlPreview, fetchLiveNews } from './services/source-connectors.js?v=91.82';
+import { importOpmlPreview, fetchLiveNews } from './services/source-connectors.js?v=91.96';
 import { articleVisualUrl, hasPreparedVisual, sourceTileUrl } from './services/article-visuals.js?v=57';
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const app = $('#app');
 const toastEl = $('#toast');
-const APP_VERSION = '84';
+const APP_VERSION = '86';
 const APP_RELEASE = '24 septembre 2026';
 document.documentElement.dataset.appVersion = APP_VERSION;
 
@@ -62,7 +62,7 @@ const cache = safeJson('news-live-cache', { articles: [], fetchedAt: null });
 const visualBackfills = safeJson(VISUAL_BACKFILL_KEY, {});
 const state = {
   view: 'home', previous: [], category: 'Politique', categoryTab: 'brief', articleId: null,
-  briefMode: 'essential', homeLimit: 36, homeOrder: [],
+  briefMode: 'essential', homeLimit: 120, homeOrder: [],
   saved: new Set(safeJson('news-saved', [])),
   feedback: safeJson('news-feedback', {}),
   topicPreferences: safeJson('news-topic-preferences-v1', {}),
@@ -195,7 +195,7 @@ function badgeFor(article) {
 function articleVisual(article, index = 0) {
   const prepared = hasPreparedVisual(article);
   const tile = sourceTileUrl(article);
-  return `<img class="article-image original-article-image stable-visual ${prepared ? 'prepared-visual' : 'source-tile-visual'}" src="${escapeHtml(tile)}" alt="" width="400" height="224" loading="eager" decoding="async" referrerpolicy="no-referrer" style="background-image:url('${escapeHtml(tile)}');background-size:cover">`;
+  return `<img class="article-image original-article-image stable-visual ${prepared ? 'prepared-visual' : 'source-tile-visual'}" src="${escapeHtml(tile)}" alt="" width="400" height="224" loading="${index < 8 ? 'eager' : 'lazy'}" decoding="async" referrerpolicy="no-referrer" style="background-image:url('${escapeHtml(tile)}');background-size:cover">`;
 }
 
 function sourceIdentity(article = {}) {
@@ -420,7 +420,7 @@ function watchRuleMatches(article, rule = {}) {
 function watchedArticles() {
   const rules = activeWatchRules();
   if (!rules.length) return [];
-  const cutoff = Date.now() - 15 * 24 * 60 * 60 * 1000;
+  const cutoff = Date.now() - 10 * 24 * 60 * 60 * 1000;
   return visibleArticles().filter(article => (Date.parse(article.publishedAt || 0) || 0) >= cutoff && rules.some(rule => watchRuleMatches(article, rule)));
 }
 
@@ -478,7 +478,7 @@ function historyBriefMarkup() {
   const days = new Map();
   for (const article of state.articles) {
     const delta = dayDelta(article.publishedAt);
-    if (delta < 1 || delta > 8 || state.feedback[article.id] === 'not') continue;
+    if (delta < 1 || delta > 9 || state.feedback[article.id] === 'not') continue;
     const key = dayKey(article.publishedAt);
     if (!days.has(key)) days.set(key, []);
     days.get(key).push(article);
@@ -491,7 +491,7 @@ function historyBriefMarkup() {
 
 function renderWatchesFinal() {
   const rules = activeWatchRules();
-  const cutoff = Date.now() - 15 * 24 * 60 * 60 * 1000;
+  const cutoff = Date.now() - 10 * 24 * 60 * 60 * 1000;
   const recent = visibleArticles().filter(article => (Date.parse(article.publishedAt || 0) || 0) >= cutoff).slice(0, 500);
   const order = [];
   const days = new Map();
@@ -500,7 +500,7 @@ function renderWatchesFinal() {
     if (!days.has(key)) { days.set(key, []); order.push(key); }
     days.get(key).push(article);
   }
-  const groups = order.slice(0, 15).map((key, dayIndex) => {
+  const groups = order.slice(0, 10).map((key, dayIndex) => {
     const dayArticles = days.get(key) || [];
     const watched = rules.length ? dayArticles.filter(article => rules.some(rule => watchRuleMatches(article, rule))) : [];
     const filtered = watched.length ? `<div class="feed stable-owned-list watch-filtered-feed-v9138">${watched.slice(0, 30).map((article, index) => compactArticleRow(article, dayIndex * 40 + index)).join('')}</div>` : '<p class="watch-empty-day-v9138">Aucune nouveauté correspondant à vos règles de veille ce jour-là.</p>';
@@ -527,7 +527,7 @@ function renderBrief() {
     const major = majorTerms.test(text) ? 70 : 0;
     const low = lowPriorityTerms.test(text) ? -240 : 0;
     return { article, score: 100 + category + corroboration + major + low - Math.min(age * 1.6, 100) };
-  }).filter(item => Date.now() - Date.parse(item.article.publishedAt || 0) <= 15 * 24 * 3600000)
+  }).filter(item => dayDelta(item.article.publishedAt) === 0)
     .sort((a, b) => b.score - a.score);
   const picks = [];
   const sourceCounts = new Map();
@@ -543,7 +543,7 @@ function renderBrief() {
     if (picks.length >= 5) break;
     if (!picks.includes(candidate)) picks.push(candidate);
   }
-  const essential = `<section class="journal-section"><div class="brief-day-v9138">${escapeHtml(fullDay(new Date()))}</div><h2 class="brief-section-title">Les 5 principales infos dans le monde</h2><div class="feed stable-owned-list">${picks.length ? picks.map(({ article }, index) => compactArticleRow(article, index)).join('') : '<p class="muted-note">Aucune information majeure récente.</p>'}</div></section>`;
+  const essential = `<section class="journal-section"><div class="brief-day-v9138">${escapeHtml(fullDay(new Date()))}</div><h2 class="brief-section-title">Les 5 principales infos dans le monde</h2><div class="feed stable-owned-list">${picks.length ? picks.map(({ article }, index) => compactArticleRow(article, index)).join('') : '<p class="muted-note">Aucune information majeure récente.</p>'}</div></section>${historyBriefMarkup()}`;
   const watchCount = watchNewCount();
   return `<main class="page">${topbar('Brief', false)}
     <div class="brief-mode-tabs"><button class="brief-mode-tab ${state.briefMode === 'essential' ? 'active' : ''}" data-brief-mode="essential">Top 5 monde</button><button class="brief-mode-tab watch-tab-v9184 ${state.briefMode === 'watches' ? 'active' : ''}" data-brief-mode="watches">Veille${watchCount ? `<span class="watch-new-badge-v9184">${watchCount > 9 ? '9+' : watchCount}</span>` : ''}</button></div>

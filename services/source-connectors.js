@@ -221,7 +221,7 @@ function capSourceFlood(articles) {
   for (const article of articles) {
     const source = fingerprintText(article.source || article.feedTitle || 'source') || 'source';
     const current = Number(allPerSource.get(source) || 0);
-    if (current >= 12) continue;
+    if (current >= 20) continue;
     if (article.customSource) {
       const customCount = Number(customPerSource.get(source) || 0);
       // An added feed is a discovery signal, not a subscription that floods
@@ -279,11 +279,11 @@ function mergeArticleHistory(fresh) {
     if (titleKey && Number.isFinite(published)) { recentTitles.set(titleKey, published); articlesByTitle.set(titleKey, article); }
   }
 
-  const cutoff = Date.now() - 45 * 24 * 60 * 60 * 1000;
+  const cutoff = Date.now() - 60 * 24 * 60 * 60 * 1000;
   const recent = merged
     .filter(article => !article.publishedAt || Date.parse(article.publishedAt) >= cutoff)
     .sort((a, b) => Date.parse(b.publishedAt || 0) - Date.parse(a.publishedAt || 0));
-  return capSourceFlood(recent).slice(0, 400);
+  return capSourceFlood(recent).slice(0, 600);
 }
 
 function positiveLearnedTopics() {

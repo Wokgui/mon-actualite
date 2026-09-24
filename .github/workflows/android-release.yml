@@ -63,7 +63,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          cp android-app/app/build/outputs/apk/debug/app-debug.apk mon-actualite-v85-91.95.1.apk
+          cp android-app/app/build/outputs/apk/debug/app-debug.apk mon-actualite-v86-91.96.apk
 
       - name: Preserve install key for future updates
         uses: actions/upload-artifact@v4
@@ -79,11 +79,11 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          TAG="v85-91.95.1"
-          APK="mon-actualite-v85-91.95.1.apk"
-          NOTES="APK Android installable de Mon Actualité. Version web intégrée : v85 / correctif Android 91.95.1. Les articles externes s’ouvrent dans le navigateur."
+          TAG="v86-91.96"
+          APK="mon-actualite-v86-91.96.apk"
+          NOTES="APK Android installable de Mon Actualité. Version web intégrée : v86 / codeRelease 91.96. Les articles externes s’ouvrent dans le navigateur."
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release upload "$TAG" "$APK" --clobber
           else
-            gh release create "$TAG" "$APK" --title "Mon Actualité v85 / 91.95.1" --notes "$NOTES"
+            gh release create "$TAG" "$APK" --title "Mon Actualité v86 / 91.96" --notes "$NOTES"
           fi

@@ -115,3 +115,14 @@ else ok('current mobile Playwright UI regression job configured');
 
 if (process.exitCode) process.exit(process.exitCode);
 console.log('Current static regression checks passed.');
+
+const briefWindowChecks = [
+  "Date.now() - 10 * 24 * 60 * 60 * 1000",
+  "delta > 9",
+  "order.slice(0, 10)",
+  "historyBriefMarkup()"
+];
+for (const marker of briefWindowChecks) {
+  if (!app.includes(marker)) fail(`10-day Brief/Watch marker missing: ${marker}`);
+}
+if (!process.exitCode) ok('Brief and watch 10-day window configured');

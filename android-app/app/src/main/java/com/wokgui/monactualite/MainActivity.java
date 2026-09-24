@@ -101,7 +101,7 @@ public class MainActivity extends Activity {
         settings.setMediaPlaybackRequiresUserGesture(false);
         settings.setSupportMultipleWindows(true);
         settings.setJavaScriptCanOpenWindowsAutomatically(true);
-        settings.setUserAgentString(settings.getUserAgentString() + " MonActualiteAndroid/85");
+        settings.setUserAgentString(settings.getUserAgentString() + " MonActualiteAndroid/86");
 
         webView.setWebViewClient(new WebViewClient() {
             @Override
@@ -172,8 +172,8 @@ public class MainActivity extends Activity {
     }
 
     private void applyAndroidHeaderPolish() {
-        String js = "(function(){if(document.getElementById('android-ui-polish-v85'))return;" +
-            "var s=document.createElement('style');s.id='android-ui-polish-v84';" +
+        String js = "(function(){if(document.getElementById('android-ui-polish-v86'))return;" +
+            "var s=document.createElement('style');s.id='android-ui-polish-v86';" +
             "s.textContent='.hero-header{background:#F1F2FF!important}.settings-page-v9185>.page-masthead-v9186,.page:has(.brief-mode-tabs)>.page-masthead-v9186{background:#F1F2FF!important}.hero-header h1{font-size:32px!important;line-height:1.08!important;font-weight:840!important;letter-spacing:-.034em!important}" +
             ".page-masthead-v9186 h1,.settings-page-v9185>.page-masthead-v9186 h1,.page:has(.brief-mode-tabs)>.page-masthead-v9186 h1{font-size:25px!important;line-height:1.12!important;font-weight:820!important;letter-spacing:-.026em!important}';" +
             "document.head.appendChild(s);})();";
