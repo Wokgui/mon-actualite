@@ -4,7 +4,7 @@ import { articleVisualUrl, hasPreparedVisual, sourceTileUrl } from './services/a
 const $ = (selector, root = document) => root.querySelector(selector);
 const app = $('#app');
 const toastEl = $('#toast');
-const APP_VERSION = '73';
+const APP_VERSION = '74';
 const APP_RELEASE = '24 septembre 2026';
 document.documentElement.dataset.appVersion = APP_VERSION;
 
@@ -257,7 +257,7 @@ function articleCard(article, index = 0) {
   const saved = state.saved.has(article.id);
   const badge = badgeFor(article);
   const title = displayTitle(article);
-  return `<article class="article-card" data-article="${escapeHtml(article.id)}" tabindex="0" aria-label="Lire : ${escapeHtml(title)}">
+  return `<article class="article-card" data-article="${escapeHtml(article.id)}" tabindex="0" aria-label="Ouvrir l’article source : ${escapeHtml(title)}">
     ${articleVisual(article, index)}
     <div class="article-body">
       <button class="save-btn ${saved ? 'saved' : ''}" data-save="${escapeHtml(article.id)}" aria-label="${saved ? 'Retirer des sauvegardes' : 'Sauvegarder l’article'}">${icon('bookmark', saved)}</button>
@@ -434,7 +434,7 @@ function clockLabel(value) {
 
 function compactArticleRow(article, index = 0) {
   const title = displayTitle(article);
-  return `<article class="article-card runtime-row" data-article="${escapeHtml(article.id)}" tabindex="0" aria-label="Lire : ${escapeHtml(title)}">
+  return `<article class="article-card runtime-row" data-article="${escapeHtml(article.id)}" tabindex="0" aria-label="Ouvrir l’article source : ${escapeHtml(title)}">
     ${articleVisual(article, index)}
     <div class="article-body"><h2>${escapeHtml(title)}</h2><div class="meta"><span class="source">${escapeHtml(article.source || 'Source')}</span><span>${escapeHtml(clockLabel(article.publishedAt))}</span></div></div>
   </article>`;
@@ -623,37 +623,28 @@ function watchRulesMarkup() {
 }
 
 function renderSettings() {
-  return `<main class="page settings-page-v9184">${topbar('Réglages', false)}
-    <section class="settings-section"><h2>Sources d’information</h2><p>Toutes les sources actuellement détectées dans votre flux. Vous pouvez les suivre, les bloquer et voir les flux par lesquels elles ont été trouvées.</p>
-      ${sourceDirectoryMarkup()}
-    </section>
-
-    <section class="settings-section"><h2>Ajouter une source ou un domaine</h2>
-      <p>Ajoutez un flux RSS/Atom précis, ou simplement un domaine qui vous intéresse.</p>
-      <div class="form-stack"><input id="source-name" class="text-input" type="text" maxlength="80" placeholder="Nom de la source (optionnel)"><input id="source-url" class="text-input" type="url" maxlength="600" placeholder="Adresse RSS / Atom"><button class="secondary-btn" data-add-source>${icon('plus')} Ajouter le flux</button></div>
-      ${sourceRows()}
-      <div class="inline-form domain-form-v9184"><input id="domain-input" class="text-input" type="text" maxlength="160" placeholder="exemple.fr"><button class="small-primary-btn" data-add-domain>Ajouter le domaine</button></div>
-      ${domainRows()}
-      <div class="import-status">${icon('upload')}<span>${escapeHtml(state.opmlName)}</span></div><label class="secondary-btn" for="opml-input">Importer un fichier OPML</label><input id="opml-input" class="file-input" type="file" accept=".opml,.xml">
-    </section>
-
-    <section class="settings-section"><h2>Centres d’intérêt</h2><div class="interest-grid centered-interest-grid-v9184">${PERSONAL_THEMES.map(theme => `<button class="interest ${state.settings.interests.includes(theme) ? 'active' : ''}" data-interest="${theme}">${theme}</button>`).join('')}</div></section>
-
-    <section class="settings-section"><h2>Mots-clés à surveiller</h2>
-      <div class="inline-form"><input id="keyword-input" class="text-input" type="text" maxlength="70" placeholder="Ex. fusion nucléaire"><button class="small-primary-btn" data-add-keyword>Ajouter</button></div>${keywordChips()}
-      <h3 class="settings-subtitle-v9184">Mots-clés à éviter</h3>
-      <div class="inline-form"><input id="blocked-keyword-input" class="text-input" type="text" maxlength="70" placeholder="Ex. football"><button class="small-primary-btn" data-add-blocked-keyword>Éviter</button></div>${blockedKeywordChips()}
-    </section>
-
-    <section class="settings-section"><h2>Veille précise</h2><p>Utilisez <strong>+</strong> pour exiger plusieurs termes et <strong>|</strong> pour accepter des alternatives. Exemple : <em>Meta + Quest 4 | Quest 4</em>. Les exclusions sont séparées par des virgules.</p>
-      <div class="form-stack"><input id="watch-query-input" class="text-input" maxlength="160" placeholder="Sujet ou règle précise"><input id="watch-exclude-input" class="text-input" maxlength="160" placeholder="À exclure : rumeur, promotion…"><button class="secondary-btn" data-add-watch-rule>${icon('plus')} Ajouter la veille</button></div>
-      ${watchRulesMarkup()}
-    </section>
-
-    <section class="settings-section"><h2>Actualité générale</h2><div class="interest-grid centered-interest-grid-v9184">${GENERAL_CATEGORIES.map(category => `<button class="interest ${state.settings.generalCategories.includes(category) ? 'active' : ''}" data-general-category="${category}">${category}</button>`).join('')}</div></section>
-
-    <section class="settings-section"><h2>Fonctionnement</h2>${settingRow('Actualisation automatique', 'Charge les nouveautés en arrière-plan sans faire clignoter la liste', 'autoRefresh')}${settingRow('Recherche web complémentaire', 'Complète les flux avec Google Actualités', 'webSearch')}</section>
-    <section class="settings-section app-version-section"><h2>Version</h2><div class="app-version-row"><div><strong>Mon actualité · version ${APP_VERSION}</strong><span>Publication du ${APP_RELEASE}</span></div><span class="app-version-badge">v${APP_VERSION}</span></div><button class="secondary-btn compact-btn" data-check-update>${icon('refresh')} Vérifier la mise à jour</button></section>
+  const accordion = (title, body) => `<details class="settings-accordion-v9185"><summary>${escapeHtml(title)}</summary><div class="settings-accordion-content-v9185">${body}</div></details>`;
+  return `<main class="page settings-page-v9185">${topbar('Réglages', false)}
+    <div class="settings-accordions-v9185">
+      ${accordion('Sources d’information', `<p>Toutes les sources détectées dans votre flux. Vous pouvez les suivre, les bloquer et consulter les flux ou sous-flux détectés.</p>${sourceDirectoryMarkup()}`)}
+      ${accordion('Ajouter une source ou un domaine', `<p>Ajoutez un flux RSS/Atom précis, un fichier OPML ou simplement un domaine qui vous intéresse.</p>
+        <div class="form-stack"><input id="source-name" class="text-input" type="text" maxlength="80" placeholder="Nom de la source (optionnel)"><input id="source-url" class="text-input" type="url" maxlength="600" placeholder="Adresse RSS / Atom"><button class="secondary-btn" data-add-source>${icon('plus')} Ajouter le flux</button></div>
+        ${sourceRows()}
+        <div class="inline-form domain-form-v9184"><input id="domain-input" class="text-input" type="text" maxlength="160" placeholder="exemple.fr"><button class="small-primary-btn" data-add-domain>Ajouter le domaine</button></div>
+        ${domainRows()}
+        <div class="import-status">${icon('upload')}<span>${escapeHtml(state.opmlName)}</span></div><label class="secondary-btn" for="opml-input">Importer un fichier OPML</label><input id="opml-input" class="file-input" type="file" accept=".opml,.xml">`)}
+      ${accordion('Centres d’intérêt', `<p>Ces thèmes servent à personnaliser la sélection générale.</p><div class="interest-grid centered-interest-grid-v9184">${PERSONAL_THEMES.map(theme => `<button class="interest ${state.settings.interests.includes(theme) ? 'active' : ''}" data-interest="${theme}">${theme}</button>`).join('')}</div>`)}
+      ${accordion('Mots-clés', `<p>Ajoutez les sujets que vous souhaitez voir davantage ou, au contraire, éviter.</p>
+        <div class="inline-form"><input id="keyword-input" class="text-input" type="text" maxlength="70" placeholder="À surveiller"><button class="small-primary-btn" data-add-keyword>Ajouter</button></div>${keywordChips()}
+        <h3 class="settings-subtitle-v9184">À éviter</h3>
+        <div class="inline-form"><input id="blocked-keyword-input" class="text-input" type="text" maxlength="70" placeholder="À éviter"><button class="small-primary-btn" data-add-blocked-keyword>Éviter</button></div>${blockedKeywordChips()}`)}
+      ${accordion('Veille', `<p>Définissez précisément ce que vous voulez surveiller. Utilisez <strong>+</strong> pour exiger plusieurs termes et <strong>|</strong> pour accepter des alternatives.</p>
+        <div class="form-stack"><input id="watch-query-input" class="text-input" maxlength="160" placeholder="Ex. Meta + Quest 4 | Quest 4"><input id="watch-exclude-input" class="text-input" maxlength="160" placeholder="À exclure : rumeur, promotion…"><button class="secondary-btn" data-add-watch-rule>${icon('plus')} Ajouter la veille</button></div>
+        ${watchRulesMarkup()}`)}
+      ${accordion('Actualité générale', `<p>Choisissez les grandes rubriques qui restent présentes dans le flux.</p><div class="interest-grid centered-interest-grid-v9184">${GENERAL_CATEGORIES.map(category => `<button class="interest ${state.settings.generalCategories.includes(category) ? 'active' : ''}" data-general-category="${category}">${category}</button>`).join('')}</div>`)}
+      ${accordion('Fonctionnement', `${settingRow('Actualisation automatique', 'Charge les nouveautés en arrière-plan.', 'autoRefresh')}${settingRow('Recherche web complémentaire', 'Complète les flux avec Google Actualités.', 'webSearch')}`)}
+      ${accordion('Version', `<div class="app-version-row"><div><strong>Mon actualité · version ${APP_VERSION}</strong><span>Publication du ${APP_RELEASE}</span></div><span class="app-version-badge">v${APP_VERSION}</span></div><button class="secondary-btn compact-btn" data-check-update>${icon('refresh')} Vérifier la mise à jour</button>`)}
+    </div>
   </main>${nav('settings')}`;
 }
 
@@ -678,14 +669,11 @@ function renderSheet() {
 }
 
 function renderLoadingScreen() {
-  app.innerHTML = `<main class="fresh-loading-v9182" role="status" aria-live="polite">
-    <div class="fresh-loading-v9182__brand">Mon actualité</div>
-    <div class="fresh-loading-v9182__spinner" aria-hidden="true"></div>
-    <h1>Chargement des dernières actualités…</h1>
-    <p>Les articles les plus récents arrivent en premier.</p>
-    <div class="fresh-loading-v9182__rows" aria-hidden="true">
-      ${Array.from({ length: 5 }, (_, index) => `<div class="fresh-loading-v9182__row" style="--i:${index}"><div></div><span></span></div>`).join('')}
-    </div>
+  app.innerHTML = `<main class="minimal-loading-v9185" role="status" aria-live="polite">
+    <div class="minimal-loading-v9185__logo">${icon('brief')}</div>
+    <h1>Mon actualité</h1>
+    <div class="minimal-loading-v9185__bar" aria-hidden="true"><span></span></div>
+    <p>Mise à jour des dernières actualités…</p>
   </main>`;
 }
 
@@ -1191,9 +1179,12 @@ app.addEventListener('click', async event => {
   if (category) { event.preventDefault(); event.stopPropagation(); state.sheet = false; navigate('category', { category: category.dataset.category, categoryTab: 'brief' }); return; }
   const article = event.target.closest('[data-article]');
   if (article) {
+    if (event.target.closest('[data-save], [data-category]')) return;
     event.preventDefault();
     event.stopPropagation();
-    navigate('detail', { articleId: article.dataset.article });
+    const selected = state.articles.find(item => String(item.id) === String(article.dataset.article || ''));
+    const url = String(selected?.url || '').trim();
+    if (url) window.open(url, '_blank', 'noopener,noreferrer');
     return;
   }
   const viewButton = event.target.closest('[data-view]');
@@ -1367,9 +1358,7 @@ window.addEventListener('resize', () => requestAnimationFrame(pumpContinuousHome
 let serviceWorkerRefreshing = false;
 if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
   navigator.serviceWorker.addEventListener('controllerchange', () => {
-    if (serviceWorkerRefreshing) return;
     serviceWorkerRefreshing = true;
-    window.location.reload();
   });
   navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' }).then(registration => registration.update()).catch(() => {});
 }
@@ -1397,9 +1386,7 @@ setInterval(() => { if (state.settings.autoRefresh && !document.hidden && naviga
 function launchCacheIsFresh(articles = [], fetchedAt = '') {
   if (!articles.length) return false;
   const fetched = Date.parse(fetchedAt || '');
-  if (!Number.isFinite(fetched) || Date.now() - fetched > 10 * 60 * 1000) return false;
-  const newest = Math.max(...articles.map(article => Date.parse(article?.publishedAt || 0) || 0));
-  return newest > 0 && Date.now() - newest < 12 * 60 * 60 * 1000;
+  return Number.isFinite(fetched) && Date.now() - fetched < 30 * 60 * 1000;
 }
 
 function applyStartupNews(payload) {
@@ -1417,38 +1404,46 @@ function applyStartupNews(payload) {
 async function bootLatestNews() {
   const cachedArticles = Array.isArray(state.articles) ? state.articles.slice() : [];
   const cachedSync = state.lastSync;
-  const freshCache = launchCacheIsFresh(cachedArticles, cachedSync);
+  let firstScreenShown = false;
 
-  if (freshCache) {
+  if (cachedArticles.length) {
     state.homeOrder = [];
     render({ resetScroll: true });
-    scheduleVisualBackfill(20);
+    firstScreenShown = true;
   } else {
     renderLoadingScreen();
   }
 
+  const hardStop = window.setTimeout(() => {
+    if (firstScreenShown) return;
+    state.syncStatus = 'error';
+    state.syncError = 'Le chargement complet continue en arrière-plan.';
+    render({ resetScroll: true });
+    firstScreenShown = true;
+  }, 8000);
+
   let fastPayload = null;
   try {
-    const startupPromise = window.__STARTUP_NEWS_V9183 || Promise.resolve(null);
     fastPayload = await Promise.race([
-      startupPromise,
-      new Promise(resolve => window.setTimeout(() => resolve(null), 1800))
+      window.__STARTUP_NEWS_V9183 || Promise.resolve(null),
+      new Promise(resolve => window.setTimeout(() => resolve(null), 2400))
     ]);
   } catch {}
 
   if (applyStartupNews(fastPayload)) {
-    render({ resetScroll: !freshCache });
-    scheduleVisualBackfill(20);
-  } else if (!freshCache && cachedArticles.length) {
+    render({ resetScroll: !firstScreenShown });
+    firstScreenShown = true;
+  } else if (!firstScreenShown && cachedArticles.length) {
     state.articles = cachedArticles;
     state.lastSync = cachedSync;
     state.homeOrder = [];
     render({ resetScroll: true });
-    scheduleVisualBackfill(20);
+    firstScreenShown = true;
   }
 
+  window.clearTimeout(hardStop);
   if (navigator.onLine) {
-    window.setTimeout(() => syncNews({ silent: true }), fastPayload?.articles?.length ? 180 : 40);
+    window.setTimeout(() => syncNews({ silent: true }), fastPayload?.articles?.length ? 300 : 80);
   }
 }
 
