@@ -76,7 +76,7 @@ for (const src of scripts) {
 for (const asset of [
   'theme-periwinkle-v91.90.css?v=2',
   'top-continuity-v91.92.css?v=1',
-  'nav-stability-separator-v91.93.css?v=1'
+  'nav-stability-separator-v91.93.css?v=2'
 ]) {
   if (!index.includes(asset)) fail(`final visual layer missing from index: ${asset}`);
   if (!sw.includes(asset)) fail(`service worker does not precache final visual layer: ${asset}`);
