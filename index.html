@@ -85,98 +85,53 @@
     </main>
   </div>
   <div id="toast" class="toast" role="status" aria-live="polite"></div>
-  <script>
-  (() => {
-    'use strict';
-    const app = document.getElementById('app');
-    if (!app) return;
-    try {
-      const cache = JSON.parse(localStorage.getItem('news-live-cache') || '{}');
-      const feedback = JSON.parse(localStorage.getItem('news-feedback') || '{}');
-      const blocked = (JSON.parse(localStorage.getItem('news-blocked-terms-v1') || '[]') || [])
-        .map(value => String(value || '').toLowerCase()).filter(value => value.length >= 2);
-      const articles = (Array.isArray(cache.articles) ? cache.articles : [])
-        .filter(article => article && typeof article === 'object' && feedback[article.id] !== 'not')
-        .filter(article => {
-          if (!blocked.length) return true;
-          const text = [article.title, article.summary, article.category, article.source].filter(Boolean).join(' ').toLowerCase();
-          return !blocked.some(term => text.includes(term));
-        })
-        .sort((left, right) => {
-          const a = Date.parse(left.publishedAt || left.date || '') || 0;
-          const b = Date.parse(right.publishedAt || right.date || '') || 0;
-          return b - a || (Number(right.score) || 0) - (Number(left.score) || 0);
-        })
-        .slice(0, 18);
-      if (!articles.length) return;
-      const escape = value => String(value || '').replace(/[&<>"']/g, character => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' }[character]));
-      const title = article => {
-        const value = String(article.title || 'Article').replace(/\s+/g, ' ').trim();
-        const source = String(article.source || '').replace(/[.*+?^$\{\}()|[\]\\]/g, '\\$&');
-        return source ? value.replace(new RegExp('\\s*[-–—|]\\s*' + source + '\\s*$', 'i'), '').trim() : value;
-      };
-      const exactTime = value => {
-        const date = new Date(value);
-        if (Number.isNaN(date.getTime())) return '';
-        return new Intl.DateTimeFormat('fr-FR', { day: '2-digit', month: '2-digit', hour: '2-digit', minute: '2-digit' }).format(date);
-      };
-      const style = document.createElement('style');
-      style.dataset.instantCache = '91.80';
-      style.textContent = '.instant-cache-v9179{width:min(100%,760px);margin:0 auto;padding:32px 16px 96px}.instant-cache-v9179 header{padding:20px 8px 18px}.instant-cache-v9179 header small{color:#6853a6;font-weight:800;text-transform:uppercase;letter-spacing:.08em}.instant-cache-v9179 header h1{font-size:2rem;margin:5px 0 0}.instant-cache-list-v9179{display:grid;gap:11px}.instant-cache-row-v9179{display:block;padding:15px 17px;border:1px solid rgba(87,65,139,.12);border-radius:18px;background:rgba(255,255,255,.92);color:#211b2e;text-decoration:none;box-shadow:0 7px 22px rgba(45,30,82,.06)}.instant-cache-row-v9179 h2{font-size:1rem;line-height:1.3;margin:5px 0 0}.instant-cache-row-v9179 small{color:#746a80;font-size:.78rem}.instant-cache-status-v9179{display:flex;align-items:center;gap:8px;color:#746a80;font-size:.82rem;margin:0 8px 14px}.instant-cache-status-v9179:before{content:"";width:8px;height:8px;border-radius:50%;background:#63b58d;box-shadow:0 0 0 4px rgba(99,181,141,.14)}';
-      document.head.appendChild(style);
-      const rows = articles.map(article => '<a class="instant-cache-row-v9179" href="' + escape(article.url || '#') + '" target="_blank" rel="noopener noreferrer"><small>' + escape(article.source || 'Source') + (exactTime(article.publishedAt || article.date) ? ' · ' + escape(exactTime(article.publishedAt || article.date)) : '') + '</small><h2>' + escape(title(article)) + '</h2></a>').join('');
-      app.innerHTML = '<main class="instant-cache-v9179"><header><small>Vos dernières actualités</small><h1>Mon actualité</h1></header><div class="instant-cache-status-v9179">Actualisation des nouveautés en arrière-plan</div><section class="instant-cache-list-v9179">' + rows + '</section></main>';
-      document.documentElement.dataset.instantCachePaint = '91.80';
-    } catch {}
-  })();
-  </script>
-  <!-- v91.80 instant cached articles, parallel startup, chronological selections -->
-  <script defer src="release-watch.js?v=91.80"></script>
-  <script defer src="runtime-stability-v91.41.js?v=91.42"></script>
-  <script defer src="article-access-v91.48.js?v=91.48"></script>
-  <script defer src="ux-guard-v91.56.js?v=91.56"></script>
-  <script defer src="summary-demand-v91.43.js?v=91.45"></script>
-  <script defer src="summary-quality-v91.46.js?v=91.46"></script>
-  <script defer src="early-image-prewarm-v91.41.js?v=91.74"></script>
-  <script defer src="bootstrap-v42.js?v=54"></script>
-  <script defer src="content-intelligence-v76.js?v=91.40"></script>
-  <script defer src="feed-editorial-v77.js?v=77"></script>
-  <script defer src="feed-editorial-polish-v77.js?v=91.27"></script>
-  <script defer src="novelty-detection-v91.js?v=91.24"></script>
-  <script defer src="content-intelligence-v78.js?v=78.3"></script>
-  <script defer src="feed-editorial-v78.js?v=78.1"></script>
-  <script defer src="summary-race-v78.js?v=91.36"></script>
-  <script defer src="content-trust-v83.js?v=83.2"></script>
-  <script defer src="source-quality-v82.js?v=82"></script>
-  <script defer src="lead-choice-v91.js?v=91.3"></script>
-  <script defer src="ai-request-control-v91.7.js?v=91.42"></script>
-  <script defer src="feed-experience-v79.js?v=79"></script>
-  <script defer src="feed-experience-v80.js?v=91.28"></script>
-  <script defer src="diagnostic-metrics-v91.js?v=91.25"></script>
-  <script defer src="feed-intelligence-v81.js?v=81.2"></script>
-  <script defer src="maintenance-v84.js?v=84"></script>
-  <script defer src="experience-v85.js?v=85"></script>
-  <script defer src="lifecycle-v86.js?v=86"></script>
-  <script defer src="personalization-learning-v91.js?v=91.40"></script>
-  <script defer src="news-pipeline-v88.js?v=88.10"></script>
-  <script defer src="article-ui-v91.38.3.js?v=91.40"></script>
-  <script defer src="quality-v88.js?v=88"></script>
-  <script defer src="quality-signals-v89.js?v=89"></script>
-  <script defer src="feed-stability-v91.38.js?v=91.40"></script>
-  <script defer src="ui-summary-fixes-v91.38.js?v=91.40"></script>
-  <script defer src="startup-stability-v91.75.js?v=91.76"></script>
-  <script defer src="summary-label-cleanup-v91.49.js?v=91.49"></script>
-  <script defer src="ux-polish-v91.57.js?v=91.57"></script>
-  <script defer src="ux-polish-v91.60.js?v=91.60"></script>
-  <script defer src="ux-polish-v91.61.js?v=91.61"></script>
-  <script defer src="bottom-nav-golden-v91.69.js?v=91.74"></script>
-  <script defer src="article-navigation-v91.73.js?v=91.75"></script>
-  <script defer src="image-stability-v91.74.js?v=91.74"></script>
-  <script defer src="article-date-v91.78.js?v=91.78"></script>
-  <script type="module" src="app.js?v=73"></script>
+  <!-- v91.78 fast then complete fresh news, resilient publisher photos and exact article dates -->
+  <script src="release-watch.js?v=91.78"></script>
+  <script src="runtime-stability-v91.41.js?v=91.42"></script>
+  <script src="article-access-v91.48.js?v=91.48"></script>
+  <script src="ux-guard-v91.56.js?v=91.56"></script>
+  <script src="summary-demand-v91.43.js?v=91.45"></script>
+  <script src="summary-quality-v91.46.js?v=91.46"></script>
+  <script src="early-image-prewarm-v91.41.js?v=91.74"></script>
+  <script src="bootstrap-v42.js?v=54"></script>
+  <script src="content-intelligence-v76.js?v=91.40"></script>
+  <script src="feed-editorial-v77.js?v=77"></script>
+  <script src="feed-editorial-polish-v77.js?v=91.27"></script>
+  <script src="novelty-detection-v91.js?v=91.24"></script>
+  <script src="content-intelligence-v78.js?v=78.3"></script>
+  <script src="feed-editorial-v78.js?v=78.1"></script>
+  <script src="summary-race-v78.js?v=91.36"></script>
+  <script src="content-trust-v83.js?v=83.2"></script>
+  <script src="source-quality-v82.js?v=82"></script>
+  <script src="lead-choice-v91.js?v=91.3"></script>
+  <script src="ai-request-control-v91.7.js?v=91.42"></script>
+  <script src="feed-experience-v79.js?v=79"></script>
+  <script src="feed-experience-v80.js?v=91.28"></script>
+  <script src="diagnostic-metrics-v91.js?v=91.25"></script>
+  <script src="feed-intelligence-v81.js?v=81.2"></script>
+  <script src="maintenance-v84.js?v=84"></script>
+  <script src="experience-v85.js?v=85"></script>
+  <script src="lifecycle-v86.js?v=86"></script>
+  <script src="personalization-learning-v91.js?v=91.40"></script>
+  <script src="news-pipeline-v88.js?v=88.10"></script>
+  <script src="article-ui-v91.38.3.js?v=91.40"></script>
+  <script src="quality-v88.js?v=88"></script>
+  <script src="quality-signals-v89.js?v=89"></script>
+  <script src="feed-stability-v91.38.js?v=91.40"></script>
+  <script src="ui-summary-fixes-v91.38.js?v=91.40"></script>
+  <script src="startup-stability-v91.75.js?v=91.76"></script>
+  <script type="module" src="app.js?v=71"></script>
   <script type="module" src="summary-fixes.js?v=44"></script>
   <script type="module" src="article-quickview.js?v=91.77"></script>
   <script type="module" src="feed-quality.js?v=45"></script>
   <script type="module" src="source-discovery-ui.js?v=3"></script>
+  <script src="summary-label-cleanup-v91.49.js?v=91.49"></script>
+  <script src="ux-polish-v91.57.js?v=91.57"></script>
+  <script src="ux-polish-v91.60.js?v=91.60"></script>
+  <script src="ux-polish-v91.61.js?v=91.61"></script>
+  <script src="bottom-nav-golden-v91.69.js?v=91.74"></script>
+  <script src="article-navigation-v91.73.js?v=91.75"></script>
+  <script src="image-stability-v91.74.js?v=91.74"></script>
+  <script src="article-date-v91.78.js?v=91.78"></script>
 </body>
 </html>

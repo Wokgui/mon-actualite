@@ -4,7 +4,7 @@ import { articleVisualUrl, hasPreparedVisual, sourceTileUrl } from './services/a
 const $ = (selector, root = document) => root.querySelector(selector);
 const app = $('#app');
 const toastEl = $('#toast');
-const APP_VERSION = '71';
+const APP_VERSION = '69';
 const APP_RELEASE = '7 septembre 2026';
 document.documentElement.dataset.appVersion = APP_VERSION;
 
@@ -183,19 +183,12 @@ function articleVisual(article, index = 0) {
   return `<img class="article-image original-article-image stable-visual ${prepared ? 'prepared-visual' : 'source-tile-visual'}" src="${escapeHtml(articleVisualUrl(article))}" alt="" width="400" height="224" loading="${index < 4 ? 'eager' : 'lazy'}" decoding="async" referrerpolicy="no-referrer" style="background-image:url('${escapeHtml(tile)}');background-size:cover" ${index < 4 ? 'fetchpriority="high"' : ''}>`;
 }
 
-function articlePublishedTime(article = {}) {
-  const parsed = Date.parse(article.publishedAt || article.date || '');
-  return Number.isFinite(parsed) ? parsed : 0;
-}
-
-function newestArticleFirst(left, right) {
-  const byDate = articlePublishedTime(right) - articlePublishedTime(left);
-  if (byDate) return byDate;
-  return (Number(right.score) || 0) - (Number(left.score) || 0);
-}
-
 function visibleArticles() {
   const blocked = safeJson('news-blocked-terms-v1', []).map(normalizeTopic).filter(term => term.length >= 2);
+  const personalizationScore = window.NewsPersonalizationV91?.createRanker(
+    state.topicPreferences,
+    state.settings.generalCategories
+  ) || (() => 0);
   return state.articles
     .filter(article => article && typeof article === 'object')
     .filter(article => {
@@ -206,7 +199,16 @@ function visibleArticles() {
       return !blocked.some(term => text.includes(term));
     })
     .slice()
-    .sort(newestArticleFirst);
+    .sort((a, b) => {
+      const feedbackScore = article => ({ more: 24, less: -20, follow: 38 }[state.feedback[article.id]] || 0);
+      const topicScore = article => {
+        let learned = 0;
+        try { learned = Number(personalizationScore(article) || 0); } catch {}
+        const chosen = state.settings.interests.includes(article.category) ? 22 : state.settings.generalCategories.includes(article.category) ? 8 : 0;
+        return learned + chosen;
+      };
+      return ((Number(b.score) || 0) + feedbackScore(b) + topicScore(b)) - ((Number(a.score) || 0) + feedbackScore(a) + topicScore(a));
+    });
 }
 
 function diversifyBySource(articles) {
@@ -229,9 +231,17 @@ function diversifyBySource(articles) {
 }
 
 function reconcileHomeOrder({ reset = false } = {}) {
-  const chronological = visibleArticles();
-  state.homeOrder = chronological.map(article => String(article.id));
-  return chronological;
+  const ranked = diversifyBySource(visibleArticles());
+  const byId = new Map(ranked.map(article => [String(article.id), article]));
+  const nextIds = ranked.map(article => String(article.id));
+  if (reset || !state.homeOrder.length) {
+    state.homeOrder = nextIds;
+  } else {
+    const kept = state.homeOrder.filter(id => byId.has(String(id)));
+    const known = new Set(kept.map(String));
+    state.homeOrder = [...kept, ...nextIds.filter(id => !known.has(String(id)))];
+  }
+  return state.homeOrder.map(id => byId.get(String(id))).filter(Boolean);
 }
 
 function stableHomeArticles() {
@@ -418,7 +428,7 @@ function historyBriefMarkup() {
     days.get(key).push(article);
   }
   return [...days.entries()].sort((a, b) => b[0].localeCompare(a[0])).slice(0, 7).map(([, items], dayIndex) => {
-    const selected = items.sort((a, b) => impact(b) - impact(a)).slice(0, 5).sort(newestArticleFirst);
+    const selected = items.sort((a, b) => impact(b) - impact(a)).slice(0, 5);
     return `<section class="brief-history-day-v9138"><div class="brief-history-date-v9138">${escapeHtml(dayLabel(selected[0]?.publishedAt))}${dayDelta(selected[0]?.publishedAt) <= 2 ? ` · ${escapeHtml(fullDay(selected[0]?.publishedAt))}` : ''}</div><div class="feed stable-owned-list">${selected.map((article, index) => compactArticleRow(article, dayIndex * 10 + index)).join('')}</div></section>`;
   }).join('');
 }
@@ -503,7 +513,6 @@ function renderBrief() {
     if (picks.length >= 5) break;
     if (!picks.includes(candidate)) picks.push(candidate);
   }
-  picks.sort((left, right) => newestArticleFirst(left.article, right.article));
   const essential = `<section class="journal-section"><div class="brief-day-v9138">${escapeHtml(fullDay(new Date()))}</div><h2 class="brief-section-title">Les 5 événements majeurs</h2><div class="feed stable-owned-list">${picks.length ? picks.map(({ article }, index) => compactArticleRow(article, index)).join('') : '<p class="muted-note">Aucune information majeure récente.</p>'}</div></section><section class="brief-history-v9138">${historyBriefMarkup()}</section>`;
   return `<button type="button" class="top-reset-icon-v9138" data-reset-read aria-label="Réinitialiser les articles parcourus" title="Réinitialiser">↻</button><main class="page">${topbar('Brief du jour', false)}
     <div class="brief-mode-tabs"><button class="brief-mode-tab ${state.briefMode === 'essential' ? 'active' : ''}" data-brief-mode="essential">L’essentiel</button><button class="brief-mode-tab ${state.briefMode === 'watches' ? 'active' : ''}" data-brief-mode="watches">Mes veilles</button></div>
@@ -682,9 +691,12 @@ function appendHomeToLimit({ increment = false } = {}) {
 }
 
 function refreshAfterNewsChange() {
-  // Rebuild the current view after each fresh payload. Appending only missing
-  // cards left newly published stories at the bottom of an already-open feed.
   reconcileHomeOrder();
+  if (state.view === 'home') {
+    appendHomeToLimit();
+    return;
+  }
+  if (state.view === 'brief' && app.querySelector('.article-card[data-article]')) return;
   render();
 }
 

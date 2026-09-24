@@ -1,6 +1,6 @@
 {
-  "version": "71",
-  "codeRelease": "91.80",
+  "version": "69",
+  "codeRelease": "91.78",
   "release": "2026-09-07",
-  "label": "v91.80 : affichage immédiat, chargement parallèle et nouveaux articles replacés en tête"
+  "label": "v91.78 : chargement complet, photos éditeur fiables et date précise sous la photo"
 }
