@@ -4,7 +4,7 @@ import { articleVisualUrl, hasPreparedVisual, sourceTileUrl } from './services/a
 const $ = (selector, root = document) => root.querySelector(selector);
 const app = $('#app');
 const toastEl = $('#toast');
-const APP_VERSION = '70';
+const APP_VERSION = '71';
 const APP_RELEASE = '24 septembre 2026';
 document.documentElement.dataset.appVersion = APP_VERSION;
 
@@ -185,10 +185,6 @@ function articleVisual(article, index = 0) {
 
 function visibleArticles() {
   const blocked = safeJson('news-blocked-terms-v1', []).map(normalizeTopic).filter(term => term.length >= 2);
-  const personalizationScore = window.NewsPersonalizationV91?.createRanker(
-    state.topicPreferences,
-    state.settings.generalCategories
-  ) || (() => 0);
   return state.articles
     .filter(article => article && typeof article === 'object')
     .filter(article => {
@@ -200,14 +196,10 @@ function visibleArticles() {
     })
     .slice()
     .sort((a, b) => {
-      const feedbackScore = article => ({ more: 24, less: -20, follow: 38 }[state.feedback[article.id]] || 0);
-      const topicScore = article => {
-        let learned = 0;
-        try { learned = Number(personalizationScore(article) || 0); } catch {}
-        const chosen = state.settings.interests.includes(article.category) ? 22 : state.settings.generalCategories.includes(article.category) ? 8 : 0;
-        return learned + chosen;
-      };
-      return ((Number(b.score) || 0) + feedbackScore(b) + topicScore(b)) - ((Number(a.score) || 0) + feedbackScore(a) + topicScore(a));
+      const aTime = Date.parse(a.publishedAt || a.date || '') || 0;
+      const bTime = Date.parse(b.publishedAt || b.date || '') || 0;
+      if (bTime !== aTime) return bTime - aTime;
+      return (Number(b.score) || 0) - (Number(a.score) || 0);
     });
 }
 
@@ -230,22 +222,14 @@ function diversifyBySource(articles) {
   return result;
 }
 
-function reconcileHomeOrder({ reset = false } = {}) {
-  const ranked = diversifyBySource(visibleArticles());
-  const byId = new Map(ranked.map(article => [String(article.id), article]));
-  const nextIds = ranked.map(article => String(article.id));
-  if (reset || !state.homeOrder.length) {
-    state.homeOrder = nextIds;
-  } else {
-    const kept = state.homeOrder.filter(id => byId.has(String(id)));
-    const known = new Set(kept.map(String));
-    state.homeOrder = [...kept, ...nextIds.filter(id => !known.has(String(id)))];
-  }
-  return state.homeOrder.map(id => byId.get(String(id))).filter(Boolean);
+function reconcileHomeOrder() {
+  const ordered = visibleArticles();
+  state.homeOrder = ordered.map(article => String(article.id));
+  return ordered;
 }
 
 function stableHomeArticles() {
-  return reconcileHomeOrder();
+  return visibleArticles();
 }
 
 function nav(active = state.view) {
@@ -274,8 +258,8 @@ function topbar(title, back = true, right = '') {
 }
 
 function syncStrip() {
-  const label = state.syncStatus === 'loading' ? 'Actualisation…' : state.syncStatus === 'error' ? 'Actualisation impossible' : state.lastSync ? `Mis à jour ${timeLabel(state.lastSync).toLowerCase()}` : 'Première actualisation en cours';
-  return `<div class="sync-strip ${state.syncStatus}"><span class="sync-dot"></span><span>${escapeHtml(label)}</span><button data-refresh aria-label="Actualiser maintenant">${icon('refresh')}</button></div>`;
+  const label = state.syncStatus === 'loading' ? 'Actualisation…' : state.syncStatus === 'error' ? 'Actualisation impossible' : state.lastSync ? `Mis à jour ${timeLabel(state.lastSync).toLowerCase()}` : 'Chargement des dernières actualités';
+  return `<div class="sync-strip ${state.syncStatus}"><span class="sync-dot"></span><span>${escapeHtml(label)}</span></div>`;
 }
 
 function renderHome() {
@@ -602,6 +586,18 @@ function renderSheet() {
     </section>
     <button type="button" class="secondary-btn personalize-settings" data-open-settings>Réglages avancés</button>
   </section></div>`;
+}
+
+function renderLoadingScreen() {
+  app.innerHTML = `<main class="fresh-loading-v9182" role="status" aria-live="polite">
+    <div class="fresh-loading-v9182__brand">Mon actualité</div>
+    <div class="fresh-loading-v9182__spinner" aria-hidden="true"></div>
+    <h1>Chargement des dernières actualités…</h1>
+    <p>Les articles les plus récents arrivent en premier.</p>
+    <div class="fresh-loading-v9182__rows" aria-hidden="true">
+      ${Array.from({ length: 5 }, (_, index) => `<div class="fresh-loading-v9182__row" style="--i:${index}"><div></div><span></span></div>`).join('')}
+    </div>
+  </main>`;
 }
 
 function render({ resetScroll = false, scrollTop = null } = {}) {
@@ -1213,13 +1209,27 @@ document.addEventListener('visibilitychange', () => { if (!document.hidden && (!
 
 setInterval(() => { if (state.settings.autoRefresh && !document.hidden && navigator.onLine) syncNews({ silent: true }); }, 15 * 60 * 1000);
 
-render();
-scheduleVisualBackfill();
-syncNews({ silent: true }).then(result => {
-  // The fast catalogue makes the first screen useful quickly. It is only a
-  // starter: follow it with the complete personalised catalogue in the
-  // background so all three article views receive the new stories.
-  if (result?.stats?.mode !== 'fast-startup' || !navigator.onLine) return;
-  window.setTimeout(() => syncNews({ silent: true }), 250);
-}).catch(() => {});
+async function bootLatestNews() {
+  renderLoadingScreen();
+  const cachedArticles = Array.isArray(state.articles) ? state.articles.slice() : [];
+  const cachedSync = state.lastSync;
+  state.articles = [];
+  state.homeOrder = [];
+  let result = null;
+  try {
+    result = await syncNews({ silent: true });
+  } catch {}
+  if (!state.articles.length && cachedArticles.length) {
+    state.articles = cachedArticles;
+    state.lastSync = cachedSync;
+  }
+  state.homeOrder = [];
+  render({ resetScroll: true });
+  scheduleVisualBackfill(40);
+  if (result?.stats?.mode === 'fast-startup' && navigator.onLine) {
+    window.setTimeout(() => syncNews({ silent: true }), 300);
+  }
+}
+
+bootLatestNews();
 window.setTimeout(() => checkAppUpdate(), 1200);
