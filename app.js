@@ -1038,7 +1038,7 @@ async function syncNews({ silent = false } = {}) {
   syncPromise = (async () => {
     try {
       const domainQueries = state.domains.map(domain => `site:${domain}`);
-      const followedNames = sourceDirectory().filter(item => state.followedSources.has(item.key)).map(item => item.name).slice(0, 4);
+      const followedNames = [...state.followedSources].slice(0, 4);
       const discoveryKeywords = [...new Set([...state.keywords, ...domainQueries, ...followedNames])].slice(0, 12);
       const result = await fetchLiveNews({
         sources: state.sources.filter(source => source.enabled !== false),
