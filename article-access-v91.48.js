@@ -19,7 +19,8 @@
     'ouest-france.fr', 'sudouest.fr', 'letelegramme.fr', 'lavoixdunord.fr',
     'republicain-lorrain.fr', 'estrepublicain.fr', 'dna.fr', 'lalsace.fr',
     'leprogres.fr', 'ledauphine.com', 'bienpublic.com', 'lejsl.com',
-    'midilibre.fr', 'ladepeche.fr', 'lamontagne.fr', 'nice-matin.fr', 'varmatin.com'
+    'midilibre.fr', 'ladepeche.fr', 'lamontagne.fr', 'nice-matin.fr', 'varmatin.com',
+    'leparisien.fr'
   ];
 
   const PAID_SOURCES = [
@@ -33,7 +34,7 @@
     'l alsace', "l'alsace", 'le progres', 'le progrès', 'le dauphine', 'le dauphiné',
     'le bien public', 'journal de saone et loire', 'journal de saône-et-loire',
     'midi libre', 'la depeche', 'la dépêche', 'la montagne', 'nice matin', 'nice-matin',
-    'var matin', 'var-matin'
+    'var matin', 'var-matin', 'le parisien'
   ];
 
   const PAYWALL_RX = /(?:réservé(?:e)?\s+aux?\s+abonnés?|contenu\s+(?:est\s+)?réservé|article\s+réservé|accès\s+réservé|pour\s+lire\s+la\s+suite[^.]{0,60}(?:abonn|connect)|abonnez[- ]?vous\s+pour\s+(?:lire|accéder|continuer)|déjà\s+abonné|offre\s+d['’]abonnement|premium\s+(?:article|content)|subscribers?\s+only|members?\s+only|cet\s+article\s+est\s+réservé)/i;
@@ -233,11 +234,26 @@
     });
   }
 
+  function summaryDisabledResponse() {
+    return cloneJsonResponse(null, {
+      ok: false,
+      summary: '',
+      text: '',
+      ai: false,
+      grounded: false,
+      unavailable: true,
+      disabled: true,
+      provider: 'summaries-disabled-v91.81'
+    });
+  }
+
   function filterNewsPayload(payload = {}) {
     if (!Array.isArray(payload?.articles)) return { payload, removed: 0 };
     let removed = 0;
     const articles = payload.articles.filter(article => {
-      const reason = explicitPaywall(article) ? 'explicit-paywall-marker' : '';
+      const reason = sourceLooksPaid(article)
+        ? 'subscription-source'
+        : (explicitPaywall(article) ? 'explicit-paywall-marker' : '');
       if (reason) rememberHidden(article, reason);
       const blocked = Boolean(reason) || isHidden(article);
       if (blocked) removed += 1;
@@ -248,7 +264,7 @@
       payload: {
         ...payload,
         articles,
-        stats: { ...(payload.stats || {}), paywallFilteredV9148: Number(payload.stats?.paywallFilteredV9148 || 0) + removed }
+        stats: { ...(payload.stats || {}), freeOnlyFilteredV9181: Number(payload.stats?.freeOnlyFilteredV9181 || 0) + removed }
       },
       removed
     };
@@ -295,8 +311,8 @@
     const body = parseBody(init) || {};
     const article = body?.article && typeof body.article === 'object' ? body.article : {};
 
-    if (sameOrigin && method === 'POST' && SUMMARY_PATHS.has(url.pathname) && isHidden(article)) {
-      return paywallUnavailable(null, {}, 'known-paywall');
+    if (sameOrigin && method === 'POST' && SUMMARY_PATHS.has(url.pathname)) {
+      return summaryDisabledResponse();
     }
 
     const response = await upstreamFetch(input, init);
@@ -306,7 +322,6 @@
       try {
         const data = await response.clone().json();
         const filtered = filterNewsPayload(data);
-        setTimeout(() => probePaidCandidates(filtered.payload.articles || []), 250);
         return filtered.removed ? cloneJsonResponse(response, filtered.payload) : response;
       } catch { return response; }
     }
@@ -406,8 +421,7 @@
     observer.observe(document.body, { childList: true, subtree: true, characterData: true });
   }
 
-  const cachedArticles = filterCachedNews();
-  if (cachedArticles.length) setTimeout(() => probePaidCandidates(cachedArticles), 700);
+  filterCachedNews();
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', startSummaryFormatting, { once: true });
   else startSummaryFormatting();
