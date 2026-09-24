@@ -484,7 +484,7 @@ function historyBriefMarkup() {
     if (!days.has(key)) days.set(key, []);
     days.get(key).push(article);
   }
-  return [...days.entries()].sort((a, b) => b[0].localeCompare(a[0])).slice(0, 7).map(([, items], dayIndex) => {
+  return [...days.entries()].sort((a, b) => b[0].localeCompare(a[0])).slice(0, BRIEF_DAYS - 1).map(([, items], dayIndex) => {
     const selected = items.sort((a, b) => impact(b) - impact(a)).slice(0, 5);
     return `<section class="brief-history-day-v9138"><div class="brief-history-date-v9138">${escapeHtml(dayLabel(selected[0]?.publishedAt))}${dayDelta(selected[0]?.publishedAt) <= 2 ? ` · ${escapeHtml(fullDay(selected[0]?.publishedAt))}` : ''}</div><div class="feed stable-owned-list">${selected.map((article, index) => compactArticleRow(article, dayIndex * 10 + index)).join('')}</div></section>`;
   }).join('');
