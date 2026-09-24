@@ -312,3 +312,18 @@ html,body,#app,.app-shell{
     padding-top:36px!important;
   }
 }
+
+
+/* Icônes de navigation pleines uniquement. */
+.bottom-nav.stable-bottom-nav-v9184 .nav-solid-icon-v9188{
+  width:23px!important;
+  height:23px!important;
+  fill:currentColor!important;
+  stroke:none!important;
+}
+.bottom-nav.stable-bottom-nav-v9184 .nav-solid-icon-v9188 .nav-solid-cut-v9188{
+  fill:none!important;
+  stroke:#fff!important;
+  stroke-width:1.7!important;
+  stroke-linecap:round!important;
+}
