@@ -259,3 +259,73 @@ html,body,#app,.app-shell,.page{
     padding-bottom:19px!important;
   }
 }
+
+
+/* v91.91 — haut uni, sans vagues, remonté et continu avec la barre système. */
+:root{ --ui-top:#F7F8FF; }
+
+html,body,#app,.app-shell{
+  background:var(--ui-top)!important;
+}
+
+body{
+  margin:0!important;
+  padding:0!important;
+}
+
+/* Accueil : suppression totale des vagues et remontée du bloc. */
+.hero-header{
+  position:relative!important;
+  overflow:hidden!important;
+  margin:0 -18px 0!important;
+  padding:14px 20px 24px!important;
+  border:0!important;
+  border-bottom:1px solid var(--ui-border)!important;
+  border-radius:0!important;
+  background:var(--ui-top)!important;
+  box-shadow:none!important;
+}
+.hero-header::before,
+.hero-header::after{
+  content:none!important;
+  display:none!important;
+}
+.hero-header .eyebrow{
+  margin:0 0 11px!important;
+}
+.hero-header h1{
+  margin:0!important;
+}
+
+/* Réglages et Brief : même continuité visuelle, plus hauts, sans décoration. */
+.settings-page-v9185>.page-masthead-v9186,
+.page:has(.brief-mode-tabs)>.page-masthead-v9186{
+  margin:0 -18px 0!important;
+  padding:16px 18px 20px!important;
+  border:0!important;
+  border-bottom:1px solid var(--ui-border)!important;
+  background:var(--ui-top)!important;
+  box-shadow:none!important;
+}
+.settings-page-v9185>.page-masthead-v9186::before,
+.settings-page-v9185>.page-masthead-v9186::after,
+.page:has(.brief-mode-tabs)>.page-masthead-v9186::before,
+.page:has(.brief-mode-tabs)>.page-masthead-v9186::after{
+  content:none!important;
+  display:none!important;
+}
+
+/* Aucun trait ou espace parasite entre le haut et le contenu. */
+.hero-header + *,
+.page-masthead-v9186 + *{
+  border-top:0!important;
+}
+
+@media(max-width:420px){
+  .hero-header{padding-top:12px!important;padding-bottom:22px!important}
+  .settings-page-v9185>.page-masthead-v9186,
+  .page:has(.brief-mode-tabs)>.page-masthead-v9186{
+    padding-top:14px!important;
+    padding-bottom:18px!important;
+  }
+}
