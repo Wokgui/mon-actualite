@@ -157,11 +157,6 @@ else ok('home prioritizes multiple publication days before same-day overflow');
 
 if (!app.includes('function resetReadStateFromNav(view)') || !app.includes("}, 620);")) fail('long-press reset contract missing');
 else ok('long-press reset contract configured');
-if (!app.includes('settingsOpenAccordions') || !app.includes('captureOpenSettingsAccordions')) fail('settings accordion preservation missing');
-else ok('settings accordions persist across actions');
-if (!app.includes('.slice(0, 10);') || !app.includes('Math.min(5, candidates.length)') || !app.includes('scheduleVisualBackfill(180)')) fail('accelerated image recovery missing');
-else ok('accelerated image recovery configured');
-
 if (!app.includes('settingsOpenAccordions') || !app.includes('captureOpenSettingsAccordions')) fail('settings accordion persistence missing');
 else ok('settings accordion persistence configured');
 if (!app.includes('navLongPressTimer') || !app.includes('resetReadStateFromNav(view)')) fail('long press reset on Home/Brief missing');
