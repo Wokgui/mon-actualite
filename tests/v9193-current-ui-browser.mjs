@@ -27,6 +27,7 @@ await context.addInitScript(payload => {
     stats: {}
   }));
   localStorage.setItem('news-grey-after-scroll-v9138-v1', JSON.stringify([payload.id]));
+  localStorage.setItem('news-grey-after-scroll-v9138-v1', JSON.stringify([payload.id]));
 }, article);
 
 const page = await context.newPage();
@@ -122,6 +123,14 @@ const homeTitlePx = await page.$eval('.hero-header h1', el => parseFloat(getComp
 assert.ok(homeTitlePx <= 32.5, 'home title must stay visually lighter than the previous oversized heading');
 
 await page.waitForSelector('[data-stable-home-feed] .article-card', { timeout: 8000 });
+assert.ok(await page.locator('[data-stable-home-feed] .article-card').first().evaluate(el => el.classList.contains('read-passed-v9138')), 'fixture article should start greyed');
+const homeReset = page.locator('.nav-item[data-view="home"]');
+await homeReset.dispatchEvent('pointerdown', { pointerType: 'touch', button: 0, clientX: 80, clientY: 820 });
+await page.waitForTimeout(700);
+await homeReset.dispatchEvent('pointerup', { pointerType: 'touch', button: 0, clientX: 80, clientY: 820 });
+assert.ok(!(await page.locator('[data-stable-home-feed] .article-card').first().evaluate(el => el.classList.contains('read-passed-v9138'))), 'long press on Home must clear greyed articles');
+assert.equal(await page.evaluate(() => localStorage.getItem('news-grey-after-scroll-v9138-v1')), '[]', 'long press reset must clear persisted grey state');
+
 const rowAlignment = await page.$eval('[data-stable-home-feed] .article-card', card => {
   const img = card.querySelector('.article-image').getBoundingClientRect();
   const title = card.querySelector('h2').getBoundingClientRect();
@@ -153,6 +162,14 @@ await page.locator('.nav-item[data-view="settings"]').click();
 await page.waitForSelector('.settings-page-v9185>.page-masthead-v9186 h1');
 const settingsTitlePx = await page.$eval('.settings-page-v9185>.page-masthead-v9186 h1', el => parseFloat(getComputedStyle(el).fontSize));
 assert.ok(settingsTitlePx <= 25.5, 'settings title must use the refined compact size');
+
+const generalAccordion = page.locator('.settings-accordion-v9185').filter({ hasText: 'Actualité générale' });
+await generalAccordion.locator('summary').click();
+assert.ok(await generalAccordion.evaluate(el => el.open), 'settings accordion must open');
+await generalAccordion.locator('[data-general-category]').first().click();
+await page.waitForTimeout(100);
+const generalAccordionAfter = page.locator('.settings-accordion-v9185').filter({ hasText: 'Actualité générale' });
+assert.ok(await generalAccordionAfter.evaluate(el => el.open), 'settings accordion must stay open after an action');
 
 const generalDetails = page.locator('.settings-accordion-v9185').filter({ hasText: 'Actualité générale' }).first();
 await generalDetails.locator(':scope > summary').click();

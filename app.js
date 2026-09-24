@@ -98,6 +98,7 @@ let syncPromise = null;
 let toastTimer;
 let visualBackfillTimer = null;
 let visualBackfillRunning = false;
+let settingsOpenAccordions = new Set();
 
 const iconPaths = {
   home: '<path d="m3 11 9-8 9 8"/><path d="M5 10v10h14V10"/><path d="M9 20v-6h6v6"/>',
@@ -198,9 +199,12 @@ function badgeFor(article) {
 function articleVisual(article, index = 0) {
   const prepared = hasPreparedVisual(article);
   const tile = sourceTileUrl(article);
-  return `<img class="article-image original-article-image stable-visual ${prepared ? 'prepared-visual' : 'source-tile-visual'}" src="${escapeHtml(tile)}" alt="" width="400" height="224" loading="${index < 18 ? 'eager' : 'lazy'}" decoding="async" referrerpolicy="no-referrer" style="background-image:url('${escapeHtml(tile)}');background-size:cover">`;
+  const real = articleVisualUrl(article);
+  const startImmediately = Boolean(real) && (prepared || index < 16);
+  const src = startImmediately ? real : tile;
+  const visualClass = startImmediately ? 'direct-visual-v9201' : 'source-tile-visual';
+  return `<img class="article-image original-article-image stable-visual ${prepared ? 'prepared-visual' : visualClass}" src="${escapeHtml(src)}" alt="" width="400" height="224" loading="${index < 20 ? 'eager' : 'lazy'}" fetchpriority="${index < 8 ? 'high' : 'auto'}" decoding="async" referrerpolicy="no-referrer" style="background-image:url('${escapeHtml(tile)}');background-size:cover">`;
 }
-
 function sourceIdentity(article = {}) {
   return normalizeTopic(article.source || article.feedTitle || '');
 }
@@ -697,7 +701,7 @@ function watchRulesMarkup() {
 }
 
 function renderSettings() {
-  const accordion = (title, body) => `<details class="settings-accordion-v9185"><summary>${escapeHtml(title)}</summary><div class="settings-accordion-content-v9185">${body}</div></details>`;
+  const accordion = (title, body) => `<details class="settings-accordion-v9185"${settingsOpenAccordions.has(title) ? ' open' : ''}><summary>${escapeHtml(title)}</summary><div class="settings-accordion-content-v9185">${body}</div></details>`;
   return `<main class="page settings-page-v9185">${topbar('Réglages', false)}
     <div class="settings-accordions-v9185">
       ${accordion('Sources d’information', sourceDirectoryMarkup())}
@@ -760,28 +764,28 @@ function renderLoadingScreen() {
   </main>`;
 }
 
+function captureOpenSettingsAccordions() {
+  const settingsPage = app.querySelector('.settings-page-v9185');
+  if (!settingsPage) return;
+  settingsOpenAccordions = new Set(
+    [...settingsPage.querySelectorAll('.settings-accordion-v9185[open] > summary')]
+      .map(summary => summary.textContent?.trim())
+      .filter(Boolean)
+  );
+}
+
 function render({ resetScroll = false, scrollTop = null } = {}) {
+  captureOpenSettingsAccordions();
   const preservedScroll = Number.isFinite(scrollTop) ? scrollTop : (resetScroll ? 0 : window.scrollY);
-  const openSettingsAccordions = state.view === 'settings'
-    ? [...app.querySelectorAll('.settings-accordion-v9185[open] > summary')].map(summary => summary.textContent.trim())
-    : [];
   const views = { home: renderHome, category: renderCategory, detail: renderDetail, brief: renderBrief, news: renderNews, settings: renderSettings };
   app.innerHTML = (views[state.view] || renderHome)() + renderSheet();
-  if (state.view === 'settings' && openSettingsAccordions.length) {
-    const wanted = new Set(openSettingsAccordions);
-    app.querySelectorAll('.settings-accordion-v9185').forEach(details => {
-      const title = details.querySelector(':scope > summary')?.textContent?.trim();
-      if (title && wanted.has(title)) details.setAttribute('open', '');
-    });
-  }
   window.scrollTo({ top: preservedScroll, behavior: 'instant' });
   if (preservedScroll > 0) requestAnimationFrame(() => window.scrollTo({ top: preservedScroll, behavior: 'instant' }));
   notifyStableRender('view');
 }
-
 function notifyStableRender(reason = 'update') {
   window.dispatchEvent(new CustomEvent('news:stable-render', { detail: { reason, view: state.view } }));
-  scheduleVisualBackfill(80);
+  scheduleVisualBackfill(45);
 }
 
 function refreshSheet() {
@@ -1061,13 +1065,13 @@ async function backfillVisibleVisuals() {
     .filter(Boolean);
   const candidates = orderedArticles
     .filter(article => {
-      if (hasPreparedVisual(article) && !recoveryIds.has(String(article.id))) return false;
+      if (!recoveryIds.has(String(article.id))) return false;
       const attempt = visualBackfills[String(article.id)];
       const attempts = Number(attempt?.attempts || 0);
       return attempts < VISUAL_BACKFILL_MAX_ATTEMPTS
         && (!attempt?.attemptedAt || Date.now() - Number(attempt.attemptedAt) >= VISUAL_BACKFILL_RETRY_DELAY);
     })
-    .slice(0, 6);
+    .slice(0, 10);
   if (!candidates.length) {
     const retryWaits = orderedArticles
       .filter(article => !hasPreparedVisual(article) || recoveryIds.has(String(article.id)))
@@ -1084,26 +1088,26 @@ async function backfillVisibleVisuals() {
     while (cursor < candidates.length) {
       const article = candidates[cursor++];
       await recoverArticleVisual(article);
-      if (cursor < candidates.length) await new Promise(resolve => setTimeout(resolve, 80));
+      if (cursor < candidates.length) await new Promise(resolve => setTimeout(resolve, 20));
     }
   };
   try {
-    const workerCount = Math.min(3, candidates.length);
+    const workerCount = Math.min(5, candidates.length);
     await Promise.all(Array.from({ length: workerCount }, () => worker()));
     persistCache();
     saveVisualBackfills();
   } finally {
     visualBackfillRunning = false;
-    scheduleVisualBackfill(350);
+    scheduleVisualBackfill(180);
   }
 }
 
-function scheduleVisualBackfill(delay = 120) {
+function scheduleVisualBackfill(delay = 60) {
   clearTimeout(visualBackfillTimer);
   visualBackfillTimer = window.setTimeout(() => {
     visualBackfillTimer = null;
     void backfillVisibleVisuals();
-  }, Math.max(80, Number(delay) || 120));
+  }, Math.max(35, Number(delay) || 60));
 }
 
 // Image errors do not add/remove DOM nodes. Capture the failure and immediately
@@ -1111,7 +1115,7 @@ function scheduleVisualBackfill(delay = 120) {
 document.addEventListener('error', event => {
   const image = event.target;
   if (image instanceof HTMLImageElement && image.closest('.article-card[data-article]')) {
-    scheduleVisualBackfill(100);
+    scheduleVisualBackfill(45);
   }
 }, true);
 
@@ -1306,9 +1310,7 @@ async function checkAppUpdate({ announce = false } = {}) {
 app.addEventListener('click', async event => {
   if (event.target.closest('[data-reset-read]')) {
     event.preventDefault();
-    greyArticleIds.clear();
-    localStorage.setItem('news-grey-after-scroll-v9138-v1', '[]');
-    document.querySelectorAll('.article-card.read-passed-v9138').forEach(card => card.classList.remove('read-passed-v9138'));
+    resetReadStateFromNav(state.view === 'brief' ? 'brief' : 'home');
     return;
   }
   const more = event.target.closest('[data-home-more]');

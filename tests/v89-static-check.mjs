@@ -161,3 +161,13 @@ if (!app.includes('openSettingsAccordions') || !app.includes("details.setAttribu
 else ok('settings accordions persist across actions');
 if (!app.includes('.slice(0, 6);') || !app.includes('Math.min(3, candidates.length)') || !app.includes('scheduleVisualBackfill(350)')) fail('accelerated image recovery missing');
 else ok('accelerated image recovery configured');
+
+if (!app.includes('settingsOpenAccordions') || !app.includes('captureOpenSettingsAccordions')) fail('settings accordion persistence missing');
+else ok('settings accordion persistence configured');
+if (!app.includes('navLongPressTimer') || !app.includes('resetReadStateFromNav(view)')) fail('long press reset on Home/Brief missing');
+else ok('long press reset on Home/Brief configured');
+if (!app.includes('startImmediately') || !app.includes('fetchpriority=')) fail('immediate high-priority article image loading missing');
+else ok('immediate high-priority article image loading configured');
+const imageSequence = read('image-sequence-v91.82.js');
+if (!imageSequence.includes('setTimeout(pump, 4)') || !imageSequence.includes('index < 24')) fail('accelerated image sequencing missing');
+else ok('accelerated image sequencing configured');
