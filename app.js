@@ -4,7 +4,7 @@ import { articleVisualUrl, hasPreparedVisual, sourceTileUrl } from './services/a
 const $ = (selector, root = document) => root.querySelector(selector);
 const app = $('#app');
 const toastEl = $('#toast');
-const APP_VERSION = '74';
+const APP_VERSION = '75';
 const APP_RELEASE = '24 septembre 2026';
 document.documentElement.dataset.appVersion = APP_VERSION;
 
@@ -270,7 +270,7 @@ function articleCard(article, index = 0) {
 }
 
 function topbar(title, back = true, right = '') {
-  return `<header class="topbar">${back ? `<button class="icon-btn" data-back aria-label="Retour">${icon('back')}</button>` : '<span></span>'}<h1>${escapeHtml(title)}</h1>${right || '<span></span>'}</header>`;
+  return `<header class="topbar page-masthead-v9186">${back ? `<button class="icon-btn" data-back aria-label="Retour">${icon('back')}</button>` : '<span></span>'}<h1>${escapeHtml(title)}</h1>${right || '<span></span>'}</header>`;
 }
 
 function syncStrip() {
@@ -391,7 +391,8 @@ function watchRuleMatches(article, rule = {}) {
 function watchedArticles() {
   const rules = activeWatchRules();
   if (!rules.length) return [];
-  return visibleArticles().filter(article => rules.some(rule => watchRuleMatches(article, rule)));
+  const cutoff = Date.now() - 15 * 24 * 60 * 60 * 1000;
+  return visibleArticles().filter(article => (Date.parse(article.publishedAt || 0) || 0) >= cutoff && rules.some(rule => watchRuleMatches(article, rule)));
 }
 
 function watchNewCount() {
@@ -461,7 +462,8 @@ function historyBriefMarkup() {
 
 function renderWatchesFinal() {
   const rules = activeWatchRules();
-  const recent = visibleArticles().slice(0, 260);
+  const cutoff = Date.now() - 15 * 24 * 60 * 60 * 1000;
+  const recent = visibleArticles().filter(article => (Date.parse(article.publishedAt || 0) || 0) >= cutoff).slice(0, 500);
   const order = [];
   const days = new Map();
   for (const article of recent) {
@@ -469,7 +471,7 @@ function renderWatchesFinal() {
     if (!days.has(key)) { days.set(key, []); order.push(key); }
     days.get(key).push(article);
   }
-  const groups = order.slice(0, 9).map((key, dayIndex) => {
+  const groups = order.slice(0, 15).map((key, dayIndex) => {
     const dayArticles = days.get(key) || [];
     const watched = rules.length ? dayArticles.filter(article => rules.some(rule => watchRuleMatches(article, rule))) : [];
     const filtered = watched.length ? `<div class="feed stable-owned-list watch-filtered-feed-v9138">${watched.slice(0, 30).map((article, index) => compactArticleRow(article, dayIndex * 40 + index)).join('')}</div>` : '<p class="watch-empty-day-v9138">Aucune nouveauté correspondant à vos règles de veille ce jour-là.</p>';
@@ -496,7 +498,7 @@ function renderBrief() {
     const major = majorTerms.test(text) ? 70 : 0;
     const low = lowPriorityTerms.test(text) ? -240 : 0;
     return { article, score: 100 + category + corroboration + major + low - Math.min(age * 1.6, 100) };
-  }).filter(item => Date.now() - Date.parse(item.article.publishedAt || 0) <= 72 * 3600000)
+  }).filter(item => Date.now() - Date.parse(item.article.publishedAt || 0) <= 15 * 24 * 3600000)
     .sort((a, b) => b.score - a.score);
   const picks = [];
   const sourceCounts = new Map();
@@ -592,17 +594,38 @@ function sourceRows() {
 
 function sourceDirectoryMarkup() {
   const items = sourceDirectory();
-  if (!items.length) return '<p class="muted-note">Les sources apparaîtront ici dès que le premier flux sera chargé.</p>';
-  return `<div class="source-directory-v9184">${items.map(item => {
+  if (!items.length) return '<p class="muted-note">Aucune source détectée pour le moment.</p>';
+  return `<div class="source-directory-v9186">${items.map(item => {
     const followed = state.followedSources.has(item.key);
     const blocked = state.blockedSources.has(item.key);
     const feeds = [...item.feeds.entries()];
-    return `<article class="source-directory-row-v9184 ${blocked ? 'is-blocked' : ''}">
-      <div class="source-directory-main-v9184"><div><strong>${escapeHtml(item.name)}</strong><span>${item.count} article${item.count > 1 ? 's' : ''}${item.domains.size ? ` · ${escapeHtml([...item.domains].slice(0,2).join(', '))}` : ''}</span></div>
-      <div class="source-actions-v9184"><button type="button" class="${followed ? 'active' : ''}" data-source-follow="${escapeHtml(item.key)}">${followed ? 'Suivie' : 'Suivre'}</button><button type="button" class="${blocked ? 'danger active' : 'danger'}" data-source-block="${escapeHtml(item.key)}">${blocked ? 'Débloquer' : 'Bloquer'}</button></div></div>
-      ${feeds.length ? `<details class="source-feeds-v9184"><summary>Flux / sous-flux détectés (${feeds.length})</summary>${feeds.map(([url,title]) => `<div><span>${escapeHtml(title)}</span><small>${escapeHtml(url)}</small></div>`).join('')}</details>` : ''}
+    return `<article class="source-directory-row-v9186 ${blocked ? 'is-blocked' : ''}">
+      <div class="source-line-v9186">
+        <strong>${escapeHtml(item.name)}</strong>
+        <div class="source-actions-v9186">
+          <button type="button" class="${followed ? 'active' : ''}" data-source-follow="${escapeHtml(item.key)}">${followed ? 'Suivie' : 'Suivre'}</button>
+          <button type="button" class="${blocked ? 'danger active' : 'danger'}" data-source-block="${escapeHtml(item.key)}">${blocked ? 'Débloquer' : 'Bloquer'}</button>
+        </div>
+      </div>
+      ${feeds.length > 1 ? `<details class="source-feeds-v9186"><summary>Sous-flux</summary>${feeds.map(([,title]) => `<div>${escapeHtml(title || 'Flux')}</div>`).join('')}</details>` : ''}
     </article>`;
   }).join('')}</div>`;
+}
+
+function blockedSourceChips() {
+  const items = [...state.blockedSources];
+  if (!items.length) return '';
+  return `<div class="keyword-list blocked-sources-v9186">${items.map(key => `<span class="keyword-chip">${escapeHtml(key)}<button data-manual-source-unblock="${escapeHtml(key)}" aria-label="Débloquer ${escapeHtml(key)}">×</button></span>`).join('')}</div>`;
+}
+
+function interestEditorMarkup() {
+  const current = uniqueTopics(state.settings.interests || []);
+  const suggestions = PERSONAL_THEMES.filter(theme => !current.some(item => normalizeTopic(item) === normalizeTopic(theme)));
+  return `<div class="interest-editor-v9186">
+    <div class="inline-form interest-add-v9186"><input id="interest-input" class="text-input" type="text" maxlength="70" placeholder="Ajouter un centre d’intérêt"><button class="small-primary-btn" data-add-interest>Ajouter</button></div>
+    <div class="interest-grid centered-interest-grid-v9184 current-interests-v9186">${current.map(theme => `<button class="interest active removable-interest-v9186" data-interest-delete="${escapeHtml(theme)}">${escapeHtml(theme)}<span aria-hidden="true">×</span></button>`).join('')}</div>
+    ${suggestions.length ? `<div class="interest-suggestions-v9186">${suggestions.map(theme => `<button type="button" data-interest="${escapeHtml(theme)}">+${escapeHtml(theme)}</button>`).join('')}</div>` : ''}
+  </div>`;
 }
 
 function keywordChips() {
@@ -626,24 +649,36 @@ function renderSettings() {
   const accordion = (title, body) => `<details class="settings-accordion-v9185"><summary>${escapeHtml(title)}</summary><div class="settings-accordion-content-v9185">${body}</div></details>`;
   return `<main class="page settings-page-v9185">${topbar('Réglages', false)}
     <div class="settings-accordions-v9185">
-      ${accordion('Sources d’information', `<p>Toutes les sources détectées dans votre flux. Vous pouvez les suivre, les bloquer et consulter les flux ou sous-flux détectés.</p>${sourceDirectoryMarkup()}`)}
-      ${accordion('Ajouter une source ou un domaine', `<p>Ajoutez un flux RSS/Atom précis, un fichier OPML ou simplement un domaine qui vous intéresse.</p>
-        <div class="form-stack"><input id="source-name" class="text-input" type="text" maxlength="80" placeholder="Nom de la source (optionnel)"><input id="source-url" class="text-input" type="url" maxlength="600" placeholder="Adresse RSS / Atom"><button class="secondary-btn" data-add-source>${icon('plus')} Ajouter le flux</button></div>
+      ${accordion('Sources d’information', sourceDirectoryMarkup())}
+
+      ${accordion('Ajouter ou bloquer une source', `
+        <div class="form-stack compact-source-form-v9186">
+          <input id="source-name" class="text-input" type="text" maxlength="80" placeholder="Nom de la source (optionnel)">
+          <input id="source-url" class="text-input" type="url" maxlength="600" placeholder="Adresse RSS / Atom">
+          <button class="secondary-btn" data-add-source>${icon('plus')} Ajouter le flux</button>
+        </div>
         ${sourceRows()}
-        <div class="inline-form domain-form-v9184"><input id="domain-input" class="text-input" type="text" maxlength="160" placeholder="exemple.fr"><button class="small-primary-btn" data-add-domain>Ajouter le domaine</button></div>
-        ${domainRows()}
-        <div class="import-status">${icon('upload')}<span>${escapeHtml(state.opmlName)}</span></div><label class="secondary-btn" for="opml-input">Importer un fichier OPML</label><input id="opml-input" class="file-input" type="file" accept=".opml,.xml">`)}
-      ${accordion('Centres d’intérêt', `<p>Ces thèmes servent à personnaliser la sélection générale.</p><div class="interest-grid centered-interest-grid-v9184">${PERSONAL_THEMES.map(theme => `<button class="interest ${state.settings.interests.includes(theme) ? 'active' : ''}" data-interest="${theme}">${theme}</button>`).join('')}</div>`)}
-      ${accordion('Mots-clés', `<p>Ajoutez les sujets que vous souhaitez voir davantage ou, au contraire, éviter.</p>
+        <div class="inline-form manual-block-source-v9186"><input id="blocked-source-input" class="text-input" type="text" maxlength="100" placeholder="Nom d’une source à bloquer"><button class="small-primary-btn danger-action-v9186" data-add-blocked-source>Bloquer</button></div>
+        ${blockedSourceChips()}
+        <label class="secondary-btn opml-button-v9186" for="opml-input">Importer un fichier OPML</label><input id="opml-input" class="file-input" type="file" accept=".opml,.xml">
+      `)}
+
+      ${accordion('Centres d’intérêt', interestEditorMarkup())}
+
+      ${accordion('Mots-clés', `
         <div class="inline-form"><input id="keyword-input" class="text-input" type="text" maxlength="70" placeholder="À surveiller"><button class="small-primary-btn" data-add-keyword>Ajouter</button></div>${keywordChips()}
         <h3 class="settings-subtitle-v9184">À éviter</h3>
         <div class="inline-form"><input id="blocked-keyword-input" class="text-input" type="text" maxlength="70" placeholder="À éviter"><button class="small-primary-btn" data-add-blocked-keyword>Éviter</button></div>${blockedKeywordChips()}`)}
-      ${accordion('Veille', `<p>Définissez précisément ce que vous voulez surveiller. Utilisez <strong>+</strong> pour exiger plusieurs termes et <strong>|</strong> pour accepter des alternatives.</p>
+
+      ${accordion('Veille', `
         <div class="form-stack"><input id="watch-query-input" class="text-input" maxlength="160" placeholder="Ex. Meta + Quest 4 | Quest 4"><input id="watch-exclude-input" class="text-input" maxlength="160" placeholder="À exclure : rumeur, promotion…"><button class="secondary-btn" data-add-watch-rule>${icon('plus')} Ajouter la veille</button></div>
         ${watchRulesMarkup()}`)}
-      ${accordion('Actualité générale', `<p>Choisissez les grandes rubriques qui restent présentes dans le flux.</p><div class="interest-grid centered-interest-grid-v9184">${GENERAL_CATEGORIES.map(category => `<button class="interest ${state.settings.generalCategories.includes(category) ? 'active' : ''}" data-general-category="${category}">${category}</button>`).join('')}</div>`)}
-      ${accordion('Fonctionnement', `${settingRow('Actualisation automatique', 'Charge les nouveautés en arrière-plan.', 'autoRefresh')}${settingRow('Recherche web complémentaire', 'Complète les flux avec Google Actualités.', 'webSearch')}`)}
-      ${accordion('Version', `<div class="app-version-row"><div><strong>Mon actualité · version ${APP_VERSION}</strong><span>Publication du ${APP_RELEASE}</span></div><span class="app-version-badge">v${APP_VERSION}</span></div><button class="secondary-btn compact-btn" data-check-update>${icon('refresh')} Vérifier la mise à jour</button>`)}
+
+      ${accordion('Actualité générale', `<div class="interest-grid centered-interest-grid-v9184">${GENERAL_CATEGORIES.map(category => `<button class="interest ${state.settings.generalCategories.includes(category) ? 'active' : ''}" data-general-category="${category}">${category}</button>`).join('')}</div>`)}
+
+      ${accordion('Fonctionnement', `<div class="function-settings-v9186">${settingRow('Actualisation automatique', 'Charge les nouveautés en arrière-plan.', 'autoRefresh')}${settingRow('Recherche web complémentaire', 'Complète les flux avec Google Actualités.', 'webSearch')}</div>`)}
+
+      ${accordion('Version', `<div class="app-version-row"><div><strong>Mon actualité · version ${APP_VERSION}</strong><span>Publication du ${APP_RELEASE}</span></div><span class="app-version-badge">v${APP_VERSION}</span></div><button class="secondary-btn compact-btn version-update-v9186" data-check-update>${icon('refresh')} Vérifier la mise à jour</button>`)}
     </div>
   </main>${nav('settings')}`;
 }
@@ -1096,6 +1131,23 @@ function addWatchRule() {
   persist(); render(); toast('Veille ajoutée'); syncNews({ silent: true });
 }
 
+function addBlockedSourceManual() {
+  const raw = $('#blocked-source-input')?.value.trim();
+  const key = normalizeTopic(raw || '');
+  if (!key) return toast('Indiquez une source');
+  state.blockedSources.add(key);
+  state.followedSources.delete(key);
+  persist(); render(); toast('Source bloquée');
+}
+
+function addInterestManual() {
+  const value = $('#interest-input')?.value.trim();
+  if (!value) return;
+  if (state.settings.interests.some(item => normalizeTopic(item) === normalizeTopic(value))) return toast('Centre d’intérêt déjà présent');
+  state.settings.interests.push(value);
+  persist(); render(); syncNews({ silent: true }); toast('Centre d’intérêt ajouté');
+}
+
 async function checkAppUpdate({ announce = false } = {}) {
   try {
     const versionUrl = new URL('./version.json', location.href);
@@ -1203,6 +1255,20 @@ app.addEventListener('click', async event => {
   if (event.target.closest('[data-add-domain]')) { addDomain(); return; }
   if (event.target.closest('[data-add-blocked-keyword]')) { addBlockedKeyword(); return; }
   if (event.target.closest('[data-add-watch-rule]')) { addWatchRule(); return; }
+  if (event.target.closest('[data-add-blocked-source]')) { addBlockedSourceManual(); return; }
+  if (event.target.closest('[data-add-interest]')) { addInterestManual(); return; }
+
+  const manualUnblock = event.target.closest('[data-manual-source-unblock]');
+  if (manualUnblock) {
+    state.blockedSources.delete(manualUnblock.dataset.manualSourceUnblock || '');
+    persist(); render(); return;
+  }
+  const interestDelete = event.target.closest('[data-interest-delete]');
+  if (interestDelete) {
+    const wanted = normalizeTopic(interestDelete.dataset.interestDelete || '');
+    state.settings.interests = state.settings.interests.filter(item => normalizeTopic(item) !== wanted);
+    persist(); render(); syncNews({ silent: true }); return;
+  }
 
   const sourceFollow = event.target.closest('[data-source-follow]');
   if (sourceFollow) {
@@ -1254,7 +1320,16 @@ app.addEventListener('click', async event => {
   const interest = event.target.closest('[data-interest]');
   if (interest) { const name = interest.dataset.interest; const current = new Set(state.settings.interests); current.has(name) ? current.delete(name) : current.add(name); state.settings.interests = [...current]; persist(); reconcileHomeOrder({ reset: true }); state.sheet ? refreshSheet() : render(); syncNews({ silent: true }); return; }
   const general = event.target.closest('[data-general-category]');
-  if (general) { const name = general.dataset.generalCategory; const current = new Set(state.settings.generalCategories); current.has(name) ? current.delete(name) : current.add(name); state.settings.generalCategories = [...current]; persist(); reconcileHomeOrder({ reset: true }); state.sheet ? refreshSheet() : render(); return; }
+  if (general) {
+    const name = general.dataset.generalCategory;
+    const current = new Set(state.settings.generalCategories);
+    current.has(name) ? current.delete(name) : current.add(name);
+    state.settings.generalCategories = [...current];
+    persist(); reconcileHomeOrder({ reset: true });
+    general.closest('details')?.removeAttribute('open');
+    state.sheet ? refreshSheet() : render();
+    return;
+  }
   const briefEssential = event.target.closest('[data-brief-essential]');
   if (briefEssential) { const name = briefEssential.dataset.briefEssential; const current = new Set(state.settings.briefEssentialCategories); current.has(name) ? current.delete(name) : current.add(name); state.settings.briefEssentialCategories = [...current]; persist(); state.sheet ? refreshSheet() : render(); return; }
   const briefWatch = event.target.closest('[data-brief-watch]');
@@ -1293,6 +1368,8 @@ app.addEventListener('keydown', event => {
   if (event.key === 'Enter' && event.target.id === 'keyword-input') addKeyword();
   if (event.key === 'Enter' && event.target.id === 'blocked-keyword-input') addBlockedKeyword();
   if (event.key === 'Enter' && event.target.id === 'domain-input') addDomain();
+  if (event.key === 'Enter' && event.target.id === 'blocked-source-input') addBlockedSourceManual();
+  if (event.key === 'Enter' && event.target.id === 'interest-input') addInterestManual();
   if (event.key === 'Enter' && event.target.id === 'watch-query-input') addWatchRule();
   if (event.key === 'Enter' && event.target.id === 'source-url') addSource();
   if (event.key === 'Escape' && state.sheet) closeSheet();
