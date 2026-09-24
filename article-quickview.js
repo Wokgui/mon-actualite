@@ -306,7 +306,7 @@ function quickReaderParagraphMarkup(paragraphs = [], label = 'Article public · 
 function quickReaderBody(article = {}) {
   const paragraphs = quickReaderParagraphs(article);
   if (!paragraphs.length) {
-    return '<p class="quick-reader-empty">Le texte complet n’est pas fourni directement par le flux.</p>';
+    return '<p class="quick-reader-empty">Impossible d’afficher davantage de texte ici pour cet article.</p>';
   }
   const full = Boolean(String(article.contentText || '').trim());
   return `<article class="quick-reader-body ${full ? 'is-full-feed' : 'is-excerpt'}">
@@ -350,7 +350,7 @@ async function quickLoadPublicArticle(article, backdrop) {
 
   const fullFromFeed = quickReaderParagraphs({ ...article, summary: '', contentText: article.contentText || '' });
   if (String(article.contentText || '').trim().length >= 700 && fullFromFeed.length) {
-    target.innerHTML = quickReaderParagraphMarkup(fullFromFeed, 'Article fourni par le flux de la source');
+    target.innerHTML = quickReaderParagraphMarkup(fullFromFeed, 'Article · lecture intégrée');
     return;
   }
 
@@ -361,11 +361,14 @@ async function quickLoadPublicArticle(article, backdrop) {
   }
 
   target.innerHTML = quickReaderLoadingMarkup();
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), 6500);
 
   try {
     const response = await fetch('/api/news?reader=1', {
       method: 'POST',
       cache: 'no-store',
+      signal: controller.signal,
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({
         url: String(article.url || ''),
@@ -380,10 +383,16 @@ async function quickLoadPublicArticle(article, backdrop) {
       target.innerHTML = quickReaderParagraphMarkup(data.paragraphs);
       return;
     }
-  } catch {}
+  } catch {
+    // Timeout, site inaccessible or extraction impossible: show the source
+    // excerpt instead of leaving a spinner running forever.
+  } finally {
+    window.clearTimeout(timeout);
+  }
 
   if (!target.isConnected) return;
-  target.innerHTML = quickReaderBody(article);
+  const fallback = quickReaderBody(article);
+  target.innerHTML = fallback || '<p class="quick-reader-empty">Le texte n’a pas pu être chargé dans l’application. Le lien vers l’article original reste disponible ci-dessous.</p>';
 }
 
 function openQuickSummary(article) {
@@ -397,7 +406,7 @@ function openQuickSummary(article) {
   backdrop.className = 'quick-summary-backdrop';
   backdrop.innerHTML = `<section class="quick-summary-sheet" role="dialog" aria-modal="true" aria-label="Lecture de l’article">
     <header class="quick-summary-head">
-      <button type="button" class="quick-summary-close" data-quick-close aria-label="Fermer">×</button>
+      <button type="button" class="quick-summary-close" data-quick-close aria-label="Retour">‹</button>
     </header>
     <div class="quick-reader-kicker">Article gratuit</div>
     <h2>${quickEsc(cleanTitle)}</h2>
