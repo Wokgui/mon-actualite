@@ -4,7 +4,7 @@ import { articleVisualUrl, hasPreparedVisual, sourceTileUrl } from './services/a
 const $ = (selector, root = document) => root.querySelector(selector);
 const app = $('#app');
 const toastEl = $('#toast');
-const APP_VERSION = '90';
+const APP_VERSION = '91';
 const APP_RELEASE = '24 septembre 2026';
 document.documentElement.dataset.appVersion = APP_VERSION;
 
@@ -17,7 +17,7 @@ const DEFAULT_WATCH_TOPICS = ['Recherche scientifique', 'Innovations', 'Progrès
 // became available a few seconds later.
 const VISUAL_BACKFILL_KEY = 'news-visual-backfill-v3';
 const VISUAL_BACKFILL_MAX_AGE = 30 * 86400000;
-const VISUAL_BACKFILL_RETRY_DELAY = 90 * 1000;
+const VISUAL_BACKFILL_RETRY_DELAY = 20 * 1000;
 const VISUAL_BACKFILL_MAX_ATTEMPTS = 4;
 const BRIEF_DAYS = 10;
 const HISTORY_SYNC_KEY = 'news-history-sync-v9200';
@@ -198,7 +198,7 @@ function badgeFor(article) {
 function articleVisual(article, index = 0) {
   const prepared = hasPreparedVisual(article);
   const tile = sourceTileUrl(article);
-  return `<img class="article-image original-article-image stable-visual ${prepared ? 'prepared-visual' : 'source-tile-visual'}" src="${escapeHtml(tile)}" alt="" width="400" height="224" loading="${index < 8 ? 'eager' : 'lazy'}" decoding="async" referrerpolicy="no-referrer" style="background-image:url('${escapeHtml(tile)}');background-size:cover">`;
+  return `<img class="article-image original-article-image stable-visual ${prepared ? 'prepared-visual' : 'source-tile-visual'}" src="${escapeHtml(tile)}" alt="" width="400" height="224" loading="${index < 18 ? 'eager' : 'lazy'}" decoding="async" referrerpolicy="no-referrer" style="background-image:url('${escapeHtml(tile)}');background-size:cover">`;
 }
 
 function sourceIdentity(article = {}) {
@@ -762,8 +762,18 @@ function renderLoadingScreen() {
 
 function render({ resetScroll = false, scrollTop = null } = {}) {
   const preservedScroll = Number.isFinite(scrollTop) ? scrollTop : (resetScroll ? 0 : window.scrollY);
+  const openSettingsAccordions = state.view === 'settings'
+    ? [...app.querySelectorAll('.settings-accordion-v9185[open] > summary')].map(summary => summary.textContent.trim())
+    : [];
   const views = { home: renderHome, category: renderCategory, detail: renderDetail, brief: renderBrief, news: renderNews, settings: renderSettings };
   app.innerHTML = (views[state.view] || renderHome)() + renderSheet();
+  if (state.view === 'settings' && openSettingsAccordions.length) {
+    const wanted = new Set(openSettingsAccordions);
+    app.querySelectorAll('.settings-accordion-v9185').forEach(details => {
+      const title = details.querySelector(':scope > summary')?.textContent?.trim();
+      if (title && wanted.has(title)) details.setAttribute('open', '');
+    });
+  }
   window.scrollTo({ top: preservedScroll, behavior: 'instant' });
   if (preservedScroll > 0) requestAnimationFrame(() => window.scrollTo({ top: preservedScroll, behavior: 'instant' }));
   notifyStableRender('view');
@@ -1043,7 +1053,7 @@ async function backfillVisibleVisuals() {
   // Only recover cards close to the Android viewport. Processing every card
   // already rendered (including hundreds below the fold) flooded Google and
   // turned otherwise valid Parisien images into HTTP 429 fallbacks.
-  const nearbyEntries = cardEntries.filter(item => item.distance <= Math.max(1400, window.innerHeight * 1.5));
+  const nearbyEntries = cardEntries.filter(item => item.distance <= Math.max(2200, window.innerHeight * 2.2));
   const recoveryIds = new Set(nearbyEntries.filter(item => item.needsRecovery).map(item => item.id));
   const visibleIds = nearbyEntries.map(item => item.id);
   const orderedArticles = [...new Set(visibleIds)]
@@ -1057,7 +1067,7 @@ async function backfillVisibleVisuals() {
       return attempts < VISUAL_BACKFILL_MAX_ATTEMPTS
         && (!attempt?.attemptedAt || Date.now() - Number(attempt.attemptedAt) >= VISUAL_BACKFILL_RETRY_DELAY);
     })
-    .slice(0, 2);
+    .slice(0, 6);
   if (!candidates.length) {
     const retryWaits = orderedArticles
       .filter(article => !hasPreparedVisual(article) || recoveryIds.has(String(article.id)))
@@ -1074,18 +1084,17 @@ async function backfillVisibleVisuals() {
     while (cursor < candidates.length) {
       const article = candidates[cursor++];
       await recoverArticleVisual(article);
-      await new Promise(resolve => setTimeout(resolve, 900));
+      if (cursor < candidates.length) await new Promise(resolve => setTimeout(resolve, 80));
     }
   };
   try {
-    await worker();
+    const workerCount = Math.min(3, candidates.length);
+    await Promise.all(Array.from({ length: workerCount }, () => worker()));
     persistCache();
     saveVisualBackfills();
   } finally {
     visualBackfillRunning = false;
-    // Continue gently for the few cards near the viewport; scrolling schedules
-    // another pass for newly visible rows.
-    scheduleVisualBackfill(1200);
+    scheduleVisualBackfill(350);
   }
 }
 
@@ -1362,6 +1371,11 @@ app.addEventListener('click', async event => {
   const viewButton = event.target.closest('[data-view]');
   if (viewButton) {
     const view = viewButton.dataset.view;
+    if ((view === 'home' || view === 'brief') && Date.now() < navLongPressBlockClickUntil) {
+      event.preventDefault();
+      event.stopPropagation();
+      return;
+    }
     if (view === 'sheet') openSheet(); else navigate(view, { savedOnly: false });
     return;
   }
@@ -1522,6 +1536,63 @@ app.addEventListener('keydown', event => {
 });
 
 const greyArticleIds = new Set(safeJson('news-grey-after-scroll-v9138-v1', []).map(String));
+let navLongPressBlockClickUntil = 0;
+let navLongPressTimer = 0;
+let navLongPressButton = null;
+let navLongPressStartX = 0;
+let navLongPressStartY = 0;
+
+function resetReadStateFromNav(view) {
+  greyArticleIds.clear();
+  localStorage.setItem('news-grey-after-scroll-v9138-v1', '[]');
+  document.querySelectorAll('.article-card.read-passed-v9138').forEach(card => card.classList.remove('read-passed-v9138'));
+  navLongPressBlockClickUntil = Date.now() + 900;
+  if (state.view !== view) {
+    state.view = view;
+    state.sheet = false;
+    state.savedOnly = false;
+    render({ resetScroll: true });
+  } else {
+    window.scrollTo({ top: 0, behavior: 'instant' });
+    bindStableCards();
+  }
+  toast('Articles remis à neuf');
+}
+
+function cancelNavLongPress() {
+  if (navLongPressTimer) window.clearTimeout(navLongPressTimer);
+  navLongPressTimer = 0;
+  navLongPressButton = null;
+}
+
+app.addEventListener('pointerdown', event => {
+  const button = event.target.closest('.bottom-nav .nav-item[data-view="home"], .bottom-nav .nav-item[data-view="brief"]');
+  if (!button) return;
+  cancelNavLongPress();
+  navLongPressButton = button;
+  navLongPressStartX = Number(event.clientX || 0);
+  navLongPressStartY = Number(event.clientY || 0);
+  const view = button.dataset.view;
+  navLongPressTimer = window.setTimeout(() => {
+    navLongPressTimer = 0;
+    navLongPressButton = null;
+    resetReadStateFromNav(view);
+  }, 620);
+});
+
+app.addEventListener('pointermove', event => {
+  if (!navLongPressButton || !navLongPressTimer) return;
+  const dx = Math.abs(Number(event.clientX || 0) - navLongPressStartX);
+  const dy = Math.abs(Number(event.clientY || 0) - navLongPressStartY);
+  if (dx > 12 || dy > 12) cancelNavLongPress();
+}, { passive: true });
+
+app.addEventListener('pointerup', cancelNavLongPress);
+app.addEventListener('pointercancel', cancelNavLongPress);
+app.addEventListener('contextmenu', event => {
+  if (event.target.closest('.bottom-nav .nav-item[data-view="home"], .bottom-nav .nav-item[data-view="brief"]')) event.preventDefault();
+});
+
 const observedGreyCards = new WeakSet();
 let scrollingDown = false;
 let lastScrollY = window.scrollY;

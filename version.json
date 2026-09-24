@@ -1,6 +1,6 @@
 {
-  "version": "90",
-  "codeRelease": "92.00",
+  "version": "91",
+  "codeRelease": "92.01",
   "release": "2026-09-24",
-  "label": "v92.00 : accueil multi-jours, veille uniquement Réglages et suppression des traits entre articles"
+  "label": "v92.01 : appui long Accueil Brief, réglages persistants et photos accélérées"
 }

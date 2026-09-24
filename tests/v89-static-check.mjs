@@ -154,3 +154,10 @@ if (!rowFix.includes('border-bottom:0!important')) fail('article separators are 
 else ok('article separators disabled globally');
 if (!app.includes('const quota = dayIndex === 0 ? 24 : dayIndex === 1 ? 16 : 8')) fail('home day coverage quota missing');
 else ok('home prioritizes multiple publication days before same-day overflow');
+
+if (!app.includes('function resetReadStateFromNav(view)') || !app.includes("}, 620);")) fail('long-press reset contract missing');
+else ok('long-press reset contract configured');
+if (!app.includes('openSettingsAccordions') || !app.includes("details.setAttribute('open', '')")) fail('settings accordion preservation missing');
+else ok('settings accordions persist across actions');
+if (!app.includes('.slice(0, 6);') || !app.includes('Math.min(3, candidates.length)') || !app.includes('scheduleVisualBackfill(350)')) fail('accelerated image recovery missing');
+else ok('accelerated image recovery configured');

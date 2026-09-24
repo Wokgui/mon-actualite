@@ -26,6 +26,7 @@ await context.addInitScript(payload => {
     fetchedAt: new Date().toISOString(),
     stats: {}
   }));
+  localStorage.setItem('news-grey-after-scroll-v9138-v1', JSON.stringify([payload.id]));
 }, article);
 
 const page = await context.newPage();
@@ -137,10 +138,27 @@ assert.ok(Math.abs(rowAlignment.imageHeight - 75) < 0.75, 'article image must ke
 assert.equal(rowAlignment.borderBottomWidth, '0px', 'articles must not have bottom separators');
 assert.equal(rowAlignment.borderTopWidth, '0px', 'articles must not have top separators');
 
+const homeNav = page.locator('.nav-item[data-view="home"]');
+await homeNav.dispatchEvent('pointerdown', { pointerType: 'touch', clientX: 30, clientY: 820 });
+await page.waitForTimeout(700);
+await homeNav.dispatchEvent('pointerup', { pointerType: 'touch', clientX: 30, clientY: 820 });
+const resetState = await page.evaluate(() => ({
+  stored: localStorage.getItem('news-grey-after-scroll-v9138-v1'),
+  greyCount: document.querySelectorAll('.article-card.read-passed-v9138').length
+}));
+assert.equal(resetState.stored, '[]', 'long press on home must clear read history');
+assert.equal(resetState.greyCount, 0, 'long press on home must ungrey visible articles');
+
 await page.locator('.nav-item[data-view="settings"]').click();
 await page.waitForSelector('.settings-page-v9185>.page-masthead-v9186 h1');
 const settingsTitlePx = await page.$eval('.settings-page-v9185>.page-masthead-v9186 h1', el => parseFloat(getComputedStyle(el).fontSize));
 assert.ok(settingsTitlePx <= 25.5, 'settings title must use the refined compact size');
+
+const generalDetails = page.locator('.settings-accordion-v9185').filter({ hasText: 'Actualité générale' }).first();
+await generalDetails.locator(':scope > summary').click();
+assert.ok(await generalDetails.evaluate(el => el.open), 'settings accordion should open');
+await generalDetails.locator('.interest').first().click();
+assert.ok(await page.locator('.settings-accordion-v9185').filter({ hasText: 'Actualité générale' }).first().evaluate(el => el.open), 'settings accordion must stay open after a setting action');
 
 await page.locator('.nav-item[data-view="brief"]').click();
 await page.waitForSelector('.page:has(.brief-mode-tabs)>.page-masthead-v9186 h1');
@@ -148,4 +166,4 @@ const briefTitlePx = await page.$eval('.page:has(.brief-mode-tabs)>.page-masthea
 assert.ok(briefTitlePx <= 25.5, 'brief title must use the refined compact size');
 
 await browser.close();
-console.log('v92.00 current UI browser contract passed.');
+console.log('v92.01 current UI browser contract passed.');
