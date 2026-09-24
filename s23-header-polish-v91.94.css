@@ -26,7 +26,9 @@
   padding-bottom:17px!important;
 }
 
-.page-masthead-v9186 h1{
+.page-masthead-v9186 h1,
+.settings-page-v9185>.page-masthead-v9186 h1,
+.page:has(.brief-mode-tabs)>.page-masthead-v9186 h1{
   font-size:25px!important;
   line-height:1.12!important;
   font-weight:820!important;
@@ -35,5 +37,7 @@
 
 @media(max-width:420px){
   .hero-header h1{font-size:31px!important}
-  .page-masthead-v9186 h1{font-size:24px!important}
+  .page-masthead-v9186 h1,
+  .settings-page-v9185>.page-masthead-v9186 h1,
+  .page:has(.brief-mode-tabs)>.page-masthead-v9186 h1{font-size:24px!important}
 }
