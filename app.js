@@ -1484,7 +1484,6 @@ app.addEventListener('click', async event => {
     current.has(name) ? current.delete(name) : current.add(name);
     state.settings.generalCategories = [...current];
     persist(); reconcileHomeOrder({ reset: true });
-    general.closest('details')?.removeAttribute('open');
     state.sheet ? refreshSheet() : render();
     return;
   }
