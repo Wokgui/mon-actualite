@@ -77,7 +77,8 @@ for (const asset of [
   'theme-periwinkle-v91.90.css?v=2',
   'top-continuity-v91.92.css?v=1',
   'nav-stability-separator-v91.93.css?v=2',
-  's23-header-polish-v91.94.css?v=2'
+  's23-header-polish-v91.94.css?v=2',
+  'feed-row-fix-v91.97.css?v=1'
 ]) {
   if (!index.includes(asset)) fail(`final visual layer missing from index: ${asset}`);
   if (!sw.includes(asset)) fail(`service worker does not precache final visual layer: ${asset}`);
@@ -127,3 +128,14 @@ for (const marker of briefWindowChecks) {
   if (!app.includes(marker)) fail(`10-day Brief/Watch marker missing: ${marker}`);
 }
 if (!process.exitCode) ok('Brief and watch 10-day window configured');
+
+if (!app.includes('function effectiveWatchRules()') || !app.includes('state.settings.briefWatchTopics')) fail('brief watch topics are not connected to effective watch rules');
+else ok('effective watch rules include brief topics');
+if (!app.includes('function fetchHistoryCoverage') || !app.includes('when:${BRIEF_DAYS}d')) fail('10-day historical discovery fetch is missing');
+else ok('historical discovery fetch configured');
+if (!app.includes('visualBackfillTimer = window.setTimeout') || !app.includes("image-failed-v9184")) fail('image recovery scheduler is not active');
+else ok('image recovery scheduler active');
+const androidGradle = read('android-app/app/build.gradle');
+const androidActivity = read('android-app/app/src/main/java/com/wokgui/monactualite/MainActivity.java');
+if (!androidGradle.includes('prepareWebAssets') || !androidActivity.includes('WebViewAssetLoader')) fail('Android APK does not bundle the current frontend');
+else ok('Android APK bundles current frontend independently of Vercel frontend deploys');

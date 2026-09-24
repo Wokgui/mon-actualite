@@ -1,10 +1,10 @@
-import { importOpmlPreview, fetchLiveNews } from './services/source-connectors.js?v=91.96';
-import { articleVisualUrl, hasPreparedVisual, sourceTileUrl } from './services/article-visuals.js?v=57';
+import { importOpmlPreview, fetchLiveNews } from './services/source-connectors.js?v=91.97';
+import { articleVisualUrl, hasPreparedVisual, sourceTileUrl } from './services/article-visuals.js?v=91.97';
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const app = $('#app');
 const toastEl = $('#toast');
-const APP_VERSION = '86';
+const APP_VERSION = '87';
 const APP_RELEASE = '24 septembre 2026';
 document.documentElement.dataset.appVersion = APP_VERSION;
 
@@ -18,8 +18,10 @@ const DEFAULT_WATCH_TOPICS = ['Recherche scientifique', 'Innovations', 'Progrès
 const VISUAL_BACKFILL_KEY = 'news-visual-backfill-v3';
 const VISUAL_BACKFILL_MAX_AGE = 30 * 86400000;
 const VISUAL_BACKFILL_RETRY_DELAY = 90 * 1000;
-const VISUAL_BACKFILL_MAX_ATTEMPTS = 2;
+const VISUAL_BACKFILL_MAX_ATTEMPTS = 4;
 const BRIEF_DAYS = 10;
+const HISTORY_SYNC_KEY = 'news-history-sync-v9197';
+const HISTORY_SYNC_MAX_AGE = 2 * 60 * 60 * 1000;
 
 const categoryMeta = {
   Politique: { icon: 'landmark', label: 'Politique' },
@@ -407,6 +409,18 @@ function activeWatchRules() {
   return Array.isArray(state.watchRules) ? state.watchRules.filter(rule => rule && String(rule.query || '').trim()) : [];
 }
 
+function effectiveWatchRules() {
+  const explicit = activeWatchRules();
+  const topics = uniqueTopics(state.settings.briefWatchTopics || []).map(query => ({ query, exclude: '', topicRule: true }));
+  const seen = new Set();
+  return [...explicit, ...topics].filter(rule => {
+    const key = `${normalizeTopic(rule.query || '')}|${normalizeTopic(rule.exclude || '')}`;
+    if (!key || seen.has(key)) return false;
+    seen.add(key);
+    return true;
+  });
+}
+
 function watchRuleMatches(article, rule = {}) {
   const text = ` ${normalizeTopic([article.title, article.summary, article.detail, article.category, article.source, ...(article.tags || []), ...(article.matches || [])].filter(Boolean).join(' '))} `;
   const query = String(rule.query || '').trim();
@@ -419,7 +433,7 @@ function watchRuleMatches(article, rule = {}) {
 }
 
 function watchedArticles() {
-  const rules = activeWatchRules();
+  const rules = effectiveWatchRules();
   if (!rules.length) return [];
   const cutoff = Date.now() - BRIEF_DAYS * 24 * 60 * 60 * 1000;
   return visibleArticles().filter(article => (Date.parse(article.publishedAt || 0) || 0) >= cutoff && rules.some(rule => watchRuleMatches(article, rule)));
@@ -491,7 +505,7 @@ function historyBriefMarkup() {
 }
 
 function renderWatchesFinal() {
-  const rules = activeWatchRules();
+  const rules = effectiveWatchRules();
   const cutoff = Date.now() - BRIEF_DAYS * 24 * 60 * 60 * 1000;
   const recent = visibleArticles().filter(article => (Date.parse(article.publishedAt || 0) || 0) >= cutoff).slice(0, 500);
   const order = [];
@@ -727,7 +741,7 @@ function renderSheet() {
     <section class="personalize-section"><h3>Accueil</h3><p>Tous les articles restent accessibles. Ces choix déterminent ceux qui remontent en premier.</p>${chips(GENERAL_CATEGORIES, state.settings.generalCategories, 'data-general-category')}${chips(PERSONAL_THEMES, state.settings.interests, 'data-interest')}</section>
     <section class="personalize-section"><h3>Brief · Essentiel</h3><p>Choisissez les rubriques utilisées pour le point d’actualité France et Monde.</p>${chips(GENERAL_CATEGORIES, state.settings.briefEssentialCategories, 'data-brief-essential')}</section>
     <section class="personalize-section"><h3>Brief · Mes veilles</h3><p>Une veille large sur toute la recherche, les innovations de tous domaines et les progrès humains. Affinez librement les thèmes suivis.</p>${chips(watchTopics, state.settings.briefWatchTopics, 'data-brief-watch')}
-      <div class="inline-form personalize-add"><input id="keyword-input" class="text-input" type="text" maxlength="70" placeholder="Ajouter une veille précise"><button class="small-primary-btn" data-add-keyword>Ajouter</button></div>
+      <div class="inline-form personalize-add"><input id="keyword-input" class="text-input" type="text" maxlength="70" placeholder="Ajouter une veille précise"><button class="small-primary-btn" data-add-watch-topic>Ajouter</button></div>
     </section>
     <button type="button" class="secondary-btn personalize-settings" data-open-settings>Réglages avancés</button>
   </section></div>`;
@@ -802,6 +816,7 @@ function updateWatchTopic(value, remove = false) {
   persist();
   const body = app.querySelector('[data-watch-editor-body]');
   if (body) body.innerHTML = watchEditorMarkup();
+  if (!remove) void syncWatchTopic(topic);
 }
 
 function appendHomeToLimit({ increment = false } = {}) {
@@ -1013,6 +1028,7 @@ async function backfillVisibleVisuals() {
       const src = image?.currentSrc || image?.src || '';
       const needsRecovery = Boolean(image && (
         image.classList.contains('source-tile-visual')
+        || image.classList.contains('image-failed-v9184')
         || card.classList.contains('v42-image-failed')
         || src.startsWith('data:image/svg+xml')
         || (image.complete && image.naturalWidth < 2)
@@ -1069,8 +1085,12 @@ async function backfillVisibleVisuals() {
   }
 }
 
-function scheduleVisualBackfill() {
+function scheduleVisualBackfill(delay = 120) {
   clearTimeout(visualBackfillTimer);
+  visualBackfillTimer = window.setTimeout(() => {
+    visualBackfillTimer = null;
+    void backfillVisibleVisuals();
+  }, Math.max(80, Number(delay) || 120));
 }
 
 // Image errors do not add/remove DOM nodes. Capture the failure and immediately
@@ -1082,11 +1102,56 @@ document.addEventListener('error', event => {
   }
 }, true);
 
+function historicalDiscoveryKeywords(extraTopic = '') {
+  const recentTopics = uniqueTopics([
+    extraTopic,
+    ...(state.settings.briefWatchTopics || []).slice(-2).reverse(),
+    ...activeWatchRules().slice(-1).map(rule => rule.query)
+  ]).filter(Boolean);
+  const broad = ['actualité France', 'actualité monde', 'Union européenne', 'science technologie'];
+  return [...new Set([...recentTopics, ...broad])]
+    .slice(0, 6)
+    .map(query => /\bwhen:\d+[dhmy]\b/i.test(query) ? query : `${query} when:${BRIEF_DAYS}d`);
+}
+
+async function fetchHistoryCoverage({ force = false, topic = '' } = {}) {
+  if (!state.settings.webSearch || !navigator.onLine) return null;
+  const last = Number(localStorage.getItem(HISTORY_SYNC_KEY) || 0);
+  if (!force && last && Date.now() - last < HISTORY_SYNC_MAX_AGE) return null;
+  const history = await fetchLiveNews({
+    sources: [],
+    keywords: historicalDiscoveryKeywords(topic),
+    preferredCategories: [],
+    webSearch: true,
+    sourcePriority: false
+  });
+  if (Array.isArray(history?.articles) && history.articles.length) {
+    state.articles = history.articles.map(applyRememberedVisual);
+    state.lastSync = history.fetchedAt || state.lastSync || new Date().toISOString();
+    state.stats = { ...(state.stats || {}), ...(history.stats || {}), historyWindowDays: BRIEF_DAYS };
+    persistCache();
+    localStorage.setItem(HISTORY_SYNC_KEY, String(Date.now()));
+  }
+  return history;
+}
+
+async function syncWatchTopic(topic) {
+  const wanted = String(topic || '').trim();
+  if (!wanted) return null;
+  try {
+    const result = await fetchHistoryCoverage({ force: true, topic: wanted });
+    if (result && state.view === 'brief' && !app.querySelector('.watch-editor-backdrop-v9138')) {
+      render({ scrollTop: window.scrollY });
+    }
+    return result;
+  } catch {
+    return null;
+  }
+}
+
 async function syncNews({ silent = false } = {}) {
   if (syncPromise) return syncPromise;
   state.syncStatus = 'loading'; state.syncError = '';
-  // Background refreshes keep the current DOM in place until fresh data is
-  // ready. Re-rendering here made every cached thumbnail disappear briefly.
   if (!silent && !app.querySelector('[data-article]')) render();
   syncPromise = (async () => {
     try {
@@ -1105,6 +1170,9 @@ async function syncNews({ silent = false } = {}) {
       state.stats = result.stats || null;
       state.syncStatus = 'idle';
       persistCache();
+
+      try { await fetchHistoryCoverage(); } catch {}
+
       refreshAfterNewsChange();
       if (!silent) toast(`${state.articles.length} article${state.articles.length > 1 ? 's' : ''} actualisé${state.articles.length > 1 ? 's' : ''}`);
       return result;
@@ -1153,12 +1221,31 @@ function addBlockedKeyword() {
   persist(); render(); toast('Mot-clé évité');
 }
 
+function reopenSettingsAccordion(title) {
+  requestAnimationFrame(() => {
+    const details = [...app.querySelectorAll('.settings-accordion-v9185')].find(item => item.querySelector(':scope > summary')?.textContent?.trim() === title);
+    details?.setAttribute('open', '');
+  });
+}
+
 function addWatchRule() {
   const query = $('#watch-query-input')?.value.trim();
   const exclude = $('#watch-exclude-input')?.value.trim() || '';
   if (!query) return toast('Indiquez ce que vous voulez surveiller');
   state.watchRules = [...activeWatchRules(), { query, exclude }];
-  persist(); render(); toast('Veille ajoutée'); syncNews({ silent: true });
+  persist();
+  render({ scrollTop: window.scrollY });
+  reopenSettingsAccordion('Veille');
+  toast('Veille ajoutée');
+  void syncWatchTopic(query);
+}
+
+function addWatchTopicFromSheet() {
+  const value = $('#keyword-input')?.value.trim();
+  if (!value) return;
+  updateWatchTopic(value, false);
+  if (state.sheet) refreshSheet();
+  toast('Veille ajoutée');
 }
 
 function addBlockedSourceManual() {
@@ -1282,6 +1369,7 @@ app.addEventListener('click', async event => {
   if (event.target.closest('[data-refresh]')) { await syncNews(); return; }
   if (event.target.closest('[data-add-source]')) { addSource(); return; }
   if (event.target.closest('[data-add-keyword]')) { addKeyword(); return; }
+  if (event.target.closest('[data-add-watch-topic]')) { addWatchTopicFromSheet(); return; }
   if (event.target.closest('[data-add-domain]')) { addDomain(); return; }
   if (event.target.closest('[data-add-blocked-keyword]')) { addBlockedKeyword(); return; }
   if (event.target.closest('[data-add-watch-rule]')) { addWatchRule(); return; }
@@ -1418,7 +1506,9 @@ app.addEventListener('change', async event => {
 
 app.addEventListener('keydown', event => {
   if ((event.key === 'Enter' || event.key === ' ') && event.target.matches('[data-article]')) event.target.click();
-  if (event.key === 'Enter' && event.target.id === 'keyword-input') addKeyword();
+  if (event.key === 'Enter' && event.target.id === 'keyword-input') {
+    if (state.sheet) addWatchTopicFromSheet(); else addKeyword();
+  }
   if (event.key === 'Enter' && event.target.id === 'blocked-keyword-input') addBlockedKeyword();
   if (event.key === 'Enter' && event.target.id === 'domain-input') addDomain();
   if (event.key === 'Enter' && event.target.id === 'blocked-source-input') addBlockedSourceManual();
@@ -1486,7 +1576,7 @@ window.addEventListener('scroll', () => {
 window.addEventListener('resize', () => requestAnimationFrame(pumpContinuousHome), { passive: true });
 
 let serviceWorkerRefreshing = false;
-if ('serviceWorker' in navigator && location.protocol.startsWith('http')) {
+if ('serviceWorker' in navigator && location.protocol.startsWith('http') && !navigator.userAgent.includes('MonActualiteAndroid/')) {
   navigator.serviceWorker.addEventListener('controllerchange', () => {
     serviceWorkerRefreshing = true;
   });

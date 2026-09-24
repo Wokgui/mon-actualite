@@ -1,0 +1,23 @@
+/* v91.97 — centre les visuels avec leurs titres sans modifier la grille compacte. */
+[data-stable-home-feed] .article-card,
+[data-stable-brief-content] .article-card.runtime-row{
+  align-items:center!important;
+}
+[data-stable-home-feed] .article-card .article-image,
+[data-stable-brief-content] .article-card.runtime-row .article-image{
+  align-self:center!important;
+  justify-self:end!important;
+}
+[data-stable-home-feed] .article-card .article-body,
+[data-stable-brief-content] .article-card.runtime-row .article-body{
+  align-self:center!important;
+  min-height:75px!important;
+  padding-top:0!important;
+  padding-bottom:0!important;
+  justify-content:center!important;
+}
+[data-stable-home-feed] .article-card h2,
+[data-stable-brief-content] .article-card.runtime-row h2{
+  margin-top:0!important;
+  margin-bottom:0!important;
+}

@@ -1,4 +1,4 @@
-import { preparedVisualUrl, sourceTileUrl } from './services/article-visuals.js?v=57';
+import { preparedVisualUrl, sourceTileUrl } from './services/article-visuals.js?v=91.97';
 
 const queued = new WeakSet();
 let queue = [];
@@ -63,7 +63,7 @@ function loadOne(card, article) {
   img.addEventListener('load', onLoad, { once: true });
   img.addEventListener('error', onError, { once: true });
   img.decoding = 'async';
-  img.loading = 'eager';
+  img.loading = Number(card.dataset.imageSequenceIndex || 99) < 8 ? 'eager' : 'lazy';
   if ('fetchPriority' in img) img.fetchPriority = Number(card.dataset.imageSequenceIndex || 99) < 4 ? 'high' : 'auto';
   img.src = wanted;
   if (img.complete && img.naturalWidth > 1) onLoad();
@@ -80,6 +80,9 @@ function schedule() {
   const byId = articlesById();
   document.querySelectorAll('.article-card[data-article]').forEach((card, index) => {
     if (queued.has(card)) return;
+    const rect = card.getBoundingClientRect();
+    const nearViewport = index < 12 || (rect.bottom >= -300 && rect.top <= window.innerHeight * 2.2);
+    if (!nearViewport) return;
     queued.add(card);
     card.dataset.imageSequenceIndex = String(index);
     const img = card.querySelector('img.article-image');
@@ -95,4 +98,9 @@ const app = document.getElementById('app');
 if (app) new MutationObserver(() => requestAnimationFrame(schedule)).observe(app, { childList: true, subtree: true });
 window.addEventListener('news:stable-render', schedule);
 window.addEventListener('pageshow', schedule);
+let scrollFrame = 0;
+window.addEventListener('scroll', () => {
+  if (scrollFrame) return;
+  scrollFrame = requestAnimationFrame(() => { scrollFrame = 0; schedule(); });
+}, { passive: true });
 schedule();

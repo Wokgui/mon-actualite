@@ -10,8 +10,8 @@ android {
         applicationId 'com.wokgui.monactualite'
         minSdk 26
         targetSdk 35
-        versionCode 86
-        versionName '86.91.96'
+        versionCode 87
+        versionName '87.91.97'
     }
 
     buildTypes {
@@ -20,4 +20,25 @@ android {
             versionNameSuffix ''
         }
     }
+}
+
+def generatedWebAssets = layout.buildDirectory.dir("generated/web-assets")
+
+tasks.register("prepareWebAssets", Sync) {
+    from(rootProject.projectDir.parentFile) {
+        include "*.html"
+        include "*.css"
+        include "*.js"
+        include "*.webmanifest"
+        include "assets/**"
+        include "services/**"
+    }
+    into(generatedWebAssets)
+}
+
+android.sourceSets.main.assets.srcDir(generatedWebAssets)
+tasks.named("preBuild").configure { dependsOn("prepareWebAssets") }
+
+dependencies {
+    implementation 'androidx.webkit:webkit:1.12.1'
 }

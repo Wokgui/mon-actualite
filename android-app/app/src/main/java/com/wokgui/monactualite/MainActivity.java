@@ -19,13 +19,17 @@ import android.webkit.WebResourceRequest;
 import android.webkit.WebSettings;
 import android.webkit.WebView;
 import android.webkit.WebViewClient;
+import android.webkit.WebResourceResponse;
+
+import androidx.webkit.WebViewAssetLoader;
 
 public class MainActivity extends Activity {
-    private static final String APP_URL = "https://mon-actualite.vercel.app/";
+    private static final String APP_URL = "https://mon-actualite.vercel.app/assets/index.html?native=87";
     private static final String APP_HOST = "mon-actualite.vercel.app";
 
     private FrameLayout root;
     private WebView webView;
+    private WebViewAssetLoader assetLoader;
     private int lastTopInset = -1;
     private int lastBottomInset = -1;
 
@@ -101,9 +105,20 @@ public class MainActivity extends Activity {
         settings.setMediaPlaybackRequiresUserGesture(false);
         settings.setSupportMultipleWindows(true);
         settings.setJavaScriptCanOpenWindowsAutomatically(true);
-        settings.setUserAgentString(settings.getUserAgentString() + " MonActualiteAndroid/86");
+        settings.setUserAgentString(settings.getUserAgentString() + " MonActualiteAndroid/87");
+
+        assetLoader = new WebViewAssetLoader.Builder()
+            .setDomain(APP_HOST)
+            .addPathHandler("/assets/", new WebViewAssetLoader.AssetsPathHandler(this))
+            .build();
 
         webView.setWebViewClient(new WebViewClient() {
+            @Override
+            public WebResourceResponse shouldInterceptRequest(WebView view, WebResourceRequest request) {
+                WebResourceResponse local = assetLoader.shouldInterceptRequest(request.getUrl());
+                return local != null ? local : super.shouldInterceptRequest(view, request);
+            }
+
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
                 Uri uri = request.getUrl();
@@ -172,8 +187,8 @@ public class MainActivity extends Activity {
     }
 
     private void applyAndroidHeaderPolish() {
-        String js = "(function(){if(document.getElementById('android-ui-polish-v86'))return;" +
-            "var s=document.createElement('style');s.id='android-ui-polish-v86';" +
+        String js = "(function(){if(document.getElementById('android-ui-polish-v87'))return;" +
+            "var s=document.createElement('style');s.id='android-ui-polish-v87';" +
             "s.textContent='.hero-header{background:#F1F2FF!important}.settings-page-v9185>.page-masthead-v9186,.page:has(.brief-mode-tabs)>.page-masthead-v9186{background:#F1F2FF!important}.hero-header h1{font-size:32px!important;line-height:1.08!important;font-weight:840!important;letter-spacing:-.034em!important}" +
             ".page-masthead-v9186 h1,.settings-page-v9185>.page-masthead-v9186 h1,.page:has(.brief-mode-tabs)>.page-masthead-v9186 h1{font-size:25px!important;line-height:1.12!important;font-weight:820!important;letter-spacing:-.026em!important}';" +
             "document.head.appendChild(s);})();";
