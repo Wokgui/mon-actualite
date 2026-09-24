@@ -33,14 +33,14 @@ public class MainActivity extends Activity {
     protected void onCreate(Bundle savedInstanceState) {
         super.onCreate(savedInstanceState);
 
-        getWindow().setStatusBarColor(Color.rgb(247, 248, 255));
+        getWindow().setStatusBarColor(Color.rgb(241, 242, 255));
         getWindow().setNavigationBarColor(Color.WHITE);
         getWindow().getDecorView().setSystemUiVisibility(
             View.SYSTEM_UI_FLAG_LIGHT_STATUS_BAR | View.SYSTEM_UI_FLAG_LIGHT_NAVIGATION_BAR
         );
 
         root = new FrameLayout(this);
-        root.setBackgroundColor(Color.rgb(247, 248, 255));
+        root.setBackgroundColor(Color.rgb(241, 242, 255));
 
         webView = new WebView(this);
         webView.setBackgroundColor(Color.WHITE);
@@ -76,7 +76,7 @@ public class MainActivity extends Activity {
 
             int extraTop = Math.round(6f * getResources().getDisplayMetrics().density);
             int wantedTop = safeTop + extraTop;
-            int wantedBottom = safeBottom;
+            int wantedBottom = 0;
 
             if (wantedTop != lastTopInset || wantedBottom != lastBottomInset) {
                 FrameLayout.LayoutParams params = (FrameLayout.LayoutParams) webView.getLayoutParams();
@@ -101,7 +101,7 @@ public class MainActivity extends Activity {
         settings.setMediaPlaybackRequiresUserGesture(false);
         settings.setSupportMultipleWindows(true);
         settings.setJavaScriptCanOpenWindowsAutomatically(true);
-        settings.setUserAgentString(settings.getUserAgentString() + " MonActualiteAndroid/84");
+        settings.setUserAgentString(settings.getUserAgentString() + " MonActualiteAndroid/85");
 
         webView.setWebViewClient(new WebViewClient() {
             @Override
@@ -172,9 +172,9 @@ public class MainActivity extends Activity {
     }
 
     private void applyAndroidHeaderPolish() {
-        String js = "(function(){if(document.getElementById('android-ui-polish-v84'))return;" +
+        String js = "(function(){if(document.getElementById('android-ui-polish-v85'))return;" +
             "var s=document.createElement('style');s.id='android-ui-polish-v84';" +
-            "s.textContent='.hero-header h1{font-size:32px!important;line-height:1.08!important;font-weight:840!important;letter-spacing:-.034em!important}" +
+            "s.textContent='.hero-header{background:#F1F2FF!important}.settings-page-v9185>.page-masthead-v9186,.page:has(.brief-mode-tabs)>.page-masthead-v9186{background:#F1F2FF!important}.hero-header h1{font-size:32px!important;line-height:1.08!important;font-weight:840!important;letter-spacing:-.034em!important}" +
             ".page-masthead-v9186 h1,.settings-page-v9185>.page-masthead-v9186 h1,.page:has(.brief-mode-tabs)>.page-masthead-v9186 h1{font-size:25px!important;line-height:1.12!important;font-weight:820!important;letter-spacing:-.026em!important}';" +
             "document.head.appendChild(s);})();";
         webView.evaluateJavascript(js, null);

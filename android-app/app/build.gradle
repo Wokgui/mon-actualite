@@ -10,8 +10,8 @@ android {
         applicationId 'com.wokgui.monactualite'
         minSdk 26
         targetSdk 35
-        versionCode 84
-        versionName '84.91.95'
+        versionCode 85
+        versionName '85.91.95.1'
     }
 
     buildTypes {
