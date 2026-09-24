@@ -1,0 +1,261 @@
+/* v91.90 — thème pervenche clair inspiré de la maquette validée. */
+:root{
+  --ui-bg:#F7F8FF;
+  --ui-surface:#FFFFFF;
+  --ui-soft:#EEF2FF;
+  --ui-soft-2:#E7EAFE;
+  --ui-accent:#818CF8;
+  --ui-active:#4338CA;
+  --ui-text:#1E293B;
+  --ui-muted:#64748B;
+  --ui-border:#E5E7EB;
+}
+
+/* Fond éditorial : blanc, sans dominante bleue. */
+html,body,#app,.app-shell,.page{
+  background:var(--ui-surface)!important;
+  color:var(--ui-text)!important;
+}
+
+/* Accueil : en-tête très clair, professionnel, sans grand aplat bleu. */
+.hero-header{
+  position:relative!important;
+  isolation:auto!important;
+  overflow:hidden!important;
+  margin:0 -18px 24px!important;
+  padding:32px 20px 30px!important;
+  border:0!important;
+  border-bottom:1px solid var(--ui-border)!important;
+  border-radius:0!important;
+  background:
+    radial-gradient(120% 90% at -8% 110%,rgba(199,210,254,.34) 0 38%,transparent 39%),
+    radial-gradient(110% 80% at 108% 108%,rgba(224,231,255,.58) 0 40%,transparent 41%),
+    linear-gradient(180deg,#FBFCFF 0%,var(--ui-bg) 100%)!important;
+  box-shadow:none!important;
+}
+.hero-header::before,
+.hero-header::after{
+  content:none!important;
+  display:none!important;
+}
+.hero-header .eyebrow{
+  position:relative!important;
+  display:inline-flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  min-height:34px!important;
+  margin:0 0 13px!important;
+  padding:0 16px!important;
+  border:1px solid #D9DEFB!important;
+  border-radius:999px!important;
+  background:#EEF0FF!important;
+  color:var(--ui-active)!important;
+  box-shadow:none!important;
+  backdrop-filter:none!important;
+  -webkit-backdrop-filter:none!important;
+  font-size:13px!important;
+  line-height:1!important;
+  font-weight:800!important;
+  letter-spacing:.01em!important;
+}
+.hero-header h1{
+  position:relative!important;
+  margin:0!important;
+  color:var(--ui-text)!important;
+  text-shadow:none!important;
+  font-size:39px!important;
+  line-height:1.04!important;
+  font-weight:880!important;
+  letter-spacing:-.045em!important;
+}
+.hero-header>p{display:none!important}
+
+/* Réglages et Brief : même famille visuelle que l'accueil. */
+.settings-page-v9185>.page-masthead-v9186,
+.page:has(.brief-mode-tabs)>.page-masthead-v9186{
+  position:relative!important;
+  isolation:auto!important;
+  overflow:hidden!important;
+  min-height:auto!important;
+  margin:0 -18px 18px!important;
+  padding:28px 18px 22px!important;
+  border:0!important;
+  border-bottom:1px solid var(--ui-border)!important;
+  background:
+    radial-gradient(120% 90% at -8% 110%,rgba(199,210,254,.30) 0 38%,transparent 39%),
+    radial-gradient(110% 80% at 108% 108%,rgba(224,231,255,.52) 0 40%,transparent 41%),
+    linear-gradient(180deg,#FBFCFF 0%,var(--ui-bg) 100%)!important;
+  box-shadow:none!important;
+}
+.settings-page-v9185>.page-masthead-v9186::before,
+.settings-page-v9185>.page-masthead-v9186::after,
+.page:has(.brief-mode-tabs)>.page-masthead-v9186::before,
+.page:has(.brief-mode-tabs)>.page-masthead-v9186::after{
+  content:none!important;
+  display:none!important;
+}
+.settings-page-v9185>.page-masthead-v9186 h1,
+.page:has(.brief-mode-tabs)>.page-masthead-v9186 h1{
+  margin:0!important;
+  color:var(--ui-text)!important;
+  text-shadow:none!important;
+  text-align:center!important;
+  font-size:29px!important;
+  line-height:1.08!important;
+  font-weight:860!important;
+  letter-spacing:-.035em!important;
+}
+.page-masthead-v9186 .icon-btn{
+  color:var(--ui-active)!important;
+  background:transparent!important;
+  border:0!important;
+  box-shadow:none!important;
+}
+
+/* Contenu articles blanc. */
+.feed,.stable-owned-list,.article-card,
+.settings-page-v9185,.settings-accordions-v9185,
+.settings-accordion-v9185,.settings-accordion-content-v9185{
+  background:#fff!important;
+}
+.article-card{
+  border:0!important;
+  border-bottom:1px solid var(--ui-border)!important;
+  border-radius:0!important;
+  box-shadow:none!important;
+}
+.article-card:last-child{border-bottom:0!important}
+.article-card h2,.article-card .article-title{color:var(--ui-text)!important}
+.article-card .article-image{border-radius:10px!important}
+
+/* Accents internes en pervenche/indigo. */
+.settings-accordion-v9185{border-bottom-color:var(--ui-border)!important}
+.settings-accordion-v9185>summary{color:var(--ui-text)!important}
+.settings-accordion-v9185>summary::after{color:var(--ui-active)!important}
+.centered-interest-grid-v9184 .interest.active,
+.source-actions-v9186 button.active,
+.keyword-chip{
+  border-color:#C7D2FE!important;
+  background:var(--ui-soft)!important;
+  color:var(--ui-active)!important;
+}
+.interest-suggestions-v9186 button{color:var(--ui-active)!important}
+.switch.on,.small-primary-btn,.primary-btn{
+  background:var(--ui-active)!important;
+  color:#fff!important;
+}
+
+/* Brief : capsule discrète, active indigo doux. */
+.brief-mode-tabs{
+  margin:0 auto 18px!important;
+  max-width:420px!important;
+  padding:4px!important;
+  border:1px solid #D9DEFB!important;
+  border-radius:14px!important;
+  background:var(--ui-soft)!important;
+}
+.brief-mode-tab{
+  min-height:40px!important;
+  border-radius:10px!important;
+  color:var(--ui-muted)!important;
+}
+.brief-mode-tab.active{
+  background:linear-gradient(135deg,#818CF8 0%,#6366F1 100%)!important;
+  color:#fff!important;
+  box-shadow:none!important;
+}
+
+/* Barre basse : 3 tiers strictement identiques.
+   L'actif colore TOUT son tiers jusqu'aux bords.
+   Aucun déplacement vertical ou latéral au changement d'onglet. */
+.bottom-nav.stable-bottom-nav-v9184{
+  height:calc(74px + env(safe-area-inset-bottom))!important;
+  padding:0!important;
+  display:grid!important;
+  grid-template-columns:repeat(3,minmax(0,1fr))!important;
+  align-items:stretch!important;
+  border-top:1px solid var(--ui-border)!important;
+  border-radius:0!important;
+  background:#fff!important;
+  box-shadow:0 -4px 16px rgba(30,41,59,.06)!important;
+  overflow:hidden!important;
+  backdrop-filter:none!important;
+  -webkit-backdrop-filter:none!important;
+}
+.bottom-nav.stable-bottom-nav-v9184 .nav-item,
+.bottom-nav.stable-bottom-nav-v9184 .nav-item.active,
+.bottom-nav.stable-bottom-nav-v9184 .nav-item:active{
+  position:relative!important;
+  width:100%!important;
+  height:calc(74px + env(safe-area-inset-bottom))!important;
+  min-height:0!important;
+  margin:0!important;
+  padding:9px 4px calc(7px + env(safe-area-inset-bottom))!important;
+  display:flex!important;
+  flex-direction:column!important;
+  align-items:center!important;
+  justify-content:center!important;
+  gap:5px!important;
+  border:0!important;
+  border-radius:0!important;
+  box-shadow:none!important;
+  transform:none!important;
+  transition:background-color .16s ease,color .16s ease!important;
+}
+.bottom-nav.stable-bottom-nav-v9184 .nav-item{
+  background:#fff!important;
+  color:var(--ui-muted)!important;
+}
+.bottom-nav.stable-bottom-nav-v9184 .nav-item.active{
+  background:var(--ui-soft)!important;
+  color:var(--ui-active)!important;
+}
+.bottom-nav.stable-bottom-nav-v9184 .nav-item.active::before,
+.bottom-nav.stable-bottom-nav-v9184 .nav-item.active::after{
+  content:none!important;
+  display:none!important;
+}
+.bottom-nav.stable-bottom-nav-v9184 .nav-item svg,
+.bottom-nav.stable-bottom-nav-v9184 .nav-solid-hard-v9189,
+.bottom-nav.stable-bottom-nav-v9184 .nav-solid-icon-v9188{
+  width:23px!important;
+  height:23px!important;
+  margin:0!important;
+  flex:0 0 23px!important;
+  transform:none!important;
+  color:inherit!important;
+}
+.bottom-nav.stable-bottom-nav-v9184 .nav-item span{
+  margin:0!important;
+  padding:0!important;
+  color:inherit!important;
+  font-size:11.5px!important;
+  line-height:1!important;
+  font-weight:760!important;
+  transform:none!important;
+}
+.nav-watch-dot-v9184{
+  top:5px!important;
+  background:#E85D75!important;
+  border-color:#fff!important;
+}
+
+/* Aucun résidu de l'ancien thème bleu vif. */
+.hero-header + *,
+.page-masthead-v9186 + *{
+  border-top-color:transparent!important;
+}
+
+#app .page{
+  padding-bottom:calc(94px + env(safe-area-inset-bottom))!important;
+}
+
+@media(max-width:420px){
+  .hero-header{padding-top:28px!important;padding-bottom:28px!important}
+  .hero-header h1{font-size:36px!important}
+  .settings-page-v9185>.page-masthead-v9186,
+  .page:has(.brief-mode-tabs)>.page-masthead-v9186{
+    padding-top:25px!important;
+    padding-bottom:19px!important;
+  }
+}
