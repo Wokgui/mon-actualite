@@ -164,7 +164,7 @@ else ok('long press reset on Home/Brief configured');
 if (!app.includes("const src = real || tile") || !app.includes("index < 24 ? 'eager' : 'lazy'") || !app.includes('fetchpriority=')) fail('immediate high-priority article image loading missing');
 else ok('immediate high-priority article image loading configured');
 const imageSequence = read('image-sequence-v91.82.js');
-if (!imageSequence.includes('started < 4') || !imageSequence.includes('setTimeout(pump, 8)') || !imageSequence.includes('index < 24')) fail('accelerated image sequencing missing');
+if (!imageSequence.includes('started < 8') || !imageSequence.includes('setTimeout(pump, 2)') || !imageSequence.includes('index < 40')) fail('accelerated image sequencing missing');
 else ok('accelerated image sequencing configured');
 
 const visualService = read('services/article-visuals.js');
