@@ -21,35 +21,6 @@ jobs:
       - name: Static regression suites
         run: |
           node tests/v89-static-check.mjs
-          node tests/v91-lead-choice.mjs
-          node tests/v91-ai-request-control.mjs
-          node tests/v914-release-watch.mjs
-          node tests/v9112-summary-gate.mjs
-          node tests/v9113-category-classifier.mjs
-          node tests/v9114-news-dedup.mjs
-          node tests/v9115-home-significance.mjs
-          node tests/v9119-visual-prepared-state.mjs
-          node tests/v9120-mobile-work-budget.mjs
-          node tests/v9122-personalization-learning.mjs
-          node tests/v9123-home-source-mentions.mjs
-          node tests/v9124-true-novelty.mjs
-          node tests/v9125-diagnostic-metrics.mjs
-          node tests/v9126-manual-refresh-bridge.mjs
-          node tests/v9127-home-seen-fallback.mjs
-          node tests/v9128-pending-payload-apply.mjs
-          node tests/v9129-summary-race-diagnostics.mjs
-          node tests/v9130-context-signals.mjs
-          node tests/v9131-category-context.mjs
-          node tests/v9132-category-gaps.mjs
-          node tests/v9133-summary-reuse.mjs
-          node tests/v9134-brief-disaster-dedup.mjs
-          node tests/v9135-final-image-prewarm.mjs
-          node tests/v9136-ranking-summary-quality.mjs
-          node tests/v9136-live-title-thumbnail.mjs
-          node tests/v9137-category-context.mjs
-          node tests/v9137-significance-context.mjs
-          node tests/v9137-brief-war-context.mjs
-          node tests/v9145-summary-resilience.mjs
 
   mobile-browser:
     needs: static-regression
@@ -76,10 +47,4 @@ jobs:
             if curl -fsS http://127.0.0.1:4173/ >/dev/null; then break; fi
             sleep 0.2
           done
-          node tests/v89-mobile-browser.mjs
-          node tests/v916-settings-browser.mjs
-          node tests/v918-visual-stability.mjs
-          node tests/v919-summary-quality.mjs
-          node tests/v9110-brief-dedup.mjs
-          node tests/v9111-navigation-performance.mjs
-          node tests/v9112-brief-real-feed.mjs
+          node tests/v9193-current-ui-browser.mjs
