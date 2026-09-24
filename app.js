@@ -688,10 +688,14 @@ function appendHomeToLimit({ increment = false } = {}) {
 function refreshAfterNewsChange() {
   reconcileHomeOrder();
   if (state.view === 'home') {
-    appendHomeToLimit();
+    const scrollTop = window.scrollY;
+    render({ scrollTop });
     return;
   }
-  if (state.view === 'brief' && app.querySelector('.article-card[data-article]')) return;
+  if (state.view === 'brief') {
+    render({ scrollTop: window.scrollY });
+    return;
+  }
   render();
 }
 
