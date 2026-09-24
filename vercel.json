@@ -8,9 +8,6 @@
     },
     "api/article-photo-fast.js": {
       "maxDuration": 30
-    },
-    "api/article-reader.js": {
-      "maxDuration": 15
     }
   },
   "headers": [
