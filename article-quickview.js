@@ -108,12 +108,16 @@ function quickTrustedResult(data = {}) {
     && (data?.fallbackQuality === 'trusted' || data?.diagnostics?.fallbackQuality === 'trusted'));
 }
 
-function quickProvisionalSummary() {
-  return 'Résumé IA en cours de préparation…';
+function quickProvisionalSummary(article = {}) {
+  const summary = quickArticleSummary(article);
+  if (summary) return summary;
+  const raw = quickClean(article.summary || '');
+  if (raw && !quickUnavailable(raw) && raw.length >= 35 && !quickLooksLikeTitleRestatement(raw, article)) return raw;
+  return '';
 }
 
 function quickUnavailableSummary() {
-  return 'Résumé IA momentanément indisponible pour cet article.';
+  return '';
 }
 
 function quickDateTime(value) {
@@ -186,7 +190,7 @@ function enhanceArticleTitlesAndTabs() {
     const cleanTitle = titleWithoutSource(article.title, article.source);
     const title = card.querySelector('h2, .brief-copy strong');
     if (title) title.textContent = cleanTitle;
-    card.setAttribute('aria-label', `Ouvrir le résumé : ${cleanTitle}`);
+    card.setAttribute('aria-label', `Lire l’article : ${cleanTitle}`);
     card.querySelectorAll('[data-quick-summary]').forEach(node => node.remove());
   });
 
@@ -246,62 +250,10 @@ function quickCacheSummary(key, summary, data = {}) {
   quickWriteJson(QUICK_CACHE_KEY, Object.fromEntries(Object.entries(latest).slice(-180)));
 }
 
-async function quickLoadSummary(article, modal) {
-  const key = `article:${article.id}`;
-  const cache = quickReadJson(QUICK_CACHE_KEY, {});
-  const text = modal.querySelector('[data-quick-summary-text]');
-  const cached = cache[key];
-  if ((cached?.ai === true || cached?.grounded === true) && cached?.summary && !cached.unavailable && quickGoodSummary(cached.summary, article)) {
-    text.textContent = quickClean(cached.summary);
-    return;
-  }
-
-  const articlePayload = {
-    url: article.url,
-    title: quickClean(article.title),
-    summary: quickArticleSummary(article),
-    source: quickClean(article.source || '')
-  };
-
-  const data = await quickFetchJson('/api/article-summary-groq?v=18&intent=foreground', {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json' },
-    cache: 'no-store',
-    body: JSON.stringify({ mode: 'article', article: articlePayload })
-  });
-  if (!modal.isConnected) return;
-
-  const groqSummary = quickClean(data?.summary || '');
-  if (quickTrustedResult(data) && !data?.unavailable && quickGoodSummary(groqSummary, article)) {
-    text.textContent = groqSummary;
-    quickCacheSummary(key, groqSummary, data || {});
-    return;
-  }
-
-  let factualFallback = !data?.unavailable && quickGoodSummary(groqSummary, article) ? groqSummary : '';
-
-  if (quickNeedsSmartRecovery(article)) {
-    const smart = await quickFetchJson('/api/article-summary-smart?v=4&intent=fallback', {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      cache: 'no-store',
-      body: JSON.stringify({ article: articlePayload })
-    });
-    if (!modal.isConnected) return;
-    const smartSummary = quickClean(smart?.text || '');
-    if (smart?.ok && quickGoodSummary(smartSummary, article)) {
-      text.textContent = smartSummary;
-      quickCacheSummary(key, smartSummary, { ...smart, ai: false });
-      return;
-    }
-  }
-
-  if (factualFallback) {
-    text.textContent = factualFallback;
-    return;
-  }
-
-  text.textContent = quickUnavailableSummary();
+async function quickLoadSummary() {
+  // Les résumés IA ont été abandonnés. Le lecteur utilise seulement
+  // l’extrait fourni par le flux/source, sans appel à un modèle.
+  return;
 }
 
 function closeQuickSummary() {
@@ -317,33 +269,28 @@ function quickUsefulVisualUrl(raw = '') {
 
 function openQuickSummary(article) {
   closeQuickSummary();
-  const feedback = quickReadJson('news-feedback', {});
-  const current = feedback[article.id] || '';
   const cleanTitle = titleWithoutSource(article.title, article.source);
-  const immediate = quickProvisionalSummary(article);
+  const excerpt = quickProvisionalSummary(article);
   const visualUrl = quickUsefulVisualUrl(article.visual?.url)
     || quickUsefulVisualUrl(article.image)
     || quickUsefulVisualUrl(article.quickVisualUrl);
+  const source = quickClean(article.source || 'la source');
   const backdrop = document.createElement('div');
   backdrop.className = 'quick-summary-backdrop';
-  backdrop.innerHTML = `<section class="quick-summary-sheet" role="dialog" aria-modal="true" aria-label="Résumé de l’article">
+  backdrop.innerHTML = `<section class="quick-summary-sheet" role="dialog" aria-modal="true" aria-label="Lecture de l’article">
     <header class="quick-summary-head">
-      <h2>${quickEsc(cleanTitle)}</h2>
       <button type="button" class="quick-summary-close" data-quick-close aria-label="Fermer">×</button>
     </header>
+    <div class="quick-reader-kicker">Article gratuit</div>
+    <h2>${quickEsc(cleanTitle)}</h2>
     ${visualUrl ? `<img class="quick-summary-image" src="${quickEsc(visualUrl)}" alt="" referrerpolicy="no-referrer" decoding="async">` : ''}
-    <div class="quick-summary-meta"><span>${quickEsc(article.source || '')}</span><span>${quickEsc(quickDateTime(article.publishedAt))}</span><span>${quickEsc(article.category || '')}</span></div>
-    <div class="quick-summary-text" data-quick-summary-text>${quickEsc(immediate)}</div>
-    <a class="quick-full-article" href="${quickEsc(article.url || '#')}" target="_blank" rel="noopener noreferrer">Lire l’article complet <span aria-hidden="true">↗</span></a>
-    ${quickTopicFeedbackMarkup(article)}
-    <p class="quick-feedback-help"><strong>Choix sur cet article</strong> « Pas intéressé » réduit les sujets semblables ; « Sujet à suivre » surveille au contraire ce sujet précis.</p>
-    <div class="quick-feedback-grid quick-feedback-secondary" data-quick-feedback-grid>
-      ${['not','follow'].map(key => quickFeedbackMarkup(key, current)).join('')}
-    </div>
+    <div class="quick-summary-meta"><span>${quickEsc(source)}</span><span>${quickEsc(quickDateTime(article.publishedAt))}</span><span>${quickEsc(article.category || '')}</span></div>
+    ${excerpt ? `<div class="quick-reader-excerpt"><strong>Aperçu fourni par la source</strong>${quickEsc(excerpt)}</div>` : '<p class="quick-reader-empty">L’article est disponible gratuitement sur le site de la source.</p>'}
+    <a class="quick-full-article" href="${quickEsc(article.url || '#')}" target="_blank" rel="noopener noreferrer">Lire l’article gratuitement <span aria-hidden="true">↗</span></a>
+    <p class="quick-reader-free-note">Seuls les articles identifiés comme accessibles sans abonnement sont conservés dans l’application.</p>
   </section>`;
   document.body.appendChild(backdrop);
   document.body.classList.add('quick-summary-open');
-  quickLoadSummary(article, backdrop);
 }
 
 document.addEventListener('click', event => {
