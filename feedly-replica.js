@@ -89,19 +89,28 @@
   }
 
   function ensureHomeBar() {
-    app.querySelectorAll('.feedly-home-bar,.feedly-mode-tabs').forEach(n => n.remove());
-    if (!isHome()) return;
+    const existingBar = app.querySelector('.feedly-home-bar');
+    const existingTabs = app.querySelector('.feedly-mode-tabs');
+    if (!isHome()) {
+      existingBar?.remove();
+      existingTabs?.remove();
+      return;
+    }
     const main = app.querySelector('main.page');
     if (!main) return;
-    const bar = document.createElement('header');
-    bar.className = 'feedly-home-bar';
-    bar.innerHTML = '<button class="feedly-avatar" data-feedly-menu aria-label="Menu">ME</button><h1>Today</h1><div class="feedly-home-actions"><button class="feedly-action" data-feedly-mark-read aria-label="Tout marquer comme lu">'+svg('check')+'</button><button class="feedly-action" data-feedly-more aria-label="Plus d’options">'+svg('more')+'</button></div>';
-    app.insertBefore(bar, main);
-    const tabs = document.createElement('div');
-    tabs.className = 'feedly-mode-tabs';
-    tabs.innerHTML = '<button class="active" type="button">Me</button><button type="button" data-view="brief">Explore</button>';
-    const feed = main.querySelector('[data-stable-home-feed]');
-    if (feed) main.insertBefore(tabs, feed);
+    if (!existingBar) {
+      const bar = document.createElement('header');
+      bar.className = 'feedly-home-bar';
+      bar.innerHTML = '<button class="feedly-avatar" data-feedly-menu aria-label="Menu">ME</button><h1>Today</h1><div class="feedly-home-actions"><button class="feedly-action" data-feedly-mark-read aria-label="Tout marquer comme lu">'+svg('check')+'</button><button class="feedly-action" data-feedly-more aria-label="Plus d’options">'+svg('more')+'</button></div>';
+      app.insertBefore(bar, main);
+    }
+    if (!existingTabs) {
+      const tabs = document.createElement('div');
+      tabs.className = 'feedly-mode-tabs';
+      tabs.innerHTML = '<button class="active" type="button">Me</button><button type="button" data-view="brief">Explore</button>';
+      const feed = main.querySelector('[data-stable-home-feed]');
+      if (feed) main.insertBefore(tabs, feed);
+    }
   }
 
   function ensureBottomNav() {
@@ -117,7 +126,7 @@
   }
 
   function drawerMarkup() {
-    const categories = ['Politique','International','Europe','Économie','Société','Santé','Environnement','Science','Technologies','IA','Mobilité'];
+    const categories = ['Politique','International','Europe','Économie','Société','Santé','Environnement','Science','Culture','Éducation','IA','Tech','Smartphones','VR','Automobile','Énergie'];
     const saved = (() => { try { return (JSON.parse(localStorage.getItem('news-saved') || '[]') || []).length; } catch { return 0; } })();
     return '<div class="feedly-drawer-backdrop" data-feedly-drawer-backdrop>'+
       '<aside class="feedly-drawer" role="dialog" aria-modal="true" aria-label="Navigation">'+
@@ -125,6 +134,7 @@
         '<div class="feedly-drawer-section">'+
           '<button class="feedly-drawer-row active" type="button" data-view="home">'+svg('home')+'<span>Today</span></button>'+
           '<button class="feedly-drawer-row" type="button" data-view="brief">'+svg('star')+'<span>Brief</span></button>'+
+          '<button class="feedly-drawer-row" type="button" data-view="news">'+svg('grid')+'<span>All</span></button>'+
           '<button class="feedly-drawer-row" type="button" data-feedly-saved>'+svg('bookmark')+'<span>Read Later</span><span class="feedly-count">'+saved+'</span></button>'+
           '<button class="feedly-drawer-row" type="button" data-view="sheet">'+svg('plus')+'<span>Follow sources</span></button>'+
         '</div>'+
