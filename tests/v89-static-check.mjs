@@ -157,9 +157,9 @@ else ok('home prioritizes multiple publication days before same-day overflow');
 
 if (!app.includes('function resetReadStateFromNav(view)') || !app.includes("}, 620);")) fail('long-press reset contract missing');
 else ok('long-press reset contract configured');
-if (!app.includes('openSettingsAccordions') || !app.includes("details.setAttribute('open', '')")) fail('settings accordion preservation missing');
+if (!app.includes('settingsOpenAccordions') || !app.includes('captureOpenSettingsAccordions')) fail('settings accordion preservation missing');
 else ok('settings accordions persist across actions');
-if (!app.includes('.slice(0, 6);') || !app.includes('Math.min(3, candidates.length)') || !app.includes('scheduleVisualBackfill(350)')) fail('accelerated image recovery missing');
+if (!app.includes('.slice(0, 10);') || !app.includes('Math.min(5, candidates.length)') || !app.includes('scheduleVisualBackfill(180)')) fail('accelerated image recovery missing');
 else ok('accelerated image recovery configured');
 
 if (!app.includes('settingsOpenAccordions') || !app.includes('captureOpenSettingsAccordions')) fail('settings accordion persistence missing');
@@ -169,5 +169,5 @@ else ok('long press reset on Home/Brief configured');
 if (!app.includes('startImmediately') || !app.includes('fetchpriority=')) fail('immediate high-priority article image loading missing');
 else ok('immediate high-priority article image loading configured');
 const imageSequence = read('image-sequence-v91.82.js');
-if (!imageSequence.includes('setTimeout(pump, 4)') || !imageSequence.includes('index < 24')) fail('accelerated image sequencing missing');
+if (!imageSequence.includes('started < 4') || !imageSequence.includes('setTimeout(pump, 8)') || !imageSequence.includes('index < 24')) fail('accelerated image sequencing missing');
 else ok('accelerated image sequencing configured');
