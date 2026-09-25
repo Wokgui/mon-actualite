@@ -18,17 +18,9 @@
     });
   }
 
-  function loadEnhancement(src) {
-    if (document.querySelector(`script[data-v941="${src}"]`)) return;
-    const script = document.createElement('script');
-    script.src = `${src}?v=94.1`;
-    script.dataset.v941 = src;
-    script.defer = true;
-    document.head.appendChild(script);
-  }
-
-  loadEnhancement('news-refinement-v94.1.js');
-  loadEnhancement('image-batch-v94.1.js');
+  // Keep this hard-fix deliberately limited to navigation. Feature scripts
+  // must be loaded explicitly by index.html so a UI enhancement can never
+  // interfere with the startup/news pipeline.
   apply();
   const target = document.getElementById('app') || document.body;
   new MutationObserver(() => requestAnimationFrame(apply)).observe(target, { childList: true, subtree: true });
