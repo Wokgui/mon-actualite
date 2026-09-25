@@ -58,7 +58,7 @@ jobs:
             unzip -o /tmp/signing-key.zip -d "$HOME/.android"
           fi
           if [ ! -f "$HOME/.android/debug.keystore" ]; then
-            keytool -genkeypair -v               -keystore "$HOME/.android/debug.keystore"               -storepass android               -alias androiddebugkey               -keypass android               -dname "CN=Mon Actualite,O=Wokgui,C=FR"               -keyalg RSA -keysize 2048 -validity 10000
+            keytool -genkeypair -v -keystore "$HOME/.android/debug.keystore" -storepass android -alias androiddebugkey -keypass android -dname "CN=Mon Actualite,O=Wokgui,C=FR" -keyalg RSA -keysize 2048 -validity 10000
           fi
 
       - name: Build APK
