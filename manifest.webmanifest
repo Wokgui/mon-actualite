@@ -3,7 +3,7 @@
   "name": "Mon actualité",
   "short_name": "Actualité",
   "description": "L'essentiel choisi et synthétisé pour vous",
-  "start_url": "/?code-release=92.02",
+  "start_url": "/?code-release=92.03",
   "scope": "/",
   "display": "standalone",
   "orientation": "portrait-primary",

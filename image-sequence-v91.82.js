@@ -1,4 +1,4 @@
-import { preparedVisualUrl, sourceTileUrl } from './services/article-visuals.js?v=92.02';
+import { preparedVisualUrl, sourceTileUrl } from './services/article-visuals.js?v=92.03';
 
 const queued = new WeakSet();
 let queue = [];
@@ -34,17 +34,13 @@ function loadOne(card, article) {
   img.classList.add('image-pending-v9184');
 
   if (!wanted || wanted === tile) {
-    if (img.src !== tile) img.src = tile;
+    if ((img.currentSrc || img.src) !== tile) img.src = tile;
     settle(img, false);
     return;
   }
 
   const wantedAbs = new URL(wanted, location.href).href;
-  if (img.currentSrc === wantedAbs && img.complete && img.naturalWidth > 1) {
-    settle(img, true);
-    return;
-  }
-
+  const currentAbs = img.currentSrc || img.src || '';
   const cleanup = () => {
     img.removeEventListener('load', onLoad);
     img.removeEventListener('error', onError);
@@ -56,9 +52,20 @@ function loadOne(card, article) {
   };
   const onError = () => {
     cleanup();
-    if (img.src !== tile) img.src = tile;
+    if ((img.currentSrc || img.src) !== tile) img.src = tile;
     settle(img, false);
   };
+
+  if (currentAbs === wantedAbs) {
+    if (img.complete) {
+      if (img.naturalWidth > 1) settle(img, true);
+      else onError();
+      return;
+    }
+    img.addEventListener('load', onLoad, { once: true });
+    img.addEventListener('error', onError, { once: true });
+    return;
+  }
 
   img.addEventListener('load', onLoad, { once: true });
   img.addEventListener('error', onError, { once: true });
@@ -68,7 +75,6 @@ function loadOne(card, article) {
   img.src = wanted;
   if (img.complete && img.naturalWidth > 1) onLoad();
 }
-
 function pump() {
   timer = 0;
   let started = 0;

@@ -161,7 +161,7 @@ if (!app.includes('settingsOpenAccordions') || !app.includes('captureOpenSetting
 else ok('settings accordion persistence configured');
 if (!app.includes('navLongPressTimer') || !app.includes('resetReadStateFromNav(view)')) fail('long press reset on Home/Brief missing');
 else ok('long press reset on Home/Brief configured');
-if (!app.includes("const src = real || tile") || !app.includes("index < 24 ? 'eager' : 'lazy'") || !app.includes('fetchpriority=')) fail('immediate high-priority article image loading missing');
+if (!app.includes("const real = preparedVisualUrl(article)") || !app.includes("const src = real || tile") || !app.includes("index < 24 ? 'eager' : 'lazy'") || !app.includes('fetchpriority=')) fail('single-source high-priority article image loading missing');
 else ok('immediate high-priority article image loading configured');
 const imageSequence = read('image-sequence-v91.82.js');
 if (!imageSequence.includes('started < 8') || !imageSequence.includes('setTimeout(pump, 2)') || !imageSequence.includes('index < 40')) fail('accelerated image sequencing missing');
@@ -172,3 +172,11 @@ if (!visualService.includes('const extracted = extractPreparedImage(rawVisual)')
 else ok('direct external visual fast path configured');
 if (!app.includes("app.addEventListener('toggle'") || !app.includes("settingsOpenAccordions.add(title)")) fail('settings accordion toggle persistence missing');
 else ok('settings accordion toggle persistence configured');
+
+const releaseWatch = read('release-watch.js');
+if (!releaseWatch.includes('IS_NATIVE_ANDROID') || !releaseWatch.includes('if (IS_NATIVE_ANDROID)')) fail('native Android release watcher guard missing');
+else ok('native Android release watcher guard configured');
+if (!imageSequence.includes('if (currentAbs === wantedAbs)') || !imageSequence.includes("img.addEventListener('load', onLoad")) fail('image sequence can still restart an already-loading image');
+else ok('image sequence preserves an already-loading source');
+if (!app.includes('article.pinnedVisualV85 = remembered.url') || !app.includes('live.pinnedVisualV85 = endpoint')) fail('recovered image proxy is not pinned across renders');
+else ok('recovered image proxy pinned across renders');

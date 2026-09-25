@@ -165,9 +165,10 @@
   // Release watcher. This file is part of v91.38, so it must identify itself as
   // v91.38. Using nativeFetch here prevents later fetch shims from falsifying
   // the value returned by /version.json.
-  const PAGE_RELEASE = '92.02';
+  const PAGE_RELEASE = '92.03';
   const RELEASE_DATE = '24 septembre 2026';
   const VERSION_PATH = '/version.json';
+  const IS_NATIVE_ANDROID = /MonActualiteAndroid\//.test(navigator.userAgent) || location.pathname.startsWith('/assets/');
   const CHECK_COOLDOWN_MS = 45_000;
   let checking = false;
   let lastCheckedAt = 0;
@@ -251,7 +252,7 @@
   }
 
   document.documentElement.dataset.codeRelease = PAGE_RELEASE;
-  window.__releaseWatch = { pageRelease: PAGE_RELEASE, checkRelease, patchVersionUi };
+  window.__releaseWatch = { pageRelease: PAGE_RELEASE, checkRelease, patchVersionUi, nativeAndroid: IS_NATIVE_ANDROID };
 
   document.addEventListener('click', event => {
     const button = event.target.closest?.('[data-check-update]');

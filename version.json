@@ -1,6 +1,6 @@
 {
-  "version": "92",
-  "codeRelease": "92.02",
-  "release": "2026-09-24",
-  "label": "v92.02 : appui long Accueil/Brief, accordéons persistants et photos fast-path"
+  "version": "93",
+  "codeRelease": "92.03",
+  "release": "2026-09-25",
+  "label": "v92.03 : navigation Réglages/Brief stable et photos sans clignotement"
 }

@@ -7,6 +7,7 @@ const context = await browser.newContext({
   deviceScaleFactor: 2.75,
   isMobile: true,
   hasTouch: true,
+  userAgent: 'Mozilla/5.0 (Linux; Android 16) AppleWebKit/537.36 Chrome/140 Mobile Safari/537.36 MonActualiteAndroid/93',
   serviceWorkers: 'block'
 });
 
@@ -31,6 +32,17 @@ await context.addInitScript(payload => {
 }, article);
 
 const page = await context.newPage();
+await page.route('**/version.json**', route => route.fulfill({
+  status: 200,
+  contentType: 'application/json',
+  body: JSON.stringify({ version: '1', codeRelease: '1.00' })
+}));
+const tinyPng = Buffer.from('iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mP8/x8AAusB9Y9Z3ksAAAAASUVORK5CYII=', 'base64');
+await page.route('**/api/article-photo-fast**', route => route.fulfill({
+  status: 200,
+  contentType: 'image/png',
+  body: tinyPng
+}));
 await page.route('**/api/**', route => route.fulfill({
   status: 200,
   contentType: 'application/json',
@@ -146,6 +158,10 @@ assert.ok(Math.abs(rowAlignment.imageCenter - rowAlignment.titleCenter) < 0.75, 
 assert.ok(Math.abs(rowAlignment.imageHeight - 75) < 0.75, 'article image must keep the 75px compact height');
 assert.equal(rowAlignment.borderBottomWidth, '0px', 'articles must not have bottom separators');
 assert.equal(rowAlignment.borderTopWidth, '0px', 'articles must not have top separators');
+const firstImage = page.locator('[data-stable-home-feed] .article-image').first();
+const firstImageSrc = await firstImage.getAttribute('src');
+await page.waitForTimeout(350);
+assert.equal(await firstImage.getAttribute('src'), firstImageSrc, 'article image source must not be reassigned after initial render');
 
 const homeNav = page.locator('.nav-item[data-view="home"]');
 await homeNav.dispatchEvent('pointerdown', { pointerType: 'touch', clientX: 30, clientY: 820 });
@@ -170,6 +186,8 @@ await generalAccordion.locator('[data-general-category]').first().click();
 await page.waitForTimeout(100);
 const generalAccordionAfter = page.locator('.settings-accordion-v9185').filter({ hasText: 'Actualité générale' });
 assert.ok(await generalAccordionAfter.evaluate(el => el.open), 'settings accordion must stay open after an action');
+await page.waitForTimeout(2100);
+assert.ok(await page.locator('.nav-item[data-view="settings"]').evaluate(el => el.classList.contains('active')), 'native settings view must not be reset by release polling');
 
 const keywordAccordion = page.locator('.settings-accordion-v9185').filter({ hasText: 'Mots-clés' }).first();
 await keywordAccordion.locator(':scope > summary').click();
@@ -189,4 +207,4 @@ const briefTitlePx = await page.$eval('.page:has(.brief-mode-tabs)>.page-masthea
 assert.ok(briefTitlePx <= 25.5, 'brief title must use the refined compact size');
 
 await browser.close();
-console.log('v92.02 current UI browser contract passed.');
+console.log('v92.03 current UI browser contract passed.');

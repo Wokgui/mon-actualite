@@ -1,10 +1,10 @@
 import { importOpmlPreview, fetchLiveNews } from './services/source-connectors.js?v=91.97';
-import { articleVisualUrl, hasPreparedVisual, sourceTileUrl } from './services/article-visuals.js?v=92.02';
+import { preparedVisualUrl, hasPreparedVisual, sourceTileUrl } from './services/article-visuals.js?v=92.03';
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const app = $('#app');
 const toastEl = $('#toast');
-const APP_VERSION = '92';
+const APP_VERSION = '93';
 const APP_RELEASE = '24 septembre 2026';
 document.documentElement.dataset.appVersion = APP_VERSION;
 
@@ -199,9 +199,9 @@ function badgeFor(article) {
 function articleVisual(article, index = 0) {
   const prepared = hasPreparedVisual(article);
   const tile = sourceTileUrl(article);
-  const real = articleVisualUrl(article);
+  const real = preparedVisualUrl(article);
   const src = real || tile;
-  const visualClass = real && real !== tile ? 'direct-visual-v9202' : 'source-tile-visual';
+  const visualClass = real && real !== tile ? 'direct-visual-v9203' : 'source-tile-visual';
   return `<img class="article-image original-article-image stable-visual ${prepared ? 'prepared-visual' : visualClass}" src="${escapeHtml(src)}" alt="" width="400" height="224" loading="${index < 24 ? 'eager' : 'lazy'}" fetchpriority="${index < 12 ? 'high' : 'auto'}" decoding="async" referrerpolicy="no-referrer" style="background-image:url('${escapeHtml(tile)}');background-size:cover">`;
 }
 function sourceIdentity(article = {}) {
@@ -988,15 +988,17 @@ function applyRememberedVisual(article) {
   const remembered = visualBackfills[String(article?.id || '')];
   if (!remembered?.url || Date.now() - Number(remembered.savedAt || 0) > VISUAL_BACKFILL_MAX_AGE) return article;
   article.image = remembered.url;
+  article.pinnedVisualV85 = remembered.url;
   article.visualStatus = 'ready';
   article.visual = { status: 'ready', url: remembered.url, source: 'article-enrichment' };
   return article;
 }
 
-function installRecoveredVisual(article, endpoint) {
+function installRecoveredVisual(article, endpoint, decodedUrl = '') {
   const live = state.articles.find(item => String(item?.id || '') === String(article?.id || ''));
   if (!live) return;
   live.image = endpoint;
+  live.pinnedVisualV85 = endpoint;
   live.visualStatus = 'ready';
   live.visual = { status: 'ready', url: endpoint, source: 'article-enrichment' };
   visualBackfills[String(live.id)] = { url: endpoint, savedAt: Date.now() };
@@ -1004,11 +1006,29 @@ function installRecoveredVisual(article, endpoint) {
     if (String(card.dataset.article || '') !== String(live.id)) return;
     const image = card.querySelector('img.article-image');
     if (!image) return;
-    image.classList.remove('source-tile-visual');
-    image.classList.add('prepared-visual');
+    image.classList.remove('source-tile-visual', 'image-failed-v9184');
+    image.classList.add('prepared-visual', 'image-ready-v9184');
     image.loading = 'eager';
-    image.src = endpoint;
+    const target = decodedUrl || endpoint;
+    const current = image.currentSrc || image.src || '';
+    let targetAbs = target;
+    try { targetAbs = new URL(target, location.href).href; } catch {}
+    if (current !== targetAbs) image.src = target;
   });
+  if (decodedUrl) window.setTimeout(() => URL.revokeObjectURL(decodedUrl), 5000);
+}
+
+async function decodedRecoveryUrl(bytes, type = 'image/jpeg') {
+  try {
+    const objectUrl = URL.createObjectURL(new Blob([bytes], { type: type || 'image/jpeg' }));
+    const probe = new Image();
+    probe.decoding = 'async';
+    probe.src = objectUrl;
+    await probe.decode();
+    return objectUrl;
+  } catch {
+    return '';
+  }
 }
 
 async function recoverArticleVisual(article) {
@@ -1019,7 +1039,8 @@ async function recoverArticleVisual(article) {
     const type = response.headers.get('Content-Type') || '';
     const bytes = await response.arrayBuffer();
     if (!response.ok || status === 'fallback' || /image\/svg\+xml/i.test(type) || bytes.byteLength < 256) throw new Error('visual unavailable');
-    installRecoveredVisual(article, endpoint);
+    const decodedUrl = await decodedRecoveryUrl(bytes, type);
+    installRecoveredVisual(article, endpoint, decodedUrl);
   } catch {
     const key = String(article.id);
     const previous = visualBackfills[key];
