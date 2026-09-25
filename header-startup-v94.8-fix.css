@@ -1,29 +1,111 @@
-/* v94.8 corrected — requested typography and header alignment adjustments only. */
-.hero-header h1{
-  font-size:12px!important;
-}
-.hero-header .eyebrow{
-  background:#7461E8!important;
-  border-color:#7461E8!important;
-  color:#FFFFFF!important;
-}
-/* Centre visuellement « Mon actualité » entre la tuile date et la séparation des articles. */
+/* v94.8 corrected — polished home header + editorial article metadata. */
+
+/* Accueil : bloc date / titre propre et équilibré, conforme à la maquette validée. */
 .hero-header{
   display:flex!important;
   flex-direction:column!important;
+  align-items:center!important;
   justify-content:center!important;
+  box-sizing:border-box!important;
+  padding-top:22px!important;
+  padding-bottom:18px!important;
+}
+.hero-header .hero-mark{
+  display:none!important;
+}
+.hero-header .eyebrow{
+  display:inline-flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  width:auto!important;
+  min-width:0!important;
+  margin:0 auto 18px!important;
+  padding:9px 24px!important;
+  border:1px solid #7461E8!important;
+  border-radius:999px!important;
+  background:#7461E8!important;
+  color:#FFFFFF!important;
+  font-size:14px!important;
+  font-weight:700!important;
+  line-height:1.15!important;
+  box-shadow:none!important;
 }
 .hero-header h1{
-  margin-top:16px!important;
-  margin-bottom:14px!important;
+  margin:0!important;
+  padding:0!important;
+  color:#17223A!important;
+  font-size:28px!important;
+  font-weight:700!important;
+  line-height:1.12!important;
+  letter-spacing:-.025em!important;
+  text-align:center!important;
+  transform:none!important;
 }
-/* Réglages : titres des onglets repliables plus grands. */
+
+/* Accueil : catégories sous forme de badges, suivies de l'ancienneté. */
+[data-stable-home-feed] .article-card{
+  grid-template-rows:auto!important;
+  min-height:92px!important;
+  padding-top:9px!important;
+  padding-bottom:9px!important;
+  border-bottom:1px solid #ECECF4!important;
+}
+[data-stable-home-feed] .article-card .article-body{
+  height:auto!important;
+  min-height:75px!important;
+  max-height:none!important;
+  justify-content:center!important;
+  overflow:visible!important;
+}
+[data-stable-home-feed] .article-card .card-top,
+[data-stable-home-feed] .article-card .summary,
+[data-stable-home-feed] .article-card .save-btn{
+  display:none!important;
+}
+[data-stable-home-feed] .article-card h2{
+  margin:0 0 7px!important;
+}
+[data-stable-home-feed] .article-card .meta{
+  display:flex!important;
+  align-items:center!important;
+  gap:8px!important;
+  margin:0!important;
+  padding:0!important;
+  color:#7A8295!important;
+  font-size:12px!important;
+  line-height:1.2!important;
+  white-space:nowrap!important;
+}
+[data-stable-home-feed] .article-card .meta .source,
+[data-stable-home-feed] .article-card .meta .dot{
+  display:none!important;
+}
+[data-stable-home-feed] .article-card .meta .category-link{
+  order:-1!important;
+  display:inline-flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  padding:4px 10px!important;
+  border:0!important;
+  border-radius:999px!important;
+  background:#F0EDFF!important;
+  color:#5B4BD8!important;
+  font:700 12px/1 system-ui,sans-serif!important;
+  text-decoration:none!important;
+}
+[data-stable-home-feed] .article-card .meta > span:not(.source)::before{
+  content:'•';
+  display:inline-block;
+  margin-right:8px;
+  color:#858CA0;
+}
+
+/* Titres Réglages / Brief et accordéons conservés comme sur la base corrigée. */
 .settings-page-v9185 details > summary,
 .settings-page-v9185 .settings-accordion-v9185 > summary,
 .settings-accordions-v9185 details > summary{
   font-size:19px!important;
 }
-/* Titres principaux Réglages et Brief : 50 % plus hauts au-dessus de la ligne basse du bandeau. */
 .settings-page-v9185 > h1,
 .settings-page-v9185 .settings-title,
 .brief-page h1,
@@ -31,6 +113,8 @@
   font-size:32px!important;
   transform:translateY(-8px)!important;
 }
+
 @media(max-width:420px){
-  .hero-header h1{font-size:11px!important;}
+  .hero-header h1{font-size:27px!important;}
+  .hero-header .eyebrow{font-size:13.5px!important;padding:9px 22px!important;}
 }
