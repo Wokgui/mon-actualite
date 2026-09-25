@@ -180,3 +180,8 @@ if (!imageSequence.includes('if (currentAbs === wantedAbs)') || !imageSequence.i
 else ok('image sequence preserves an already-loading source');
 if (!app.includes('article.pinnedVisualV85 = remembered.url') || !app.includes('live.pinnedVisualV85 = endpoint')) fail('recovered image proxy is not pinned across renders');
 else ok('recovered image proxy pinned across renders');
+
+if (!app.includes('if (IS_NATIVE_ANDROID) {') || !app.includes('publishedNumber > currentNumber') || !app.includes("if (!IS_NATIVE_ANDROID) window.setTimeout(() => checkAppUpdate(), 1400)")) fail('native app update guard missing');
+else ok('native app update guard configured');
+if (!app.includes("sessionStorage.setItem('news-active-view-v9204'") || !app.includes('view: INITIAL_VIEW')) fail('session view preservation missing');
+else ok('session view preservation configured');

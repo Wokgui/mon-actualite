@@ -16,10 +16,10 @@ jobs:
           set -euo pipefail
           mkdir -p package
           rsync -a --exclude='.git' --exclude='.github' --exclude='package' ./ package/
-      - name: Upload v93 package
+      - name: Upload v94 package
         uses: actions/upload-artifact@v4
         with:
-          name: mon-actualite-v93-92.03
+          name: mon-actualite-v94-92.04
           path: package/
           if-no-files-found: error
           retention-days: 7

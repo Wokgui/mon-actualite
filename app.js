@@ -1,11 +1,14 @@
 import { importOpmlPreview, fetchLiveNews } from './services/source-connectors.js?v=91.97';
-import { preparedVisualUrl, hasPreparedVisual, sourceTileUrl } from './services/article-visuals.js?v=92.03';
+import { preparedVisualUrl, hasPreparedVisual, sourceTileUrl } from './services/article-visuals.js?v=92.04';
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const app = $('#app');
 const toastEl = $('#toast');
-const APP_VERSION = '93';
-const APP_RELEASE = '24 septembre 2026';
+const APP_VERSION = '94';
+const APP_RELEASE = '25 septembre 2026';
+const IS_NATIVE_ANDROID = /MonActualiteAndroid\//.test(navigator.userAgent) || location.pathname.startsWith('/assets/');
+const savedSessionView = sessionStorage.getItem('news-active-view-v9204');
+const INITIAL_VIEW = ['home', 'settings', 'brief'].includes(savedSessionView) ? savedSessionView : 'home';
 document.documentElement.dataset.appVersion = APP_VERSION;
 
 const GENERAL_CATEGORIES = ['Politique', 'International', 'Économie', 'Société', 'Santé', 'Environnement', 'Science', 'Culture', 'Éducation', 'Europe'];
@@ -64,7 +67,7 @@ const savedSettings = safeJson('news-settings', {});
 const cache = safeJson('news-live-cache', { articles: [], fetchedAt: null });
 const visualBackfills = safeJson(VISUAL_BACKFILL_KEY, {});
 const state = {
-  view: 'home', previous: [], category: 'Politique', categoryTab: 'brief', articleId: null,
+  view: INITIAL_VIEW, previous: [], category: 'Politique', categoryTab: 'brief', articleId: null,
   briefMode: 'essential', homeLimit: 120, homeOrder: [],
   saved: new Set(safeJson('news-saved', [])),
   feedback: safeJson('news-feedback', {}),
@@ -775,6 +778,9 @@ function captureOpenSettingsAccordions() {
 
 function render({ resetScroll = false, scrollTop = null } = {}) {
   captureOpenSettingsAccordions();
+  if (['home', 'settings', 'brief'].includes(state.view)) {
+    try { sessionStorage.setItem('news-active-view-v9204', state.view); } catch {}
+  }
   const preservedScroll = Number.isFinite(scrollTop) ? scrollTop : (resetScroll ? 0 : window.scrollY);
   const views = { home: renderHome, category: renderCategory, detail: renderDetail, brief: renderBrief, news: renderNews, settings: renderSettings };
   app.innerHTML = (views[state.view] || renderHome)() + renderSheet();
@@ -1302,6 +1308,10 @@ function addInterestManual() {
 }
 
 async function checkAppUpdate({ announce = false } = {}) {
+  if (IS_NATIVE_ANDROID) {
+    if (announce) toast(`Version Android ${APP_VERSION} installée`);
+    return;
+  }
   try {
     const versionUrl = new URL('./version.json', location.href);
     versionUrl.searchParams.set('t', Date.now().toString());
@@ -1309,11 +1319,13 @@ async function checkAppUpdate({ announce = false } = {}) {
     if (!response.ok) throw new Error('version unavailable');
     const published = await response.json();
     const publishedVersion = String(published?.version || '').trim();
+    const currentNumber = Number.parseInt(APP_VERSION, 10);
+    const publishedNumber = Number.parseInt(publishedVersion, 10);
     const registration = 'serviceWorker' in navigator ? await navigator.serviceWorker.getRegistration() : null;
     await registration?.update();
     if (registration?.waiting) registration.waiting.postMessage({ type: 'SKIP_WAITING' });
 
-    if (publishedVersion && publishedVersion !== APP_VERSION) {
+    if (Number.isFinite(publishedNumber) && Number.isFinite(currentNumber) && publishedNumber > currentNumber) {
       if (announce) toast(`Mise à jour vers la version ${publishedVersion}…`);
       const nextUrl = new URL(location.href);
       nextUrl.searchParams.set('app-version', publishedVersion);
@@ -1326,7 +1338,6 @@ async function checkAppUpdate({ announce = false } = {}) {
     if (announce) toast('Vérification impossible pour le moment');
   }
 }
-
 app.addEventListener('click', async event => {
   if (event.target.closest('[data-reset-read]')) {
     event.preventDefault();
@@ -1774,4 +1785,4 @@ async function bootLatestNews() {
 }
 
 bootLatestNews();
-window.setTimeout(() => checkAppUpdate(), 1400);
+if (!IS_NATIVE_ANDROID) window.setTimeout(() => checkAppUpdate(), 1400);

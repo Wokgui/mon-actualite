@@ -1,6 +1,6 @@
 {
-  "version": "93",
-  "codeRelease": "92.03",
+  "version": "94",
+  "codeRelease": "92.04",
   "release": "2026-09-25",
-  "label": "v92.03 : navigation Réglages/Brief stable et photos sans clignotement"
+  "label": "v92.04 : Réglages et Brief restent affichés, photos sans clignotement"
 }

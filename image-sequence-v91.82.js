@@ -1,4 +1,4 @@
-import { preparedVisualUrl, sourceTileUrl } from './services/article-visuals.js?v=92.03';
+import { preparedVisualUrl, sourceTileUrl } from './services/article-visuals.js?v=92.04';
 
 const queued = new WeakSet();
 let queue = [];

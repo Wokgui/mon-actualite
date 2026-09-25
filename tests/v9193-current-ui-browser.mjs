@@ -7,7 +7,7 @@ const context = await browser.newContext({
   deviceScaleFactor: 2.75,
   isMobile: true,
   hasTouch: true,
-  userAgent: 'Mozilla/5.0 (Linux; Android 16) AppleWebKit/537.36 Chrome/140 Mobile Safari/537.36 MonActualiteAndroid/93',
+  userAgent: 'Mozilla/5.0 (Linux; Android 16) AppleWebKit/537.36 Chrome/140 Mobile Safari/537.36 MonActualiteAndroid/94',
   serviceWorkers: 'block'
 });
 
@@ -177,6 +177,7 @@ const generalAccordionAfter = page.locator('.settings-accordion-v9185').filter({
 assert.ok(await generalAccordionAfter.evaluate(el => el.open), 'settings accordion must stay open after an action');
 await page.waitForTimeout(2100);
 assert.ok(await page.locator('.nav-item[data-view="settings"]').evaluate(el => el.classList.contains('active')), 'native settings view must not be reset by release polling');
+assert.equal(await page.evaluate(() => sessionStorage.getItem('news-active-view-v9204')), 'settings', 'native view must survive delayed app update check');
 
 const keywordAccordion = page.locator('.settings-accordion-v9185').filter({ hasText: 'Mots-clés' }).first();
 await keywordAccordion.locator(':scope > summary').click();
@@ -196,4 +197,4 @@ const briefTitlePx = await page.$eval('.page:has(.brief-mode-tabs)>.page-masthea
 assert.ok(briefTitlePx <= 25.5, 'brief title must use the refined compact size');
 
 await browser.close();
-console.log('v92.03 current UI browser contract passed.');
+console.log('v92.04 current UI browser contract passed.');
