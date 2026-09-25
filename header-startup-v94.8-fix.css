@@ -1,12 +1,18 @@
-/* v94.8 corrected — only requested home header adjustments. */
+/* v94.8 corrected — requested typography adjustments only. */
 .hero-header h1{
-  font-size:29px!important;
+  font-size:27px!important;
 }
 .hero-header .eyebrow{
   background:#7461E8!important;
   border-color:#7461E8!important;
   color:#FFFFFF!important;
 }
+/* Réglages : titres des onglets repliables légèrement plus grands. */
+.settings-page-v9185 details > summary,
+.settings-page-v9185 .settings-accordion-v9185 > summary,
+.settings-accordions-v9185 details > summary{
+  font-size:17px!important;
+}
 @media(max-width:420px){
-  .hero-header h1{font-size:28px!important;}
+  .hero-header h1{font-size:26px!important;}
 }
