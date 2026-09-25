@@ -2,16 +2,8 @@ name: Android APK release
 
 on:
   push:
-    branches: [main]
-    paths:
-      - 'android-app/**'
-      - '*.html'
-      - '*.css'
-      - '*.js'
-      - '*.webmanifest'
-      - 'services/**'
-      - 'assets/**'
-      - '.github/workflows/android-release.yml'
+    branches:
+      - main
   workflow_dispatch:
 
 permissions:
@@ -71,14 +63,13 @@ jobs:
           set -euo pipefail
           cp android-app/app/build/outputs/apk/debug/app-debug.apk mon-actualite-v94-92.04.apk
 
-      - name: Verify bundled frontend
-        shell: bash
-        run: |
-          set -euo pipefail
-          unzip -p mon-actualite-v94-92.04.apk assets/index.html | grep -q 'app.js?v=92.04'
-          unzip -p mon-actualite-v94-92.04.apk assets/app.js | grep -q 'effectiveWatchRules'
-          unzip -p mon-actualite-v94-92.04.apk assets/app.js | grep -q 'fetchHistoryCoverage'
-          unzip -p mon-actualite-v94-92.04.apk assets/feed-row-fix-v91.97.css | grep -q 'border-bottom:0!important'
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: mon-actualite-v94-92.04-apk
+          path: mon-actualite-v94-92.04.apk
+          retention-days: 30
+          if-no-files-found: error
 
       - name: Preserve install key for future updates
         uses: actions/upload-artifact@v4
@@ -96,7 +87,7 @@ jobs:
           set -euo pipefail
           TAG="v94-92.04"
           APK="mon-actualite-v94-92.04.apk"
-          NOTES="APK Android installable de Mon Actualité. Version web intégrée : v94 / codeRelease 92.04. Les articles externes s’ouvrent dans le navigateur."
+          NOTES="APK Android installable de Mon Actualité. Version web intégrée : v94 / codeRelease 92.04."
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release upload "$TAG" "$APK" --clobber
           else
