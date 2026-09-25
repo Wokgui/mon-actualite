@@ -1,19 +1,24 @@
 (()=>{'use strict';
-function installCss(){if(document.getElementById('ui-tune-v942'))return;const s=document.createElement('style');s.id='ui-tune-v942';s.textContent=`
+function installCss(){document.getElementById('ui-tune-v942')?.remove();const s=document.createElement('style');s.id='ui-tune-v942';s.textContent=`
+:root{--news-accent-separator:#8d82e8!important}
 .shortcut-manual{grid-template-columns:minmax(0,1fr) 94px 94px!important}.shortcut-manual .shortcut-act{width:94px!important;min-width:94px!important;padding:9px 6px!important}
-/* Source directory: Suivre / Bloquer always have exactly the same footprint. */
 .source-directory-row-v9186{grid-template-columns:minmax(0,1fr) 82px 82px!important;column-gap:8px!important}.source-directory-row-v9186 [data-source-follow],.source-directory-row-v9186 [data-source-block]{box-sizing:border-box!important;width:82px!important;min-width:82px!important;max-width:82px!important;height:42px!important;padding:0 4px!important;display:inline-flex!important;align-items:center!important;justify-content:center!important;text-align:center!important;line-height:1.1!important}
-/* Watch sensitivity: enough vertical room for descenders such as the p in pertinent. */
-.watch-sensitivity-v941 label{text-align:center!important}.watch-sensitivity-v941 select{box-sizing:border-box!important;min-height:52px!important;height:auto!important;padding-top:13px!important;padding-bottom:15px!important;line-height:1.45!important;overflow:visible!important}
-/* One coherent accent separator system: header/content and content/bottom navigation. */
-:root{--news-accent-separator:rgba(103,83,225,.42)}
-.app-header,.home-header,.brief-header,.settings-header,.page-header,.top-shell,.hero-header{border-bottom:2px solid var(--news-accent-separator)!important}
-.bottom-nav,.app-nav,.main-nav,nav[aria-label*="principale" i]{border-top:2px solid var(--news-accent-separator)!important}
-/* Settings and Watch use the same separator instead of pale grey rules. */
-.settings-accordion-v9185{border-bottom-color:var(--news-accent-separator)!important}.settings-accordion-v9185>summary{border-color:var(--news-accent-separator)!important}.watch-sensitivity-v941{border-color:var(--news-accent-separator)!important}
+.watch-sensitivity-v941 label{text-align:center!important}.watch-sensitivity-v941 select{box-sizing:border-box!important;min-height:52px!important;height:52px!important;padding:10px 34px 12px 14px!important;line-height:1.35!important;overflow:visible!important}
+/* Explicit page separators: full width under the top band and immediately above the fixed bottom band. */
+.page-edge-top-v943{position:absolute!important;left:0!important;right:0!important;height:2px!important;background:var(--news-accent-separator)!important;z-index:6!important;pointer-events:none!important}.page-edge-bottom-v943{position:fixed!important;left:0!important;right:0!important;height:2px!important;background:var(--news-accent-separator)!important;z-index:19!important;pointer-events:none!important}
+/* Home date outline uses exactly the separator colour. */
+.date-pill,.date-chip,.today-date,.hero-date,.home-date-v943{border:2px solid var(--news-accent-separator)!important;box-shadow:none!important}
+/* Brief selected tile: fill all the way to its own edges, with no differently coloured rim or inset. */
+.brief-selected-v943{background:#5148c6!important;background-image:none!important;border:0!important;outline:0!important;box-shadow:none!important;color:#fff!important}
+.brief-selected-v943::before,.brief-selected-v943::after{display:none!important}
 @media(max-width:380px){.shortcut-manual{grid-template-columns:minmax(0,1fr) 86px 86px!important}.shortcut-manual .shortcut-act{width:86px!important;min-width:86px!important;font-size:11px!important}.source-directory-row-v9186{grid-template-columns:minmax(0,1fr) 76px 76px!important}.source-directory-row-v9186 [data-source-follow],.source-directory-row-v9186 [data-source-block]{width:76px!important;min-width:76px!important;max-width:76px!important}}
 `;document.head.append(s)}
 function reorder(){const host=document.querySelector('.settings-accordions-v9185');if(!host)return;const all=[...host.querySelectorAll(':scope > .settings-accordion-v9185')];const find=t=>all.find(x=>x.querySelector(':scope > summary')?.textContent?.trim()===t);const size=find('Taille du texte'),general=find('Actualité générale');if(size&&general&&size.nextElementSibling!==general)host.insertBefore(size,general)}
-function apply(){installCss();reorder()}
-const app=document.getElementById('app');if(app)new MutationObserver(()=>requestAnimationFrame(apply)).observe(app,{childList:true,subtree:true});window.addEventListener('news:stable-render',apply);apply();
+const text=e=>(e?.textContent||'').replace(/\s+/g,' ').trim();
+function decorate(){const root=document.getElementById('app');if(!root)return;root.querySelectorAll('.page-edge-top-v943,.page-edge-bottom-v943').forEach(x=>x.remove());const nav=root.querySelector('.bottom-nav,nav');if(nav){const b=document.createElement('i');b.className='page-edge-bottom-v943';const r=nav.getBoundingClientRect();b.style.top=Math.max(0,Math.round(r.top)-2)+'px';document.body.appendChild(b)}
+const heading=[...root.querySelectorAll('h1')].find(h=>['Réglages','Brief'].includes(text(h)));if(heading){let band=heading.parentElement;while(band&&band!==root){const r=band.getBoundingClientRect();if(r.width>=root.getBoundingClientRect().width*.8&&r.height>=70)break;band=band.parentElement}if(band){const line=document.createElement('i');line.className='page-edge-top-v943';line.style.top=Math.round(band.getBoundingClientRect().bottom+scrollY-2)+'px';document.body.appendChild(line)}}
+const homeTitle=[...root.querySelectorAll('h1,h2')].find(h=>text(h)==='Mon actualité');if(homeTitle){const p=homeTitle.parentElement;const date=[...p.querySelectorAll('*')].find(x=>/^\w+\s+\d{1,2}\s+\w+/i.test(text(x))&&x.children.length===0);date?.classList.add('home-date-v943')}
+const briefHeading=[...root.querySelectorAll('h1')].find(h=>text(h)==='Brief');if(briefHeading){[...root.querySelectorAll('button')].forEach(btn=>{const t=text(btn);if(t==='Top 5 monde'||t==='Veille'){const selected=btn.classList.contains('active')||btn.getAttribute('aria-selected')==='true'||getComputedStyle(btn).color==='rgb(255, 255, 255)';btn.classList.toggle('brief-selected-v943',selected)}})}}
+function apply(){installCss();reorder();requestAnimationFrame(decorate)}
+const app=document.getElementById('app');if(app)new MutationObserver(()=>requestAnimationFrame(apply)).observe(app,{childList:true,subtree:true});window.addEventListener('news:stable-render',apply);window.addEventListener('resize',()=>requestAnimationFrame(decorate));apply();
 })();
