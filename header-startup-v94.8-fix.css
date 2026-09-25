@@ -1,18 +1,35 @@
-/* v94.8 corrected — requested typography adjustments only. */
+/* v94.8 corrected — requested typography and header alignment adjustments only. */
 .hero-header h1{
-  font-size:27px!important;
+  font-size:25px!important;
 }
 .hero-header .eyebrow{
   background:#7461E8!important;
   border-color:#7461E8!important;
   color:#FFFFFF!important;
 }
-/* Réglages : titres des onglets repliables légèrement plus grands. */
+/* Centre visuellement « Mon actualité » entre la tuile date et la séparation des articles. */
+.hero-header{
+  display:flex!important;
+  flex-direction:column!important;
+  justify-content:center!important;
+}
+.hero-header h1{
+  margin-top:16px!important;
+  margin-bottom:14px!important;
+}
+/* Réglages : titres des onglets repliables plus grands. */
 .settings-page-v9185 details > summary,
 .settings-page-v9185 .settings-accordion-v9185 > summary,
 .settings-accordions-v9185 details > summary{
-  font-size:17px!important;
+  font-size:19px!important;
+}
+/* Titres principaux Réglages et Brief légèrement plus grands. */
+.settings-page-v9185 > h1,
+.settings-page-v9185 .settings-title,
+.brief-page h1,
+.brief-page .brief-title{
+  font-size:30px!important;
 }
 @media(max-width:420px){
-  .hero-header h1{font-size:26px!important;}
+  .hero-header h1{font-size:24px!important;}
 }
