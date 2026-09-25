@@ -1,0 +1,6 @@
+(()=>{'use strict';
+function installCss(){if(document.getElementById('ui-tune-v942'))return;const s=document.createElement('style');s.id='ui-tune-v942';s.textContent=`.shortcut-manual{grid-template-columns:minmax(0,1fr) 94px 94px!important}.shortcut-manual .shortcut-act{width:94px!important;min-width:94px!important;padding:9px 6px!important}@media(max-width:380px){.shortcut-manual{grid-template-columns:minmax(0,1fr) 86px 86px!important}.shortcut-manual .shortcut-act{width:86px!important;min-width:86px!important;font-size:11px!important}}`;document.head.append(s)}
+function reorder(){const host=document.querySelector('.settings-accordions-v9185');if(!host)return;const all=[...host.querySelectorAll(':scope > .settings-accordion-v9185')];const find=t=>all.find(x=>x.querySelector(':scope > summary')?.textContent?.trim()===t);const size=find('Taille du texte'),general=find('Actualité générale');if(size&&general&&size.nextElementSibling!==general)host.insertBefore(size,general)}
+function apply(){installCss();reorder()}
+const app=document.getElementById('app');if(app)new MutationObserver(()=>requestAnimationFrame(apply)).observe(app,{childList:true,subtree:true});window.addEventListener('news:stable-render',apply);apply();
+})();
