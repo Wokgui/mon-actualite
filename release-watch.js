@@ -221,6 +221,10 @@
   }
 
   async function checkRelease({ force = false, announce = false } = {}) {
+    if (IS_NATIVE_ANDROID) {
+      if (announce) showToast(`Version Android intégrée ${PAGE_RELEASE}`);
+      return false;
+    }
     if (checking || reloadStarted || document.hidden || !navigator.onLine) {
       if (announce && !navigator.onLine) showToast('Vérification impossible hors connexion');
       return false;
