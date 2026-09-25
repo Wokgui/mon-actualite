@@ -1,6 +1,6 @@
 /* v94.8 corrected — requested typography and header alignment adjustments only. */
 .hero-header h1{
-  font-size:23px!important;
+  font-size:12px!important;
 }
 .hero-header .eyebrow{
   background:#7461E8!important;
@@ -23,13 +23,14 @@
 .settings-accordions-v9185 details > summary{
   font-size:19px!important;
 }
-/* Titres principaux Réglages et Brief plus grands. */
+/* Titres principaux Réglages et Brief : 50 % plus hauts au-dessus de la ligne basse du bandeau. */
 .settings-page-v9185 > h1,
 .settings-page-v9185 .settings-title,
 .brief-page h1,
 .brief-page .brief-title{
   font-size:32px!important;
+  transform:translateY(-8px)!important;
 }
 @media(max-width:420px){
-  .hero-header h1{font-size:22px!important;}
+  .hero-header h1{font-size:11px!important;}
 }
