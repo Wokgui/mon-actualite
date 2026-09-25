@@ -1,116 +1,104 @@
 import { preparedVisualUrl, sourceTileUrl } from './services/article-visuals.js?v=92.04';
 
 const queued = new WeakSet();
-let queue = [];
-let timer = 0;
+const FIRST_BATCH = 14;
+let generation = 0;
+let laterTimer = 0;
 
 function readArticles() {
   try {
     const payload = JSON.parse(localStorage.getItem('news-live-cache') || '{}');
     return Array.isArray(payload.articles) ? payload.articles : [];
-  } catch {
-    return [];
-  }
+  } catch { return []; }
 }
-
-function articlesById() {
-  return new Map(readArticles().map(article => [String(article?.id || ''), article]));
+function articlesById() { return new Map(readArticles().map(a => [String(a?.id || ''), a])); }
+function preload(url, timeout = 6500) {
+  return new Promise(resolve => {
+    if (!url) return resolve(false);
+    const probe = new Image();
+    let done = false;
+    const finish = ok => { if (done) return; done = true; clearTimeout(timer); probe.onload = probe.onerror = null; resolve(ok); };
+    const timer = setTimeout(() => finish(false), timeout);
+    probe.onload = () => finish(probe.naturalWidth > 1);
+    probe.onerror = () => finish(false);
+    probe.decoding = 'async';
+    try { probe.fetchPriority = 'high'; } catch {}
+    probe.src = url;
+    if (probe.complete) finish(probe.naturalWidth > 1);
+  });
 }
-
-function settle(img, ok) {
+function mark(img, ok) {
   img.classList.remove('image-pending-v9184');
   img.classList.toggle('image-ready-v9184', ok);
   img.classList.toggle('image-failed-v9184', !ok);
   img.dataset.imageSequenceDone = '1';
 }
-
-function loadOne(card, article) {
-  if (!card?.isConnected || !article) return;
-  const img = card.querySelector('img.article-image');
-  if (!img || img.dataset.imageSequenceDone === '1') return;
-
+async function resolveVisual(article) {
   const tile = sourceTileUrl(article);
   const wanted = preparedVisualUrl(article);
-  img.classList.add('image-pending-v9184');
-
-  if (!wanted || wanted === tile) {
-    if ((img.currentSrc || img.src) !== tile) img.src = tile;
-    settle(img, false);
-    return;
-  }
-
-  const wantedAbs = new URL(wanted, location.href).href;
-  const currentAbs = img.currentSrc || img.src || '';
-  const cleanup = () => {
-    img.removeEventListener('load', onLoad);
-    img.removeEventListener('error', onError);
-  };
-  const onLoad = () => {
-    cleanup();
-    if (img.naturalWidth > 1) settle(img, true);
-    else onError();
-  };
-  const onError = () => {
-    cleanup();
-    if ((img.currentSrc || img.src) !== tile) img.src = tile;
-    settle(img, false);
-  };
-
-  if (currentAbs === wantedAbs) {
-    if (img.complete) {
-      if (img.naturalWidth > 1) settle(img, true);
-      else onError();
-      return;
-    }
-    img.addEventListener('load', onLoad, { once: true });
-    img.addEventListener('error', onError, { once: true });
-    return;
-  }
-
-  img.addEventListener('load', onLoad, { once: true });
-  img.addEventListener('error', onError, { once: true });
-  img.decoding = 'async';
-  img.loading = Number(card.dataset.imageSequenceIndex || 99) < 24 ? 'eager' : 'lazy';
-  if ('fetchPriority' in img) img.fetchPriority = Number(card.dataset.imageSequenceIndex || 99) < 16 ? 'high' : 'auto';
-  img.src = wanted;
-  if (img.complete && img.naturalWidth > 1) onLoad();
+  if (wanted && wanted !== tile && await preload(wanted)) return { url: wanted, ok: true };
+  if (tile) await preload(tile, 3000);
+  return { url: tile || wanted || '', ok: false };
 }
-function pump() {
-  timer = 0;
-  let started = 0;
-  while (queue.length && started < 8) {
-    const item = queue.shift();
-    if (item) loadOne(item.card, item.article);
-    started += 1;
-  }
-  if (queue.length) timer = window.setTimeout(pump, 2);
+async function loadFirstBatch(items, token) {
+  // Resolve the whole first screen in parallel, then swap every thumbnail in one frame.
+  const resolved = await Promise.all(items.map(async item => ({ ...item, visual: await resolveVisual(item.article) })));
+  if (token !== generation) return;
+  requestAnimationFrame(() => {
+    resolved.forEach(({ card, visual }) => {
+      if (!card?.isConnected) return;
+      const img = card.querySelector('img.article-image');
+      if (!img) return;
+      img.loading = 'eager'; img.decoding = 'async';
+      try { img.fetchPriority = 'high'; } catch {}
+      if (visual.url && (img.currentSrc || img.src) !== new URL(visual.url, location.href).href) img.src = visual.url;
+      mark(img, visual.ok);
+    });
+  });
 }
-
+async function loadLater(item, token) {
+  const visual = await resolveVisual(item.article);
+  if (token !== generation || !item.card?.isConnected) return;
+  const img = item.card.querySelector('img.article-image');
+  if (!img) return;
+  img.loading = 'lazy'; img.decoding = 'async';
+  if (visual.url) img.src = visual.url;
+  mark(img, visual.ok);
+}
 function schedule() {
   const byId = articlesById();
+  const fresh = [];
   document.querySelectorAll('.article-card[data-article]').forEach((card, index) => {
     if (queued.has(card)) return;
     const rect = card.getBoundingClientRect();
-    const nearViewport = index < 40 || (rect.bottom >= -600 && rect.top <= window.innerHeight * 5);
-    if (!nearViewport) return;
-    queued.add(card);
-    card.dataset.imageSequenceIndex = String(index);
+    if (!(index < 40 || (rect.bottom >= -500 && rect.top <= window.innerHeight * 4))) return;
+    const article = byId.get(String(card.dataset.article || ''));
+    if (!article) return;
+    queued.add(card); card.dataset.imageSequenceIndex = String(index);
     const img = card.querySelector('img.article-image');
     if (img) img.classList.add('image-pending-v9184');
-    const article = byId.get(String(card.dataset.article || ''));
-    if (article) queue.push({ card, article, index });
+    fresh.push({ card, article, index });
   });
-  queue.sort((a,b) => a.index - b.index);
-  if (!timer && queue.length) pump();
+  if (!fresh.length) return;
+  fresh.sort((a,b) => a.index - b.index);
+  const token = generation;
+  const first = fresh.filter(x => x.index < FIRST_BATCH);
+  const later = fresh.filter(x => x.index >= FIRST_BATCH);
+  if (first.length) loadFirstBatch(first, token);
+  if (later.length) {
+    clearTimeout(laterTimer);
+    laterTimer = setTimeout(() => later.forEach(item => loadLater(item, token)), 30);
+  }
 }
-
+function resetForRender() {
+  generation += 1;
+  document.querySelectorAll('.article-card img.article-image').forEach(img => { delete img.dataset.imageSequenceDone; });
+  schedule();
+}
 const app = document.getElementById('app');
 if (app) new MutationObserver(() => requestAnimationFrame(schedule)).observe(app, { childList: true, subtree: true });
-window.addEventListener('news:stable-render', schedule);
+window.addEventListener('news:stable-render', resetForRender);
 window.addEventListener('pageshow', schedule);
 let scrollFrame = 0;
-window.addEventListener('scroll', () => {
-  if (scrollFrame) return;
-  scrollFrame = requestAnimationFrame(() => { scrollFrame = 0; schedule(); });
-}, { passive: true });
+window.addEventListener('scroll', () => { if (scrollFrame) return; scrollFrame = requestAnimationFrame(() => { scrollFrame = 0; schedule(); }); }, { passive: true });
 schedule();
