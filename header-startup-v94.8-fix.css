@@ -1,6 +1,6 @@
 /* v94.8 corrected — polished home header + editorial article metadata. */
 
-/* Accueil : bloc date / titre propre et équilibré, conforme à la maquette validée. */
+/* Accueil : style « classique amélioré » validé. */
 .hero-header{
   display:flex!important;
   flex-direction:column!important;
@@ -8,20 +8,30 @@
   justify-content:center!important;
   box-sizing:border-box!important;
   padding-top:22px!important;
-  padding-bottom:18px!important;
+  padding-bottom:20px!important;
 }
 .hero-header .hero-mark{
-  display:none!important;
+  display:block!important;
+  order:2!important;
+  width:34px!important;
+  height:2px!important;
+  margin:0 auto 13px!important;
+  border:0!important;
+  border-radius:999px!important;
+  background:#7461E8!important;
+  font-size:0!important;
+  line-height:0!important;
 }
 .hero-header .eyebrow{
+  order:1!important;
   display:inline-flex!important;
   align-items:center!important;
   justify-content:center!important;
   width:auto!important;
   min-width:0!important;
-  margin:0 auto 18px!important;
+  margin:0 auto 16px!important;
   padding:9px 24px!important;
-  border:1px solid #7461E8!important;
+  border:0!important;
   border-radius:999px!important;
   background:#7461E8!important;
   color:#FFFFFF!important;
@@ -31,10 +41,11 @@
   box-shadow:none!important;
 }
 .hero-header h1{
+  order:3!important;
   margin:0!important;
   padding:0!important;
   color:#17223A!important;
-  font-size:28px!important;
+  font-size:27px!important;
   font-weight:700!important;
   line-height:1.12!important;
   letter-spacing:-.025em!important;
@@ -115,6 +126,6 @@
 }
 
 @media(max-width:420px){
-  .hero-header h1{font-size:27px!important;}
+  .hero-header h1{font-size:26px!important;}
   .hero-header .eyebrow{font-size:13.5px!important;padding:9px 22px!important;}
 }
