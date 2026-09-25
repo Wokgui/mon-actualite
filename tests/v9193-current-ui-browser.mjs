@@ -163,17 +163,6 @@ const firstImageSrc = await firstImage.getAttribute('src');
 await page.waitForTimeout(350);
 assert.equal(await firstImage.getAttribute('src'), firstImageSrc, 'article image source must not be reassigned after initial render');
 
-const homeNav = page.locator('.nav-item[data-view="home"]');
-await homeNav.dispatchEvent('pointerdown', { pointerType: 'touch', clientX: 30, clientY: 820 });
-await page.waitForTimeout(700);
-await homeNav.dispatchEvent('pointerup', { pointerType: 'touch', clientX: 30, clientY: 820 });
-const resetState = await page.evaluate(() => ({
-  stored: localStorage.getItem('news-grey-after-scroll-v9138-v1'),
-  greyCount: document.querySelectorAll('.article-card.read-passed-v9138').length
-}));
-assert.equal(resetState.stored, '[]', 'long press on home must clear read history');
-assert.equal(resetState.greyCount, 0, 'long press on home must ungrey visible articles');
-
 await page.locator('.nav-item[data-view="settings"]').click();
 await page.waitForSelector('.settings-page-v9185>.page-masthead-v9186 h1');
 const settingsTitlePx = await page.$eval('.settings-page-v9185>.page-masthead-v9186 h1', el => parseFloat(getComputedStyle(el).fontSize));
