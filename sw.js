@@ -1,4 +1,4 @@
-const CACHE = 'mon-actualite-v92-04-core-r1';
+const CACHE = 'mon-actualite-v92-04-core-r2';
 const COMPAT_DIAGNOSTIC = 'v92.04-core';
 const THUMB_CACHE = 'mon-actualite-thumbnails-v6-feedly';
 const THUMB_NEGATIVE_TTL_MS = 90 * 1000;
@@ -20,7 +20,7 @@ const ASSETS = [
   './article-access-v91.48.js?v=91.88',
   './startup-news-prefetch-v91.83.js?v=91.88',
   './app.js?v=92.04',
-  './image-sequence-v91.82.js?v=92.04', './nav-solid-hardfix-v91.89.js?v=1',
+  './image-sequence-v91.82.js?v=92.04', './nav-solid-hardfix-v91.89.js?v=1', './ui-controls-v95.js?v=2',
   './services/source-connectors.js?v=91.97', './services/article-visuals.js?v=92.04',
   './services/article-visuals.js?v=57',
   './manifest.webmanifest?v=92.04',
@@ -34,183 +34,16 @@ self.addEventListener('install', event => {
   event.waitUntil((async () => {
     const cache = await caches.open(CACHE);
     await Promise.allSettled(ASSETS.map(asset => cache.add(new Request(asset, { cache: 'reload' }))));
-    // Do not skip waiting here. Taking control while the installed PWA is
-    // starting caused a second reload and kept Android's splash screen visible.
-    // The new worker activates naturally after the app is closed.
   })());
 });
-
-self.addEventListener('message', event => {
-  if (event.data?.type === 'SKIP_WAITING') self.skipWaiting();
-});
-
-self.addEventListener('activate', event => {
-  event.waitUntil(
-    caches.keys()
-      .then(keys => Promise.all(keys.filter(key => key !== CACHE && key !== THUMB_CACHE).map(key => caches.delete(key))))
-      .then(() => self.clients.claim())
-  );
-});
-
-async function staleWhileRevalidate(request, cacheName) {
-  const cache = await caches.open(cacheName);
-  const cached = await cache.match(request);
-  const network = fetch(request).then(response => {
-    if (response.ok && response.type !== 'opaque') cache.put(request, response.clone()).catch(() => {});
-    return response;
-  });
-  if (cached) return cached;
-  return network;
-}
-
-async function cachedNavigation() {
-  const cache = await caches.open(CACHE);
-  return (await cache.match('./index.html')) || (await cache.match('./')) || null;
-}
-
-async function refreshNavigation(request) {
-  const cache = await caches.open(CACHE);
-  try {
-    const response = await fetch(request, { cache: 'no-store' });
-    if (response.ok && response.type !== 'opaque') {
-      await Promise.allSettled([
-        cache.put('./index.html', response.clone()),
-        cache.put('./', response.clone())
-      ]);
-    }
-  } catch {}
-}
-
-async function navigationResponse(request) {
-  const cached = await cachedNavigation();
-  if (cached) return cached;
-  try { return await fetch(request, { cache: 'no-store' }); }
-  catch { return new Response('Hors connexion', { status: 503, headers: { 'Content-Type': 'text/plain; charset=utf-8' } }); }
-}
-
-function neutralThumbnailResponse() {
-  return new Response('<svg xmlns="http://www.w3.org/2000/svg" width="640" height="420" viewBox="0 0 640 420"><rect width="640" height="420" rx="22" fill="#f1f1f4"/><path d="M0 340 150 225l64 43 66-67 179 129H0Z" fill="#d7d7de"/><circle cx="490" cy="115" r="39" fill="#dedee4"/></svg>', {
-    status: 200,
-    headers: {
-      'Content-Type': 'image/svg+xml',
-      'Cache-Control': 'public, max-age=90',
-      'X-Thumbnail-Status': 'neutral-fallback',
-      'X-Thumbnail-Cached-At': String(Date.now())
-    }
-  });
-}
-
-function thumbnailCacheKey(request) {
-  try {
-    const source = new URL(request.url);
-    const key = new URL('/__cached-article-thumbnail', self.location.origin);
-    const articleUrl = source.searchParams.get('url') || '';
-    const title = source.searchParams.get('title') || '';
-    const image = source.searchParams.get('image') || '';
-    if (articleUrl) key.searchParams.set('url', articleUrl);
-    else if (title) key.searchParams.set('title', title);
-    else if (image) key.searchParams.set('image', image);
-    else return request;
-    return new Request(key.href);
-  } catch {
-    return request;
-  }
-}
-
-function isFallbackThumbnail(response) {
-  const status = response?.headers?.get('X-Thumbnail-Status') || '';
-  const type = response?.headers?.get('Content-Type') || '';
-  return status === 'fallback' || status === 'publisher-tile' || status === 'neutral-fallback' || /image\/svg\+xml/i.test(type);
-}
-
-async function cacheThumbnail(cache, request, canonicalKey, response, { canonical = true } = {}) {
-  if (!response) return;
-  await cache.put(request, response.clone()).catch(() => {});
-  if (canonical && canonicalKey.url !== request.url) await cache.put(canonicalKey, response.clone()).catch(() => {});
-}
-
-async function thumbnailResponse(request) {
-  const cache = await caches.open(THUMB_CACHE);
-  const canonicalKey = thumbnailCacheKey(request);
-
-  const canonicalCached = await cache.match(canonicalKey);
-  if (canonicalCached) {
-    if (!isFallbackThumbnail(canonicalCached)) return canonicalCached;
-    await cache.delete(canonicalKey).catch(() => {});
-  }
-
-  const cached = await cache.match(request);
-  if (cached) {
-    if (!isFallbackThumbnail(cached)) {
-      if (canonicalKey.url !== request.url) cache.put(canonicalKey, cached.clone()).catch(() => {});
-      return cached;
-    }
-    const cachedAt = Number(cached.headers.get('X-Thumbnail-Cached-At') || 0);
-    if (cachedAt && Date.now() - cachedAt < THUMB_NEGATIVE_TTL_MS) return cached;
-    await cache.delete(request).catch(() => {});
-  }
-
-  const inflightKey = canonicalKey.url;
-  const existing = thumbnailInflight.get(inflightKey);
-  if (existing) {
-    try { return (await existing).clone(); }
-    catch {}
-  }
-
-  const job = (async () => {
-    try {
-      const response = await fetch(request, { cache: 'no-store' });
-      if (response.ok && response.type !== 'opaque' && !isFallbackThumbnail(response)) {
-        await cacheThumbnail(cache, request, canonicalKey, response);
-        return response;
-      }
-
-      await cache.delete(request).catch(() => {});
-      if (response.status === 404 || isFallbackThumbnail(response)) {
-        const fallback = neutralThumbnailResponse();
-        await cacheThumbnail(cache, request, canonicalKey, fallback, { canonical: false });
-        return fallback;
-      }
-      return response;
-    } catch {
-      const fallback = neutralThumbnailResponse();
-      await cacheThumbnail(cache, request, canonicalKey, fallback, { canonical: false });
-      return fallback;
-    }
-  })();
-
-  thumbnailInflight.set(inflightKey, job);
-  try { return (await job).clone(); }
-  finally { thumbnailInflight.delete(inflightKey); }
-}
-
-self.addEventListener('fetch', event => {
-  if (event.request.method !== 'GET') return;
-  const url = new URL(event.request.url);
-  if (url.origin !== self.location.origin) return;
-
-  if (url.pathname === '/api/exact-news-thumbnail') {
-    const replacement = new URL('/api/article-thumbnail', url.origin);
-    replacement.search = url.search;
-    event.respondWith(thumbnailResponse(new Request(replacement.href)));
-    return;
-  }
-  if (url.pathname === '/api/article-thumbnail' || url.pathname === '/api/article-photo-fast') {
-    event.respondWith(thumbnailResponse(event.request));
-    return;
-  }
-  if (url.pathname.startsWith('/api/')) return;
-
-  if (url.pathname === '/version.json') {
-    event.respondWith(fetch(event.request, { cache: 'no-store' }));
-    return;
-  }
-
-  if (event.request.mode === 'navigate' || url.pathname === '/' || url.pathname === '/index.html') {
-    event.respondWith(navigationResponse(event.request));
-    event.waitUntil(refreshNavigation(event.request));
-    return;
-  }
-
-  event.respondWith(staleWhileRevalidate(event.request, CACHE).catch(() => caches.match('./index.html')));
-});
+self.addEventListener('message', event => { if (event.data?.type === 'SKIP_WAITING') self.skipWaiting(); });
+self.addEventListener('activate', event => { event.waitUntil(caches.keys().then(keys => Promise.all(keys.filter(key => key !== CACHE && key !== THUMB_CACHE).map(key => caches.delete(key)))).then(() => self.clients.claim())); });
+async function staleWhileRevalidate(request, cacheName) { const cache = await caches.open(cacheName); const cached = await cache.match(request); const network = fetch(request).then(response => { if (response.ok && response.type !== 'opaque') cache.put(request, response.clone()).catch(() => {}); return response; }); if (cached) return cached; return network; }
+async function cachedNavigation() { const cache = await caches.open(CACHE); return (await cache.match('./index.html')) || (await cache.match('./')) || null; }
+async function refreshNavigation(request) { const cache = await caches.open(CACHE); try { const response = await fetch(request, { cache: 'no-store' }); if (response.ok && response.type !== 'opaque') await Promise.allSettled([cache.put('./index.html', response.clone()),cache.put('./', response.clone())]); } catch {} }
+async function navigationResponse(request) { const cached = await cachedNavigation(); if (cached) return cached; try { return await fetch(request, { cache: 'no-store' }); } catch { return new Response('Hors connexion', { status: 503, headers: { 'Content-Type': 'text/plain; charset=utf-8' } }); } }
+function neutralThumbnailResponse() { return new Response('<svg xmlns="http://www.w3.org/2000/svg" width="640" height="420" viewBox="0 0 640 420"><rect width="640" height="420" rx="22" fill="#f1f1f4"/><path d="M0 340 150 225l64 43 66-67 179 129H0Z" fill="#d7d7de"/><circle cx="490" cy="115" r="39" fill="#dedee4"/></svg>', {status:200,headers:{'Content-Type':'image/svg+xml','Cache-Control':'public, max-age=90','X-Thumbnail-Status':'neutral-fallback','X-Thumbnail-Cached-At':String(Date.now())}}); }
+function thumbnailCacheKey(request) { try { const source=new URL(request.url),key=new URL('/__cached-article-thumbnail',self.location.origin),articleUrl=source.searchParams.get('url')||'',title=source.searchParams.get('title')||'',image=source.searchParams.get('image')||'';if(articleUrl)key.searchParams.set('url',articleUrl);else if(title)key.searchParams.set('title',title);else if(image)key.searchParams.set('image',image);else return request;return new Request(key.href);}catch{return request;} }
+function isFallbackThumbnail(response){return response?.headers?.get('X-Thumbnail-Status')==='neutral-fallback'}
+async function thumbnailResponse(request){const cache=await caches.open(THUMB_CACHE),key=thumbnailCacheKey(request),cached=await cache.match(key);if(cached&&!isFallbackThumbnail(cached))return cached;if(cached&&isFallbackThumbnail(cached)){const at=Number(cached.headers.get('X-Thumbnail-Cached-At')||0);if(Date.now()-at<THUMB_NEGATIVE_TTL_MS)return cached}const id=key.url;if(thumbnailInflight.has(id))return thumbnailInflight.get(id);const task=(async()=>{try{const response=await fetch(request,{cache:'no-store'});if(response.ok){await cache.put(key,response.clone()).catch(()=>{});return response}}catch{}const fallback=neutralThumbnailResponse();await cache.put(key,fallback.clone()).catch(()=>{});return fallback})().finally(()=>thumbnailInflight.delete(id));thumbnailInflight.set(id,task);return task}
+self.addEventListener('fetch',event=>{const request=event.request,url=new URL(request.url);if(request.mode==='navigate'){event.respondWith(navigationResponse(request));event.waitUntil(refreshNavigation(request));return}if(url.origin===self.location.origin&&url.pathname==='/api/article-photo-fast'){event.respondWith(thumbnailResponse(request));return}if(request.method==='GET'&&url.origin===self.location.origin){event.respondWith(staleWhileRevalidate(request,CACHE));}});
