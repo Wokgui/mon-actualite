@@ -59,6 +59,7 @@ assert.ok(geometry.every(item => item.border === '0px'), 'article separators mus
 const requestCounts = [...photoRequests.reduce((map,url)=>map.set(url,(map.get(url)||0)+1),new Map()).values()];
 assert.ok(Math.max(...requestCounts) <= 2, 'the client must not loop on the same photo URL when the service worker is unavailable');
 assert.ok(maxActivePhotoRequests <= 4, `photo concurrency exceeded the four-request budget: ${maxActivePhotoRequests}`);
+await page.waitForFunction(() => document.querySelectorAll('[data-stable-home-feed] .article-card img.image-ready-v98').length >= 6, null, { timeout: 3000 });
 assert.equal(await page.locator('[data-stable-home-feed] .article-card img.image-ready-v98').count() >= 6, true, 'the six priority images must load first');
 const initialPhotoRequests = photoRequests.length;
 const initialUniquePhotoRequests = new Set(photoRequests).size;
