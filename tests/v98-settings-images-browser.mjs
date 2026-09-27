@@ -57,7 +57,7 @@ await page.route('**/api/article-photo-fast**', async route => {
   finally { activePhotoRequests -= 1; }
 });
 await page.route('**/api/article-thumbnail**', route => route.fulfill({ status: 200, contentType: 'image/png', headers: { 'X-Thumbnail-Status': 'feed', 'Cache-Control': 'public, max-age=3600' }, body: png }));
-await page.route('**/version.json**', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ version: '98', codeRelease: '98.03' }) }));
+await page.route('**/version.json**', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ version: '98', codeRelease: '98.04' }) }));
 
 const started = performance.now();
 await page.goto('http://127.0.0.1:4173/', { waitUntil: 'domcontentloaded', timeout: 15000 });
@@ -87,20 +87,35 @@ await page.waitForSelector('.settings-accordions-v9185');
 const titles = await page.locator('.settings-accordion-v9185>summary').allTextContents();
 assert.deepEqual(titles.slice(0,3), ['Langue','Taille et densité du texte','Affichage']);
 assert.equal(titles.filter(title => title === 'Taille du texte').length, 0);
+assert.ok(titles.includes('Sources d’information de base'));
+assert.equal(titles.includes('Sources d’information'), false);
+assert.equal(titles.includes('Centres d’intérêt'), false);
 assert.ok(titles.indexOf('L’essentiel') < titles.indexOf('Veille'));
 assert.equal(new Set(titles).size, titles.length, 'settings sections must not be duplicated');
 await page.screenshot({ path: `${evidenceDir}/settings.png`, fullPage: true });
 
 const open = async title => page.locator('.settings-accordion-v9185').filter({ has: page.locator(`summary:text-is("${title}")`) }).evaluate(element => { element.open = true; });
+const physicalArticleGap = () => page.locator('[data-stable-home-feed] .article-card').evaluateAll(cards => {
+  const first = cards[0].getBoundingClientRect();
+  const second = cards[1].getBoundingClientRect();
+  return second.top - first.bottom;
+});
 await open('Taille et densité du texte');
-await page.locator('[data-ui-range="density"]').fill('0');
+await page.locator('[data-ui-range="density"]').evaluate(range => {
+  range.value = '0';
+  range.dispatchEvent(new Event('change', { bubbles: true }));
+});
 await page.locator('[data-view="home"]').click();
-const looseGap = parseFloat(await page.locator('[data-stable-home-feed]').evaluate(element => getComputedStyle(element).rowGap));
+const looseGap = await physicalArticleGap();
+await page.reload({ waitUntil: 'domcontentloaded' });
+await page.waitForSelector('[data-stable-home-feed] .article-card');
+assert.equal(JSON.parse(await page.evaluate(() => localStorage.getItem('news-settings'))).density, 0, 'the zero-density endpoint must survive reload');
+assert.ok(Math.abs((await physicalArticleGap()) - looseGap) < 1, 'persisted density must keep the same physical spacing');
 await page.locator('[data-view="settings"]').click(); await open('Taille et densité du texte');
 await page.locator('[data-ui-range="density"]').fill('100');
 await page.locator('[data-view="home"]').click();
-const denseGap = parseFloat(await page.locator('[data-stable-home-feed]').evaluate(element => getComputedStyle(element).rowGap));
-assert.ok(denseGap < looseGap, `density must reduce article spacing (${looseGap} -> ${denseGap})`);
+const denseGap = await physicalArticleGap();
+assert.ok(looseGap - denseGap >= 15, `density must visibly reduce physical article spacing (${looseGap} -> ${denseGap})`);
 
 await page.locator('[data-view="settings"]').click(); await open('Taille et densité du texte');
 await page.locator('[data-ui-range="titleSize"]').fill('70'); await page.locator('[data-view="home"]').click();
@@ -124,11 +139,34 @@ assert.ok(await page.locator('.article-category-badge:visible').count() > 0);
 assert.ok(await page.locator('.article-age:visible').count() > 0);
 
 await page.locator('[data-view="settings"]').click(); await open('L’essentiel');
+await open('Actualité générale');
+const domainLayouts = await page.evaluate(() => {
+  const general = document.querySelector('[data-general-category]');
+  const essential = document.querySelector('[data-brief-essential]');
+  const style = element => { const css=getComputedStyle(element); return { borderRadius:css.borderRadius,padding:css.padding,fontSize:css.fontSize,fontWeight:css.fontWeight }; };
+  return {
+    general: style(general), essential: style(essential),
+    generalJustify:getComputedStyle(general.parentElement).justifyContent,
+    essentialJustify:getComputedStyle(essential.parentElement).justifyContent
+  };
+});
+assert.deepEqual(domainLayouts.essential, domainLayouts.general, 'essential domain buttons must match general-news buttons');
+assert.equal(domainLayouts.essentialJustify, 'center', 'essential domains must be centered');
 await page.locator('[data-ui-range="essentialCount"]').fill('3');
 await page.locator('[data-view="brief"]').click();
-assert.equal(await page.locator('.journal-section').first().locator('.article-card').count(), 3, 'essential count must be applied');
+assert.equal(await page.locator('[data-stable-brief-content] .article-card').count(), 3, 'essential count must be a strict total');
+assert.equal(await page.locator('.brief-history-day-v9138').count(), 0, 'strict total must not append historical sections');
 assert.equal((await page.locator('.brief-mode-tab').first().textContent()).trim(), 'L’essentiel');
 await page.screenshot({ path: `${evidenceDir}/brief.png` });
+
+await page.locator('[data-view="settings"]').click(); await open('L’essentiel');
+for (const category of categories.filter(category => category !== 'Politique')) {
+  const button = page.locator(`[data-brief-essential="${category}"]`);
+  if (await button.getAttribute('aria-pressed') === 'true') await button.click();
+}
+await page.locator('[data-view="brief"]').click();
+assert.equal(await page.locator('[data-stable-brief-content] .article-card').count(), 3, 'domain filtering must preserve the requested strict total when enough articles exist');
+assert.deepEqual(await page.locator('[data-stable-brief-content] .article-category-badge').allTextContents(), ['Politique','Politique','Politique'], 'L’essentiel must strictly follow selected domains');
 
 await page.locator('[data-view="settings"]').click(); await open('Fonctionnement');
 const auto = page.locator('[data-setting-toggle="autoRefresh"]');

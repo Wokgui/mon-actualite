@@ -6,7 +6,7 @@
 .bottom-nav .nav-item,.stable-bottom-nav-v9184 .nav-item{padding-top:3px!important;padding-bottom:3px!important}
 .settings-page-v9185,.brief-page{padding-bottom:62px!important}
 
-#app .feed,#app .stable-owned-list{gap:var(--article-row-gap)!important}
+#app .feed,#app .stable-owned-list{display:grid!important;grid-auto-flow:row!important;gap:var(--article-row-gap)!important}
 #app [data-stable-home-feed] .article-card,#app [data-stable-brief-content] .article-card.runtime-row{display:grid!important;grid-template-columns:minmax(0,1fr) 112px!important;grid-template-areas:"body image"!important;grid-template-rows:minmax(75px,auto)!important;align-items:center!important;min-height:75px!important;padding:0!important;margin:0!important;border:0!important;box-shadow:none!important;font-size:calc(1em * var(--article-text-scale))!important;overflow:hidden!important}
 #app [data-stable-home-feed] .article-card .article-image,#app [data-stable-brief-content] .article-card.runtime-row .article-image{grid-area:image!important;width:112px!important;height:75px!important;min-height:75px!important;max-height:75px!important;aspect-ratio:112/75!important;align-self:center!important;justify-self:end!important;margin:0!important;object-fit:cover!important;background-color:#eef0f4!important}
 #app [data-stable-home-feed] .article-card .article-body,#app [data-stable-brief-content] .article-card.runtime-row .article-body{grid-area:body!important;display:flex!important;flex-direction:column!important;justify-content:center!important;align-self:stretch!important;height:auto!important;min-height:75px!important;max-height:none!important;padding:5px 10px 5px 0!important;margin:0!important;box-sizing:border-box!important;overflow:hidden!important}
@@ -16,7 +16,7 @@
 .article-category-badge{order:0!important;display:inline-block!important;flex:0 1 auto!important;max-width:96px!important;padding:2px 5px!important;border-radius:999px!important;background:color-mix(in srgb,var(--app-accent) 12%,white)!important;color:var(--app-accent)!important;overflow:hidden!important;text-overflow:ellipsis!important;white-space:nowrap!important;text-align:left!important}
 #app .article-card .meta .article-age{display:inline!important;color:#8c8797!important}
 html[data-show-badges="0"] #app .article-badges,html[data-show-badges="0"] #app .article-category-badge,html[data-show-badges="0"] #app .badge-age-dot{display:none!important}
-html[data-show-age="0"] #app .article-age,html[data-show-age="0"] #app .badge-age-dot{display:none!important}
+html[data-show-age="0"] #app .article-card .meta .article-age,html[data-show-age="0"] #app .article-card .meta .badge-age-dot{display:none!important}
 html[data-show-badges="0"][data-show-age="0"] #app .article-card .meta{display:none!important}
 html[data-show-badges="0"][data-show-age="0"] #app .article-card h2{margin-bottom:0!important}
 .article-card,.feed>.article-card,.stable-owned-list>.article-card,.runtime-brief-content .article-card{border:0!important;box-shadow:none!important}
@@ -34,9 +34,10 @@ html[data-show-badges="0"][data-show-age="0"] #app .article-card h2{margin-botto
 .essential-domains{margin-top:10px}
 .interest.active,.switch.on{background:var(--app-accent)!important;border-color:var(--app-accent)!important}
 
-.image-pending-v98{background-image:linear-gradient(110deg,#eceff4 8%,#f7f8fa 28%,#eceff4 48%)!important;background-size:220% 100%!important;animation:image-shimmer-v98 1.05s linear infinite!important}
-.image-ready-v98{animation:none!important;background-image:none!important}
-.image-fallback-v98{animation:none!important;background-color:#eef0f4!important}
+.article-image{transition:opacity .16s ease-out,filter .16s ease-out!important;will-change:opacity,filter}
+.image-pending-v98{opacity:.76;filter:blur(.7px);background-image:linear-gradient(110deg,#eceff4 8%,#f7f8fa 28%,#eceff4 48%)!important;background-size:220% 100%!important;animation:image-shimmer-v98 1.05s linear infinite!important}
+.image-ready-v98{opacity:1;filter:none;animation:none!important;background-image:none!important}
+.image-fallback-v98{opacity:1;filter:none;animation:none!important;background-color:#eef0f4!important}
 @keyframes image-shimmer-v98{to{background-position:-220% 0}}
 
 @media(max-width:380px){.language-settings{grid-template-columns:1fr}.language-settings .small-primary-btn{width:100%}}

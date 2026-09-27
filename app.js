@@ -1,5 +1,5 @@
-import { importOpmlPreview, fetchLiveNews } from './services/source-connectors.js?v=98.3';
-import { preparedVisualUrl, hasPreparedVisual, sourceTileUrl } from './services/article-visuals.js?v=98.3';
+import { importOpmlPreview, fetchLiveNews } from './services/source-connectors.js?v=98.4';
+import { preparedVisualUrl, hasPreparedVisual, sourceTileUrl } from './services/article-visuals.js?v=98.4';
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const app = $('#app');
@@ -78,6 +78,11 @@ function safeJson(key, fallback) {
   catch { return fallback; }
 }
 
+function boundedNumber(value, fallback, min, max) {
+  const number = Number(value);
+  return Math.max(min, Math.min(max, Number.isFinite(number) ? number : fallback));
+}
+
 const legacyUiSettings = safeJson('news-ui-v96', {});
 const storedSettings = safeJson('news-settings', {});
 const savedSettings = {
@@ -123,12 +128,12 @@ const state = {
     interests: Array.isArray(savedSettings.interests) ? savedSettings.interests : [...PERSONAL_THEMES],
     briefEssentialCategories: Array.isArray(savedSettings.briefEssentialCategories) ? savedSettings.briefEssentialCategories : [...GENERAL_CATEGORIES],
     briefWatchTopics: Array.isArray(savedSettings.briefWatchTopics) ? savedSettings.briefWatchTopics : [...DEFAULT_WATCH_TOPICS],
-    essentialCount: Math.max(3, Math.min(12, Number(savedSettings.essentialCount) || 5)),
+    essentialCount: Math.round(boundedNumber(savedSettings.essentialCount, 5, 3, 12)),
     language: selectedLanguage,
     enabledLanguages: [...new Set(['fr', ...(Array.isArray(savedSettings.enabledLanguages) ? savedSettings.enabledLanguages : []), selectedLanguage])].filter(code => LANGUAGE_PRESETS[code]),
-    textSize: Math.max(85, Math.min(125, Number(savedSettings.textSize) || 100)),
-    density: Math.max(0, Math.min(100, Number(savedSettings.density) || 62)),
-    titleSize: Math.max(70, Math.min(140, Number(savedSettings.titleSize) || 100)),
+    textSize: boundedNumber(savedSettings.textSize, 100, 85, 125),
+    density: boundedNumber(savedSettings.density, 62, 0, 100),
+    titleSize: boundedNumber(savedSettings.titleSize, 100, 70, 140),
     showBadges: savedSettings.showBadges !== false,
     showAge: savedSettings.showAge !== false,
     accent: /^#[0-9a-f]{6}$/i.test(savedSettings.accent || '') ? savedSettings.accent : '#7461e8'
@@ -138,11 +143,11 @@ const state = {
 function applyAppearanceSettings() {
   const root = document.documentElement;
   const { accent, textSize, titleSize, density, showBadges, showAge, language } = state.settings;
-  const rowGap = Math.round(18 - density * .15);
+  const rowGap = Math.round(20 - density * .18);
   root.style.setProperty('--app-accent', accent);
   root.style.setProperty('--article-text-scale', String(textSize / 100));
   root.style.setProperty('--app-title-scale', String(titleSize / 100));
-  root.style.setProperty('--article-row-gap', `${Math.max(3, rowGap)}px`);
+  root.style.setProperty('--article-row-gap', `${Math.max(2, rowGap)}px`);
   root.style.setProperty('--header-v-pad', `${Math.round(8 + titleSize * .055)}px`);
   root.dataset.showBadges = showBadges ? '1' : '0';
   root.dataset.showAge = showAge ? '1' : '0';
@@ -552,29 +557,6 @@ function compactArticleRow(article, index = 0) {
   </article>`;
 }
 
-function historyBriefMarkup() {
-  const major = /guerre|attaque|cessez-le-feu|élection|gouvernement|président|premier ministre|attentat|catastrophe|séisme|inondation|incendie|crise|accord|sommet|justice|condamn|budget|déficit|croissance|inflation|chômage|épidémie|climat|diplomatie|nucléaire|réforme|retraite/i;
-  const low = /football|match|mercato|tennis|formule 1|promotion|bon plan|soldes|réduction|console|jeu vidéo|gta|people|célébrité|télé-réalité/i;
-  const editorial = new Set(['Politique', 'International', 'Europe', 'Économie', 'Société', 'Santé', 'Environnement', 'Science']);
-  const impact = article => Number(article.score || 0) + (editorial.has(article.category) ? 65 : 0) + (major.test(`${article.title || ''} ${article.summary || ''}`) ? 80 : 0) + Math.max(0, (article.sources?.length || 1) - 1) * 25 - (low.test(`${article.title || ''} ${article.summary || ''}`) ? 180 : 0);
-  const days = new Map();
-  for (const article of visibleArticles()) {
-    const delta = dayDelta(article.publishedAt);
-    if (delta < 1 || delta >= BRIEF_DAYS || state.feedback[article.id] === 'not') continue;
-    const key = dayKey(article.publishedAt);
-    if (!days.has(key)) days.set(key, []);
-    days.get(key).push(article);
-  }
-  return [...days.entries()].sort((a, b) => b[0].localeCompare(a[0])).slice(0, BRIEF_DAYS - 1).map(([, items], dayIndex) => {
-    const allowed = new Set(state.settings.briefEssentialCategories);
-    const selected = items
-      .filter(article => !allowed.size || allowed.has(article.category))
-      .sort((a, b) => impact(b) - impact(a))
-      .slice(0, state.settings.essentialCount);
-    return `<section class="brief-history-day-v9138"><div class="brief-history-date-v9138">${escapeHtml(dayLabel(selected[0]?.publishedAt))}${dayDelta(selected[0]?.publishedAt) <= 2 ? ` · ${escapeHtml(fullDay(selected[0]?.publishedAt))}` : ''}</div><div class="feed stable-owned-list">${selected.map((article, index) => compactArticleRow(article, dayIndex * 10 + index)).join('')}</div></section>`;
-  }).join('');
-}
-
 function renderWatchesFinal() {
   const rules = effectiveWatchRules();
   const cutoff = Date.now() - BRIEF_DAYS * 24 * 60 * 60 * 1000;
@@ -615,7 +597,7 @@ function renderBrief() {
     const major = majorTerms.test(text) ? 70 : 0;
     const low = lowPriorityTerms.test(text) ? -240 : 0;
     return { article, score: 100 + category + corroboration + major + low - Math.min(age * 1.6, 100) };
-  }).filter(item => dayDelta(item.article.publishedAt) === 0)
+  }).filter(item => dayDelta(item.article.publishedAt) >= 0 && dayDelta(item.article.publishedAt) < BRIEF_DAYS)
     .sort((a, b) => b.score - a.score);
   const picks = [];
   const sourceCounts = new Map();
@@ -631,7 +613,7 @@ function renderBrief() {
     if (picks.length >= essentialCount) break;
     if (!picks.includes(candidate)) picks.push(candidate);
   }
-  const essential = `<section class="journal-section"><div class="brief-day-v9138">${escapeHtml(fullDay(new Date()))}</div><h2 class="brief-section-title">L’essentiel · ${essentialCount} article${essentialCount > 1 ? 's' : ''}</h2><div class="feed stable-owned-list">${picks.length ? picks.map(({ article }, index) => compactArticleRow(article, index)).join('') : '<p class="muted-note">Aucune information majeure récente dans les domaines choisis.</p>'}</div></section>${historyBriefMarkup()}`;
+  const essential = `<section class="journal-section"><div class="brief-day-v9138">Sélection récente</div><h2 class="brief-section-title">L’essentiel · ${picks.length} article${picks.length > 1 ? 's' : ''}</h2><div class="feed stable-owned-list">${picks.length ? picks.map(({ article }, index) => compactArticleRow(article, index)).join('') : '<p class="muted-note">Aucune information majeure récente dans les domaines choisis.</p>'}</div></section>`;
   const watchCount = watchNewCount();
   return `<main class="page">${topbar('Brief', false)}
     <div class="brief-mode-tabs"><button class="brief-mode-tab ${state.briefMode === 'essential' ? 'active' : ''}" data-brief-mode="essential">L’essentiel</button><button class="brief-mode-tab watch-tab-v9184 ${state.briefMode === 'watches' ? 'active' : ''}" data-brief-mode="watches">Veille${watchCount ? `<span class="watch-new-badge-v9184">${watchCount > 9 ? '9+' : watchCount}</span>` : ''}</button></div>
@@ -777,7 +759,7 @@ function displaySettingsMarkup() {
 }
 
 function essentialSettingsMarkup() {
-  return `${rangeSetting('Nombre d’articles', 'essentialCount', 3, 12, '3', '12')}<strong class="settings-field-title">Domaines couverts</strong><div class="interest-grid essential-domains">${GENERAL_CATEGORIES.map(category => `<button type="button" class="interest ${state.settings.briefEssentialCategories.includes(category) ? 'active' : ''}" data-brief-essential="${escapeHtml(category)}" aria-pressed="${state.settings.briefEssentialCategories.includes(category)}">${escapeHtml(category)}</button>`).join('')}</div>`;
+  return `${rangeSetting('Nombre d’articles', 'essentialCount', 3, 12, '3', '12')}<strong class="settings-field-title">Domaines couverts</strong><div class="interest-grid centered-interest-grid-v9184 essential-domains">${GENERAL_CATEGORIES.map(category => `<button type="button" class="interest ${state.settings.briefEssentialCategories.includes(category) ? 'active' : ''}" data-brief-essential="${escapeHtml(category)}" aria-pressed="${state.settings.briefEssentialCategories.includes(category)}">${escapeHtml(category)}</button>`).join('')}</div>`;
 }
 
 function renderSettings() {
@@ -792,9 +774,7 @@ function renderSettings() {
 
       ${accordion('Actualité générale', `<div class="interest-grid centered-interest-grid-v9184">${GENERAL_CATEGORIES.map(category => `<button class="interest ${state.settings.generalCategories.includes(category) ? 'active' : ''}" data-general-category="${category}">${category}</button>`).join('')}</div>`)}
 
-      ${accordion('Centres d’intérêt', interestEditorMarkup())}
-
-      ${accordion('Sources d’information', sourceDirectoryMarkup())}
+      ${accordion('Sources d’information de base', sourceDirectoryMarkup())}
 
       ${accordion('Ajouter / bloquer une source', `
         <div class="form-stack compact-source-form-v9186">
@@ -1495,17 +1475,20 @@ app.addEventListener('click', async event => {
   if (event.target.closest('[data-close-sheet]') && !event.target.closest('[data-sheet-panel]')) closeSheet();
 });
 
+function updateRangeSetting(target) {
+  const range = target.closest?.('[data-ui-range]');
+  if (!range) return false;
+  const key = range.dataset.uiRange;
+  state.settings[key] = boundedNumber(range.value, state.settings[key], Number(range.min), Number(range.max));
+  const output = app.querySelector(`[data-ui-output="${key}"]`);
+  if (output) output.value = String(state.settings[key]);
+  applyAppearanceSettings();
+  persist();
+  return true;
+}
+
 app.addEventListener('input', event => {
-  const range = event.target.closest('[data-ui-range]');
-  if (range) {
-    const key = range.dataset.uiRange;
-    state.settings[key] = Number(range.value);
-    const output = app.querySelector(`[data-ui-output="${key}"]`);
-    if (output) output.value = range.value;
-    applyAppearanceSettings();
-    persist();
-    return;
-  }
+  if (updateRangeSetting(event.target)) return;
   if (event.target.matches('[data-accent]')) {
     state.settings.accent = event.target.value;
     applyAppearanceSettings();
@@ -1514,6 +1497,7 @@ app.addEventListener('input', event => {
 });
 
 app.addEventListener('change', async event => {
+  if (updateRangeSetting(event.target)) return;
   if (event.target.matches('[data-date]')) { state[event.target.dataset.date === 'from' ? 'customFrom' : 'customTo'] = event.target.value; render(); }
   if (event.target.matches('[data-setting-select]')) { state.settings[event.target.dataset.settingSelect] = event.target.value; persist(); toast('Réglage enregistré'); }
   if (event.target.matches('[data-language]')) { selectLanguage(event.target.value); return; }
@@ -1684,7 +1668,7 @@ if ('serviceWorker' in navigator && location.protocol.startsWith('http') && !nav
     serviceWorkerRefreshing = true;
     window.location.reload();
   });
-  navigator.serviceWorker.register('./sw-v98.js?v=98.3', { updateViaCache: 'none' }).then(registration => {
+  navigator.serviceWorker.register('./sw-v98.js?v=98.4', { updateViaCache: 'none' }).then(registration => {
     if (registration.waiting) registration.waiting.postMessage('SKIP_WAITING');
     registration.addEventListener('updatefound', () => {
       const installing = registration.installing;

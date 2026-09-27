@@ -1,4 +1,4 @@
-import { preparedVisualUrl, sourceTileUrl } from './services/article-visuals.js?v=98.3';
+import { preparedVisualUrl, sourceTileUrl } from './services/article-visuals.js?v=98.4';
 
 const MAX_CONCURRENT = 4;
 const PRIORITY_COUNT = 6;
@@ -20,7 +20,7 @@ function articleMap() {
 
 function proxyUrl(article) {
   const params = new URLSearchParams({
-    v: '98.3', url: String(article?.url || '').slice(0, 1900),
+    v: '98.4', url: String(article?.url || '').slice(0, 1900),
     image: String(article?.visual?.url || article?.image || '').slice(0, 1900),
     title: String(article?.title || '').slice(0, 280),
     category: String(article?.category || '').slice(0, 70),

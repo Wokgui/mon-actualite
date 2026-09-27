@@ -73,7 +73,7 @@ for (const src of scripts) {
   else ok(`service worker precaches runtime script ${src}`);
 }
 
-for (const asset of ['app-controls.css?v=98.3']) {
+for (const asset of ['app-controls.css?v=98.4']) {
   if (!index.includes(asset)) fail(`final visual layer missing from index: ${asset}`);
   if (!sw.includes(asset)) fail(`service worker does not precache final visual layer: ${asset}`);
   else ok(`service worker precaches final visual layer: ${asset}`);
@@ -113,15 +113,16 @@ console.log('Current static regression checks passed.');
 
 const briefWindowChecks = [
   "const BRIEF_DAYS = 10",
-  "delta >= BRIEF_DAYS",
-  "slice(0, BRIEF_DAYS - 1)",
+  "Date.now() - BRIEF_DAYS * 24 * 60 * 60 * 1000",
   "order.slice(0, BRIEF_DAYS)",
-  "historyBriefMarkup()"
+  "dayDelta(item.article.publishedAt) < BRIEF_DAYS"
 ];
 for (const marker of briefWindowChecks) {
   if (!app.includes(marker)) fail(`10-day Brief/Watch marker missing: ${marker}`);
 }
 if (!process.exitCode) ok('Brief and watch 10-day window configured');
+if (app.includes('historyBriefMarkup')) fail('L’essentiel must enforce one strict total instead of appending daily history');
+else ok('L’essentiel enforces one strict total');
 
 if (!/function effectiveWatchRules\(\)\s*{\s*return activeWatchRules\(\);\s*}/.test(app)) fail('Veille must use only rules entered in Settings > Veille');
 else ok('Veille uses only Settings > Veille rules');
@@ -133,8 +134,13 @@ if (app.includes('scheduleVisualBackfill') || app.includes('recoverArticleVisual
 else ok('single bounded image pipeline owns photo loading');
 const androidGradle = read('android-app/app/build.gradle');
 const androidActivity = read('android-app/app/src/main/java/com/wokgui/monactualite/MainActivity.java');
+const androidManifest = read('android-app/app/src/main/AndroidManifest.xml');
 if (!androidGradle.includes('prepareWebAssets') || !androidActivity.includes('WebViewAssetLoader')) fail('Android APK does not bundle the current frontend');
 else ok('Android APK bundles current frontend independently of Vercel frontend deploys');
+if (androidActivity.includes('.hero-header h1{font-size:32px!important')) fail('Android still overrides the title-size preference');
+else ok('Android preserves the user-selected title size');
+if (!androidManifest.includes('@drawable/app_icon_sun')) fail('Android launcher does not use the existing sun icon');
+else ok('Android launcher uses the existing sun icon');
 
 const coreNews = read('lib/news-core.js');
 const apiNews = read('api/news.js');
