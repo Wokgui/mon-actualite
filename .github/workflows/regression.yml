@@ -21,6 +21,7 @@ jobs:
       - name: Static regression suites
         run: |
           node tests/v89-static-check.mjs
+          node tests/v98-locale-backend.mjs
 
   mobile-browser:
     needs: static-regression
@@ -48,3 +49,4 @@ jobs:
             sleep 0.2
           done
           node tests/v9193-current-ui-browser.mjs
+          node tests/v98-settings-images-browser.mjs test-results/v98

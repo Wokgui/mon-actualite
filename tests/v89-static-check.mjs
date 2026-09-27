@@ -7,7 +7,7 @@ const fail = message => { console.error(`FAIL: ${message}`); process.exitCode = 
 const ok = message => console.log(`OK: ${message}`);
 
 const index = read('index.html');
-const sw = read('sw.js');
+const sw = read('sw-v98.js');
 const version = JSON.parse(read('version.json'));
 const app = read('app.js');
 const polish = read('feed-editorial-polish-v77.js');
@@ -32,7 +32,7 @@ const requiredRuntimeScripts = [
   'release-watch.js',
   'startup-news-prefetch-v91.83.js',
   'app.js',
-  'image-sequence-v91.82.js',
+  'image-pipeline.js',
   'nav-solid-hardfix-v91.89.js'
 ];
 for (const file of requiredRuntimeScripts) {
@@ -73,13 +73,7 @@ for (const src of scripts) {
   else ok(`service worker precaches runtime script ${src}`);
 }
 
-for (const asset of [
-  'theme-periwinkle-v91.90.css?v=2',
-  'top-continuity-v91.92.css?v=1',
-  'nav-stability-separator-v91.93.css?v=2',
-  's23-header-polish-v91.94.css?v=2',
-  'feed-row-fix-v91.97.css?v=3'
-]) {
+for (const asset of ['app-controls.css?v=98.0']) {
   if (!index.includes(asset)) fail(`final visual layer missing from index: ${asset}`);
   if (!sw.includes(asset)) fail(`service worker does not precache final visual layer: ${asset}`);
   else ok(`service worker precaches final visual layer: ${asset}`);
@@ -129,7 +123,7 @@ for (const marker of briefWindowChecks) {
 }
 if (!process.exitCode) ok('Brief and watch 10-day window configured');
 
-if (!app.includes("function effectiveWatchRules() {\n  return activeWatchRules();\n}")) fail('Veille must use only rules entered in Settings > Veille');
+if (!/function effectiveWatchRules\(\)\s*{\s*return activeWatchRules\(\);\s*}/.test(app)) fail('Veille must use only rules entered in Settings > Veille');
 else ok('Veille uses only Settings > Veille rules');
 if (app.match(/function effectiveWatchRules\(\)[\s\S]{0,500}briefWatchTopics/)) fail('legacy briefWatchTopics still influence Veille');
 if (!app.includes('function fetchHistoryCoverage') || !app.includes("days = topic ? BRIEF_DAYS : 31")) fail('31-day home / 10-day watch historical discovery is missing');
@@ -143,14 +137,14 @@ else ok('Android APK bundles current frontend independently of Vercel frontend d
 
 const coreNews = read('lib/news-core.js');
 const apiNews = read('api/news.js');
-const rowFix = read('feed-row-fix-v91.97.css');
+const rowFix = read('app-controls.css');
 if (!coreNews.includes('bucket.length < 12') || !coreNews.includes('selected.splice(500)')) fail('historical day coverage is not preserved in news-core');
 else ok('historical day coverage preserved in news-core');
 if (!apiNews.includes('bucket.length < 10') || !apiNews.includes('CATALOG_LIMIT = 320')) fail('historical day coverage is not preserved by API catalogue ranking');
 else ok('historical day coverage preserved by API catalogue ranking');
-if (!rowFix.includes('grid-template-rows:75px') || !rowFix.includes('height:75px!important') || !rowFix.includes('display:none!important')) fail('exact image/title centering contract missing');
+if (!rowFix.includes('grid-template-rows:minmax(75px,auto)') || !rowFix.includes('height:75px!important') || !rowFix.includes('display:none!important')) fail('stable image and compact metadata contract missing');
 else ok('exact image/title centering contract configured');
-if (!rowFix.includes('border-bottom:0!important')) fail('article separators are still allowed by the final visual layer');
+if (!rowFix.includes('border:0!important')) fail('article separators are still allowed by the final visual layer');
 else ok('article separators disabled globally');
 if (!app.includes('const quota = dayIndex === 0 ? 24 : dayIndex === 1 ? 16 : 8')) fail('home day coverage quota missing');
 else ok('home prioritizes multiple publication days before same-day overflow');
@@ -161,11 +155,11 @@ if (!app.includes('settingsOpenAccordions') || !app.includes('captureOpenSetting
 else ok('settings accordion persistence configured');
 if (!app.includes('navLongPressTimer') || !app.includes('resetReadStateFromNav(view)')) fail('long press reset on Home/Brief missing');
 else ok('long press reset on Home/Brief configured');
-if (!app.includes("const real = preparedVisualUrl(article)") || !app.includes("const src = real || tile") || !app.includes("index < 24 ? 'eager' : 'lazy'") || !app.includes('fetchpriority=')) fail('single-source high-priority article image loading missing');
+if (!app.includes("const real = preparedVisualUrl(article)") || !app.includes("const src = real || tile") || !app.includes("index < 6 ? 'eager' : 'lazy'") || !app.includes('fetchpriority=')) fail('single-source high-priority article image loading missing');
 else ok('immediate high-priority article image loading configured');
-const imageSequence = read('image-sequence-v91.82.js');
-if (!imageSequence.includes('started < 8') || !imageSequence.includes('setTimeout(pump, 2)') || !imageSequence.includes('index < 40')) fail('accelerated image sequencing missing');
-else ok('accelerated image sequencing configured');
+const imageSequence = read('image-pipeline.js');
+if (!imageSequence.includes("index < 6 ? 'eager' : 'lazy'") || !imageSequence.includes("index < 4 ? 'high' : 'auto'") || !imageSequence.includes('retryAfter = 60_000')) fail('bounded image loading pipeline missing');
+else ok('bounded image loading pipeline configured');
 
 const visualService = read('services/article-visuals.js');
 if (!visualService.includes('const extracted = extractPreparedImage(rawVisual)') || !visualService.includes("return url.href")) fail('direct external visual fast path missing');
@@ -176,8 +170,8 @@ else ok('settings accordion toggle persistence configured');
 const releaseWatch = read('release-watch.js');
 if (!releaseWatch.includes('IS_NATIVE_ANDROID') || !releaseWatch.includes('if (IS_NATIVE_ANDROID)')) fail('native Android release watcher guard missing');
 else ok('native Android release watcher guard configured');
-if (!imageSequence.includes('if (currentAbs === wantedAbs)') || !imageSequence.includes("img.addEventListener('load', onLoad")) fail('image sequence can still restart an already-loading image');
-else ok('image sequence preserves an already-loading source');
+if (!imageSequence.includes("image.addEventListener('load'") || !imageSequence.includes("image.addEventListener('error'")) fail('image pipeline load and fallback handling missing');
+else ok('image pipeline preserves the initial source and only falls back after error');
 if (!app.includes('article.pinnedVisualV85 = remembered.url') || !app.includes('live.pinnedVisualV85 = endpoint')) fail('recovered image proxy is not pinned across renders');
 else ok('recovered image proxy pinned across renders');
 

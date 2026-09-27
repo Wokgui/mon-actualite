@@ -1,11 +1,11 @@
-import { importOpmlPreview, fetchLiveNews } from './services/source-connectors.js?v=91.97';
-import { preparedVisualUrl, hasPreparedVisual, sourceTileUrl } from './services/article-visuals.js?v=92.04';
+import { importOpmlPreview, fetchLiveNews } from './services/source-connectors.js?v=98.0';
+import { preparedVisualUrl, hasPreparedVisual, sourceTileUrl } from './services/article-visuals.js?v=98.0';
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const app = $('#app');
 const toastEl = $('#toast');
-const APP_VERSION = '94';
-const APP_RELEASE = '25 septembre 2026';
+const APP_VERSION = '98';
+const APP_RELEASE = '27 septembre 2026';
 const IS_NATIVE_ANDROID = /MonActualiteAndroid\//.test(navigator.userAgent) || location.pathname.startsWith('/assets/');
 const savedSessionView = sessionStorage.getItem('news-active-view-v9204');
 const INITIAL_VIEW = ['home', 'settings', 'brief'].includes(savedSessionView) ? savedSessionView : 'home';
@@ -15,6 +15,14 @@ const GENERAL_CATEGORIES = ['Politique', 'International', 'Économie', 'Sociét�
 const PERSONAL_THEMES = ['IA', 'Tech', 'Smartphones', 'VR', 'Automobile', 'Énergie'];
 const WATCH_TOPICS = ['Recherche scientifique', 'Innovations', 'Progrès humains', 'Médecine', 'Espace', 'IA', 'VR', 'Tech', 'Énergie', 'Environnement', 'Mobilité', 'Éducation'];
 const DEFAULT_WATCH_TOPICS = ['Recherche scientifique', 'Innovations', 'Progrès humains', 'Médecine', 'Espace', 'IA', 'Énergie', 'Environnement', 'Éducation'];
+const LANGUAGE_PRESETS = {
+  fr: { label: 'Français', locale: 'fr-FR', country: 'FR', countryName: 'France' },
+  en: { label: 'English', locale: 'en-GB', country: 'GB', countryName: 'Royaume-Uni' },
+  de: { label: 'Deutsch', locale: 'de-DE', country: 'DE', countryName: 'Allemagne' },
+  es: { label: 'Español', locale: 'es-ES', country: 'ES', countryName: 'Espagne' },
+  it: { label: 'Italiano', locale: 'it-IT', country: 'IT', countryName: 'Italie' },
+  pt: { label: 'Português', locale: 'pt-PT', country: 'PT', countryName: 'Portugal' }
+};
 // v3 deliberately drops the old persisted failure markers. A single transient
 // miss used to freeze a source tile for six hours, even when the exact image
 // became available a few seconds later.
@@ -55,7 +63,16 @@ const defaultSettings = {
   generalCategories: [...GENERAL_CATEGORIES],
   interests: [...PERSONAL_THEMES],
   briefEssentialCategories: [...GENERAL_CATEGORIES],
-  briefWatchTopics: [...DEFAULT_WATCH_TOPICS]
+  briefWatchTopics: [...DEFAULT_WATCH_TOPICS],
+  essentialCount: 5,
+  language: 'fr',
+  enabledLanguages: ['fr'],
+  textSize: 100,
+  density: 62,
+  titleSize: 100,
+  showBadges: true,
+  showAge: true,
+  accent: '#7461e8'
 };
 
 function safeJson(key, fallback) {
@@ -63,8 +80,24 @@ function safeJson(key, fallback) {
   catch { return fallback; }
 }
 
-const savedSettings = safeJson('news-settings', {});
-const cache = safeJson('news-live-cache', { articles: [], fetchedAt: null });
+const legacyUiSettings = safeJson('news-ui-v96', {});
+const storedSettings = safeJson('news-settings', {});
+const savedSettings = {
+  language: legacyUiSettings.language,
+  density: legacyUiSettings.density,
+  textSize: legacyUiSettings.textSize,
+  titleSize: legacyUiSettings.titleSize,
+  showBadges: legacyUiSettings.showBadges,
+  showAge: legacyUiSettings.showAge,
+  accent: legacyUiSettings.accent,
+  essentialCount: legacyUiSettings.essentialCount,
+  briefEssentialCategories: legacyUiSettings.essentialDomains,
+  ...storedSettings
+};
+const selectedLanguage = LANGUAGE_PRESETS[savedSettings.language] ? savedSettings.language : 'fr';
+const cacheLanguage = localStorage.getItem('news-cache-language-v98') || selectedLanguage;
+const rawCache = safeJson('news-live-cache', { articles: [], fetchedAt: null });
+const cache = cacheLanguage === selectedLanguage ? rawCache : { articles: [], fetchedAt: null };
 const visualBackfills = safeJson(VISUAL_BACKFILL_KEY, {});
 const state = {
   view: INITIAL_VIEW, previous: [], category: 'Politique', categoryTab: 'brief', articleId: null,
@@ -91,9 +124,34 @@ const state = {
     generalCategories: Array.isArray(savedSettings.generalCategories) ? savedSettings.generalCategories : [...GENERAL_CATEGORIES],
     interests: Array.isArray(savedSettings.interests) ? savedSettings.interests : [...PERSONAL_THEMES],
     briefEssentialCategories: Array.isArray(savedSettings.briefEssentialCategories) ? savedSettings.briefEssentialCategories : [...GENERAL_CATEGORIES],
-    briefWatchTopics: Array.isArray(savedSettings.briefWatchTopics) ? savedSettings.briefWatchTopics : [...DEFAULT_WATCH_TOPICS]
+    briefWatchTopics: Array.isArray(savedSettings.briefWatchTopics) ? savedSettings.briefWatchTopics : [...DEFAULT_WATCH_TOPICS],
+    essentialCount: Math.max(3, Math.min(12, Number(savedSettings.essentialCount) || 5)),
+    language: selectedLanguage,
+    enabledLanguages: [...new Set(['fr', ...(Array.isArray(savedSettings.enabledLanguages) ? savedSettings.enabledLanguages : []), selectedLanguage])].filter(code => LANGUAGE_PRESETS[code]),
+    textSize: Math.max(85, Math.min(125, Number(savedSettings.textSize) || 100)),
+    density: Math.max(0, Math.min(100, Number(savedSettings.density) || 62)),
+    titleSize: Math.max(70, Math.min(140, Number(savedSettings.titleSize) || 100)),
+    showBadges: savedSettings.showBadges !== false,
+    showAge: savedSettings.showAge !== false,
+    accent: /^#[0-9a-f]{6}$/i.test(savedSettings.accent || '') ? savedSettings.accent : '#7461e8'
   }
 };
+
+function applyAppearanceSettings() {
+  const root = document.documentElement;
+  const { accent, textSize, titleSize, density, showBadges, showAge, language } = state.settings;
+  const rowGap = Math.round(18 - density * .15);
+  root.style.setProperty('--app-accent', accent);
+  root.style.setProperty('--article-text-scale', String(textSize / 100));
+  root.style.setProperty('--app-title-scale', String(titleSize / 100));
+  root.style.setProperty('--article-row-gap', `${Math.max(3, rowGap)}px`);
+  root.style.setProperty('--header-v-pad', `${Math.round(8 + titleSize * .055)}px`);
+  root.dataset.showBadges = showBadges ? '1' : '0';
+  root.dataset.showAge = showAge ? '1' : '0';
+  root.lang = language;
+}
+
+applyAppearanceSettings();
 
 let deferredInstallPrompt = null;
 let isInstalled = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
@@ -205,7 +263,7 @@ function articleVisual(article, index = 0) {
   const real = preparedVisualUrl(article);
   const src = real || tile;
   const visualClass = real && real !== tile ? 'direct-visual-v9203' : 'source-tile-visual';
-  return `<img class="article-image original-article-image stable-visual ${prepared ? 'prepared-visual' : visualClass}" src="${escapeHtml(src)}" alt="" width="400" height="224" loading="${index < 24 ? 'eager' : 'lazy'}" fetchpriority="${index < 12 ? 'high' : 'auto'}" decoding="async" referrerpolicy="no-referrer" style="background-image:url('${escapeHtml(tile)}');background-size:cover">`;
+  return `<img class="article-image original-article-image stable-visual image-pending-v98 ${prepared ? 'prepared-visual' : visualClass}" src="${escapeHtml(src)}" alt="" width="112" height="75" loading="${index < 6 ? 'eager' : 'lazy'}" fetchpriority="${index < 4 ? 'high' : 'auto'}" decoding="async" referrerpolicy="no-referrer" style="background-image:url('${escapeHtml(tile)}');background-size:cover">`;
 }
 function sourceIdentity(article = {}) {
   return normalizeTopic(article.source || article.feedTitle || '');
@@ -314,10 +372,10 @@ function articleCard(article, index = 0) {
     ${articleVisual(article, index)}
     <div class="article-body">
       <button class="save-btn ${saved ? 'saved' : ''}" data-save="${escapeHtml(article.id)}" aria-label="${saved ? 'Retirer des sauvegardes' : 'Sauvegarder l’article'}">${icon('bookmark', saved)}</button>
-      <div class="card-top"><span class="badge ${badge === 'Important' ? 'important' : ''}">${badge}</span></div>
+      <div class="card-top article-badges"><span class="badge ${badge === 'Important' ? 'important' : ''}">${badge}</span></div>
       <h2>${escapeHtml(title)}</h2>
       <p class="summary">${escapeHtml(article.summary)}</p>
-      <div class="meta"><span class="source">${escapeHtml(article.source)}</span><i class="dot"></i><span>${timeLabel(article.publishedAt)}</span><i class="dot"></i><button class="category-link" data-category="${escapeHtml(article.category)}">${escapeHtml(article.category)}</button></div>
+      <div class="meta"><span class="source">${escapeHtml(article.source)}</span><i class="dot source-dot"></i><button class="category-link article-category-badge" data-category="${escapeHtml(article.category)}">${escapeHtml(article.category)}</button><i class="dot badge-age-dot"></i><span class="article-age">${timeLabel(article.publishedAt)}</span></div>
     </div>
   </article>`;
 }
@@ -494,7 +552,7 @@ function compactArticleRow(article, index = 0) {
   const title = displayTitle(article);
   return `<article class="article-card runtime-row" data-article="${escapeHtml(article.id)}" tabindex="0" aria-label="Ouvrir l’article source : ${escapeHtml(title)}">
     ${articleVisual(article, index)}
-    <div class="article-body"><h2>${escapeHtml(title)}</h2><div class="meta"><span class="source">${escapeHtml(article.source || 'Source')}</span><span>${escapeHtml(clockLabel(article.publishedAt))}</span></div></div>
+    <div class="article-body"><h2>${escapeHtml(title)}</h2><div class="meta"><span class="source">${escapeHtml(article.source || 'Source')}</span><i class="dot source-dot"></i><button class="category-link article-category-badge" data-category="${escapeHtml(article.category || '')}">${escapeHtml(article.category || 'Actualité')}</button><i class="dot badge-age-dot"></i><span class="article-age">${escapeHtml(timeLabel(article.publishedAt))}</span></div></div>
   </article>`;
 }
 
@@ -512,7 +570,11 @@ function historyBriefMarkup() {
     days.get(key).push(article);
   }
   return [...days.entries()].sort((a, b) => b[0].localeCompare(a[0])).slice(0, BRIEF_DAYS - 1).map(([, items], dayIndex) => {
-    const selected = items.sort((a, b) => impact(b) - impact(a)).slice(0, 5);
+    const allowed = new Set(state.settings.briefEssentialCategories);
+    const selected = items
+      .filter(article => !allowed.size || allowed.has(article.category))
+      .sort((a, b) => impact(b) - impact(a))
+      .slice(0, state.settings.essentialCount);
     return `<section class="brief-history-day-v9138"><div class="brief-history-date-v9138">${escapeHtml(dayLabel(selected[0]?.publishedAt))}${dayDelta(selected[0]?.publishedAt) <= 2 ? ` · ${escapeHtml(fullDay(selected[0]?.publishedAt))}` : ''}</div><div class="feed stable-owned-list">${selected.map((article, index) => compactArticleRow(article, dayIndex * 10 + index)).join('')}</div></section>`;
   }).join('');
 }
@@ -547,7 +609,9 @@ function renderBrief() {
     const shared = [...a].filter(word => b.has(word)).length;
     return shared >= 2 && shared / Math.max(1, Math.min(a.size, b.size)) >= .28;
   };
-  const ranked = visibleArticles().map(article => {
+  const allowedEssential = new Set(state.settings.briefEssentialCategories);
+  const essentialCount = state.settings.essentialCount;
+  const ranked = visibleArticles().filter(article => !allowedEssential.size || allowedEssential.has(article.category)).map(article => {
     const text = `${article.title || ''} ${article.summary || ''}`;
     const age = Math.max(0, (Date.now() - Date.parse(article.publishedAt || 0)) / 3600000);
     const category = globalCategories.has(article.category) ? 55 : -35;
@@ -560,7 +624,7 @@ function renderBrief() {
   const picks = [];
   const sourceCounts = new Map();
   for (const candidate of ranked) {
-    if (picks.length >= 5) break;
+    if (picks.length >= essentialCount) break;
     const source = candidate.article.source || 'Source';
     if (Number(sourceCounts.get(source) || 0) >= 2) continue;
     if (picks.some(item => sameEvent(item.article, candidate.article))) continue;
@@ -568,13 +632,13 @@ function renderBrief() {
     sourceCounts.set(source, Number(sourceCounts.get(source) || 0) + 1);
   }
   for (const candidate of ranked) {
-    if (picks.length >= 5) break;
+    if (picks.length >= essentialCount) break;
     if (!picks.includes(candidate)) picks.push(candidate);
   }
-  const essential = `<section class="journal-section"><div class="brief-day-v9138">${escapeHtml(fullDay(new Date()))}</div><h2 class="brief-section-title">Les 5 principales infos dans le monde</h2><div class="feed stable-owned-list">${picks.length ? picks.map(({ article }, index) => compactArticleRow(article, index)).join('') : '<p class="muted-note">Aucune information majeure récente.</p>'}</div></section>${historyBriefMarkup()}`;
+  const essential = `<section class="journal-section"><div class="brief-day-v9138">${escapeHtml(fullDay(new Date()))}</div><h2 class="brief-section-title">L’essentiel · ${essentialCount} article${essentialCount > 1 ? 's' : ''}</h2><div class="feed stable-owned-list">${picks.length ? picks.map(({ article }, index) => compactArticleRow(article, index)).join('') : '<p class="muted-note">Aucune information majeure récente dans les domaines choisis.</p>'}</div></section>${historyBriefMarkup()}`;
   const watchCount = watchNewCount();
   return `<main class="page">${topbar('Brief', false)}
-    <div class="brief-mode-tabs"><button class="brief-mode-tab ${state.briefMode === 'essential' ? 'active' : ''}" data-brief-mode="essential">Top 5 monde</button><button class="brief-mode-tab watch-tab-v9184 ${state.briefMode === 'watches' ? 'active' : ''}" data-brief-mode="watches">Veille${watchCount ? `<span class="watch-new-badge-v9184">${watchCount > 9 ? '9+' : watchCount}</span>` : ''}</button></div>
+    <div class="brief-mode-tabs"><button class="brief-mode-tab ${state.briefMode === 'essential' ? 'active' : ''}" data-brief-mode="essential">L’essentiel</button><button class="brief-mode-tab watch-tab-v9184 ${state.briefMode === 'watches' ? 'active' : ''}" data-brief-mode="watches">Veille${watchCount ? `<span class="watch-new-badge-v9184">${watchCount > 9 ? '9+' : watchCount}</span>` : ''}</button></div>
     <div class="runtime-brief-content" data-stable-brief-content>${state.briefMode === 'essential' ? essential : renderWatchesFinal()}</div>
   </main>${nav('brief')}`;
 }
@@ -702,13 +766,41 @@ function watchRulesMarkup() {
   return rules.length ? `<div class="watch-rules-v9184">${rules.map((rule,index) => `<div class="watch-rule-v9184"><div><strong>${escapeHtml(rule.query)}</strong>${rule.exclude ? `<span>Évite : ${escapeHtml(rule.exclude)}</span>` : ''}</div><button type="button" data-watch-rule-delete="${index}" aria-label="Supprimer cette veille">×</button></div>`).join('')}</div>` : '<p class="muted-note">Aucune règle de veille.</p>';
 }
 
+function rangeSetting(label, key, min, max, left, right) {
+  return `<label class="preference-range"><strong>${escapeHtml(label)}</strong><input type="range" min="${min}" max="${max}" value="${state.settings[key]}" data-ui-range="${key}"><span><i>${escapeHtml(left)}</i><output data-ui-output="${key}">${state.settings[key]}</output><i>${escapeHtml(right)}</i></span></label>`;
+}
+
+function languageSettingsMarkup() {
+  const current = LANGUAGE_PRESETS[state.settings.language] || LANGUAGE_PRESETS.fr;
+  const options = state.settings.enabledLanguages.map(code => `<option value="${code}" ${state.settings.language === code ? 'selected' : ''}>${escapeHtml(LANGUAGE_PRESETS[code].label)}</option>`).join('');
+  return `<div class="language-settings"><select class="text-input" data-language aria-label="Langue de l’application et des sources">${options}</select><button type="button" class="small-primary-btn" data-add-language>Ajouter une langue</button></div><p class="muted-note">Les sources proposées par défaut suivent le pays correspondant : <strong data-language-country>${escapeHtml(current.countryName)}</strong>.</p>`;
+}
+
+function displaySettingsMarkup() {
+  return `<label class="preference-check"><input type="checkbox" data-display-setting="showBadges" ${state.settings.showBadges ? 'checked' : ''}><span>Afficher les badges</span></label><label class="preference-check"><input type="checkbox" data-display-setting="showAge" ${state.settings.showAge ? 'checked' : ''}><span>Afficher depuis combien de temps l’article est sorti</span></label><label class="preference-color"><strong>Couleur dominante</strong><input type="color" value="${state.settings.accent}" data-accent aria-label="Couleur dominante"></label>`;
+}
+
+function essentialSettingsMarkup() {
+  return `${rangeSetting('Nombre d’articles', 'essentialCount', 3, 12, '3', '12')}<strong class="settings-field-title">Domaines couverts</strong><div class="interest-grid essential-domains">${GENERAL_CATEGORIES.map(category => `<button type="button" class="interest ${state.settings.briefEssentialCategories.includes(category) ? 'active' : ''}" data-brief-essential="${escapeHtml(category)}" aria-pressed="${state.settings.briefEssentialCategories.includes(category)}">${escapeHtml(category)}</button>`).join('')}</div>`;
+}
+
 function renderSettings() {
   const accordion = (title, body) => `<details class="settings-accordion-v9185"${settingsOpenAccordions.has(title) ? ' open' : ''}><summary>${escapeHtml(title)}</summary><div class="settings-accordion-content-v9185">${body}</div></details>`;
   return `<main class="page settings-page-v9185">${topbar('Réglages', false)}
     <div class="settings-accordions-v9185">
+      ${accordion('Langue', languageSettingsMarkup())}
+
+      ${accordion('Taille et densité du texte', `${rangeSetting('Taille du texte', 'textSize', 85, 125, 'Petit', 'Grand')}${rangeSetting('Densité entre les articles', 'density', 0, 100, 'Peu dense', 'Très dense')}${rangeSetting('Taille du titre', 'titleSize', 70, 140, 'Petit titre', 'Gros titre')}`)}
+
+      ${accordion('Affichage', displaySettingsMarkup())}
+
+      ${accordion('Actualité générale', `<div class="interest-grid centered-interest-grid-v9184">${GENERAL_CATEGORIES.map(category => `<button class="interest ${state.settings.generalCategories.includes(category) ? 'active' : ''}" data-general-category="${category}">${category}</button>`).join('')}</div>`)}
+
+      ${accordion('Centres d’intérêt', interestEditorMarkup())}
+
       ${accordion('Sources d’information', sourceDirectoryMarkup())}
 
-      ${accordion('Ajouter ou bloquer une source', `
+      ${accordion('Ajouter / bloquer une source', `
         <div class="form-stack compact-source-form-v9186">
           <input id="source-name" class="text-input" type="text" maxlength="80" placeholder="Nom de la source (optionnel)">
           <input id="source-url" class="text-input" type="url" maxlength="600" placeholder="Adresse RSS / Atom">
@@ -720,18 +812,16 @@ function renderSettings() {
         <label class="secondary-btn opml-button-v9186" for="opml-input">Importer un fichier OPML</label><input id="opml-input" class="file-input" type="file" accept=".opml,.xml">
       `)}
 
-      ${accordion('Centres d’intérêt', interestEditorMarkup())}
-
       ${accordion('Mots-clés', `
         <div class="inline-form"><input id="keyword-input" class="text-input" type="text" maxlength="70" placeholder="À surveiller"><button class="small-primary-btn" data-add-keyword>Ajouter</button></div>${keywordChips()}
         <h3 class="settings-subtitle-v9184">À éviter</h3>
         <div class="inline-form"><input id="blocked-keyword-input" class="text-input" type="text" maxlength="70" placeholder="À éviter"><button class="small-primary-btn" data-add-blocked-keyword>Éviter</button></div>${blockedKeywordChips()}`)}
 
+      ${accordion('L’essentiel', essentialSettingsMarkup())}
+
       ${accordion('Veille', `
         <div class="form-stack"><input id="watch-query-input" class="text-input" maxlength="160" placeholder="Ex. Meta + Quest 4 | Quest 4"><input id="watch-exclude-input" class="text-input" maxlength="160" placeholder="À exclure : rumeur, promotion…"><button class="secondary-btn" data-add-watch-rule>${icon('plus')} Ajouter la veille</button></div>
         ${watchRulesMarkup()}`)}
-
-      ${accordion('Actualité générale', `<div class="interest-grid centered-interest-grid-v9184">${GENERAL_CATEGORIES.map(category => `<button class="interest ${state.settings.generalCategories.includes(category) ? 'active' : ''}" data-general-category="${category}">${category}</button>`).join('')}</div>`)}
 
       ${accordion('Fonctionnement', `<div class="function-settings-v9186">${settingRow('Actualisation automatique', 'Charge les nouveautés en arrière-plan.', 'autoRefresh')}${settingRow('Recherche web complémentaire', 'Complète les flux avec Google Actualités.', 'webSearch')}</div>`)}
 
@@ -945,21 +1035,29 @@ function persist() {
   localStorage.setItem('news-blocked-sources-v1', JSON.stringify([...state.blockedSources]));
   localStorage.setItem('news-watch-rules-v1', JSON.stringify(state.watchRules));
   localStorage.setItem('news-watch-last-seen-v1', String(state.watchLastSeen || 0));
+  localStorage.removeItem('news-ui-v96');
 }
 
 function persistCache() {
   localStorage.setItem('news-live-cache', JSON.stringify({ articles: state.articles, fetchedAt: state.lastSync, stats: state.stats }));
+  localStorage.setItem('news-cache-language-v98', state.settings.language);
+}
+
+function catalogueSignature(articles = []) {
+  return articles.map(article => `${article?.id || ''}|${article?.title || ''}|${article?.publishedAt || ''}|${article?.visual?.url || article?.image || ''}`).join('\n');
 }
 
 function applyDownloadedNews(payload) {
   if (!payload || !Array.isArray(payload.articles)) return false;
-  state.articles = payload.articles.map(applyRememberedVisual);
+  const nextArticles = payload.articles.map(applyRememberedVisual);
+  const changed = catalogueSignature(nextArticles) !== catalogueSignature(state.articles);
+  state.articles = nextArticles;
   state.lastSync = payload.fetchedAt || new Date().toISOString();
   state.stats = payload.stats || null;
   state.syncStatus = 'idle';
   state.syncError = '';
   persistCache();
-  refreshAfterNewsChange();
+  if (changed) refreshAfterNewsChange();
   return true;
 }
 
@@ -1160,12 +1258,16 @@ async function fetchHistoryCoverage({ force = false, topic = '', days = topic ? 
   if (!state.settings.webSearch || !navigator.onLine) return null;
   const last = Number(localStorage.getItem(HISTORY_SYNC_KEY) || 0);
   if (!force && last && Date.now() - last < HISTORY_SYNC_MAX_AGE) return null;
-  const history = await fetchLiveNews({
+    const locale = LANGUAGE_PRESETS[state.settings.language] || LANGUAGE_PRESETS.fr;
+    const history = await fetchLiveNews({
     sources: [],
     keywords: historicalDiscoveryKeywords(topic, days),
     preferredCategories: [],
     webSearch: true,
-    sourcePriority: false
+      sourcePriority: false,
+      language: state.settings.language,
+      locale: locale.locale,
+      country: locale.country
   });
   if (Array.isArray(history?.articles) && history.articles.length) {
     state.articles = history.articles.map(applyRememberedVisual);
@@ -1200,14 +1302,20 @@ async function syncNews({ silent = false } = {}) {
       const domainQueries = state.domains.map(domain => `site:${domain}`);
       const followedNames = [...state.followedSources].slice(0, 4);
       const discoveryKeywords = [...new Set([...state.keywords, ...domainQueries, ...followedNames])].slice(0, 12);
+      const locale = LANGUAGE_PRESETS[state.settings.language] || LANGUAGE_PRESETS.fr;
       const result = await fetchLiveNews({
         sources: state.sources.filter(source => source.enabled !== false),
         keywords: discoveryKeywords,
         preferredCategories: state.settings.interests,
         webSearch: state.settings.webSearch,
-        sourcePriority: false
+        sourcePriority: false,
+        language: state.settings.language,
+        locale: locale.locale,
+        country: locale.country
       });
-      state.articles = Array.isArray(result.articles) ? result.articles.map(applyRememberedVisual) : [];
+      const nextArticles = Array.isArray(result.articles) ? result.articles.map(applyRememberedVisual) : [];
+      const changed = catalogueSignature(nextArticles) !== catalogueSignature(state.articles);
+      state.articles = nextArticles;
       state.lastSync = result.fetchedAt || new Date().toISOString();
       state.stats = result.stats || null;
       state.syncStatus = 'idle';
@@ -1215,7 +1323,7 @@ async function syncNews({ silent = false } = {}) {
 
       try { await fetchHistoryCoverage(); } catch {}
 
-      refreshAfterNewsChange();
+      if (changed) refreshAfterNewsChange();
       if (!silent) toast(`${state.articles.length} article${state.articles.length > 1 ? 's' : ''} actualisé${state.articles.length > 1 ? 's' : ''}`);
       return result;
     } catch (error) {
@@ -1338,6 +1446,23 @@ async function checkAppUpdate({ announce = false } = {}) {
     if (announce) toast('Vérification impossible pour le moment');
   }
 }
+
+function selectLanguage(code) {
+  if (!LANGUAGE_PRESETS[code] || code === state.settings.language) return;
+  state.settings.language = code;
+  state.settings.enabledLanguages = [...new Set([...state.settings.enabledLanguages, code])];
+  state.articles = [];
+  state.lastSync = null;
+  state.stats = null;
+  state.homeOrder = [];
+  persist();
+  persistCache();
+  applyAppearanceSettings();
+  render({ resetScroll: true });
+  toast(`Sources par défaut : ${LANGUAGE_PRESETS[code].countryName}`);
+  syncNews({ silent: true });
+}
+
 app.addEventListener('click', async event => {
   if (event.target.closest('[data-reset-read]')) {
     event.preventDefault();
@@ -1417,6 +1542,16 @@ app.addEventListener('click', async event => {
   if (event.target.closest('[data-open-settings]')) { state.sheet = false; navigate('settings', { savedOnly: false }); return; }
   if (event.target.closest('[data-check-update]')) { await checkAppUpdate({ announce: true }); return; }
   if (event.target.closest('[data-refresh]')) { await syncNews(); return; }
+  if (event.target.closest('[data-add-language]')) {
+    const choices = Object.entries(LANGUAGE_PRESETS).filter(([code]) => !state.settings.enabledLanguages.includes(code));
+    if (!choices.length) { toast('Toutes les langues disponibles sont déjà ajoutées'); return; }
+    const answer = window.prompt(`Code de langue à ajouter : ${choices.map(([code, value]) => `${code} (${value.label})`).join(', ')}`, choices[0][0]);
+    const code = String(answer || '').trim().toLowerCase();
+    if (!answer) return;
+    if (!LANGUAGE_PRESETS[code]) { toast('Langue non prise en charge'); return; }
+    selectLanguage(code);
+    return;
+  }
   if (event.target.closest('[data-add-source]')) { addSource(); return; }
   if (event.target.closest('[data-add-keyword]')) { addKeyword(); return; }
   if (event.target.closest('[data-add-watch-topic]')) { addWatchTopicFromSheet(); return; }
@@ -1525,7 +1660,7 @@ app.addEventListener('click', async event => {
   const briefWatch = event.target.closest('[data-brief-watch]');
   if (briefWatch) { const name = briefWatch.dataset.briefWatch; const current = new Set(state.settings.briefWatchTopics); current.has(name) ? current.delete(name) : current.add(name); state.settings.briefWatchTopics = [...current]; persist(); state.sheet ? refreshSheet() : render(); return; }
   if (event.target.closest('[data-saved-filter]')) { state.savedOnly = !state.savedOnly; render(); return; }
-  if (event.target.closest('[data-reset]')) { state.settings = { ...defaultSettings, generalCategories: [...GENERAL_CATEGORIES], interests: [...PERSONAL_THEMES], briefEssentialCategories: [...GENERAL_CATEGORIES], briefWatchTopics: [...DEFAULT_WATCH_TOPICS] }; state.keywords = []; state.blockedTerms = []; state.domains = []; state.followedSources.clear(); state.blockedSources.clear(); state.watchRules = []; state.topicPreferences = {}; window.NewsPersonalizationV91?.reset(); persist(); render(); toast('Préférences réinitialisées'); syncNews({ silent: true }); return; }
+  if (event.target.closest('[data-reset]')) { state.settings = { ...defaultSettings, generalCategories: [...GENERAL_CATEGORIES], interests: [...PERSONAL_THEMES], briefEssentialCategories: [...GENERAL_CATEGORIES], briefWatchTopics: [...DEFAULT_WATCH_TOPICS], enabledLanguages: ['fr'] }; state.keywords = []; state.blockedTerms = []; state.domains = []; state.followedSources.clear(); state.blockedSources.clear(); state.watchRules = []; state.topicPreferences = {}; window.NewsPersonalizationV91?.reset(); persist(); applyAppearanceSettings(); render(); toast('Préférences réinitialisées'); syncNews({ silent: true }); return; }
   if (event.target.closest('[data-install]')) {
     if (isInstalled) return toast('L’application est déjà installée');
     if (deferredInstallPrompt) { deferredInstallPrompt.prompt(); const choice = await deferredInstallPrompt.userChoice; deferredInstallPrompt = null; toast(choice.outcome === 'accepted' ? 'Installation lancée' : 'Installation annulée'); }
@@ -1535,9 +1670,34 @@ app.addEventListener('click', async event => {
   if (event.target.closest('[data-close-sheet]') && !event.target.closest('[data-sheet-panel]')) closeSheet();
 });
 
+app.addEventListener('input', event => {
+  const range = event.target.closest('[data-ui-range]');
+  if (range) {
+    const key = range.dataset.uiRange;
+    state.settings[key] = Number(range.value);
+    const output = app.querySelector(`[data-ui-output="${key}"]`);
+    if (output) output.value = range.value;
+    applyAppearanceSettings();
+    persist();
+    return;
+  }
+  if (event.target.matches('[data-accent]')) {
+    state.settings.accent = event.target.value;
+    applyAppearanceSettings();
+    persist();
+  }
+});
+
 app.addEventListener('change', async event => {
   if (event.target.matches('[data-date]')) { state[event.target.dataset.date === 'from' ? 'customFrom' : 'customTo'] = event.target.value; render(); }
   if (event.target.matches('[data-setting-select]')) { state.settings[event.target.dataset.settingSelect] = event.target.value; persist(); toast('Réglage enregistré'); }
+  if (event.target.matches('[data-language]')) { selectLanguage(event.target.value); return; }
+  if (event.target.matches('[data-display-setting]')) {
+    state.settings[event.target.dataset.displaySetting] = event.target.checked;
+    applyAppearanceSettings();
+    persist();
+    return;
+  }
   if (event.target.id === 'opml-input' && event.target.files[0]) {
     const file = event.target.files[0];
     try {
@@ -1695,9 +1855,20 @@ window.addEventListener('resize', () => requestAnimationFrame(pumpContinuousHome
 let serviceWorkerRefreshing = false;
 if ('serviceWorker' in navigator && location.protocol.startsWith('http') && !navigator.userAgent.includes('MonActualiteAndroid/')) {
   navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (serviceWorkerRefreshing) return;
     serviceWorkerRefreshing = true;
+    window.location.reload();
   });
-  navigator.serviceWorker.register('./sw.js', { updateViaCache: 'none' }).then(registration => registration.update()).catch(() => {});
+  navigator.serviceWorker.register('./sw-v98.js?v=98.0', { updateViaCache: 'none' }).then(registration => {
+    if (registration.waiting) registration.waiting.postMessage('SKIP_WAITING');
+    registration.addEventListener('updatefound', () => {
+      const installing = registration.installing;
+      installing?.addEventListener('statechange', () => {
+        if (installing.state === 'installed' && navigator.serviceWorker.controller) installing.postMessage('SKIP_WAITING');
+      });
+    });
+    registration.update();
+  }).catch(() => {});
 }
 
 window.addEventListener('beforeinstallprompt', event => {

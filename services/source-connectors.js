@@ -202,8 +202,10 @@ function stableArticleId(article) {
   return `a-${hash32(key, 2166136261)}${hash32(key, 0x9e3779b1)}`;
 }
 
-function readArticleHistory() {
+function readArticleHistory(language = 'fr') {
   try {
+    const cachedLanguage = localStorage.getItem('news-cache-language-v98') || language;
+    if (cachedLanguage !== language) return [];
     const cache = JSON.parse(localStorage.getItem('news-live-cache') || '{}');
     return Array.isArray(cache.articles)
       ? cache.articles.filter(article => String(article?.id || '').startsWith('a-')).map(normalizeArticle)
@@ -237,7 +239,7 @@ function capSourceFlood(articles) {
   return result;
 }
 
-function mergeArticleHistory(fresh) {
+function mergeArticleHistory(fresh, language = 'fr') {
   const merged = [];
   const seenUrls = new Set();
   const recentTitles = new Map();
@@ -256,7 +258,7 @@ function mergeArticleHistory(fresh) {
     }
   };
 
-  for (const rawArticle of [...fresh, ...readArticleHistory()]) {
+  for (const rawArticle of [...fresh, ...readArticleHistory(language)]) {
     const article = normalizeArticle(rawArticle);
     if (!article?.id) continue;
 
@@ -312,8 +314,8 @@ function buildDiscoveryKeywords(keywords, preferredCategories) {
   return [...new Set([...explicit, ...learned, ...interests].filter(value => value.length >= 2))].slice(0, 8);
 }
 
-export async function fetchLiveNews({ sources = [], keywords = [], preferredCategories = [], webSearch = true, sourcePriority = true } = {}) {
-  const interests = [...new Set(preferredCategories.map(cleanText).filter(Boolean))].sort((a, b) => a.localeCompare(b, 'fr'));
+export async function fetchLiveNews({ sources = [], keywords = [], preferredCategories = [], webSearch = true, sourcePriority = true, language = 'fr', locale = 'fr-FR', country = 'FR' } = {}) {
+  const interests = [...new Set(preferredCategories.map(cleanText).filter(Boolean))].sort((a, b) => a.localeCompare(b, language));
   const discoveryKeywords = webSearch ? buildDiscoveryKeywords(keywords, interests) : keywords.map(cleanText).filter(Boolean);
   // Added sources are deliberately never given a blanket ranking bonus. They
   // contribute candidate stories, while interests/+ feedback drive searches
@@ -321,7 +323,7 @@ export async function fetchLiveNews({ sources = [], keywords = [], preferredCate
   const effectiveSourcePriority = false;
   const useSharedCatalogue = !sources.length && !discoveryKeywords.length && webSearch;
   const endpoint = useSharedCatalogue
-    ? `/api/news?interests=${encodeURIComponent(interests.join(','))}&fresh=${Date.now()}`
+    ? `/api/news?interests=${encodeURIComponent(interests.join(','))}&language=${encodeURIComponent(language)}&locale=${encodeURIComponent(locale)}&country=${encodeURIComponent(country)}&fresh=${Date.now()}`
     : '/api/news';
   const response = await fetch(endpoint, useSharedCatalogue ? {
     method: 'GET',
@@ -336,7 +338,10 @@ export async function fetchLiveNews({ sources = [], keywords = [], preferredCate
       keywords: discoveryKeywords,
       preferredCategories: interests,
       webSearch,
-      sourcePriority: effectiveSourcePriority
+      sourcePriority: effectiveSourcePriority,
+      language,
+      locale,
+      country
     })
   });
   if (!response.ok) throw new Error(`Synchronisation impossible (${response.status})`);
@@ -346,7 +351,7 @@ export async function fetchLiveNews({ sources = [], keywords = [], preferredCate
       const article = normalizeArticle(rawArticle);
       return { ...article, id: stableArticleId(article) };
     }));
-    payload.articles = mergeArticleHistory(fresh);
+    payload.articles = mergeArticleHistory(fresh, language);
     payload.discoveryTopics = discoveryKeywords;
   }
   return payload;
