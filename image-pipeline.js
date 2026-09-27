@@ -1,4 +1,4 @@
-import { preparedVisualUrl, sourceTileUrl } from './services/article-visuals.js?v=98.2';
+import { preparedVisualUrl, sourceTileUrl } from './services/article-visuals.js?v=98.3';
 
 const MAX_CONCURRENT = 4;
 const PRIORITY_COUNT = 6;
@@ -20,7 +20,7 @@ function articleMap() {
 
 function proxyUrl(article) {
   const params = new URLSearchParams({
-    v: '98.2', url: String(article?.url || '').slice(0, 1900),
+    v: '98.3', url: String(article?.url || '').slice(0, 1900),
     image: String(article?.visual?.url || article?.image || '').slice(0, 1900),
     title: String(article?.title || '').slice(0, 280),
     category: String(article?.category || '').slice(0, 70),
@@ -38,6 +38,13 @@ function isManagedProxy(url) {
     const parsed = new URL(url, location.href);
     return parsed.origin === location.origin
       && ['/api/article-photo-fast', '/api/article-thumbnail', '/api/exact-news-thumbnail'].includes(parsed.pathname);
+  } catch { return false; }
+}
+
+function isExternalHttp(url) {
+  try {
+    const parsed = new URL(url, location.href);
+    return ['http:', 'https:'].includes(parsed.protocol) && parsed.origin !== location.origin;
   } catch { return false; }
 }
 
@@ -107,7 +114,7 @@ function bind(card, index, articles) {
 
   const tile = sourceTileUrl(article);
   const prepared = image.dataset.photoSrc || preparedVisualUrl(article);
-  const preferred = isManagedProxy(prepared) ? proxyUrl(article) : prepared;
+  const preferred = isManagedProxy(prepared) || isExternalHttp(prepared) ? proxyUrl(article) : prepared;
   const candidates = [...new Set([preferred, proxyUrl(article)]
     .filter(url => url && absolute(url) !== absolute(tile)))];
   const task = { card, image, candidates, tile, cursor: 0, started: false, finished: false, released: false, currentCandidate: '', objectUrl: '', start: null };

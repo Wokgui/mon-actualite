@@ -73,7 +73,7 @@ for (const src of scripts) {
   else ok(`service worker precaches runtime script ${src}`);
 }
 
-for (const asset of ['app-controls.css?v=98.2']) {
+for (const asset of ['app-controls.css?v=98.3']) {
   if (!index.includes(asset)) fail(`final visual layer missing from index: ${asset}`);
   if (!sw.includes(asset)) fail(`service worker does not precache final visual layer: ${asset}`);
   else ok(`service worker precaches final visual layer: ${asset}`);
@@ -162,8 +162,8 @@ if (!imageSequence.includes('const MAX_CONCURRENT = 4') || !imageSequence.includ
 else ok('bounded image loading pipeline configured');
 
 const visualService = read('services/article-visuals.js');
-if (!visualService.includes('const extracted = extractPreparedImage(rawVisual)') || !visualService.includes("return url.href")) fail('direct external visual fast path missing');
-else ok('direct external visual fast path configured');
+if (!visualService.includes('const extracted = extractPreparedImage(rawVisual)') || !imageSequence.includes('isExternalHttp(prepared)')) fail('external visuals are not routed through the validated image proxy');
+else ok('external visuals route through the validated bounded proxy');
 if (!app.includes("app.addEventListener('toggle'") || !app.includes("settingsOpenAccordions.add(title)")) fail('settings accordion toggle persistence missing');
 else ok('settings accordion toggle persistence configured');
 
