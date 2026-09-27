@@ -1,4 +1,4 @@
-import { preparedVisualUrl, sourceTileUrl } from './services/article-visuals.js?v=98.1';
+import { preparedVisualUrl, sourceTileUrl } from './services/article-visuals.js?v=98.2';
 
 const MAX_CONCURRENT = 4;
 const PRIORITY_COUNT = 6;
@@ -6,6 +6,8 @@ const RETRY_AFTER_MS = 60_000;
 const bound = new WeakSet();
 const queued = new WeakSet();
 const failures = new Map();
+const managedInflight = new Map();
+const managedBlobs = new Map();
 const queue = [];
 let active = 0;
 
@@ -18,7 +20,7 @@ function articleMap() {
 
 function proxyUrl(article) {
   const params = new URLSearchParams({
-    v: '98.1', url: String(article?.url || '').slice(0, 1900),
+    v: '98.2', url: String(article?.url || '').slice(0, 1900),
     image: String(article?.visual?.url || article?.image || '').slice(0, 1900),
     title: String(article?.title || '').slice(0, 280),
     category: String(article?.category || '').slice(0, 70),
@@ -29,6 +31,40 @@ function proxyUrl(article) {
 
 function absolute(url) {
   try { return new URL(url, location.href).href; } catch { return String(url || ''); }
+}
+
+function isManagedProxy(url) {
+  try {
+    const parsed = new URL(url, location.href);
+    return parsed.origin === location.origin
+      && ['/api/article-photo-fast', '/api/article-thumbnail', '/api/exact-news-thumbnail'].includes(parsed.pathname);
+  } catch { return false; }
+}
+
+function rememberBlob(url, blob) {
+  managedBlobs.delete(url);
+  managedBlobs.set(url, blob);
+  while (managedBlobs.size > 32) managedBlobs.delete(managedBlobs.keys().next().value);
+  return blob;
+}
+
+function managedImageBlob(url) {
+  if (managedBlobs.has(url)) return Promise.resolve(rememberBlob(url, managedBlobs.get(url)));
+  if (managedInflight.has(url)) return managedInflight.get(url);
+  const request = fetch(url, { cache: 'force-cache', credentials: 'same-origin' }).then(async response => {
+    const status = String(response.headers.get('X-Thumbnail-Status') || '').toLowerCase();
+    const contentType = String(response.headers.get('Content-Type') || '').toLowerCase();
+    if (!response.ok || status.includes('fallback') || contentType.includes('image/svg+xml')) {
+      throw new Error(`unusable image response: ${response.status} ${status || contentType}`);
+    }
+    const blob = await response.blob();
+    if (blob.size < 256 || !String(blob.type || contentType).toLowerCase().startsWith('image/')) {
+      throw new Error('empty or invalid image response');
+    }
+    return rememberBlob(url, blob);
+  }).finally(() => managedInflight.delete(url));
+  managedInflight.set(url, request);
+  return request;
 }
 
 function mark(image, ready) {
@@ -70,10 +106,11 @@ function bind(card, index, articles) {
   bound.add(card);
 
   const tile = sourceTileUrl(article);
-  const preferred = image.dataset.photoSrc || preparedVisualUrl(article);
-  const candidates = [...new Set([preferred, preparedVisualUrl(article), proxyUrl(article)]
+  const prepared = image.dataset.photoSrc || preparedVisualUrl(article);
+  const preferred = isManagedProxy(prepared) ? proxyUrl(article) : prepared;
+  const candidates = [...new Set([preferred, proxyUrl(article)]
     .filter(url => url && absolute(url) !== absolute(tile)))];
-  const task = { card, image, candidates, tile, cursor: 0, started: false, finished: false, released: false, start: null };
+  const task = { card, image, candidates, tile, cursor: 0, started: false, finished: false, released: false, currentCandidate: '', objectUrl: '', start: null };
 
   const release = () => {
     if (task.released) return;
@@ -87,14 +124,41 @@ function bind(card, index, articles) {
     mark(image, ready);
     release();
   };
+  const revokeObjectUrl = () => {
+    if (!task.objectUrl) return;
+    URL.revokeObjectURL(task.objectUrl);
+    task.objectUrl = '';
+  };
+  const assignCandidate = async candidate => {
+    task.currentCandidate = candidate;
+    if (!isManagedProxy(candidate)) {
+      image.src = candidate;
+      return;
+    }
+    try {
+      const blob = await managedImageBlob(candidate);
+      if (task.finished || task.currentCandidate !== candidate) return;
+      if (!card.isConnected) { finish(false); return; }
+      revokeObjectUrl();
+      task.objectUrl = URL.createObjectURL(blob);
+      image.src = task.objectUrl;
+    } catch {
+      if (task.finished || task.currentCandidate !== candidate) return;
+      if (!card.isConnected) { finish(false); return; }
+      failures.set(candidate, Date.now());
+      next();
+    }
+  };
   const next = () => {
     while (task.cursor < task.candidates.length) {
       const candidate = task.candidates[task.cursor++];
       const failedAt = failures.get(candidate) || 0;
       if (Date.now() - failedAt < RETRY_AFTER_MS) continue;
-      image.src = candidate;
+      void assignCandidate(candidate);
       return;
     }
+    task.currentCandidate = '';
+    revokeObjectUrl();
     image.src = tile;
     finish(false);
   };
@@ -103,15 +167,21 @@ function bind(card, index, articles) {
   image.decoding = 'async';
   image.addEventListener('load', async () => {
     if (!task.started || task.finished) return;
-    if (absolute(image.src) === absolute(tile)) { finish(false); return; }
+    if (absolute(image.src) === absolute(tile)) {
+      if (!task.currentCandidate) finish(false);
+      return;
+    }
     try { await image.decode(); } catch {}
-    if (image.naturalWidth > 1 && image.naturalHeight > 1) finish(true);
+    if (image.naturalWidth > 1 && image.naturalHeight > 1) {
+      finish(true);
+      if (task.objectUrl) setTimeout(revokeObjectUrl, 1000);
+    }
     else next();
   });
   image.addEventListener('error', () => {
     if (!task.started || task.finished) return;
-    const failed = task.candidates.find(candidate => absolute(candidate) === absolute(image.src));
-    if (failed) failures.set(failed, Date.now());
+    if (task.currentCandidate) failures.set(task.currentCandidate, Date.now());
+    revokeObjectUrl();
     next();
   });
   task.start = () => {

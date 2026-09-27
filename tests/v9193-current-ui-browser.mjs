@@ -139,6 +139,7 @@ const homeTitlePx = await page.$eval('.hero-header h1', el => parseFloat(getComp
 assert.ok(homeTitlePx <= 32.5, 'home title must stay visually lighter than the previous oversized heading');
 
 await page.waitForSelector('[data-stable-home-feed] .article-card', { timeout: 8000 });
+await page.waitForFunction(() => document.querySelector('[data-stable-home-feed] .article-card')?.classList.contains('read-passed-v9138'), null, { timeout: 2000 });
 assert.ok(await page.locator('[data-stable-home-feed] .article-card').first().evaluate(el => el.classList.contains('read-passed-v9138')), 'fixture article should start greyed');
 const homeReset = page.locator('.nav-item[data-view="home"]');
 await homeReset.dispatchEvent('pointerdown', { pointerType: 'touch', button: 0, clientX: 80, clientY: 820 });
@@ -201,4 +202,4 @@ const briefTitlePx = await page.$eval('.page:has(.brief-mode-tabs)>.page-masthea
 assert.ok(briefTitlePx <= 25.5, 'brief title must use the refined compact size');
 
 await browser.close();
-console.log('v98.01 current UI browser contract passed.');
+console.log('v98.02 current UI browser contract passed.');

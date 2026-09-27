@@ -34,12 +34,12 @@ jobs:
         run: gradle :app:assembleDebug --no-daemon
 
       - name: Rename APK
-        run: cp android-app/app/build/outputs/apk/debug/app-debug.apk mon-actualite-v98.01.apk
+        run: cp android-app/app/build/outputs/apk/debug/app-debug.apk mon-actualite-v98.02.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: mon-actualite-v98.01-apk
-          path: mon-actualite-v98.01.apk
+          name: mon-actualite-v98.02-apk
+          path: mon-actualite-v98.02.apk
           if-no-files-found: error
           retention-days: 30

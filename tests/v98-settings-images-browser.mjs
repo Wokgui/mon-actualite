@@ -15,6 +15,7 @@ const articles = Array.from({ length: 30 }, (_, index) => ({
   publishedAt: new Date(now - index * 900000).toISOString(), url: `https://example.test/${index}`, score: 300 - index
 }));
 const png = await readFile(new URL('../assets/icon-192.png', import.meta.url));
+const neutralSvg = '<svg xmlns="http://www.w3.org/2000/svg" width="400" height="224"><rect width="400" height="224" fill="#eef0f4"/></svg>';
 const launchOptions = { headless: true, args: ['--no-sandbox','--disable-gpu'] };
 if (process.env.CHROME_PATH) launchOptions.executablePath = process.env.CHROME_PATH;
 else if (process.platform === 'win32') launchOptions.executablePath = 'C:/Program Files/Google/Chrome/Application/chrome.exe';
@@ -37,15 +38,23 @@ await page.route('**/api/news**', async route => {
   await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ articles, fetchedAt: new Date().toISOString(), stats: {} }) });
 });
 await page.route('**/api/article-photo-fast**', async route => {
-  photoRequests.push(route.request().url());
+  const requestUrl = route.request().url();
+  photoRequests.push(requestUrl);
   activePhotoRequests += 1;
   maxActivePhotoRequests = Math.max(maxActivePhotoRequests, activePhotoRequests);
   await new Promise(resolve => setTimeout(resolve, 80));
-  try { await route.fulfill({ status: 200, contentType: 'image/png', headers: { 'X-Thumbnail-Status': 'feed', 'Cache-Control': 'public, max-age=3600' }, body: png }); }
+  const isNeutralFallback = new URL(requestUrl).searchParams.get('title')?.startsWith('Article 7 ');
+  try {
+    if (isNeutralFallback) {
+      await route.fulfill({ status: 200, contentType: 'image/svg+xml', headers: { 'X-Thumbnail-Status': 'neutral-fallback', 'Cache-Control': 'public, max-age=90' }, body: neutralSvg });
+    } else {
+      await route.fulfill({ status: 200, contentType: 'image/png', headers: { 'X-Thumbnail-Status': 'feed', 'Cache-Control': 'public, max-age=3600' }, body: png });
+    }
+  }
   finally { activePhotoRequests -= 1; }
 });
 await page.route('**/api/article-thumbnail**', route => route.fulfill({ status: 200, contentType: 'image/png', headers: { 'X-Thumbnail-Status': 'feed', 'Cache-Control': 'public, max-age=3600' }, body: png }));
-await page.route('**/version.json**', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ version: '98', codeRelease: '98.01' }) }));
+await page.route('**/version.json**', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ version: '98', codeRelease: '98.02' }) }));
 
 const started = performance.now();
 await page.goto('http://127.0.0.1:4173/', { waitUntil: 'domcontentloaded', timeout: 15000 });
@@ -57,10 +66,13 @@ const geometry = await page.locator('[data-stable-home-feed] .article-card').eva
 assert.ok(geometry.every(item => Math.abs(item.width-112)<.75 && Math.abs(item.height-75)<.75), 'article images must reserve the same 112x75 space');
 assert.ok(geometry.every(item => item.border === '0px'), 'article separators must stay removed');
 const requestCounts = [...photoRequests.reduce((map,url)=>map.set(url,(map.get(url)||0)+1),new Map()).values()];
-assert.ok(Math.max(...requestCounts) <= 2, 'the client must not loop on the same photo URL when the service worker is unavailable');
+assert.ok(Math.max(...requestCounts) <= 1, 'rerenders must share the same photo request instead of repeating it');
 assert.ok(maxActivePhotoRequests <= 4, `photo concurrency exceeded the four-request budget: ${maxActivePhotoRequests}`);
 await page.waitForFunction(() => document.querySelectorAll('[data-stable-home-feed] .article-card img.image-ready-v98').length >= 6, null, { timeout: 3000 });
 assert.equal(await page.locator('[data-stable-home-feed] .article-card img.image-ready-v98').count() >= 6, true, 'the six priority images must load first');
+await page.waitForFunction(() => [...document.querySelectorAll('[data-stable-home-feed] .article-card')].find(card => card.querySelector('h2')?.textContent?.startsWith('Article 7 '))?.querySelector('img')?.classList.contains('image-fallback-v98'), null, { timeout: 3000 });
+const rejectedFallback = await page.locator('[data-stable-home-feed] .article-card').filter({ hasText: 'Article 7 de contrôle' }).first().locator('img').evaluate(image => ({ src:image.currentSrc || image.src, fallback:image.classList.contains('image-fallback-v98') }));
+assert.ok(rejectedFallback.fallback && rejectedFallback.src.startsWith('data:image/svg+xml'), 'a neutral HTTP 200 fallback must be replaced by the local source tile');
 const initialPhotoRequests = photoRequests.length;
 const initialUniquePhotoRequests = new Set(photoRequests).size;
 const initialPhotoVariants = photoRequests.reduce((counts,url)=>{const key=new URL(url).searchParams.get('v')||'none';counts[key]=(counts[key]||0)+1;return counts;},{});
@@ -133,5 +145,5 @@ await page.waitForTimeout(250);
 assert.ok(newsBodies.some(body => body.language === 'en' && body.country === 'GB'), 'language must drive the country of every default news request');
 assert.equal(errors.filter(error => !/Service Worker registration blocked/.test(error)).length, 0, `browser errors: ${errors.join(' | ')}`);
 
-console.log(JSON.stringify({ readyMs:Math.round(readyMs), settings:titles, looseGap, denseGap, smallTitle, largeTitle, initialPhotoRequests, initialUniquePhotoRequests, initialPhotoVariants, maxActivePhotoRequests, localeRequest:newsBodies.find(body=>body.language==='en') }, null, 2));
+console.log(JSON.stringify({ readyMs:Math.round(readyMs), settings:titles, looseGap, denseGap, smallTitle, largeTitle, initialPhotoRequests, initialUniquePhotoRequests, initialPhotoVariants, maxActivePhotoRequests, rejectedFallback, localeRequest:newsBodies.find(body=>body.language==='en') }, null, 2));
 await browser.close();
