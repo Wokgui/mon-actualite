@@ -73,7 +73,7 @@ for (const src of scripts) {
   else ok(`service worker precaches runtime script ${src}`);
 }
 
-for (const asset of ['app-controls.css?v=98.0']) {
+for (const asset of ['app-controls.css?v=98.1']) {
   if (!index.includes(asset)) fail(`final visual layer missing from index: ${asset}`);
   if (!sw.includes(asset)) fail(`service worker does not precache final visual layer: ${asset}`);
   else ok(`service worker precaches final visual layer: ${asset}`);
@@ -128,8 +128,9 @@ else ok('Veille uses only Settings > Veille rules');
 if (app.match(/function effectiveWatchRules\(\)[\s\S]{0,500}briefWatchTopics/)) fail('legacy briefWatchTopics still influence Veille');
 if (!app.includes('function fetchHistoryCoverage') || !app.includes("days = topic ? BRIEF_DAYS : 31")) fail('31-day home / 10-day watch historical discovery is missing');
 else ok('31-day home and 10-day watch historical discovery configured');
-if (!app.includes('visualBackfillTimer = window.setTimeout') || !app.includes("image-failed-v9184")) fail('image recovery scheduler is not active');
-else ok('image recovery scheduler active');
+const imageSequence = read('image-pipeline.js');
+if (app.includes('scheduleVisualBackfill') || app.includes('recoverArticleVisual') || !imageSequence.includes('const MAX_CONCURRENT = 4')) fail('photo loading must have one bounded owner');
+else ok('single bounded image pipeline owns photo loading');
 const androidGradle = read('android-app/app/build.gradle');
 const androidActivity = read('android-app/app/src/main/java/com/wokgui/monactualite/MainActivity.java');
 if (!androidGradle.includes('prepareWebAssets') || !androidActivity.includes('WebViewAssetLoader')) fail('Android APK does not bundle the current frontend');
@@ -155,10 +156,9 @@ if (!app.includes('settingsOpenAccordions') || !app.includes('captureOpenSetting
 else ok('settings accordion persistence configured');
 if (!app.includes('navLongPressTimer') || !app.includes('resetReadStateFromNav(view)')) fail('long press reset on Home/Brief missing');
 else ok('long press reset on Home/Brief configured');
-if (!app.includes("const real = preparedVisualUrl(article)") || !app.includes("const src = real || tile") || !app.includes("index < 6 ? 'eager' : 'lazy'") || !app.includes('fetchpriority=')) fail('single-source high-priority article image loading missing');
+if (!app.includes("const target = real || tile") || !app.includes('data-photo-src=') || !app.includes('fetchpriority=')) fail('stable placeholder and prioritized article image loading missing');
 else ok('immediate high-priority article image loading configured');
-const imageSequence = read('image-pipeline.js');
-if (!imageSequence.includes("index < 6 ? 'eager' : 'lazy'") || !imageSequence.includes("index < 4 ? 'high' : 'auto'") || !imageSequence.includes('retryAfter = 60_000')) fail('bounded image loading pipeline missing');
+if (!imageSequence.includes('const MAX_CONCURRENT = 4') || !imageSequence.includes('const PRIORITY_COUNT = 6') || !imageSequence.includes("rootMargin: '480px 0px'") || !imageSequence.includes('function pump()')) fail('bounded image loading pipeline missing');
 else ok('bounded image loading pipeline configured');
 
 const visualService = read('services/article-visuals.js');
@@ -172,8 +172,8 @@ if (!releaseWatch.includes('IS_NATIVE_ANDROID') || !releaseWatch.includes('if (I
 else ok('native Android release watcher guard configured');
 if (!imageSequence.includes("image.addEventListener('load'") || !imageSequence.includes("image.addEventListener('error'")) fail('image pipeline load and fallback handling missing');
 else ok('image pipeline preserves the initial source and only falls back after error');
-if (!app.includes('article.pinnedVisualV85 = remembered.url') || !app.includes('live.pinnedVisualV85 = endpoint')) fail('recovered image proxy is not pinned across renders');
-else ok('recovered image proxy pinned across renders');
+if (!app.includes('article.pinnedVisualV85 = remembered.url') || app.includes('live.pinnedVisualV85 = endpoint')) fail('legacy successful image migration is not isolated from the new pipeline');
+else ok('legacy successful image URLs migrate without a second recovery loop');
 
 if (!app.includes('if (IS_NATIVE_ANDROID) {') || !app.includes('publishedNumber > currentNumber') || !app.includes("if (!IS_NATIVE_ANDROID) window.setTimeout(() => checkAppUpdate(), 1400)")) fail('native app update guard missing');
 else ok('native app update guard configured');

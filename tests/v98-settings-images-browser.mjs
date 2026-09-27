@@ -28,15 +28,24 @@ const page = await context.newPage();
 const errors = [];
 const newsBodies = [];
 const photoRequests = [];
+let activePhotoRequests = 0;
+let maxActivePhotoRequests = 0;
 page.on('pageerror', error => errors.push(error.message));
 page.on('console', message => { if (message.type() === 'error') errors.push(message.text()); });
 await page.route('**/api/news**', async route => {
   try { if (route.request().postData()) newsBodies.push(JSON.parse(route.request().postData())); } catch {}
   await route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ articles, fetchedAt: new Date().toISOString(), stats: {} }) });
 });
-await page.route('**/api/article-photo-fast**', async route => { photoRequests.push(route.request().url()); await route.fulfill({ status: 200, contentType: 'image/png', headers: { 'X-Thumbnail-Status': 'feed', 'Cache-Control': 'public, max-age=3600' }, body: png }); });
+await page.route('**/api/article-photo-fast**', async route => {
+  photoRequests.push(route.request().url());
+  activePhotoRequests += 1;
+  maxActivePhotoRequests = Math.max(maxActivePhotoRequests, activePhotoRequests);
+  await new Promise(resolve => setTimeout(resolve, 80));
+  try { await route.fulfill({ status: 200, contentType: 'image/png', headers: { 'X-Thumbnail-Status': 'feed', 'Cache-Control': 'public, max-age=3600' }, body: png }); }
+  finally { activePhotoRequests -= 1; }
+});
 await page.route('**/api/article-thumbnail**', route => route.fulfill({ status: 200, contentType: 'image/png', headers: { 'X-Thumbnail-Status': 'feed', 'Cache-Control': 'public, max-age=3600' }, body: png }));
-await page.route('**/version.json**', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ version: '98', codeRelease: '98.00' }) }));
+await page.route('**/version.json**', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ version: '98', codeRelease: '98.01' }) }));
 
 const started = performance.now();
 await page.goto('http://127.0.0.1:4173/', { waitUntil: 'domcontentloaded', timeout: 15000 });
@@ -49,6 +58,8 @@ assert.ok(geometry.every(item => Math.abs(item.width-112)<.75 && Math.abs(item.h
 assert.ok(geometry.every(item => item.border === '0px'), 'article separators must stay removed');
 const requestCounts = [...photoRequests.reduce((map,url)=>map.set(url,(map.get(url)||0)+1),new Map()).values()];
 assert.ok(Math.max(...requestCounts) <= 2, 'the client must not loop on the same photo URL when the service worker is unavailable');
+assert.ok(maxActivePhotoRequests <= 4, `photo concurrency exceeded the four-request budget: ${maxActivePhotoRequests}`);
+assert.equal(await page.locator('[data-stable-home-feed] .article-card img.image-ready-v98').count() >= 6, true, 'the six priority images must load first');
 const initialPhotoRequests = photoRequests.length;
 const initialUniquePhotoRequests = new Set(photoRequests).size;
 const initialPhotoVariants = photoRequests.reduce((counts,url)=>{const key=new URL(url).searchParams.get('v')||'none';counts[key]=(counts[key]||0)+1;return counts;},{});
@@ -121,5 +132,5 @@ await page.waitForTimeout(250);
 assert.ok(newsBodies.some(body => body.language === 'en' && body.country === 'GB'), 'language must drive the country of every default news request');
 assert.equal(errors.filter(error => !/Service Worker registration blocked/.test(error)).length, 0, `browser errors: ${errors.join(' | ')}`);
 
-console.log(JSON.stringify({ readyMs:Math.round(readyMs), settings:titles, looseGap, denseGap, smallTitle, largeTitle, initialPhotoRequests, initialUniquePhotoRequests, initialPhotoVariants, localeRequest:newsBodies.find(body=>body.language==='en') }, null, 2));
+console.log(JSON.stringify({ readyMs:Math.round(readyMs), settings:titles, looseGap, denseGap, smallTitle, largeTitle, initialPhotoRequests, initialUniquePhotoRequests, initialPhotoVariants, maxActivePhotoRequests, localeRequest:newsBodies.find(body=>body.language==='en') }, null, 2));
 await browser.close();

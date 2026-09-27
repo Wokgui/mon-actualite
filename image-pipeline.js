@@ -1,8 +1,13 @@
-import { preparedVisualUrl, sourceTileUrl } from './services/article-visuals.js?v=98.0';
+import { preparedVisualUrl, sourceTileUrl } from './services/article-visuals.js?v=98.1';
 
+const MAX_CONCURRENT = 4;
+const PRIORITY_COUNT = 6;
+const RETRY_AFTER_MS = 60_000;
 const bound = new WeakSet();
+const queued = new WeakSet();
 const failures = new Map();
-const retryAfter = 60_000;
+const queue = [];
+let active = 0;
 
 function articleMap() {
   try {
@@ -13,7 +18,7 @@ function articleMap() {
 
 function proxyUrl(article) {
   const params = new URLSearchParams({
-    v: '98', url: String(article?.url || '').slice(0, 1900),
+    v: '98.1', url: String(article?.url || '').slice(0, 1900),
     image: String(article?.visual?.url || article?.image || '').slice(0, 1900),
     title: String(article?.title || '').slice(0, 280),
     category: String(article?.category || '').slice(0, 70),
@@ -22,11 +27,40 @@ function proxyUrl(article) {
   return `/api/article-photo-fast?${params}`;
 }
 
+function absolute(url) {
+  try { return new URL(url, location.href).href; } catch { return String(url || ''); }
+}
+
 function mark(image, ready) {
   image.classList.remove('image-pending-v98');
   image.classList.toggle('image-ready-v98', ready);
   image.classList.toggle('image-fallback-v98', !ready);
 }
+
+function pump() {
+  while (active < MAX_CONCURRENT && queue.length) {
+    const task = queue.shift();
+    if (!task.card.isConnected || task.finished) continue;
+    active += 1;
+    task.start();
+  }
+}
+
+function enqueue(task) {
+  if (task.started || task.finished || queued.has(task.card)) return;
+  queued.add(task.card);
+  queue.push(task);
+  pump();
+}
+
+const observer = new IntersectionObserver(entries => {
+  entries.forEach(entry => {
+    if (!entry.isIntersecting) return;
+    const task = entry.target.__imageTaskV98;
+    if (task) enqueue(task);
+    observer.unobserve(entry.target);
+  });
+}, { rootMargin: '480px 0px', threshold: 0.01 });
 
 function bind(card, index, articles) {
   if (bound.has(card)) return;
@@ -34,39 +68,62 @@ function bind(card, index, articles) {
   const article = articles.get(String(card.dataset.article || ''));
   if (!image || !article) return;
   bound.add(card);
-  image.loading = index < 6 ? 'eager' : 'lazy';
-  image.fetchPriority = index < 4 ? 'high' : 'auto';
-  image.decoding = 'async';
+
   const tile = sourceTileUrl(article);
-  const candidates = [...new Set([preparedVisualUrl(article), proxyUrl(article)].filter(Boolean))];
-  let candidateIndex = candidates.findIndex(url => {
-    try { return new URL(url, location.href).href === image.src; } catch { return false; }
-  });
+  const preferred = image.dataset.photoSrc || preparedVisualUrl(article);
+  const candidates = [...new Set([preferred, preparedVisualUrl(article), proxyUrl(article)]
+    .filter(url => url && absolute(url) !== absolute(tile)))];
+  const task = { card, image, candidates, tile, cursor: 0, started: false, finished: false, released: false, start: null };
+
+  const release = () => {
+    if (task.released) return;
+    task.released = true;
+    active = Math.max(0, active - 1);
+    pump();
+  };
+  const finish = ready => {
+    if (task.finished) return;
+    task.finished = true;
+    mark(image, ready);
+    release();
+  };
   const next = () => {
-    while (++candidateIndex < candidates.length) {
-      const candidate = candidates[candidateIndex];
+    while (task.cursor < task.candidates.length) {
+      const candidate = task.candidates[task.cursor++];
       const failedAt = failures.get(candidate) || 0;
-      if (Date.now() - failedAt < retryAfter) continue;
+      if (Date.now() - failedAt < RETRY_AFTER_MS) continue;
       image.src = candidate;
       return;
     }
     image.src = tile;
-    mark(image, false);
+    finish(false);
   };
+
+  image.loading = 'eager';
+  image.decoding = 'async';
   image.addEventListener('load', async () => {
-    if (image.src.startsWith('data:image/svg+xml')) { mark(image, false); return; }
+    if (!task.started || task.finished) return;
+    if (absolute(image.src) === absolute(tile)) { finish(false); return; }
     try { await image.decode(); } catch {}
-    if (image.naturalWidth > 0) mark(image, true); else next();
+    if (image.naturalWidth > 1 && image.naturalHeight > 1) finish(true);
+    else next();
   });
   image.addEventListener('error', () => {
-    const failed = candidates.find(url => { try { return new URL(url, location.href).href === image.src; } catch { return false; } });
+    if (!task.started || task.finished) return;
+    const failed = task.candidates.find(candidate => absolute(candidate) === absolute(image.src));
     if (failed) failures.set(failed, Date.now());
     next();
   });
-  if (image.complete) {
-    if (image.naturalWidth > 0 && !image.src.startsWith('data:image/svg+xml')) mark(image, true);
-    else if (!image.src.startsWith('data:image/svg+xml')) next();
-  }
+  task.start = () => {
+    if (task.started || task.finished) return;
+    task.started = true;
+    next();
+  };
+  card.__imageTaskV98 = task;
+
+  if (!candidates.length) { mark(image, false); task.finished = true; return; }
+  if (index < PRIORITY_COUNT) enqueue(task);
+  else observer.observe(card);
 }
 
 function scan() {

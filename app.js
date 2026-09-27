@@ -1,5 +1,5 @@
-import { importOpmlPreview, fetchLiveNews } from './services/source-connectors.js?v=98.0';
-import { preparedVisualUrl, hasPreparedVisual, sourceTileUrl } from './services/article-visuals.js?v=98.0';
+import { importOpmlPreview, fetchLiveNews } from './services/source-connectors.js?v=98.1';
+import { preparedVisualUrl, hasPreparedVisual, sourceTileUrl } from './services/article-visuals.js?v=98.1';
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const app = $('#app');
@@ -28,8 +28,6 @@ const LANGUAGE_PRESETS = {
 // became available a few seconds later.
 const VISUAL_BACKFILL_KEY = 'news-visual-backfill-v3';
 const VISUAL_BACKFILL_MAX_AGE = 30 * 86400000;
-const VISUAL_BACKFILL_RETRY_DELAY = 20 * 1000;
-const VISUAL_BACKFILL_MAX_ATTEMPTS = 4;
 const BRIEF_DAYS = 10;
 const HISTORY_SYNC_KEY = 'news-history-sync-v9200';
 const HISTORY_SYNC_MAX_AGE = 2 * 60 * 60 * 1000;
@@ -157,8 +155,6 @@ let deferredInstallPrompt = null;
 let isInstalled = window.matchMedia('(display-mode: standalone)').matches || window.navigator.standalone === true;
 let syncPromise = null;
 let toastTimer;
-let visualBackfillTimer = null;
-let visualBackfillRunning = false;
 let settingsOpenAccordions = new Set();
 
 const iconPaths = {
@@ -261,9 +257,9 @@ function articleVisual(article, index = 0) {
   const prepared = hasPreparedVisual(article);
   const tile = sourceTileUrl(article);
   const real = preparedVisualUrl(article);
-  const src = real || tile;
+  const target = real || tile;
   const visualClass = real && real !== tile ? 'direct-visual-v9203' : 'source-tile-visual';
-  return `<img class="article-image original-article-image stable-visual image-pending-v98 ${prepared ? 'prepared-visual' : visualClass}" src="${escapeHtml(src)}" alt="" width="112" height="75" loading="${index < 6 ? 'eager' : 'lazy'}" fetchpriority="${index < 4 ? 'high' : 'auto'}" decoding="async" referrerpolicy="no-referrer" style="background-image:url('${escapeHtml(tile)}');background-size:cover">`;
+  return `<img class="article-image original-article-image stable-visual image-pending-v98 ${prepared ? 'prepared-visual' : visualClass}" src="${escapeHtml(tile)}" data-photo-src="${escapeHtml(target)}" alt="" width="112" height="75" loading="lazy" fetchpriority="${index < 4 ? 'high' : 'auto'}" decoding="async" referrerpolicy="no-referrer" style="background-image:url('${escapeHtml(tile)}');background-size:cover">`;
 }
 function sourceIdentity(article = {}) {
   return normalizeTopic(article.source || article.feedTitle || '');
@@ -880,7 +876,6 @@ function render({ resetScroll = false, scrollTop = null } = {}) {
 }
 function notifyStableRender(reason = 'update') {
   window.dispatchEvent(new CustomEvent('news:stable-render', { detail: { reason, view: state.view } }));
-  scheduleVisualBackfill(45);
 }
 
 function refreshSheet() {
@@ -1063,31 +1058,6 @@ function applyDownloadedNews(payload) {
 
 window.__applyNewsPayloadV9128 = applyDownloadedNews;
 
-function articleThumbnailUrl(article) {
-  const params = new URLSearchParams({
-    v: '19',
-    url: String(article?.url || '').slice(0, 1900),
-    // When a Google CDN image works on desktop but is refused on the phone,
-    // let our same-origin endpoint fetch and serve that exact image.
-    image: String(article?.image || '').slice(0, 1900),
-    title: String(article?.title || '').replace(/\s+/g, ' ').trim().slice(0, 280),
-    category: String(article?.category || '').replace(/\s+/g, ' ').trim().slice(0, 70),
-    source: String(article?.source || '').replace(/\s+/g, ' ').trim().slice(0, 100),
-    custom: article?.customSource ? '1' : '0'
-  });
-  return `/api/article-thumbnail?${params}`;
-}
-
-function saveVisualBackfills() {
-  const recent = Object.entries(visualBackfills)
-    // Only successful recoveries survive an app restart. Failed attempts are
-    // session-local so a temporary Google/publisher miss never poisons the
-    // next launch on the phone.
-    .filter(([, item]) => item?.url && Date.now() - Number(item.savedAt || 0) < VISUAL_BACKFILL_MAX_AGE)
-    .slice(-300);
-  try { localStorage.setItem(VISUAL_BACKFILL_KEY, JSON.stringify(Object.fromEntries(recent))); } catch {}
-}
-
 function applyRememberedVisual(article) {
   const remembered = visualBackfills[String(article?.id || '')];
   if (!remembered?.url || Date.now() - Number(remembered.savedAt || 0) > VISUAL_BACKFILL_MAX_AGE) return article;
@@ -1097,151 +1067,6 @@ function applyRememberedVisual(article) {
   article.visual = { status: 'ready', url: remembered.url, source: 'article-enrichment' };
   return article;
 }
-
-function installRecoveredVisual(article, endpoint, decodedUrl = '') {
-  const live = state.articles.find(item => String(item?.id || '') === String(article?.id || ''));
-  if (!live) return;
-  live.image = endpoint;
-  live.pinnedVisualV85 = endpoint;
-  live.visualStatus = 'ready';
-  live.visual = { status: 'ready', url: endpoint, source: 'article-enrichment' };
-  visualBackfills[String(live.id)] = { url: endpoint, savedAt: Date.now() };
-  document.querySelectorAll('.article-card[data-article]').forEach(card => {
-    if (String(card.dataset.article || '') !== String(live.id)) return;
-    const image = card.querySelector('img.article-image');
-    if (!image) return;
-    image.classList.remove('source-tile-visual', 'image-failed-v9184');
-    image.classList.add('prepared-visual', 'image-ready-v9184');
-    image.loading = 'eager';
-    const target = decodedUrl || endpoint;
-    const current = image.currentSrc || image.src || '';
-    let targetAbs = target;
-    try { targetAbs = new URL(target, location.href).href; } catch {}
-    if (current !== targetAbs) image.src = target;
-  });
-  if (decodedUrl) window.setTimeout(() => URL.revokeObjectURL(decodedUrl), 5000);
-}
-
-async function decodedRecoveryUrl(bytes, type = 'image/jpeg') {
-  try {
-    const objectUrl = URL.createObjectURL(new Blob([bytes], { type: type || 'image/jpeg' }));
-    const probe = new Image();
-    probe.decoding = 'async';
-    probe.src = objectUrl;
-    await probe.decode();
-    return objectUrl;
-  } catch {
-    return '';
-  }
-}
-
-async function recoverArticleVisual(article) {
-  const endpoint = articleThumbnailUrl(article);
-  try {
-    const response = await fetch(endpoint, { cache: 'force-cache' });
-    const status = response.headers.get('X-Thumbnail-Status') || '';
-    const type = response.headers.get('Content-Type') || '';
-    const bytes = await response.arrayBuffer();
-    if (!response.ok || status === 'fallback' || /image\/svg\+xml/i.test(type) || bytes.byteLength < 256) throw new Error('visual unavailable');
-    const decodedUrl = await decodedRecoveryUrl(bytes, type);
-    installRecoveredVisual(article, endpoint, decodedUrl);
-  } catch {
-    const key = String(article.id);
-    const previous = visualBackfills[key];
-    visualBackfills[key] = {
-      attemptedAt: Date.now(),
-      attempts: Math.min(VISUAL_BACKFILL_MAX_ATTEMPTS, Number(previous?.attempts || 0) + 1)
-    };
-  }
-}
-
-function visualCardDistance(card) {
-  const rect = card.getBoundingClientRect();
-  if (rect.bottom >= -120 && rect.top <= window.innerHeight + 120) return 0;
-  if (rect.top > window.innerHeight) return rect.top - window.innerHeight;
-  return Math.abs(rect.bottom);
-}
-
-async function backfillVisibleVisuals() {
-  if (visualBackfillRunning || !navigator.onLine || document.hidden) return;
-  const cardEntries = [...document.querySelectorAll('.article-card[data-article]')]
-    .map(card => {
-      const image = card.querySelector('img.article-image');
-      const src = image?.currentSrc || image?.src || '';
-      const needsRecovery = Boolean(image && (
-        image.classList.contains('source-tile-visual')
-        || image.classList.contains('image-failed-v9184')
-        || card.classList.contains('v42-image-failed')
-        || src.startsWith('data:image/svg+xml')
-        || (image.complete && image.naturalWidth < 2)
-      ));
-      return { id: String(card.dataset.article || ''), distance: visualCardDistance(card), needsRecovery };
-    })
-    .sort((a, b) => a.distance - b.distance)
-  // Only recover cards close to the Android viewport. Processing every card
-  // already rendered (including hundreds below the fold) flooded Google and
-  // turned otherwise valid Parisien images into HTTP 429 fallbacks.
-  const nearbyEntries = cardEntries.filter(item => item.distance <= Math.max(2200, window.innerHeight * 2.2));
-  const recoveryIds = new Set(nearbyEntries.filter(item => item.needsRecovery).map(item => item.id));
-  const visibleIds = nearbyEntries.map(item => item.id);
-  const orderedArticles = [...new Set(visibleIds)]
-    .map(id => state.articles.find(article => String(article?.id || '') === id))
-    .filter(Boolean);
-  const candidates = orderedArticles
-    .filter(article => {
-      if (!recoveryIds.has(String(article.id))) return false;
-      const attempt = visualBackfills[String(article.id)];
-      const attempts = Number(attempt?.attempts || 0);
-      return attempts < VISUAL_BACKFILL_MAX_ATTEMPTS
-        && (!attempt?.attemptedAt || Date.now() - Number(attempt.attemptedAt) >= VISUAL_BACKFILL_RETRY_DELAY);
-    })
-    .slice(0, 10);
-  if (!candidates.length) {
-    const retryWaits = orderedArticles
-      .filter(article => !hasPreparedVisual(article) || recoveryIds.has(String(article.id)))
-      .map(article => visualBackfills[String(article.id)])
-      .filter(attempt => Number(attempt?.attempts || 0) > 0 && Number(attempt.attempts) < VISUAL_BACKFILL_MAX_ATTEMPTS)
-      .map(attempt => VISUAL_BACKFILL_RETRY_DELAY - (Date.now() - Number(attempt.attemptedAt || 0)))
-      .filter(wait => wait > 0);
-    if (retryWaits.length) scheduleVisualBackfill(Math.max(350, Math.min(...retryWaits) + 50));
-    return;
-  }
-  visualBackfillRunning = true;
-  let cursor = 0;
-  const worker = async () => {
-    while (cursor < candidates.length) {
-      const article = candidates[cursor++];
-      await recoverArticleVisual(article);
-      if (cursor < candidates.length) await new Promise(resolve => setTimeout(resolve, 20));
-    }
-  };
-  try {
-    const workerCount = Math.min(5, candidates.length);
-    await Promise.all(Array.from({ length: workerCount }, () => worker()));
-    persistCache();
-    saveVisualBackfills();
-  } finally {
-    visualBackfillRunning = false;
-    scheduleVisualBackfill(180);
-  }
-}
-
-function scheduleVisualBackfill(delay = 60) {
-  clearTimeout(visualBackfillTimer);
-  visualBackfillTimer = window.setTimeout(() => {
-    visualBackfillTimer = null;
-    void backfillVisibleVisuals();
-  }, Math.max(35, Number(delay) || 60));
-}
-
-// Image errors do not add/remove DOM nodes. Capture the failure and immediately
-// schedule the same-origin recovery used for articles without a prepared visual.
-document.addEventListener('error', event => {
-  const image = event.target;
-  if (image instanceof HTMLImageElement && image.closest('.article-card[data-article]')) {
-    scheduleVisualBackfill(45);
-  }
-}, true);
 
 function historicalDiscoveryKeywords(extraTopic = '', days = 31) {
   const recentTopics = uniqueTopics([
@@ -1859,7 +1684,7 @@ if ('serviceWorker' in navigator && location.protocol.startsWith('http') && !nav
     serviceWorkerRefreshing = true;
     window.location.reload();
   });
-  navigator.serviceWorker.register('./sw-v98.js?v=98.0', { updateViaCache: 'none' }).then(registration => {
+  navigator.serviceWorker.register('./sw-v98.js?v=98.1', { updateViaCache: 'none' }).then(registration => {
     if (registration.waiting) registration.waiting.postMessage('SKIP_WAITING');
     registration.addEventListener('updatefound', () => {
       const installing = registration.installing;
