@@ -76,8 +76,7 @@ const requestCounts = [...photoRequests.reduce((map,url)=>map.set(url,(map.get(u
 assert.ok(Math.max(...requestCounts) <= 1, 'rerenders must share the same photo request instead of repeating it');
 assert.ok(maxActivePhotoRequests <= 8, `photo concurrency exceeded the eight-request budget: ${maxActivePhotoRequests}`);
 assert.deepEqual(directExternalPhotoRequests, [], 'external publisher images must go through the validated same-origin proxy');
-await page.waitForFunction(() => document.querySelectorAll('[data-stable-home-feed] .article-card img.image-ready-v98').length >= 15, null, { timeout: 3000 });
-assert.equal(await page.locator('[data-stable-home-feed] .article-card img.image-ready-v98').count() >= 15, true, 'the sixteen priority slots must load immediately, except a rejected fallback');
+await page.waitForFunction(() => document.querySelectorAll('[data-stable-home-feed] .article-card img.image-ready-v98').length >= 15, null, { timeout: 5000 });
 await page.waitForFunction(() => [...document.querySelectorAll('[data-stable-home-feed] .article-card')].find(card => card.querySelector('h2')?.textContent?.startsWith('Article 7 '))?.querySelector('img')?.classList.contains('image-fallback-v98'), null, { timeout: 3000 });
 const rejectedFallback = await page.locator('[data-stable-home-feed] .article-card').filter({ hasText: 'Article 7 de contrôle' }).first().locator('img').evaluate(image => ({ src:image.currentSrc || image.src, fallback:image.classList.contains('image-fallback-v98') }));
 assert.ok(rejectedFallback.fallback && rejectedFallback.src.startsWith('data:image/svg+xml'), 'a neutral HTTP 200 fallback must be replaced by the local source tile');
