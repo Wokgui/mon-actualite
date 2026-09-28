@@ -1,5 +1,5 @@
-import { importOpmlPreview, fetchLiveNews } from './services/source-connectors.js?v=98.9';
-import { preparedVisualUrl, hasPreparedVisual, sourceTileUrl } from './services/article-visuals.js?v=98.9';
+import { importOpmlPreview, fetchLiveNews } from './services/source-connectors.js?v=98.10';
+import { preparedVisualUrl, hasPreparedVisual, sourceTileUrl } from './services/article-visuals.js?v=98.10';
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const app = $('#app');
@@ -38,6 +38,56 @@ const LANGUAGE_PRESETS = {
   hi: { label: 'हिन्दी', locale: 'hi-IN', country: 'IN', countryName: 'Inde' },
   id: { label: 'Bahasa Indonesia', locale: 'id-ID', country: 'ID', countryName: 'Indonésie' }
 };
+
+const UI_TEXT = {
+  fr: {
+    home: 'Accueil', settings: 'Réglages', brief: 'Brief', essential: 'L’essentiel', watch: 'Veille', editWatch: 'Régler la veille',
+    language: 'Langue', textDensity: 'Taille et densité du texte', display: 'Affichage', generalNews: 'Actualité générale', baseSources: 'Sources d’information de base', addBlockSource: 'Ajouter / bloquer une source', keywords: 'Mots-clés', operation: 'Fonctionnement', version: 'Version',
+    articleText: 'Taille du texte des articles', interfaceText: 'Taille du texte de l’interface', density: 'Densité entre les articles', titleSize: 'Taille du titre', small: 'Petit', large: 'Grand', lowDensity: 'Peu dense', highDensity: 'Très dense', smallTitle: 'Petit titre', largeTitle: 'Gros titre',
+    showBadges: 'Afficher les badges', showAge: 'Afficher depuis combien de temps l’article est sorti', headerBackground: 'Couleur de fond du bandeau', dominantColor: 'Couleur dominante', articleCount: 'Nombre d’articles', coveredDomains: 'Domaines couverts',
+    chooseLanguages: 'Choisir des langues', sourcesCountry: 'Les sources proposées par défaut suivent le pays correspondant : {country}.', availableLanguages: 'Langues disponibles', catalogHelp: 'Téléchargez une langue puis utilisez ses sources d’information.', selected: 'Sélectionnée', use: 'Utiliser', download: 'Télécharger', close: 'Fermer',
+    automaticRefresh: 'Actualisation automatique', automaticDesc: 'Charge les nouveautés en arrière-plan.', webSearch: 'Recherche web complémentaire', webSearchDesc: 'Complète les flux avec Google Actualités.', publication: 'Publication du {date}', checkUpdate: 'Vérifier la mise à jour', follow: 'Suivre', followed: 'Suivie', block: 'Bloquer', unblock: 'Débloquer'
+  },
+  en: {
+    home: 'Home', settings: 'Settings', brief: 'Brief', essential: 'Essential', watch: 'Watch', editWatch: 'Edit watch',
+    language: 'Language', textDensity: 'Text size and density', display: 'Display', generalNews: 'General news', baseSources: 'Default news sources', addBlockSource: 'Add / block a source', keywords: 'Keywords', operation: 'Operation', version: 'Version',
+    articleText: 'Article text size', interfaceText: 'Interface text size', density: 'Space between articles', titleSize: 'Title size', small: 'Small', large: 'Large', lowDensity: 'More space', highDensity: 'More compact', smallTitle: 'Small title', largeTitle: 'Large title',
+    showBadges: 'Show badges', showAge: 'Show how long ago the article was published', headerBackground: 'Header background colour', dominantColor: 'Accent colour', articleCount: 'Number of articles', coveredDomains: 'Topics covered',
+    chooseLanguages: 'Choose languages', sourcesCountry: 'Default sources follow the corresponding country: {country}.', availableLanguages: 'Available languages', catalogHelp: 'Download a language, then use its news sources.', selected: 'Selected', use: 'Use', download: 'Download', close: 'Close',
+    automaticRefresh: 'Automatic refresh', automaticDesc: 'Loads new stories in the background.', webSearch: 'Additional web search', webSearchDesc: 'Completes feeds with Google News.', publication: 'Published on {date}', checkUpdate: 'Check for updates', follow: 'Follow', followed: 'Following', block: 'Block', unblock: 'Unblock'
+  },
+  de: { home:'Start', settings:'Einstellungen', brief:'Brief', essential:'Das Wichtigste', watch:'Beobachtung', editWatch:'Beobachtung einstellen', language:'Sprache', textDensity:'Textgröße und Dichte', display:'Anzeige', generalNews:'Allgemeine Nachrichten', baseSources:'Standard-Nachrichtenquellen', addBlockSource:'Quelle hinzufügen / blockieren', keywords:'Schlüsselwörter', operation:'Funktionsweise', version:'Version', showBadges:'Badges anzeigen', showAge:'Alter des Artikels anzeigen', chooseLanguages:'Sprachen auswählen' },
+  es: { home:'Inicio', settings:'Ajustes', brief:'Resumen', essential:'Lo esencial', watch:'Seguimiento', editWatch:'Configurar seguimiento', language:'Idioma', textDensity:'Tamaño y densidad del texto', display:'Visualización', generalNews:'Actualidad general', baseSources:'Fuentes de información predeterminadas', addBlockSource:'Añadir / bloquear una fuente', keywords:'Palabras clave', operation:'Funcionamiento', version:'Versión', showBadges:'Mostrar etiquetas', showAge:'Mostrar hace cuánto se publicó el artículo', chooseLanguages:'Elegir idiomas' },
+  it: { home:'Home', settings:'Impostazioni', brief:'Riepilogo', essential:'L’essenziale', watch:'Monitoraggio', editWatch:'Imposta monitoraggio', language:'Lingua', textDensity:'Dimensione e densità del testo', display:'Visualizzazione', generalNews:'Notizie generali', baseSources:'Fonti di informazione predefinite', addBlockSource:'Aggiungi / blocca una fonte', keywords:'Parole chiave', operation:'Funzionamento', version:'Versione', showBadges:'Mostra badge', showAge:'Mostra da quanto è uscito l’articolo', chooseLanguages:'Scegli lingue' },
+  pt: { home:'Início', settings:'Definições', brief:'Resumo', essential:'O essencial', watch:'Vigilância', editWatch:'Configurar vigilância', language:'Idioma', textDensity:'Tamanho e densidade do texto', display:'Visualização', generalNews:'Notícias gerais', baseSources:'Fontes de informação predefinidas', addBlockSource:'Adicionar / bloquear fonte', keywords:'Palavras-chave', operation:'Funcionamento', version:'Versão', showBadges:'Mostrar etiquetas', showAge:'Mostrar há quanto tempo o artigo foi publicado', chooseLanguages:'Escolher idiomas' },
+  nl: { home:'Start', settings:'Instellingen', brief:'Overzicht', essential:'Essentieel', watch:'Volgen', editWatch:'Volgen instellen', language:'Taal', textDensity:'Tekstgrootte en dichtheid', display:'Weergave', generalNews:'Algemeen nieuws', baseSources:'Standaard nieuwsbronnen', addBlockSource:'Bron toevoegen / blokkeren', keywords:'Trefwoorden', operation:'Werking', version:'Versie', showBadges:'Labels tonen', showAge:'Publicatietijd tonen', chooseLanguages:'Talen kiezen' },
+  pl: { home:'Start', settings:'Ustawienia', brief:'Skrót', essential:'Najważniejsze', watch:'Obserwowane', editWatch:'Ustaw obserwowane', language:'Język', textDensity:'Rozmiar i gęstość tekstu', display:'Wygląd', generalNews:'Wiadomości ogólne', baseSources:'Podstawowe źródła informacji', addBlockSource:'Dodaj / zablokuj źródło', keywords:'Słowa kluczowe', operation:'Działanie', version:'Wersja', showBadges:'Pokaż etykiety', showAge:'Pokaż czas publikacji artykułu', chooseLanguages:'Wybierz języki' },
+  ro: { home:'Acasă', settings:'Setări', brief:'Rezumat', essential:'Esențial', watch:'Monitorizare', editWatch:'Setează monitorizarea', language:'Limbă', textDensity:'Dimensiunea și densitatea textului', display:'Afișare', generalNews:'Știri generale', baseSources:'Surse de informare implicite', addBlockSource:'Adaugă / blochează o sursă', keywords:'Cuvinte-cheie', operation:'Funcționare', version:'Versiune', showBadges:'Afișează etichetele', showAge:'Afișează vechimea articolului', chooseLanguages:'Alege limbile' },
+  sv: { home:'Hem', settings:'Inställningar', brief:'Översikt', essential:'Det viktigaste', watch:'Bevakning', editWatch:'Ställ in bevakning', language:'Språk', textDensity:'Textstorlek och täthet', display:'Visning', generalNews:'Allmänna nyheter', baseSources:'Standardnyhetskällor', addBlockSource:'Lägg till / blockera en källa', keywords:'Nyckelord', operation:'Funktion', version:'Version', showBadges:'Visa etiketter', showAge:'Visa när artikeln publicerades', chooseLanguages:'Välj språk' },
+  no: { home:'Hjem', settings:'Innstillinger', brief:'Oversikt', essential:'Det viktigste', watch:'Overvåking', editWatch:'Still inn overvåking', language:'Språk', textDensity:'Tekststørrelse og tetthet', display:'Visning', generalNews:'Generelle nyheter', baseSources:'Standard nyhetskilder', addBlockSource:'Legg til / blokker en kilde', keywords:'Nøkkelord', operation:'Funksjon', version:'Versjon', showBadges:'Vis merker', showAge:'Vis når artikkelen ble publisert', chooseLanguages:'Velg språk' },
+  da: { home:'Hjem', settings:'Indstillinger', brief:'Overblik', essential:'Det vigtigste', watch:'Overvågning', editWatch:'Indstil overvågning', language:'Sprog', textDensity:'Tekststørrelse og tæthed', display:'Visning', generalNews:'Generelle nyheder', baseSources:'Standardnyhedskilder', addBlockSource:'Tilføj / bloker en kilde', keywords:'Nøgleord', operation:'Funktion', version:'Version', showBadges:'Vis mærker', showAge:'Vis hvornår artiklen blev udgivet', chooseLanguages:'Vælg sprog' },
+  fi: { home:'Koti', settings:'Asetukset', brief:'Kooste', essential:'Tärkeimmät', watch:'Seuranta', editWatch:'Aseta seuranta', language:'Kieli', textDensity:'Tekstin koko ja tiheys', display:'Näyttö', generalNews:'Yleiset uutiset', baseSources:'Oletusuutislähteet', addBlockSource:'Lisää / estä lähde', keywords:'Avainsanat', operation:'Toiminta', version:'Versio', showBadges:'Näytä tunnisteet', showAge:'Näytä artikkelin julkaisuaika', chooseLanguages:'Valitse kielet' },
+  cs: { home:'Domů', settings:'Nastavení', brief:'Přehled', essential:'To nejdůležitější', watch:'Sledování', editWatch:'Nastavit sledování', language:'Jazyk', textDensity:'Velikost a hustota textu', display:'Zobrazení', generalNews:'Obecné zprávy', baseSources:'Výchozí zdroje zpráv', addBlockSource:'Přidat / zablokovat zdroj', keywords:'Klíčová slova', operation:'Fungování', version:'Verze', showBadges:'Zobrazit štítky', showAge:'Zobrazit dobu od vydání článku', chooseLanguages:'Vybrat jazyky' },
+  el: { home:'Αρχική', settings:'Ρυθμίσεις', brief:'Σύνοψη', essential:'Τα σημαντικότερα', watch:'Παρακολούθηση', editWatch:'Ρύθμιση παρακολούθησης', language:'Γλώσσα', textDensity:'Μέγεθος και πυκνότητα κειμένου', display:'Εμφάνιση', generalNews:'Γενικές ειδήσεις', baseSources:'Βασικές πηγές ενημέρωσης', addBlockSource:'Προσθήκη / αποκλεισμός πηγής', keywords:'Λέξεις-κλειδιά', operation:'Λειτουργία', version:'Έκδοση', showBadges:'Εμφάνιση ετικετών', showAge:'Εμφάνιση χρόνου δημοσίευσης', chooseLanguages:'Επιλογή γλωσσών' },
+  tr: { home:'Ana sayfa', settings:'Ayarlar', brief:'Özet', essential:'Önemli haberler', watch:'Takip', editWatch:'Takibi ayarla', language:'Dil', textDensity:'Metin boyutu ve yoğunluğu', display:'Görünüm', generalNews:'Genel haberler', baseSources:'Varsayılan haber kaynakları', addBlockSource:'Kaynak ekle / engelle', keywords:'Anahtar kelimeler', operation:'Çalışma', version:'Sürüm', showBadges:'Rozetleri göster', showAge:'Makalenin yayın zamanını göster', chooseLanguages:'Dil seç' },
+  uk: { home:'Головна', settings:'Налаштування', brief:'Огляд', essential:'Головне', watch:'Стеження', editWatch:'Налаштувати стеження', language:'Мова', textDensity:'Розмір і щільність тексту', display:'Відображення', generalNews:'Загальні новини', baseSources:'Основні джерела інформації', addBlockSource:'Додати / заблокувати джерело', keywords:'Ключові слова', operation:'Робота', version:'Версія', showBadges:'Показувати мітки', showAge:'Показувати час публікації статті', chooseLanguages:'Вибрати мови' },
+  ja: { home:'ホーム', settings:'設定', brief:'まとめ', essential:'重要記事', watch:'ウォッチ', editWatch:'ウォッチを設定', language:'言語', textDensity:'文字サイズと密度', display:'表示', generalNews:'一般ニュース', baseSources:'基本ニュースソース', addBlockSource:'ソースを追加・ブロック', keywords:'キーワード', operation:'動作', version:'バージョン', showBadges:'バッジを表示', showAge:'記事の公開からの経過時間を表示', chooseLanguages:'言語を選択' },
+  ko: { home:'홈', settings:'설정', brief:'요약', essential:'핵심 뉴스', watch:'관심 소식', editWatch:'관심 소식 설정', language:'언어', textDensity:'텍스트 크기와 밀도', display:'화면', generalNews:'일반 뉴스', baseSources:'기본 뉴스 출처', addBlockSource:'출처 추가 / 차단', keywords:'키워드', operation:'작동 방식', version:'버전', showBadges:'배지 표시', showAge:'기사 게시 경과 시간 표시', chooseLanguages:'언어 선택' },
+  hi: { home:'होम', settings:'सेटिंग', brief:'सारांश', essential:'मुख्य समाचार', watch:'निगरानी', editWatch:'निगरानी सेट करें', language:'भाषा', textDensity:'टेक्स्ट आकार और घनत्व', display:'दिखावट', generalNews:'सामान्य समाचार', baseSources:'मूल समाचार स्रोत', addBlockSource:'स्रोत जोड़ें / ब्लॉक करें', keywords:'कीवर्ड', operation:'कार्यप्रणाली', version:'संस्करण', showBadges:'बैज दिखाएँ', showAge:'लेख के प्रकाशन का समय दिखाएँ', chooseLanguages:'भाषाएँ चुनें' },
+  id: { home:'Beranda', settings:'Pengaturan', brief:'Ringkasan', essential:'Intisari', watch:'Pantauan', editWatch:'Atur pantauan', language:'Bahasa', textDensity:'Ukuran dan kepadatan teks', display:'Tampilan', generalNews:'Berita umum', baseSources:'Sumber berita bawaan', addBlockSource:'Tambah / blokir sumber', keywords:'Kata kunci', operation:'Cara kerja', version:'Versi', showBadges:'Tampilkan label', showAge:'Tampilkan waktu terbit artikel', chooseLanguages:'Pilih bahasa' }
+};
+
+function ui(key, variables = {}) {
+  const code = state?.settings?.language || selectedLanguage || 'fr';
+  const template = UI_TEXT[code]?.[key] ?? UI_TEXT.en[key] ?? UI_TEXT.fr[key] ?? key;
+  return String(template).replace(/\{(\w+)\}/g, (_, name) => variables[name] ?? '');
+}
+
+function localizedCountry(country) {
+  const preset = LANGUAGE_PRESETS[state?.settings?.language] || LANGUAGE_PRESETS.fr;
+  try { return new Intl.DisplayNames([preset.locale], { type: 'region' }).of(country) || country; }
+  catch { return Object.values(LANGUAGE_PRESETS).find(item => item.country === country)?.countryName || country; }
+}
 // v3 deliberately drops the old persisted failure markers. A single transient
 // miss used to freeze a source tile for six hours, even when the exact image
 // became available a few seconds later.
@@ -181,6 +231,7 @@ function applyAppearanceSettings() {
   root.dataset.showBadges = showBadges ? '1' : '0';
   root.dataset.showAge = showAge ? '1' : '0';
   root.lang = language;
+  document.title = language === 'fr' ? 'Mon actualité' : `${ui('brief')} · Mon actualité`;
   document.querySelector('meta[name="theme-color"]')?.setAttribute('content', headerBackground);
 }
 
@@ -405,10 +456,10 @@ function reconcileHomeOrder() {
 
 function nav(active = state.view) {
   const watchCount = watchNewCount();
-  return `<nav class="bottom-nav stable-bottom-nav-v9184" aria-label="Navigation principale">
-    <button class="nav-item ${active === 'home' ? 'active' : ''}" data-view="home" aria-label="Accueil">${navSolidIcon('home')}<span>Accueil</span></button>
-    <button class="nav-item ${active === 'settings' ? 'active' : ''}" data-view="settings" aria-label="Réglages">${navSolidIcon('settings')}<span>Réglages</span></button>
-    <button class="nav-item ${active === 'brief' ? 'active' : ''}" data-view="brief" aria-label="Brief">${navSolidIcon('brief')}<span>Brief</span>${watchCount ? `<i class="nav-watch-dot-v9184" aria-label="${watchCount} nouveauté${watchCount > 1 ? 's' : ''} de veille">${watchCount > 9 ? '9+' : watchCount}</i>` : ''}</button>
+  return `<nav class="bottom-nav stable-bottom-nav-v9184" aria-label="${escapeHtml(ui('brief'))}">
+    <button class="nav-item ${active === 'home' ? 'active' : ''}" data-view="home" aria-label="${escapeHtml(ui('home'))}">${navSolidIcon('home')}<span>${escapeHtml(ui('home'))}</span></button>
+    <button class="nav-item ${active === 'settings' ? 'active' : ''}" data-view="settings" aria-label="${escapeHtml(ui('settings'))}">${navSolidIcon('settings')}<span>${escapeHtml(ui('settings'))}</span></button>
+    <button class="nav-item ${active === 'brief' ? 'active' : ''}" data-view="brief" aria-label="${escapeHtml(ui('brief'))}">${navSolidIcon('brief')}<span>${escapeHtml(ui('brief'))}</span>${watchCount ? `<i class="nav-watch-dot-v9184">${watchCount > 9 ? '9+' : watchCount}</i>` : ''}</button>
   </nav>`;
 }
 
@@ -622,7 +673,7 @@ function renderWatchesFinal() {
     const filtered = `<div class="feed stable-owned-list watch-filtered-feed-v9138">${watched.slice(0, 30).map((article, index) => compactArticleRow(article, dayIndex * 40 + index)).join('')}</div>`;
     return `<section class="watch-day-v9138"><h3>${escapeHtml(dayLabel(watched[0]?.publishedAt))}</h3>${filtered}</section>`;
   }).filter(Boolean).join('');
-  return `<section class="watches-by-day-v9138 watch-layout-v9138"><div class="watches-head-v9138"><strong>Veille</strong><button type="button" class="watch-edit-button-v9138" data-view="settings">Régler la veille</button></div>${groups}</section>`;
+  return `<section class="watches-by-day-v9138 watch-layout-v9138"><div class="watches-head-v9138"><strong>${escapeHtml(ui('watch'))}</strong><button type="button" class="watch-edit-button-v9138" data-view="settings">${escapeHtml(ui('editWatch'))}</button></div>${groups}</section>`;
 }
 
 function renderBrief() {
@@ -678,8 +729,8 @@ function renderBrief() {
       return `<section class="brief-history-day-v9138 journal-section"><div class="brief-history-date-v9138">${escapeHtml(dayLabel(picks[0].article.publishedAt))}</div><div class="feed stable-owned-list">${picks.map(({ article }, index) => compactArticleRow(article, dayIndex * essentialCount + index)).join('')}</div></section>`;
     }).filter(Boolean).join('');
   const watchCount = watchNewCount();
-  return `<main class="page">${topbar('Brief', false)}
-    <div class="brief-mode-tabs"><button class="brief-mode-tab ${state.briefMode === 'essential' ? 'active' : ''}" data-brief-mode="essential">L’essentiel</button><button class="brief-mode-tab watch-tab-v9184 ${state.briefMode === 'watches' ? 'active' : ''}" data-brief-mode="watches">Veille${watchCount ? `<span class="watch-new-badge-v9184">${watchCount > 9 ? '9+' : watchCount}</span>` : ''}</button></div>
+  return `<main class="page">${topbar(ui('brief'), false)}
+    <div class="brief-mode-tabs"><button class="brief-mode-tab ${state.briefMode === 'essential' ? 'active' : ''}" data-brief-mode="essential">${escapeHtml(ui('essential'))}</button><button class="brief-mode-tab watch-tab-v9184 ${state.briefMode === 'watches' ? 'active' : ''}" data-brief-mode="watches">${escapeHtml(ui('watch'))}${watchCount ? `<span class="watch-new-badge-v9184">${watchCount > 9 ? '9+' : watchCount}</span>` : ''}</button></div>
     <div class="runtime-brief-content" data-stable-brief-content>${state.briefMode === 'essential' ? essential : renderWatchesFinal()}</div>
   </main>${nav('brief')}`;
 }
@@ -765,8 +816,8 @@ function sourceDirectoryMarkup() {
       <div class="source-line-v9186">
         <strong>${escapeHtml(item.name)}</strong>
         <div class="source-actions-v9186">
-          <button type="button" class="${followed ? 'active' : ''}" data-source-follow="${escapeHtml(item.key)}">${followed ? 'Suivie' : 'Suivre'}</button>
-          <button type="button" class="${blocked ? 'danger active' : 'danger'}" data-source-block="${escapeHtml(item.key)}">${blocked ? 'Débloquer' : 'Bloquer'}</button>
+          <button type="button" class="${followed ? 'active' : ''}" data-source-follow="${escapeHtml(item.key)}">${escapeHtml(ui(followed ? 'followed' : 'follow'))}</button>
+          <button type="button" class="${blocked ? 'danger active' : 'danger'}" data-source-block="${escapeHtml(item.key)}">${escapeHtml(ui(blocked ? 'unblock' : 'block'))}</button>
         </div>
       </div>
       ${feeds.length > 1 ? `<details class="source-feeds-v9186"><summary>Sous-flux</summary>${feeds.map(([,title]) => `<div>${escapeHtml(title || 'Flux')}</div>`).join('')}</details>` : ''}
@@ -814,7 +865,8 @@ function rangeSetting(label, key, min, max, left, right) {
 function languageSettingsMarkup() {
   const current = LANGUAGE_PRESETS[state.settings.language] || LANGUAGE_PRESETS.fr;
   const options = state.settings.enabledLanguages.map(code => `<option value="${code}" ${state.settings.language === code ? 'selected' : ''}>${escapeHtml(LANGUAGE_PRESETS[code].label)}</option>`).join('');
-  return `<div class="language-settings"><select class="text-input" data-language aria-label="Langue de l’application et des sources">${options}</select><button type="button" class="small-primary-btn" data-add-language>Choisir des langues</button></div><p class="muted-note">Les sources proposées par défaut suivent le pays correspondant : <strong data-language-country>${escapeHtml(current.countryName)}</strong>.</p>`;
+  const country = localizedCountry(current.country);
+  return `<div class="language-settings"><select class="text-input" data-language aria-label="${escapeHtml(ui('language'))}">${options}</select><button type="button" class="small-primary-btn" data-add-language>${escapeHtml(ui('chooseLanguages'))}</button></div><p class="muted-note">${escapeHtml(ui('sourcesCountry', { country }))}</p>`;
 }
 
 function countryFlag(country = '') {
@@ -826,35 +878,35 @@ function openLanguageCatalog() {
   const rows = Object.entries(LANGUAGE_PRESETS).map(([code, preset]) => {
     const current = code === state.settings.language;
     const installed = state.settings.enabledLanguages.includes(code);
-    return `<button type="button" class="language-option-v9805 ${current ? 'is-current' : ''}" data-language-install="${code}" ${current ? 'aria-current="true"' : ''}><span class="language-flag-v9805">${countryFlag(preset.country)}</span><span><strong>${escapeHtml(preset.label)}</strong><small>${escapeHtml(preset.countryName)}</small></span><em>${current ? 'Sélectionnée' : installed ? 'Utiliser' : 'Télécharger'}</em></button>`;
+    return `<button type="button" class="language-option-v9805 ${current ? 'is-current' : ''}" data-language-install="${code}" ${current ? 'aria-current="true"' : ''}><span class="language-flag-v9805">${countryFlag(preset.country)}</span><span><strong>${escapeHtml(preset.label)}</strong><small>${escapeHtml(localizedCountry(preset.country))}</small></span><em>${escapeHtml(ui(current ? 'selected' : installed ? 'use' : 'download'))}</em></button>`;
   }).join('');
-  app.insertAdjacentHTML('beforeend', `<div class="language-catalog-backdrop-v9805" data-language-catalog><section class="language-catalog-v9805" role="dialog" aria-modal="true" aria-labelledby="language-catalog-title"><header><div><strong id="language-catalog-title">Langues disponibles</strong><span>Téléchargez une langue puis utilisez ses sources d’information.</span></div><button type="button" data-close-language-catalog aria-label="Fermer">×</button></header><div class="language-options-v9805">${rows}</div></section></div>`);
+  app.insertAdjacentHTML('beforeend', `<div class="language-catalog-backdrop-v9805" data-language-catalog><section class="language-catalog-v9805" role="dialog" aria-modal="true" aria-labelledby="language-catalog-title"><header><div><strong id="language-catalog-title">${escapeHtml(ui('availableLanguages'))}</strong><span>${escapeHtml(ui('catalogHelp'))}</span></div><button type="button" data-close-language-catalog aria-label="${escapeHtml(ui('close'))}">×</button></header><div class="language-options-v9805">${rows}</div></section></div>`);
   app.querySelector('[data-close-language-catalog]')?.focus();
 }
 
 function displaySettingsMarkup() {
-  return `<label class="preference-check"><input type="checkbox" data-display-setting="showBadges" ${state.settings.showBadges ? 'checked' : ''}><span>Afficher les badges</span></label><label class="preference-check"><input type="checkbox" data-display-setting="showAge" ${state.settings.showAge ? 'checked' : ''}><span>Afficher depuis combien de temps l’article est sorti</span></label><label class="preference-color"><strong>Couleur de fond du bandeau</strong><input type="color" value="${state.settings.headerBackground}" data-header-background aria-label="Couleur de fond du bandeau"></label><label class="preference-color"><strong>Couleur dominante</strong><input type="color" value="${state.settings.accent}" data-accent aria-label="Couleur dominante"></label>`;
+  return `<label class="preference-check"><input type="checkbox" data-display-setting="showBadges" ${state.settings.showBadges ? 'checked' : ''}><span>${escapeHtml(ui('showBadges'))}</span></label><label class="preference-check"><input type="checkbox" data-display-setting="showAge" ${state.settings.showAge ? 'checked' : ''}><span>${escapeHtml(ui('showAge'))}</span></label><label class="preference-color"><strong>${escapeHtml(ui('headerBackground'))}</strong><input type="color" value="${state.settings.headerBackground}" data-header-background aria-label="${escapeHtml(ui('headerBackground'))}"></label><label class="preference-color"><strong>${escapeHtml(ui('dominantColor'))}</strong><input type="color" value="${state.settings.accent}" data-accent aria-label="${escapeHtml(ui('dominantColor'))}"></label>`;
 }
 
 function essentialSettingsMarkup() {
-  return `${rangeSetting('Nombre d’articles', 'essentialCount', 3, 12, '3', '12')}<strong class="settings-field-title">Domaines couverts</strong><div class="interest-grid centered-interest-grid-v9184 essential-domains">${GENERAL_CATEGORIES.map(category => `<button type="button" class="interest ${state.settings.briefEssentialCategories.includes(category) ? 'active' : ''}" data-brief-essential="${escapeHtml(category)}" aria-pressed="${state.settings.briefEssentialCategories.includes(category)}">${escapeHtml(category)}</button>`).join('')}</div>`;
+  return `${rangeSetting(ui('articleCount'), 'essentialCount', 3, 12, '3', '12')}<strong class="settings-field-title">${escapeHtml(ui('coveredDomains'))}</strong><div class="interest-grid centered-interest-grid-v9184 essential-domains">${GENERAL_CATEGORIES.map(category => `<button type="button" class="interest ${state.settings.briefEssentialCategories.includes(category) ? 'active' : ''}" data-brief-essential="${escapeHtml(category)}" aria-pressed="${state.settings.briefEssentialCategories.includes(category)}">${escapeHtml(category)}</button>`).join('')}</div>`;
 }
 
 function renderSettings() {
   const accordion = (title, body) => `<details class="settings-accordion-v9185"${settingsOpenAccordions.has(title) ? ' open' : ''}><summary>${escapeHtml(title)}</summary><div class="settings-accordion-content-v9185">${body}</div></details>`;
-  return `<main class="page settings-page-v9185">${topbar('Réglages', false)}
+  return `<main class="page settings-page-v9185">${topbar(ui('settings'), false)}
     <div class="settings-accordions-v9185">
-      ${accordion('Langue', languageSettingsMarkup())}
+      ${accordion(ui('language'), languageSettingsMarkup())}
 
-      ${accordion('Taille et densité du texte', `${rangeSetting('Taille du texte des articles', 'textSize', 100, 175, 'Petit', 'Grand')}${rangeSetting('Taille du texte de l’interface', 'interfaceTextSize', 85, 150, 'Petit', 'Grand')}${rangeSetting('Densité entre les articles', 'density', 0, 100, 'Peu dense', 'Très dense')}${rangeSetting('Taille du titre', 'titleSize', 70, 140, 'Petit titre', 'Gros titre')}`)}
+      ${accordion(ui('textDensity'), `${rangeSetting(ui('articleText'), 'textSize', 100, 175, ui('small'), ui('large'))}${rangeSetting(ui('interfaceText'), 'interfaceTextSize', 85, 150, ui('small'), ui('large'))}${rangeSetting(ui('density'), 'density', 0, 100, ui('lowDensity'), ui('highDensity'))}${rangeSetting(ui('titleSize'), 'titleSize', 70, 140, ui('smallTitle'), ui('largeTitle'))}`)}
 
-      ${accordion('Affichage', displaySettingsMarkup())}
+      ${accordion(ui('display'), displaySettingsMarkup())}
 
-      ${accordion('Actualité générale', `<div class="interest-grid centered-interest-grid-v9184">${GENERAL_CATEGORIES.map(category => `<button class="interest ${state.settings.generalCategories.includes(category) ? 'active' : ''}" data-general-category="${category}">${category}</button>`).join('')}</div>`)}
+      ${accordion(ui('generalNews'), `<div class="interest-grid centered-interest-grid-v9184">${GENERAL_CATEGORIES.map(category => `<button class="interest ${state.settings.generalCategories.includes(category) ? 'active' : ''}" data-general-category="${category}">${category}</button>`).join('')}</div>`)}
 
-      ${accordion('Sources d’information de base', sourceDirectoryMarkup())}
+      ${accordion(ui('baseSources'), sourceDirectoryMarkup())}
 
-      ${accordion('Ajouter / bloquer une source', `
+      ${accordion(ui('addBlockSource'), `
         <div class="form-stack compact-source-form-v9186">
           <input id="source-name" class="text-input" type="text" maxlength="80" placeholder="Nom de la source (optionnel)">
           <input id="source-url" class="text-input" type="url" maxlength="600" placeholder="Adresse RSS / Atom">
@@ -866,20 +918,20 @@ function renderSettings() {
         <label class="secondary-btn opml-button-v9186" for="opml-input">Importer un fichier OPML</label><input id="opml-input" class="file-input" type="file" accept=".opml,.xml">
       `)}
 
-      ${accordion('Mots-clés', `
+      ${accordion(ui('keywords'), `
         <div class="inline-form"><input id="keyword-input" class="text-input" type="text" maxlength="70" placeholder="À surveiller"><button class="small-primary-btn" data-add-keyword>Ajouter</button></div>${keywordChips()}
         <h3 class="settings-subtitle-v9184">À éviter</h3>
         <div class="inline-form"><input id="blocked-keyword-input" class="text-input" type="text" maxlength="70" placeholder="À éviter"><button class="small-primary-btn" data-add-blocked-keyword>Éviter</button></div>${blockedKeywordChips()}`)}
 
-      ${accordion('L’essentiel', essentialSettingsMarkup())}
+      ${accordion(ui('essential'), essentialSettingsMarkup())}
 
-      ${accordion('Veille', `
+      ${accordion(ui('watch'), `
         <div class="form-stack"><input id="watch-query-input" class="text-input" maxlength="160" placeholder="Ex. Meta + Quest 4 | Quest 4"><input id="watch-exclude-input" class="text-input" maxlength="160" placeholder="À exclure : rumeur, promotion…"><button class="secondary-btn" data-add-watch-rule>${icon('plus')} Ajouter la veille</button></div>
         ${watchRulesMarkup()}`)}
 
-      ${accordion('Fonctionnement', `<div class="function-settings-v9186">${settingRow('Actualisation automatique', 'Charge les nouveautés en arrière-plan.', 'autoRefresh')}${settingRow('Recherche web complémentaire', 'Complète les flux avec Google Actualités.', 'webSearch')}</div>`)}
+      ${accordion(ui('operation'), `<div class="function-settings-v9186">${settingRow(ui('automaticRefresh'), ui('automaticDesc'), 'autoRefresh')}${settingRow(ui('webSearch'), ui('webSearchDesc'), 'webSearch')}</div>`)}
 
-      ${accordion('Version', `<div class="app-version-row"><div><strong>Mon actualité · version ${APP_VERSION}</strong><span>Publication du ${APP_RELEASE}</span></div><span class="app-version-badge">v${APP_VERSION}</span></div><button class="secondary-btn compact-btn version-update-v9186" data-check-update>${icon('refresh')} Vérifier la mise à jour</button>`)}
+      ${accordion(ui('version'), `<div class="app-version-row"><div><strong>Mon actualité · ${escapeHtml(ui('version').toLowerCase())} ${APP_VERSION}</strong><span>${escapeHtml(ui('publication', { date: APP_RELEASE }))}</span></div><span class="app-version-badge">v${APP_VERSION}</span></div><button class="secondary-btn compact-btn version-update-v9186" data-check-update>${icon('refresh')} ${escapeHtml(ui('checkUpdate'))}</button>`)}
     </div>
   </main>${nav('settings')}`;
 }
@@ -1269,7 +1321,7 @@ function addWatchRule() {
   state.watchRules = [...activeWatchRules(), { query, exclude }];
   persist();
   render({ scrollTop: window.scrollY });
-  reopenSettingsAccordion('Veille');
+  reopenSettingsAccordion(ui('watch'));
   toast('Veille ajoutée');
   void syncWatchTopic(query);
 }
@@ -1471,7 +1523,7 @@ app.addEventListener('click', async event => {
     following ? state.followedSources.add(key) : state.followedSources.delete(key);
     state.blockedSources.delete(key);
     sourceFollow.classList.toggle('active', following);
-    sourceFollow.textContent = following ? 'Suivie' : 'Suivre';
+    sourceFollow.textContent = ui(following ? 'followed' : 'follow');
     if (blockButton) {
       blockButton.classList.remove('active');
       blockButton.textContent = 'Bloquer';
@@ -1490,10 +1542,10 @@ app.addEventListener('click', async event => {
     blocking ? state.blockedSources.add(key) : state.blockedSources.delete(key);
     state.followedSources.delete(key);
     sourceBlock.classList.toggle('active', blocking);
-    sourceBlock.textContent = blocking ? 'Débloquer' : 'Bloquer';
+    sourceBlock.textContent = ui(blocking ? 'unblock' : 'block');
     if (followButton) {
       followButton.classList.remove('active');
-      followButton.textContent = 'Suivre';
+      followButton.textContent = ui('follow');
     }
     row?.classList.toggle('is-blocked', blocking);
     persist();
@@ -1757,7 +1809,7 @@ if ('serviceWorker' in navigator && location.protocol.startsWith('http') && !nav
     serviceWorkerRefreshing = true;
     window.location.reload();
   });
-  navigator.serviceWorker.register('./sw-v98.js?v=98.9', { updateViaCache: 'none' }).then(registration => {
+  navigator.serviceWorker.register('./sw-v98.js?v=98.10', { updateViaCache: 'none' }).then(registration => {
     if (registration.waiting) registration.waiting.postMessage('SKIP_WAITING');
     registration.addEventListener('updatefound', () => {
       const installing = registration.installing;

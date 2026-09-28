@@ -202,4 +202,4 @@ const briefTitlePx = await page.$eval('.page:has(.brief-mode-tabs)>.page-masthea
 assert.ok(briefTitlePx <= 25.5, 'brief title must use the refined compact size');
 
 await browser.close();
-console.log('v98.09 current UI browser contract passed.');
+console.log('v98.10 current UI browser contract passed.');

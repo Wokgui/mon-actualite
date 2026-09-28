@@ -69,7 +69,7 @@ await page.route('**/api/article-photo-fast**', async route => {
   finally { activePhotoRequests -= 1; }
 });
 await page.route('**/api/article-thumbnail**', route => { preparedPhotoRequests.push(route.request().url()); return route.fulfill({ status: 200, contentType: 'image/png', headers: { 'X-Thumbnail-Status': 'feed', 'Cache-Control': 'public, max-age=3600' }, body: png }); });
-await page.route('**/version.json**', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ version: '98', codeRelease: '98.09' }) }));
+await page.route('**/version.json**', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ version: '98', codeRelease: '98.10' }) }));
 
 const started = performance.now();
 await page.goto('http://127.0.0.1:4173/', { waitUntil: 'domcontentloaded', timeout: 15000 });
@@ -187,6 +187,11 @@ assert.ok(largeTitle.font > smallTitle.font && largeTitle.height > smallTitle.he
 
 await page.locator('[data-view="settings"]').click(); await open('Affichage');
 await page.locator('[data-display-setting="showBadges"]').uncheck();
+await page.locator('[data-view="home"]').click();
+assert.equal(await page.locator('.article-category-badge:visible').count(), 0, 'badges must hide independently while article age remains enabled');
+assert.ok(await page.locator('.article-age:visible').count() > 0, 'article age must remain visible when only badges are disabled');
+assert.notEqual(await page.locator('[data-stable-home-feed] .meta').first().evaluate(el => getComputedStyle(el).display), 'none', 'metadata row must remain compact and visible for article age');
+await page.locator('[data-view="settings"]').click(); await open('Affichage');
 await page.locator('[data-display-setting="showAge"]').uncheck();
 await page.locator('[data-view="home"]').click();
 assert.equal(await page.locator('.article-category-badge:visible').count(), 0);
@@ -275,7 +280,7 @@ await page.locator('[data-check-update]').click();
 await page.waitForSelector('#toast.show');
 const updateOverlay = await page.evaluate(() => { const toast=document.querySelector('#toast').getBoundingClientRect(); const nav=document.querySelector('.bottom-nav').getBoundingClientRect(); return { toastBottom:toast.bottom, navTop:nav.top }; });
 assert.ok(updateOverlay.toastBottom < updateOverlay.navTop, `update result must stay above bottom navigation (${JSON.stringify(updateOverlay)})`);
-assert.ok(Math.abs(await page.locator('.bottom-nav').evaluate(el => el.getBoundingClientRect().height) - 68) < .75, 'bottom navigation must use the reduced 68px height');
+assert.ok(Math.abs(await page.locator('.bottom-nav').evaluate(el => el.getBoundingClientRect().height) - 62) < .75, 'bottom navigation must use the reduced 62px height');
 
 await open('Langue');
 await page.locator('[data-add-language]').click();
@@ -284,6 +289,9 @@ await page.screenshot({ path: `${evidenceDir}/languages.png` });
 await page.locator('[data-language-install="ja"]').click();
 await page.waitForFunction(() => document.documentElement.lang === 'ja');
 await page.waitForFunction(() => JSON.parse(localStorage.getItem('news-settings')||'{}').language === 'ja');
+assert.equal((await page.locator('.bottom-nav [data-view="home"] span').textContent()).trim(), 'ホーム', 'changing language must translate the navigation immediately');
+assert.equal((await page.locator('.page-masthead-v9186 h1').textContent()).trim(), '設定', 'changing language must translate the current screen immediately');
+assert.deepEqual((await page.locator('.settings-accordion-v9185>summary').allTextContents()).slice(0,3), ['言語','文字サイズと密度','表示'], 'changing language must translate Settings sections');
 await page.waitForTimeout(250);
 assert.ok(newsBodies.some(body => body.language === 'ja' && body.country === 'JP'), 'language must drive the country of every default news request');
 assert.ok(newsBodies.some(body => Number(body.historyDays) >= historyDays), 'history synchronization must request enough days to reach the previous calendar month');
