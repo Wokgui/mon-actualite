@@ -48,11 +48,104 @@ function sameEvent(candidate = '', expected = '') {
 function queryVariants(title = '') {
   const clean = plain(title).replace(/\s+[-–—]\s+[^-–—]{2,90}$/, '').slice(0, 240);
   const variants = [clean];
-  const afterColon = clean.split(/\s*[:：]\s*/).filter(Boolean).pop();
+  const colonParts = clean.split(/\s*[:：]\s*/).filter(Boolean);
+  const beforeColon = colonParts[0];
+  const afterColon = colonParts.pop();
+  if (beforeColon && beforeColon !== clean && titleWords(beforeColon).length >= 3) variants.push(beforeColon);
   if (afterColon && afterColon !== clean && titleWords(afterColon).length >= 4) variants.push(afterColon);
   const words = titleWords(clean).filter(word => word.length >= 4);
+  if (words.length >= 5) variants.push(words.slice(0, 8).join(' '));
   if (words.length >= 5) variants.push(words.slice(-10).join(' '));
-  return [...new Set(variants.filter(Boolean))].slice(0, 2);
+  return [...new Set(variants.filter(Boolean))].slice(0, 4);
+}
+
+function sourceKey(value = '') {
+  return normalize(value).replace(/\b(?:www|com|fr|org|net|eu|lu|info|actualites?)\b/g, ' ').replace(/[^a-z0-9]+/g, ' ').trim().replace(/\s+/g, '');
+}
+
+function sourceAgreement(pageUrl = '', source = '') {
+  const wanted = sourceKey(source);
+  if (!wanted) return false;
+  try {
+    const host = sourceKey(new URL(pageUrl).hostname);
+    return host.includes(wanted) || wanted.includes(host);
+  } catch { return false; }
+}
+
+function bingImageEntries(html = '', title = '', source = '') {
+  const ranked = [];
+  let position = 0;
+  for (const anchor of String(html).match(/<a\b[^>]{0,6000}>/gi) || []) {
+    if (!/\bclass=["'][^"']*\biusc\b/i.test(anchor)) continue;
+    const encoded = (anchor.match(/\bm=(["'])([\s\S]*?)\1/i) || [])[2] || '';
+    if (!encoded) continue;
+    try {
+      const item = JSON.parse(decode(encoded));
+      const label = plain(`${item.t || ''} ${item.desc || ''}`);
+      const agreement = titleAgreement(label, title);
+      const sameSource = sourceAgreement(item.purl, source);
+      if (!sameEvent(label, title) && !(sameSource && agreement.hits >= 2)) continue;
+      const urls = [item.murl, item.turl].filter(value => /^https?:\/\//i.test(value || ''));
+      if (!urls.length) continue;
+      ranked.push({
+        urls,
+        pageUrl: /^https?:\/\//i.test(item.purl || '') ? item.purl : 'https://www.bing.com/images/',
+        score: Math.max(agreement.score, agreement.shorterCoverage) + (sameSource ? .45 : 0) - position * .002
+      });
+    } catch {}
+    position += 1;
+    if (position >= 80) break;
+  }
+  return ranked.sort((a, b) => b.score - a.score).slice(0, 8);
+}
+
+async function fetchImageEntry(entry) {
+  for (const url of entry.urls) {
+    try {
+      const response = await fetch(url, {
+        redirect: 'follow',
+        signal: AbortSignal.timeout(IMAGE_TIMEOUT_MS),
+        headers: { 'User-Agent': UA, 'Accept': 'image/avif,image/webp,image/jpeg,image/png,image/*', 'Referer': entry.pageUrl }
+      });
+      if (!response.ok) continue;
+      const type = String(response.headers.get('content-type') || '').split(';')[0].trim().toLowerCase();
+      const length = Number(response.headers.get('content-length') || 0);
+      if (length > MAX_IMAGE_BYTES) continue;
+      const buffer = Buffer.from(await response.arrayBuffer());
+      if (usefulImage(buffer, type)) return { buffer, type };
+    } catch {}
+  }
+  throw new Error('image candidate unavailable');
+}
+
+async function fastBingImageSearch(title, source = '') {
+  for (const query of queryVariants(title)) {
+    const searches = [...new Set([
+      source ? `"${query}" "${source}"` : '',
+      `"${query}"`,
+      source ? `${query} ${source}` : query
+    ].filter(Boolean))];
+    for (const exactQuery of searches) {
+      try {
+        const searchUrl = new URL('https://www.bing.com/images/search');
+        searchUrl.search = new URLSearchParams({ q: exactQuery, form: 'HDRSC2', setlang: 'fr-FR' }).toString();
+        const response = await fetch(searchUrl, {
+          redirect: 'follow',
+          signal: AbortSignal.timeout(SEARCH_TIMEOUT_MS),
+          headers: { 'User-Agent': UA, 'Accept': 'text/html,application/xhtml+xml', 'Accept-Language': 'fr-FR,fr;q=0.9' }
+        });
+        if (!response.ok) continue;
+        const buffer = Buffer.from(await response.arrayBuffer());
+        if (!buffer.length || buffer.byteLength > MAX_SEARCH_BYTES) continue;
+        const entries = bingImageEntries(buffer.toString('utf8'), title, source);
+        for (let offset = 0; offset < entries.length; offset += 3) {
+          try { return await Promise.any(entries.slice(offset, offset + 3).map(fetchImageEntry)); }
+          catch {}
+        }
+      } catch {}
+    }
+  }
+  throw new Error('no exact image-search result');
 }
 
 function xmlTag(block = '', name = '') {
@@ -174,12 +267,12 @@ function replay(res, result) {
   return res.end(result.buffer);
 }
 
-function sendFast(res, image) {
+function sendFast(res, image, kind = 'fast') {
   res.statusCode = 200;
   res.setHeader('Content-Type', image.type);
   res.setHeader('Content-Length', String(image.buffer.byteLength));
   res.setHeader('Cache-Control', 'public, max-age=604800, s-maxage=31536000, stale-while-revalidate=2592000');
-  res.setHeader('X-Thumbnail-Status', 'bing-news-fast-exact');
+  res.setHeader('X-Thumbnail-Status', kind === 'search' ? 'bing-images-fast-exact' : 'bing-news-fast-exact');
   res.setHeader('X-Content-Type-Options', 'nosniff');
   return res.end(image.buffer);
 }
@@ -197,10 +290,13 @@ module.exports = async function handler(req, res) {
   const fast = title
     ? fastBingImage(title, source).then(image => ({ kind: 'fast', image }))
     : Promise.reject(new Error('no title'));
+  const searchFallback = title
+    ? fastBingImageSearch(title, source).then(image => ({ kind: 'search', image }))
+    : Promise.reject(new Error('no title'));
 
   try {
-    const winner = await Promise.any([fast, mainValid]);
-    if (winner.kind === 'fast') return sendFast(res, winner.image);
+    const winner = await Promise.any([fast, searchFallback, mainValid]);
+    if (winner.kind === 'fast' || winner.kind === 'search') return sendFast(res, winner.image, winner.kind);
     return replay(res, winner.result);
   } catch {
     try { return replay(res, await mainPromise); }
@@ -211,3 +307,5 @@ module.exports = async function handler(req, res) {
     }
   }
 };
+
+module.exports.__test = { bingImageEntries, sourceAgreement, titleAgreement, sameEvent };

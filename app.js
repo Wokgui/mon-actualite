@@ -1,5 +1,5 @@
-import { importOpmlPreview, fetchLiveNews } from './services/source-connectors.js?v=98.5';
-import { preparedVisualUrl, hasPreparedVisual, sourceTileUrl } from './services/article-visuals.js?v=98.5';
+import { importOpmlPreview, fetchLiveNews } from './services/source-connectors.js?v=98.7';
+import { preparedVisualUrl, hasPreparedVisual, sourceTileUrl } from './services/article-visuals.js?v=98.7';
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const app = $('#app');
@@ -43,7 +43,6 @@ const LANGUAGE_PRESETS = {
 // became available a few seconds later.
 const VISUAL_BACKFILL_KEY = 'news-visual-backfill-v3';
 const VISUAL_BACKFILL_MAX_AGE = 30 * 86400000;
-const BRIEF_DAYS = 10;
 const HISTORY_SYNC_KEY = 'news-history-sync-v9200';
 const HISTORY_SYNC_MAX_AGE = 2 * 60 * 60 * 1000;
 
@@ -86,7 +85,8 @@ const defaultSettings = {
   titleSize: 100,
   showBadges: true,
   showAge: true,
-  accent: '#7461e8'
+  accent: '#7461e8',
+  headerBackground: '#f7f8ff'
 };
 
 function safeJson(key, fallback) {
@@ -110,6 +110,7 @@ const savedSettings = {
   showBadges: legacyUiSettings.showBadges,
   showAge: legacyUiSettings.showAge,
   accent: legacyUiSettings.accent,
+  headerBackground: legacyUiSettings.headerBackground,
   essentialCount: legacyUiSettings.essentialCount,
   briefEssentialCategories: legacyUiSettings.essentialDomains,
   ...storedSettings
@@ -154,21 +155,24 @@ const state = {
     titleSize: boundedNumber(savedSettings.titleSize, 100, 70, 140),
     showBadges: savedSettings.showBadges !== false,
     showAge: savedSettings.showAge !== false,
-    accent: /^#[0-9a-f]{6}$/i.test(savedSettings.accent || '') ? savedSettings.accent : '#7461e8'
+    accent: /^#[0-9a-f]{6}$/i.test(savedSettings.accent || '') ? savedSettings.accent : '#7461e8',
+    headerBackground: /^#[0-9a-f]{6}$/i.test(savedSettings.headerBackground || '') ? savedSettings.headerBackground : '#f7f8ff'
   }
 };
 
 function applyAppearanceSettings() {
   const root = document.documentElement;
-  const { accent, textSize, interfaceTextSize, titleSize, density, showBadges, showAge, language } = state.settings;
+  const { accent, headerBackground, textSize, interfaceTextSize, titleSize, density, showBadges, showAge, language } = state.settings;
   const rowGap = Math.round(20 - density * .18);
   const photoWidth = Math.round(112 + (textSize - 100) * (36 / 75));
   const photoHeight = Math.round(photoWidth * 75 / 112);
   root.style.setProperty('--app-accent', accent);
   root.style.setProperty('--ui-accent', accent);
   root.style.setProperty('--ui-active', accent);
+  root.style.setProperty('--header-background', headerBackground);
   root.style.setProperty('--article-text-scale', String(textSize / 100));
   root.style.setProperty('--interface-text-scale', String(interfaceTextSize / 100));
+  root.style.setProperty('--interface-space-scale', String(interfaceTextSize / 100));
   root.style.setProperty('--app-title-scale', String(titleSize / 100));
   root.style.setProperty('--article-image-width', `${photoWidth}px`);
   root.style.setProperty('--article-image-height', `${photoHeight}px`);
@@ -177,6 +181,7 @@ function applyAppearanceSettings() {
   root.dataset.showBadges = showBadges ? '1' : '0';
   root.dataset.showAge = showAge ? '1' : '0';
   root.lang = language;
+  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', headerBackground);
 }
 
 applyAppearanceSettings();
@@ -247,6 +252,19 @@ function displayTitle(article = {}) {
 function todayOffset(days) {
   const d = new Date(); d.setDate(d.getDate() + days);
   return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
+}
+
+function previousMonthStart(reference = new Date()) {
+  return new Date(reference.getFullYear(), reference.getMonth() - 1, 1).getTime();
+}
+
+function historyWindowDays(reference = new Date()) {
+  return Math.min(62, Math.max(31, Math.ceil((reference.getTime() - previousMonthStart(reference)) / 86400000) + 1));
+}
+
+function isInArticleHistory(value, reference = new Date()) {
+  const time = Date.parse(value || '');
+  return Number.isFinite(time) && time >= previousMonthStart(reference);
 }
 
 function dateLabel(date = new Date()) {
@@ -322,6 +340,7 @@ function visibleArticles() {
   const blockedSources = state.blockedSources || new Set();
   return state.articles
     .filter(article => article && typeof article === 'object')
+    .filter(article => isInArticleHistory(article.publishedAt || article.date))
     .filter(article => !isVideoOnlyArticle(article))
     .filter(article => {
       if (state.feedback[article.id] === 'not') return false;
@@ -535,8 +554,7 @@ function watchRuleMatches(article, rule = {}) {
 function watchedArticles() {
   const rules = effectiveWatchRules();
   if (!rules.length) return [];
-  const cutoff = Date.now() - BRIEF_DAYS * 24 * 60 * 60 * 1000;
-  return visibleArticles().filter(article => (Date.parse(article.publishedAt || 0) || 0) >= cutoff && rules.some(rule => watchRuleMatches(article, rule)));
+  return visibleArticles().filter(article => rules.some(rule => watchRuleMatches(article, rule)));
 }
 
 function watchNewCount() {
@@ -589,8 +607,7 @@ function compactArticleRow(article, index = 0) {
 
 function renderWatchesFinal() {
   const rules = effectiveWatchRules();
-  const cutoff = Date.now() - BRIEF_DAYS * 24 * 60 * 60 * 1000;
-  const recent = visibleArticles().filter(article => (Date.parse(article.publishedAt || 0) || 0) >= cutoff).slice(0, 500);
+  const recent = visibleArticles().slice(0, 600);
   const order = [];
   const days = new Map();
   for (const article of recent) {
@@ -598,7 +615,7 @@ function renderWatchesFinal() {
     if (!days.has(key)) { days.set(key, []); order.push(key); }
     days.get(key).push(article);
   }
-  const groups = order.slice(0, BRIEF_DAYS).map((key, dayIndex) => {
+  const groups = order.map((key, dayIndex) => {
     const dayArticles = days.get(key) || [];
     const watched = rules.length ? dayArticles.filter(article => rules.some(rule => watchRuleMatches(article, rule))) : [];
     if (!watched.length) return '';
@@ -628,7 +645,7 @@ function renderBrief() {
     const major = majorTerms.test(text) ? 70 : 0;
     const low = lowPriorityTerms.test(text) ? -240 : 0;
     return { article, score: 100 + category + corroboration + major + low - Math.min(age * 1.6, 100) };
-  }).filter(item => dayDelta(item.article.publishedAt) >= 0 && dayDelta(item.article.publishedAt) < BRIEF_DAYS)
+  }).filter(item => isInArticleHistory(item.article.publishedAt))
     .sort((a, b) => b.score - a.score);
   const byDay = new Map();
   for (const candidate of ranked) {
@@ -655,7 +672,6 @@ function renderBrief() {
   };
   const essential = [...byDay.values()]
     .sort((left, right) => Date.parse(right[0]?.article?.publishedAt || 0) - Date.parse(left[0]?.article?.publishedAt || 0))
-    .slice(0, BRIEF_DAYS)
     .map((candidates, dayIndex) => {
       const picks = pickDay(candidates);
       if (!picks.length) return '';
@@ -817,7 +833,7 @@ function openLanguageCatalog() {
 }
 
 function displaySettingsMarkup() {
-  return `<label class="preference-check"><input type="checkbox" data-display-setting="showBadges" ${state.settings.showBadges ? 'checked' : ''}><span>Afficher les badges</span></label><label class="preference-check"><input type="checkbox" data-display-setting="showAge" ${state.settings.showAge ? 'checked' : ''}><span>Afficher depuis combien de temps l’article est sorti</span></label><label class="preference-color"><strong>Couleur dominante</strong><input type="color" value="${state.settings.accent}" data-accent aria-label="Couleur dominante"></label>`;
+  return `<label class="preference-check"><input type="checkbox" data-display-setting="showBadges" ${state.settings.showBadges ? 'checked' : ''}><span>Afficher les badges</span></label><label class="preference-check"><input type="checkbox" data-display-setting="showAge" ${state.settings.showAge ? 'checked' : ''}><span>Afficher depuis combien de temps l’article est sorti</span></label><label class="preference-color"><strong>Couleur de fond du bandeau</strong><input type="color" value="${state.settings.headerBackground}" data-header-background aria-label="Couleur de fond du bandeau"></label><label class="preference-color"><strong>Couleur dominante</strong><input type="color" value="${state.settings.accent}" data-accent aria-label="Couleur dominante"></label>`;
 }
 
 function essentialSettingsMarkup() {
@@ -1121,7 +1137,7 @@ function historicalDiscoveryKeywords(extraTopic = '', days = 31) {
     .map(query => /\bwhen:\d+[dhmy]\b/i.test(query) ? query : `${query} when:${days}d`);
 }
 
-async function fetchHistoryCoverage({ force = false, topic = '', days = topic ? BRIEF_DAYS : 31 } = {}) {
+async function fetchHistoryCoverage({ force = false, topic = '', days = historyWindowDays() } = {}) {
   if (!state.settings.webSearch || !navigator.onLine) return null;
   const last = Number(localStorage.getItem(HISTORY_SYNC_KEY) || 0);
   if (!force && last && Date.now() - last < HISTORY_SYNC_MAX_AGE) return null;
@@ -1132,6 +1148,7 @@ async function fetchHistoryCoverage({ force = false, topic = '', days = topic ? 
     preferredCategories: [],
     webSearch: true,
       sourcePriority: false,
+      historyDays: days,
       language: state.settings.language,
       locale: locale.locale,
       country: locale.country
@@ -1561,6 +1578,11 @@ app.addEventListener('input', event => {
     applyAppearanceSettings();
     persist();
   }
+  if (event.target.matches('[data-header-background]')) {
+    state.settings.headerBackground = event.target.value;
+    applyAppearanceSettings();
+    persist();
+  }
 });
 
 app.addEventListener('change', async event => {
@@ -1735,7 +1757,7 @@ if ('serviceWorker' in navigator && location.protocol.startsWith('http') && !nav
     serviceWorkerRefreshing = true;
     window.location.reload();
   });
-  navigator.serviceWorker.register('./sw-v98.js?v=98.5', { updateViaCache: 'none' }).then(registration => {
+  navigator.serviceWorker.register('./sw-v98.js?v=98.7', { updateViaCache: 'none' }).then(registration => {
     if (registration.waiting) registration.waiting.postMessage('SKIP_WAITING');
     registration.addEventListener('updatefound', () => {
       const installing = registration.installing;

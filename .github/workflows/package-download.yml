@@ -22,7 +22,7 @@ jobs:
       - name: Upload source package
         uses: actions/upload-artifact@v4
         with:
-          name: mon-actualite-v94-92.04-source
+          name: mon-actualite-v98-98.07-source
           path: package/
           if-no-files-found: error
           retention-days: 7
@@ -49,13 +49,13 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          cp android-app/app/build/outputs/apk/debug/app-debug.apk mon-actualite-v94.apk
-          test -s mon-actualite-v94.apk
+          cp android-app/app/build/outputs/apk/debug/app-debug.apk mon-actualite-v98-98.07.apk
+          test -s mon-actualite-v98-98.07.apk
 
       - name: Upload Android APK
         uses: actions/upload-artifact@v4
         with:
-          name: mon-actualite-v94-apk
-          path: mon-actualite-v94.apk
+          name: mon-actualite-v98-98.07-apk
+          path: mon-actualite-v98-98.07.apk
           if-no-files-found: error
           retention-days: 30

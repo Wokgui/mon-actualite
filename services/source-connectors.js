@@ -281,7 +281,7 @@ function mergeArticleHistory(fresh, language = 'fr') {
     if (titleKey && Number.isFinite(published)) { recentTitles.set(titleKey, published); articlesByTitle.set(titleKey, article); }
   }
 
-  const cutoff = Date.now() - 60 * 24 * 60 * 60 * 1000;
+  const cutoff = Date.now() - 62 * 24 * 60 * 60 * 1000;
   const recent = merged
     .filter(article => !article.publishedAt || Date.parse(article.publishedAt) >= cutoff)
     .sort((a, b) => Date.parse(b.publishedAt || 0) - Date.parse(a.publishedAt || 0));
@@ -314,7 +314,7 @@ function buildDiscoveryKeywords(keywords, preferredCategories) {
   return [...new Set([...explicit, ...learned, ...interests].filter(value => value.length >= 2))].slice(0, 8);
 }
 
-export async function fetchLiveNews({ sources = [], keywords = [], preferredCategories = [], webSearch = true, sourcePriority = true, language = 'fr', locale = 'fr-FR', country = 'FR' } = {}) {
+export async function fetchLiveNews({ sources = [], keywords = [], preferredCategories = [], webSearch = true, sourcePriority = true, language = 'fr', locale = 'fr-FR', country = 'FR', historyDays = 31 } = {}) {
   const interests = [...new Set(preferredCategories.map(cleanText).filter(Boolean))].sort((a, b) => a.localeCompare(b, language));
   const discoveryKeywords = webSearch ? buildDiscoveryKeywords(keywords, interests) : keywords.map(cleanText).filter(Boolean);
   // Added sources are deliberately never given a blanket ranking bonus. They
@@ -341,7 +341,8 @@ export async function fetchLiveNews({ sources = [], keywords = [], preferredCate
       sourcePriority: effectiveSourcePriority,
       language,
       locale,
-      country
+      country,
+      historyDays: Math.max(31, Math.min(62, Number(historyDays) || 31))
     })
   });
   if (!response.ok) throw new Error(`Synchronisation impossible (${response.status})`);

@@ -7,7 +7,7 @@ const { rankCatalogArticles } = require('../lib/news-significance');
 const { suppressCorePrewarmRequest, scheduleFinalImagePrewarm } = require('../lib/final-image-prewarm');
 const articleReaderHandler = require('../lib/article-reader');
 
-const CATALOG_LIMIT = 320;
+const CATALOG_LIMIT = 620;
 
 function wantsReaderMode(req) {
   if (String(req.query?.reader || '') === '1') return true;

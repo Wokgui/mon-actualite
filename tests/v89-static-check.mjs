@@ -73,7 +73,7 @@ for (const src of scripts) {
   else ok(`service worker precaches runtime script ${src}`);
 }
 
-for (const asset of ['app-controls.css?v=98.5']) {
+for (const asset of ['app-controls.css?v=98.7']) {
   if (!index.includes(asset)) fail(`final visual layer missing from index: ${asset}`);
   if (!sw.includes(asset)) fail(`service worker does not precache final visual layer: ${asset}`);
   else ok(`service worker precaches final visual layer: ${asset}`);
@@ -111,27 +111,29 @@ else ok('current mobile Playwright UI regression job configured');
 if (process.exitCode) process.exit(process.exitCode);
 console.log('Current static regression checks passed.');
 
-const briefWindowChecks = [
-  "const BRIEF_DAYS = 10",
-  "Date.now() - BRIEF_DAYS * 24 * 60 * 60 * 1000",
-  "order.slice(0, BRIEF_DAYS)",
-  "dayDelta(item.article.publishedAt) < BRIEF_DAYS"
-];
-for (const marker of briefWindowChecks) {
-  if (!app.includes(marker)) fail(`10-day Brief/Watch marker missing: ${marker}`);
+for (const marker of ['function previousMonthStart', 'function historyWindowDays', 'function isInArticleHistory']) {
+  if (!app.includes(marker)) fail(`previous-calendar-month history marker missing: ${marker}`);
 }
-if (!process.exitCode) ok('Brief and watch 10-day window configured');
+if (app.includes('const BRIEF_DAYS = 10')) fail('legacy 10-day Brief/Watch limit is still active');
+else ok('Home, Brief and watch use the previous-calendar-month window');
 if (!app.includes('brief-history-day-v9138') || !app.includes('const pickDay = candidates')) fail('L’essentiel must enforce the requested count separately for every day');
 else ok('L’essentiel enforces its count separately for every day');
 
 if (!/function effectiveWatchRules\(\)\s*{\s*return activeWatchRules\(\);\s*}/.test(app)) fail('Veille must use only rules entered in Settings > Veille');
 else ok('Veille uses only Settings > Veille rules');
 if (app.match(/function effectiveWatchRules\(\)[\s\S]{0,500}briefWatchTopics/)) fail('legacy briefWatchTopics still influence Veille');
-if (!app.includes('function fetchHistoryCoverage') || !app.includes("days = topic ? BRIEF_DAYS : 31")) fail('31-day home / 10-day watch historical discovery is missing');
-else ok('31-day home and 10-day watch historical discovery configured');
+if (!app.includes('function fetchHistoryCoverage') || !app.includes('days = historyWindowDays()') || !app.includes('historyDays: days')) fail('calendar-month historical discovery is missing');
+else ok('calendar-month historical discovery configured');
 const imageSequence = read('image-pipeline.js');
 if (app.includes('scheduleVisualBackfill') || app.includes('recoverArticleVisual') || !imageSequence.includes('const MAX_CONCURRENT = 8')) fail('photo loading must have one bounded owner');
 else ok('single bounded image pipeline owns photo loading');
+if (!imageSequence.includes('RECOVERY_DELAYS_MS = [8_000, 30_000]') || !imageSequence.includes("url.searchParams.set('recovery'")) fail('failed photos do not receive bounded cache-bypassing recovery attempts');
+else ok('failed photos receive bounded cache-bypassing recovery attempts');
+const photoFast = read('api/article-photo-fast.js');
+if (!photoFast.includes('fastBingImageSearch') || !photoFast.includes('bingImageEntries') || !photoFast.includes('sourceAgreement')) fail('generic title/source photo recovery is missing');
+else ok('generic title/source photo recovery configured');
+if (!sw.includes("THUMB_CACHE='mon-actualite-thumbnails-v9'") || sw.includes('cache.put(key,fallback.clone())')) fail('negative thumbnail fallbacks must be purged and never cached');
+else ok('negative thumbnail fallbacks are purged instead of cached');
 const androidGradle = read('android-app/app/build.gradle');
 const androidActivity = read('android-app/app/src/main/java/com/wokgui/monactualite/MainActivity.java');
 const androidManifest = read('android-app/app/src/main/AndroidManifest.xml');
@@ -145,9 +147,9 @@ else ok('Android launcher uses adaptive icons');
 const coreNews = read('lib/news-core.js');
 const apiNews = read('api/news.js');
 const rowFix = read('app-controls.css');
-if (!coreNews.includes('bucket.length < 12') || !coreNews.includes('selected.splice(500)')) fail('historical day coverage is not preserved in news-core');
+if (!coreNews.includes('bucket.length < 12') || !coreNews.includes('selected.splice(700)') || !coreNews.includes('historyDays')) fail('historical day coverage is not preserved in news-core');
 else ok('historical day coverage preserved in news-core');
-if (!apiNews.includes('bucket.length < 10') || !apiNews.includes('CATALOG_LIMIT = 320')) fail('historical day coverage is not preserved by API catalogue ranking');
+if (!apiNews.includes('bucket.length < 10') || !apiNews.includes('CATALOG_LIMIT = 620')) fail('historical day coverage is not preserved by API catalogue ranking');
 else ok('historical day coverage preserved by API catalogue ranking');
 if (!rowFix.includes('grid-template-rows:minmax(var(--article-image-height),auto)') || !rowFix.includes('height:var(--article-image-height)!important') || !rowFix.includes('display:none!important')) fail('stable adaptive image and compact metadata contract missing');
 else ok('exact image/title centering contract configured');

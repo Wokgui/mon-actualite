@@ -1,9 +1,10 @@
-import { preparedVisualUrl, sourceTileUrl } from './services/article-visuals.js?v=98.5';
+import { preparedVisualUrl, sourceTileUrl } from './services/article-visuals.js?v=98.7';
 
 const MAX_CONCURRENT = 8;
 const PRIORITY_COUNT = 16;
 const REQUEST_TIMEOUT_MS = 6500;
 const RETRY_AFTER_MS = 60_000;
+const RECOVERY_DELAYS_MS = [8_000, 30_000];
 const bound = new WeakSet();
 const queued = new WeakSet();
 const failures = new Map();
@@ -21,13 +22,19 @@ function articleMap() {
 
 function proxyUrl(article) {
   const params = new URLSearchParams({
-    v: '98.5', url: String(article?.url || '').slice(0, 1900),
+    v: '98.7', url: String(article?.url || '').slice(0, 1900),
     image: String(article?.visual?.url || article?.image || '').slice(0, 1900),
     title: String(article?.title || '').slice(0, 280),
     category: String(article?.category || '').slice(0, 70),
     source: String(article?.source || article?.feedTitle || '').slice(0, 100)
   });
   return `/api/article-photo-fast?${params}`;
+}
+
+function recoveryUrl(article, attempt) {
+  const url = new URL(proxyUrl(article), location.href);
+  url.searchParams.set('recovery', String(attempt));
+  return `${url.pathname}${url.search}`;
 }
 
 function absolute(url) {
@@ -123,7 +130,7 @@ function bind(card, index, articles) {
   const preferred = isManagedProxy(prepared) || isExternalHttp(prepared) ? proxyUrl(article) : prepared;
   const candidates = [...new Set([preferred, proxyUrl(article)]
     .filter(url => url && absolute(url) !== absolute(tile)))];
-  const task = { card, image, candidates, tile, cursor: 0, started: false, finished: false, released: false, currentCandidate: '', objectUrl: '', start: null };
+  const task = { card, image, article, candidates, tile, cursor: 0, started: false, finished: false, waitingRetry: false, retryCount: 0, released: false, currentCandidate: '', objectUrl: '', start: null };
 
   const release = () => {
     if (task.released) return;
@@ -133,8 +140,27 @@ function bind(card, index, articles) {
   };
   const finish = ready => {
     if (task.finished) return;
-    task.finished = true;
     mark(image, ready);
+    if (!ready && task.retryCount < RECOVERY_DELAYS_MS.length && card.isConnected) {
+      task.waitingRetry = true;
+      release();
+      const delay = RECOVERY_DELAYS_MS[task.retryCount];
+      task.retryCount += 1;
+      window.setTimeout(() => {
+        if (!card.isConnected || task.finished) return;
+        task.waitingRetry = false;
+        task.started = false;
+        task.released = false;
+        task.cursor = 0;
+        task.currentCandidate = '';
+        task.candidates = [recoveryUrl(task.article, task.retryCount)];
+        task.candidates.forEach(candidate => failures.delete(candidate));
+        queued.delete(card);
+        enqueue(task);
+      }, delay);
+      return;
+    }
+    task.finished = true;
     release();
   };
   const revokeObjectUrl = () => {
@@ -180,7 +206,7 @@ function bind(card, index, articles) {
   image.decoding = 'async';
   if (index < PRIORITY_COUNT) image.fetchPriority = 'high';
   image.addEventListener('load', async () => {
-    if (!task.started || task.finished) return;
+    if (!task.started || task.finished || task.waitingRetry) return;
     if (absolute(image.src) === absolute(tile)) {
       if (!task.currentCandidate) finish(false);
       return;
@@ -193,7 +219,7 @@ function bind(card, index, articles) {
     else next();
   });
   image.addEventListener('error', () => {
-    if (!task.started || task.finished) return;
+    if (!task.started || task.finished || task.waitingRetry) return;
     if (task.currentCandidate) failures.set(task.currentCandidate, Date.now());
     revokeObjectUrl();
     next();

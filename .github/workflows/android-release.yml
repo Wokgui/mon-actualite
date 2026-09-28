@@ -61,13 +61,13 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          cp android-app/app/build/outputs/apk/debug/app-debug.apk mon-actualite-v98-98.05.apk
+          cp android-app/app/build/outputs/apk/debug/app-debug.apk mon-actualite-v98-98.07.apk
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: mon-actualite-v98-98.05-apk
-          path: mon-actualite-v98-98.05.apk
+          name: mon-actualite-v98-98.07-apk
+          path: mon-actualite-v98-98.07.apk
           retention-days: 30
           if-no-files-found: error
 
@@ -85,11 +85,11 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          TAG="v98-98.05"
-          APK="mon-actualite-v98-98.05.apk"
-          NOTES="APK Android installable de Mon Actualité. Version web intégrée : v98 / codeRelease 98.05. Tailles des articles, badges, photos, interface et titre réellement appliquées, langues enrichies, L’essentiel quotidien, icône Android adaptative et photos accélérées."
+          TAG="v98-98.07"
+          APK="mon-actualite-v98-98.07.apk"
+          NOTES="APK Android installable de Mon Actualité. Version web intégrée : v98 / codeRelease 98.07. Récupération générique renforcée des photos par titre et source, validation des images, nouvelles tentatives automatiques et suppression du cache des fallbacks vides, avec les réglages d’affichage et l’historique mensuel de 98.06."
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release upload "$TAG" "$APK" --clobber
           else
-            gh release create "$TAG" "$APK" --title "Mon Actualité v98 / 98.05" --notes "$NOTES"
+            gh release create "$TAG" "$APK" --title "Mon Actualité v98 / 98.07" --notes "$NOTES"
           fi
