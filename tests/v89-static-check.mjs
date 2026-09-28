@@ -73,7 +73,7 @@ for (const src of scripts) {
   else ok(`service worker precaches runtime script ${src}`);
 }
 
-for (const asset of ['app-controls.css?v=98.8']) {
+for (const asset of ['app-controls.css?v=98.9']) {
   if (!index.includes(asset)) fail(`final visual layer missing from index: ${asset}`);
   if (!sw.includes(asset)) fail(`service worker does not precache final visual layer: ${asset}`);
   else ok(`service worker precaches final visual layer: ${asset}`);
@@ -141,6 +141,8 @@ const androidActivity = read('android-app/app/src/main/java/com/wokgui/monactual
 const androidManifest = read('android-app/app/src/main/AndroidManifest.xml');
 if (!androidGradle.includes('prepareWebAssets') || !androidActivity.includes('WebViewAssetLoader')) fail('Android APK does not bundle the current frontend');
 else ok('Android APK bundles current frontend independently of Vercel frontend deploys');
+if (!androidGradle.includes("System.getenv('MON_ACTUALITE_KEYSTORE')") || !androidGradle.includes('signingConfig signingConfigs.stableDebug')) fail('Android CI must explicitly use the preserved stable install key');
+else ok('Android CI explicitly uses the preserved stable install key');
 if (androidActivity.includes('.hero-header h1{font-size:32px!important')) fail('Android still overrides the title-size preference');
 else ok('Android preserves the user-selected title size');
 if (!androidManifest.includes('@mipmap/ic_launcher') || !androidManifest.includes('@mipmap/ic_launcher_round')) fail('Android launcher does not use adaptive icons');

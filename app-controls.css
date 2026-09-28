@@ -79,7 +79,7 @@ html[data-show-badges="0"][data-show-age="0"] #app .article-card h2{margin-botto
 
 @media(max-width:380px){.language-settings{grid-template-columns:1fr}.language-settings .small-primary-btn{width:100%}.language-options-v9805{grid-template-columns:1fr}}
 
-/* v98.08 — la taille d’interface agrandit aussi les volumes et espacements de Réglages. */
+/* v98.09 — la taille d’interface agrandit aussi les volumes et espacements de Réglages. */
 .settings-page-v9185>.page-masthead-v9186{min-height:calc(62px * var(--interface-space-scale))!important;padding-top:calc(10px * var(--interface-space-scale))!important;padding-bottom:calc(10px * var(--interface-space-scale))!important}
 .settings-accordion-v9185>summary{min-height:calc(58px * var(--interface-space-scale))!important;padding:calc(18px * var(--interface-space-scale)) 34px calc(16px * var(--interface-space-scale))!important;line-height:1.25!important}
 .settings-accordion-v9185>summary::after{font-size:calc(20px * var(--interface-text-scale))!important}

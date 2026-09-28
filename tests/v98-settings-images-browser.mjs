@@ -69,7 +69,7 @@ await page.route('**/api/article-photo-fast**', async route => {
   finally { activePhotoRequests -= 1; }
 });
 await page.route('**/api/article-thumbnail**', route => { preparedPhotoRequests.push(route.request().url()); return route.fulfill({ status: 200, contentType: 'image/png', headers: { 'X-Thumbnail-Status': 'feed', 'Cache-Control': 'public, max-age=3600' }, body: png }); });
-await page.route('**/version.json**', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ version: '98', codeRelease: '98.08' }) }));
+await page.route('**/version.json**', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ version: '98', codeRelease: '98.09' }) }));
 
 const started = performance.now();
 await page.goto('http://127.0.0.1:4173/', { waitUntil: 'domcontentloaded', timeout: 15000 });

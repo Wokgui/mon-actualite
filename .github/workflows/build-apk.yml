@@ -9,6 +9,7 @@ on:
 
 permissions:
   contents: read
+  actions: read
 
 jobs:
   apk:
@@ -29,17 +30,32 @@ jobs:
         with:
           gradle-version: '8.7'
 
+      - name: Restore stable install key
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$HOME/.android"
+          artifact_id="$(gh api "repos/$GITHUB_REPOSITORY/actions/artifacts?name=mon-actualite-debug-keystore&per_page=1" --jq '.artifacts[0].id // empty')"
+          test -n "$artifact_id"
+          gh api "repos/$GITHUB_REPOSITORY/actions/artifacts/$artifact_id/zip" > /tmp/signing-key.zip
+          unzip -o /tmp/signing-key.zip -d "$HOME/.android"
+          test -s "$HOME/.android/debug.keystore"
+
       - name: Build debug APK
         working-directory: android-app
+        env:
+          MON_ACTUALITE_KEYSTORE: /home/runner/.android/debug.keystore
         run: gradle :app:assembleDebug --no-daemon
 
       - name: Rename APK
-        run: cp android-app/app/build/outputs/apk/debug/app-debug.apk mon-actualite-v98-98.08.apk
+        run: cp android-app/app/build/outputs/apk/debug/app-debug.apk mon-actualite-v98-98.09.apk
 
       - name: Upload APK
         uses: actions/upload-artifact@v4
         with:
-          name: mon-actualite-v98-98.08-apk
-          path: mon-actualite-v98-98.08.apk
+          name: mon-actualite-v98-98.09-apk
+          path: mon-actualite-v98-98.09.apk
           if-no-files-found: error
           retention-days: 30

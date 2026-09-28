@@ -18,4 +18,4 @@ const entries = bingImageEntries(html, title, 'Klima-Agence');
 assert.equal(entries.length, 1, 'unrelated images must be rejected');
 assert.equal(entries[0].urls[0], 'https://cdn.example/event.jpg');
 
-console.log('v98.08 generic photo recovery ranking passed.');
+console.log('v98.09 generic photo recovery ranking passed.');

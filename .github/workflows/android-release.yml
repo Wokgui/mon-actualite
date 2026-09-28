@@ -55,19 +55,21 @@ jobs:
 
       - name: Build APK
         working-directory: android-app
+        env:
+          MON_ACTUALITE_KEYSTORE: /home/runner/.android/debug.keystore
         run: gradle :app:assembleDebug --no-daemon
 
       - name: Prepare APK
         shell: bash
         run: |
           set -euo pipefail
-          cp android-app/app/build/outputs/apk/debug/app-debug.apk mon-actualite-v98-98.08.apk
+          cp android-app/app/build/outputs/apk/debug/app-debug.apk mon-actualite-v98-98.09.apk
 
       - name: Upload APK artifact
         uses: actions/upload-artifact@v4
         with:
-          name: mon-actualite-v98-98.08-apk
-          path: mon-actualite-v98-98.08.apk
+          name: mon-actualite-v98-98.09-apk
+          path: mon-actualite-v98-98.09.apk
           retention-days: 30
           if-no-files-found: error
 
@@ -85,11 +87,11 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
-          TAG="v98-98.08"
-          APK="mon-actualite-v98-98.08.apk"
-          NOTES="APK Android installable de Mon Actualité. Version web intégrée : v98 / codeRelease 98.08. Les images déjà préparées sont chargées directement avant la récupération générique par titre et source, avec validation, nouvelles tentatives automatiques et aucun cache des fallbacks vides."
+          TAG="v98-98.09"
+          APK="mon-actualite-v98-98.09.apk"
+          NOTES="APK Android installable de Mon Actualité. Version web intégrée : v98 / codeRelease 98.09. Images préparées prioritaires, récupération générique durable et signature APK désormais explicitement stabilisée pour les prochaines mises à jour."
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release upload "$TAG" "$APK" --clobber
           else
-            gh release create "$TAG" "$APK" --title "Mon Actualité v98 / 98.08" --notes "$NOTES"
+            gh release create "$TAG" "$APK" --title "Mon Actualité v98 / 98.09" --notes "$NOTES"
           fi
