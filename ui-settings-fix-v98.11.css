@@ -1,0 +1,7 @@
+/* v98.11 — cohérence des réglages typographiques. */
+.preference-range>strong,.preference-range>span,.preference-range output{font-size:calc(12px * var(--interface-text-scale))!important}
+.preference-range>strong{font-size:calc(13px * var(--interface-text-scale))!important}
+.function-settings-v9186 .setting-label strong,.function-settings-v9186 .setting-label span,.app-version-row strong,.app-version-row span,.version-update-v9186,.settings-page-v9185 .app-version-badge{font-size:calc(12px * var(--interface-text-scale))!important}
+.function-settings-v9186 .setting-label strong,.app-version-row strong{font-size:calc(13px * var(--interface-text-scale))!important}
+/* Le curseur « Taille des titres » pilote les titres d’articles des trois vues : Accueil, Essentiel et Veille. */
+#app [data-stable-home-feed] .article-card h2,#app [data-stable-brief-content] .article-card h2,#app .watch-day-v9138 .article-card h2{font-size:calc(13px * var(--article-text-scale) * var(--app-title-scale))!important}
