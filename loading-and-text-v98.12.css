@@ -1,5 +1,5 @@
-/* v98.12 — chargement cohérent avec l’icône de l’application et plage de texte plus petite. */
-.minimal-loading-v9185__logo{width:58px!important;height:58px!important;border-radius:18px!important;background:#ede9fb url('assets/app-icon-192.png') center/48px 48px no-repeat!important;box-shadow:0 8px 24px rgba(70,58,130,.10)!important}
+/* v98.13 — chargement cohérent avec l’icône Android et plage de texte compacte. */
+.minimal-loading-v9185__logo{width:72px!important;height:72px!important;border-radius:22%!important;background:transparent url('assets/app-icon-192.png') center/72px 72px no-repeat!important;box-shadow:0 8px 24px rgba(70,58,130,.10)!important;overflow:hidden!important}
 .minimal-loading-v9185__logo::before,.minimal-loading-v9185__logo::after{content:none!important}
 .minimal-loading-v9185__logo svg{display:none!important}
 .minimal-loading-v9185{gap:12px!important;background:#f7f8ff!important}
@@ -7,6 +7,5 @@
 .minimal-loading-v9185__bar{width:min(190px,58vw)!important;height:3px!important;background:#e5e2ee!important}
 .minimal-loading-v9185__bar span{background:var(--app-accent,#7461e8)!important}
 .minimal-loading-v9185 p{font-size:12px!important}
-/* Étend visuellement le réglage existant : 100 devient plus compact qu’avant, sans toucher aux autres tailles d’interface. */
 #app [data-stable-home-feed] .article-card h2,#app [data-stable-brief-content] .article-card h2,#app .watch-day-v9138 .article-card h2{font-size:calc(11.5px * var(--article-text-scale) * var(--app-title-scale))!important}
 #app [data-stable-home-feed] .article-card .meta,#app [data-stable-brief-content] .article-card.runtime-row .meta{font-size:calc(8px * var(--article-text-scale))!important}
