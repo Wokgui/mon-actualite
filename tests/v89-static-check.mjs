@@ -73,7 +73,7 @@ for (const src of scripts) {
   else ok(`service worker precaches runtime script ${src}`);
 }
 
-for (const asset of ['app-controls.css?v=98.7']) {
+for (const asset of ['app-controls.css?v=98.8']) {
   if (!index.includes(asset)) fail(`final visual layer missing from index: ${asset}`);
   if (!sw.includes(asset)) fail(`service worker does not precache final visual layer: ${asset}`);
   else ok(`service worker precaches final visual layer: ${asset}`);
@@ -129,6 +129,8 @@ if (app.includes('scheduleVisualBackfill') || app.includes('recoverArticleVisual
 else ok('single bounded image pipeline owns photo loading');
 if (!imageSequence.includes('RECOVERY_DELAYS_MS = [8_000, 30_000]') || !imageSequence.includes("url.searchParams.set('recovery'")) fail('failed photos do not receive bounded cache-bypassing recovery attempts');
 else ok('failed photos receive bounded cache-bypassing recovery attempts');
+if (!imageSequence.includes('isExternalHttp(prepared) || isGenericResolver(prepared) ? proxyUrl(article) : prepared')) fail('validated exact same-origin images must stay ahead of refreshed generic recovery');
+else ok('validated same-origin prepared images keep first priority');
 const photoFast = read('api/article-photo-fast.js');
 if (!photoFast.includes('fastBingImageSearch') || !photoFast.includes('bingImageEntries') || !photoFast.includes('sourceAgreement')) fail('generic title/source photo recovery is missing');
 else ok('generic title/source photo recovery configured');

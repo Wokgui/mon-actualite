@@ -83,6 +83,13 @@ export function preparedVisualUrl(article = {}) {
   if (pinned) return pinned;
 
   const rawVisual = clean(article.visual?.url || article.image || '');
+  const status = clean(article.visual?.status || article.visualStatus || '').toLowerCase();
+  if (rawVisual && isSameOriginImageProxy(rawVisual) && ['ready', 'available', 'loaded'].includes(status)) {
+    try {
+      const url = new URL(rawVisual, location.href);
+      return `${url.pathname}${url.search}`;
+    } catch {}
+  }
   const extracted = extractPreparedImage(rawVisual);
   if (extracted) return extracted;
 

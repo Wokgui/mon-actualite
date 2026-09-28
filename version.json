@@ -1,6 +1,6 @@
 {
   "version": "98",
-  "codeRelease": "98.07",
+  "codeRelease": "98.08",
   "release": "2026-09-28",
-  "label": "v98.07 : images récupérées durablement et cache négatif supprimé"
+  "label": "v98.08 : images préparées prioritaires et récupération durable"
 }

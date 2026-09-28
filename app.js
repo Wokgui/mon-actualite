@@ -1,5 +1,5 @@
-import { importOpmlPreview, fetchLiveNews } from './services/source-connectors.js?v=98.7';
-import { preparedVisualUrl, hasPreparedVisual, sourceTileUrl } from './services/article-visuals.js?v=98.7';
+import { importOpmlPreview, fetchLiveNews } from './services/source-connectors.js?v=98.8';
+import { preparedVisualUrl, hasPreparedVisual, sourceTileUrl } from './services/article-visuals.js?v=98.8';
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const app = $('#app');
@@ -1757,7 +1757,7 @@ if ('serviceWorker' in navigator && location.protocol.startsWith('http') && !nav
     serviceWorkerRefreshing = true;
     window.location.reload();
   });
-  navigator.serviceWorker.register('./sw-v98.js?v=98.7', { updateViaCache: 'none' }).then(registration => {
+  navigator.serviceWorker.register('./sw-v98.js?v=98.8', { updateViaCache: 'none' }).then(registration => {
     if (registration.waiting) registration.waiting.postMessage('SKIP_WAITING');
     registration.addEventListener('updatefound', () => {
       const installing = registration.installing;

@@ -20,7 +20,8 @@ const articles = Array.from({ length: historyDays * 3 }, (_, index) => {
   id: `v98-${index}`, title: `Article ${index + 1} de contrôle fonctionnel et visuel mobile`,
   summary: 'Résumé de contrôle.', source: `Source ${day + 1}-${slot + 1}`, category: 'Politique',
   publishedAt: new Date(now - day * 86400000 - slot * 900000).toISOString(), url: `https://example.test/${index}`,
-  image: index === 0 ? 'https://images.example.test/external-cover.jpg' : '', score: 300 - index
+  image: index === 0 ? 'https://images.example.test/external-cover.jpg' : index === 1 ? '/api/article-thumbnail?image=https%3A%2F%2Fimages.example.test%2Fprepared-cover.jpg&exact=1' : '',
+  visualStatus: index === 1 ? 'ready' : 'unavailable', score: 300 - index
   });
 });
 articles.push({ ...articles.at(-1), id:'too-old', title:'Article hors fenêtre historique', publishedAt:new Date(previousMonthStart - 86400000).toISOString(), url:'https://example.test/too-old' });
@@ -39,6 +40,7 @@ const page = await context.newPage();
 const errors = [];
 const newsBodies = [];
 const photoRequests = [];
+const preparedPhotoRequests = [];
 const directExternalPhotoRequests = [];
 let activePhotoRequests = 0;
 let maxActivePhotoRequests = 0;
@@ -66,8 +68,8 @@ await page.route('**/api/article-photo-fast**', async route => {
   }
   finally { activePhotoRequests -= 1; }
 });
-await page.route('**/api/article-thumbnail**', route => route.fulfill({ status: 200, contentType: 'image/png', headers: { 'X-Thumbnail-Status': 'feed', 'Cache-Control': 'public, max-age=3600' }, body: png }));
-await page.route('**/version.json**', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ version: '98', codeRelease: '98.07' }) }));
+await page.route('**/api/article-thumbnail**', route => { preparedPhotoRequests.push(route.request().url()); return route.fulfill({ status: 200, contentType: 'image/png', headers: { 'X-Thumbnail-Status': 'feed', 'Cache-Control': 'public, max-age=3600' }, body: png }); });
+await page.route('**/version.json**', route => route.fulfill({ status: 200, contentType: 'application/json', body: JSON.stringify({ version: '98', codeRelease: '98.08' }) }));
 
 const started = performance.now();
 await page.goto('http://127.0.0.1:4173/', { waitUntil: 'domcontentloaded', timeout: 15000 });
@@ -82,6 +84,7 @@ const requestCounts = [...photoRequests.reduce((map,url)=>map.set(url,(map.get(u
 assert.ok(Math.max(...requestCounts) <= 1, 'rerenders must share the same photo request instead of repeating it');
 assert.ok(maxActivePhotoRequests <= 8, `photo concurrency exceeded the eight-request budget: ${maxActivePhotoRequests}`);
 assert.deepEqual(directExternalPhotoRequests, [], 'external publisher images must go through the validated same-origin proxy');
+assert.ok(preparedPhotoRequests.some(url => url.includes('prepared-cover.jpg')), 'an already validated same-origin prepared cover must be loaded directly before generic recovery');
 await page.waitForFunction(() => document.querySelectorAll('[data-stable-home-feed] .article-card img.image-ready-v98').length >= 15, null, { timeout: 5000 });
 await page.waitForFunction(() => [...document.querySelectorAll('[data-stable-home-feed] .article-card')].find(card => card.querySelector('h2')?.textContent?.startsWith('Article 7 '))?.querySelector('img')?.classList.contains('image-fallback-v98'), null, { timeout: 3000 });
 const rejectedFallback = await page.locator('[data-stable-home-feed] .article-card').filter({ hasText: 'Article 7 de contrôle' }).first().locator('img').evaluate(image => ({ src:image.currentSrc || image.src, fallback:image.classList.contains('image-fallback-v98') }));
