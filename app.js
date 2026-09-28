@@ -1,11 +1,11 @@
-import { importOpmlPreview, fetchLiveNews } from './services/source-connectors.js?v=98.4';
-import { preparedVisualUrl, hasPreparedVisual, sourceTileUrl } from './services/article-visuals.js?v=98.4';
+import { importOpmlPreview, fetchLiveNews } from './services/source-connectors.js?v=98.5';
+import { preparedVisualUrl, hasPreparedVisual, sourceTileUrl } from './services/article-visuals.js?v=98.5';
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const app = $('#app');
 const toastEl = $('#toast');
 const APP_VERSION = '98';
-const APP_RELEASE = '27 septembre 2026';
+const APP_RELEASE = '28 septembre 2026';
 const IS_NATIVE_ANDROID = /MonActualiteAndroid\//.test(navigator.userAgent) || location.pathname.startsWith('/assets/');
 const savedSessionView = sessionStorage.getItem('news-active-view-v9204');
 const INITIAL_VIEW = ['home', 'settings', 'brief'].includes(savedSessionView) ? savedSessionView : 'home';
@@ -21,7 +21,22 @@ const LANGUAGE_PRESETS = {
   de: { label: 'Deutsch', locale: 'de-DE', country: 'DE', countryName: 'Allemagne' },
   es: { label: 'Español', locale: 'es-ES', country: 'ES', countryName: 'Espagne' },
   it: { label: 'Italiano', locale: 'it-IT', country: 'IT', countryName: 'Italie' },
-  pt: { label: 'Português', locale: 'pt-PT', country: 'PT', countryName: 'Portugal' }
+  pt: { label: 'Português', locale: 'pt-PT', country: 'PT', countryName: 'Portugal' },
+  nl: { label: 'Nederlands', locale: 'nl-NL', country: 'NL', countryName: 'Pays-Bas' },
+  pl: { label: 'Polski', locale: 'pl-PL', country: 'PL', countryName: 'Pologne' },
+  ro: { label: 'Română', locale: 'ro-RO', country: 'RO', countryName: 'Roumanie' },
+  sv: { label: 'Svenska', locale: 'sv-SE', country: 'SE', countryName: 'Suède' },
+  no: { label: 'Norsk', locale: 'nb-NO', country: 'NO', countryName: 'Norvège' },
+  da: { label: 'Dansk', locale: 'da-DK', country: 'DK', countryName: 'Danemark' },
+  fi: { label: 'Suomi', locale: 'fi-FI', country: 'FI', countryName: 'Finlande' },
+  cs: { label: 'Čeština', locale: 'cs-CZ', country: 'CZ', countryName: 'Tchéquie' },
+  el: { label: 'Ελληνικά', locale: 'el-GR', country: 'GR', countryName: 'Grèce' },
+  tr: { label: 'Türkçe', locale: 'tr-TR', country: 'TR', countryName: 'Turquie' },
+  uk: { label: 'Українська', locale: 'uk-UA', country: 'UA', countryName: 'Ukraine' },
+  ja: { label: '日本語', locale: 'ja-JP', country: 'JP', countryName: 'Japon' },
+  ko: { label: '한국어', locale: 'ko-KR', country: 'KR', countryName: 'Corée du Sud' },
+  hi: { label: 'हिन्दी', locale: 'hi-IN', country: 'IN', countryName: 'Inde' },
+  id: { label: 'Bahasa Indonesia', locale: 'id-ID', country: 'ID', countryName: 'Indonésie' }
 };
 // v3 deliberately drops the old persisted failure markers. A single transient
 // miss used to freeze a source tile for six hours, even when the exact image
@@ -65,7 +80,8 @@ const defaultSettings = {
   essentialCount: 5,
   language: 'fr',
   enabledLanguages: ['fr'],
-  textSize: 100,
+  textSize: 115,
+  interfaceTextSize: 100,
   density: 62,
   titleSize: 100,
   showBadges: true,
@@ -89,6 +105,7 @@ const savedSettings = {
   language: legacyUiSettings.language,
   density: legacyUiSettings.density,
   textSize: legacyUiSettings.textSize,
+  interfaceTextSize: legacyUiSettings.interfaceTextSize,
   titleSize: legacyUiSettings.titleSize,
   showBadges: legacyUiSettings.showBadges,
   showAge: legacyUiSettings.showAge,
@@ -131,7 +148,8 @@ const state = {
     essentialCount: Math.round(boundedNumber(savedSettings.essentialCount, 5, 3, 12)),
     language: selectedLanguage,
     enabledLanguages: [...new Set(['fr', ...(Array.isArray(savedSettings.enabledLanguages) ? savedSettings.enabledLanguages : []), selectedLanguage])].filter(code => LANGUAGE_PRESETS[code]),
-    textSize: boundedNumber(savedSettings.textSize, 100, 85, 125),
+    textSize: boundedNumber(savedSettings.textSize, 115, 100, 175),
+    interfaceTextSize: boundedNumber(savedSettings.interfaceTextSize, 100, 85, 150),
     density: boundedNumber(savedSettings.density, 62, 0, 100),
     titleSize: boundedNumber(savedSettings.titleSize, 100, 70, 140),
     showBadges: savedSettings.showBadges !== false,
@@ -142,11 +160,18 @@ const state = {
 
 function applyAppearanceSettings() {
   const root = document.documentElement;
-  const { accent, textSize, titleSize, density, showBadges, showAge, language } = state.settings;
+  const { accent, textSize, interfaceTextSize, titleSize, density, showBadges, showAge, language } = state.settings;
   const rowGap = Math.round(20 - density * .18);
+  const photoWidth = Math.round(112 + (textSize - 100) * (36 / 75));
+  const photoHeight = Math.round(photoWidth * 75 / 112);
   root.style.setProperty('--app-accent', accent);
+  root.style.setProperty('--ui-accent', accent);
+  root.style.setProperty('--ui-active', accent);
   root.style.setProperty('--article-text-scale', String(textSize / 100));
+  root.style.setProperty('--interface-text-scale', String(interfaceTextSize / 100));
   root.style.setProperty('--app-title-scale', String(titleSize / 100));
+  root.style.setProperty('--article-image-width', `${photoWidth}px`);
+  root.style.setProperty('--article-image-height', `${photoHeight}px`);
   root.style.setProperty('--article-row-gap', `${Math.max(2, rowGap)}px`);
   root.style.setProperty('--header-v-pad', `${Math.round(8 + titleSize * .055)}px`);
   root.dataset.showBadges = showBadges ? '1' : '0';
@@ -225,7 +250,8 @@ function todayOffset(days) {
 }
 
 function dateLabel(date = new Date()) {
-  return new Intl.DateTimeFormat('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' }).format(date);
+  const locale = LANGUAGE_PRESETS[state.settings.language]?.locale || 'fr-FR';
+  return new Intl.DateTimeFormat(locale, { weekday: 'long', day: 'numeric', month: 'long' }).format(date);
 }
 
 function timeLabel(dateString) {
@@ -235,18 +261,20 @@ function timeLabel(dateString) {
   if (diffMinutes < 1) return 'À l’instant';
   if (diffMinutes < 60) return `Il y a ${diffMinutes} min`;
   if (diffMinutes < 24 * 60) return `Il y a ${Math.floor(diffMinutes / 60)} h`;
-  if (diffMinutes < 48 * 60) return `Hier, ${new Intl.DateTimeFormat('fr-FR', { hour: '2-digit', minute: '2-digit' }).format(date)}`;
-  return new Intl.DateTimeFormat('fr-FR', { day: 'numeric', month: 'short' }).format(date);
+  const locale = LANGUAGE_PRESETS[state.settings.language]?.locale || 'fr-FR';
+  if (diffMinutes < 48 * 60) return `Hier, ${new Intl.DateTimeFormat(locale, { hour: '2-digit', minute: '2-digit' }).format(date)}`;
+  return new Intl.DateTimeFormat(locale, { day: 'numeric', month: 'short' }).format(date);
 }
 
 function articleDateTimeLabel(dateString) {
   const date = new Date(dateString);
   if (Number.isNaN(date.getTime())) return '';
-  const day = new Intl.DateTimeFormat('fr-FR', {
+  const locale = LANGUAGE_PRESETS[state.settings.language]?.locale || 'fr-FR';
+  const day = new Intl.DateTimeFormat(locale, {
     weekday: 'long', day: 'numeric', month: 'long',
     ...(date.getFullYear() !== new Date().getFullYear() ? { year: 'numeric' } : {})
   }).format(date);
-  const time = new Intl.DateTimeFormat('fr-FR', { hour: '2-digit', minute: '2-digit' }).format(date);
+  const time = new Intl.DateTimeFormat(locale, { hour: '2-digit', minute: '2-digit' }).format(date);
   return `${day.charAt(0).toUpperCase()}${day.slice(1)} à ${time}`;
 }
 
@@ -526,7 +554,8 @@ function dayDelta(value) {
 function fullDay(value) {
   const date = new Date(value);
   if (Number.isNaN(date.getTime())) return '';
-  const label = new Intl.DateTimeFormat('fr-FR', { weekday: 'long', day: 'numeric', month: 'long' }).format(date);
+  const locale = LANGUAGE_PRESETS[state.settings.language]?.locale || 'fr-FR';
+  const label = new Intl.DateTimeFormat(locale, { weekday: 'long', day: 'numeric', month: 'long' }).format(date);
   return label.charAt(0).toUpperCase() + label.slice(1);
 }
 
@@ -546,7 +575,8 @@ function dayKey(value) {
 
 function clockLabel(value) {
   const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? '' : new Intl.DateTimeFormat('fr-FR', { hour: '2-digit', minute: '2-digit' }).format(date);
+  const locale = LANGUAGE_PRESETS[state.settings.language]?.locale || 'fr-FR';
+  return Number.isNaN(date.getTime()) ? '' : new Intl.DateTimeFormat(locale, { hour: '2-digit', minute: '2-digit' }).format(date);
 }
 
 function compactArticleRow(article, index = 0) {
@@ -571,10 +601,11 @@ function renderWatchesFinal() {
   const groups = order.slice(0, BRIEF_DAYS).map((key, dayIndex) => {
     const dayArticles = days.get(key) || [];
     const watched = rules.length ? dayArticles.filter(article => rules.some(rule => watchRuleMatches(article, rule))) : [];
-    const filtered = watched.length ? `<div class="feed stable-owned-list watch-filtered-feed-v9138">${watched.slice(0, 30).map((article, index) => compactArticleRow(article, dayIndex * 40 + index)).join('')}</div>` : '<p class="watch-empty-day-v9138">Aucune nouveauté correspondant à vos règles de veille ce jour-là.</p>';
-    return `<section class="watch-day-v9138"><h3>${escapeHtml(dayLabel(dayArticles[0]?.publishedAt))}</h3>${filtered}</section>`;
-  }).join('');
-  return `<section class="watches-by-day-v9138 watch-layout-v9138"><div class="watches-head-v9138"><strong>Veille</strong><button type="button" class="watch-edit-button-v9138" data-view="settings">Régler la veille</button></div>${groups || '<p class="muted-note">Aucune actualité récente.</p>'}</section>`;
+    if (!watched.length) return '';
+    const filtered = `<div class="feed stable-owned-list watch-filtered-feed-v9138">${watched.slice(0, 30).map((article, index) => compactArticleRow(article, dayIndex * 40 + index)).join('')}</div>`;
+    return `<section class="watch-day-v9138"><h3>${escapeHtml(dayLabel(watched[0]?.publishedAt))}</h3>${filtered}</section>`;
+  }).filter(Boolean).join('');
+  return `<section class="watches-by-day-v9138 watch-layout-v9138"><div class="watches-head-v9138"><strong>Veille</strong><button type="button" class="watch-edit-button-v9138" data-view="settings">Régler la veille</button></div>${groups}</section>`;
 }
 
 function renderBrief() {
@@ -599,21 +630,37 @@ function renderBrief() {
     return { article, score: 100 + category + corroboration + major + low - Math.min(age * 1.6, 100) };
   }).filter(item => dayDelta(item.article.publishedAt) >= 0 && dayDelta(item.article.publishedAt) < BRIEF_DAYS)
     .sort((a, b) => b.score - a.score);
-  const picks = [];
-  const sourceCounts = new Map();
+  const byDay = new Map();
   for (const candidate of ranked) {
-    if (picks.length >= essentialCount) break;
-    const source = candidate.article.source || 'Source';
-    if (Number(sourceCounts.get(source) || 0) >= 2) continue;
-    if (picks.some(item => sameEvent(item.article, candidate.article))) continue;
-    picks.push(candidate);
-    sourceCounts.set(source, Number(sourceCounts.get(source) || 0) + 1);
+    const key = dayKey(candidate.article.publishedAt);
+    if (!byDay.has(key)) byDay.set(key, []);
+    byDay.get(key).push(candidate);
   }
-  for (const candidate of ranked) {
-    if (picks.length >= essentialCount) break;
-    if (!picks.includes(candidate)) picks.push(candidate);
-  }
-  const essential = `<section class="journal-section"><div class="brief-day-v9138">Sélection récente</div><h2 class="brief-section-title">L’essentiel · ${picks.length} article${picks.length > 1 ? 's' : ''}</h2><div class="feed stable-owned-list">${picks.length ? picks.map(({ article }, index) => compactArticleRow(article, index)).join('') : '<p class="muted-note">Aucune information majeure récente dans les domaines choisis.</p>'}</div></section>`;
+  const pickDay = candidates => {
+    const picks = [];
+    const sourceCounts = new Map();
+    for (const candidate of candidates) {
+      if (picks.length >= essentialCount) break;
+      const source = candidate.article.source || 'Source';
+      if (Number(sourceCounts.get(source) || 0) >= 2) continue;
+      if (picks.some(item => sameEvent(item.article, candidate.article))) continue;
+      picks.push(candidate);
+      sourceCounts.set(source, Number(sourceCounts.get(source) || 0) + 1);
+    }
+    for (const candidate of candidates) {
+      if (picks.length >= essentialCount) break;
+      if (!picks.includes(candidate)) picks.push(candidate);
+    }
+    return picks;
+  };
+  const essential = [...byDay.values()]
+    .sort((left, right) => Date.parse(right[0]?.article?.publishedAt || 0) - Date.parse(left[0]?.article?.publishedAt || 0))
+    .slice(0, BRIEF_DAYS)
+    .map((candidates, dayIndex) => {
+      const picks = pickDay(candidates);
+      if (!picks.length) return '';
+      return `<section class="brief-history-day-v9138 journal-section"><div class="brief-history-date-v9138">${escapeHtml(dayLabel(picks[0].article.publishedAt))}</div><div class="feed stable-owned-list">${picks.map(({ article }, index) => compactArticleRow(article, dayIndex * essentialCount + index)).join('')}</div></section>`;
+    }).filter(Boolean).join('');
   const watchCount = watchNewCount();
   return `<main class="page">${topbar('Brief', false)}
     <div class="brief-mode-tabs"><button class="brief-mode-tab ${state.briefMode === 'essential' ? 'active' : ''}" data-brief-mode="essential">L’essentiel</button><button class="brief-mode-tab watch-tab-v9184 ${state.briefMode === 'watches' ? 'active' : ''}" data-brief-mode="watches">Veille${watchCount ? `<span class="watch-new-badge-v9184">${watchCount > 9 ? '9+' : watchCount}</span>` : ''}</button></div>
@@ -751,7 +798,22 @@ function rangeSetting(label, key, min, max, left, right) {
 function languageSettingsMarkup() {
   const current = LANGUAGE_PRESETS[state.settings.language] || LANGUAGE_PRESETS.fr;
   const options = state.settings.enabledLanguages.map(code => `<option value="${code}" ${state.settings.language === code ? 'selected' : ''}>${escapeHtml(LANGUAGE_PRESETS[code].label)}</option>`).join('');
-  return `<div class="language-settings"><select class="text-input" data-language aria-label="Langue de l’application et des sources">${options}</select><button type="button" class="small-primary-btn" data-add-language>Ajouter une langue</button></div><p class="muted-note">Les sources proposées par défaut suivent le pays correspondant : <strong data-language-country>${escapeHtml(current.countryName)}</strong>.</p>`;
+  return `<div class="language-settings"><select class="text-input" data-language aria-label="Langue de l’application et des sources">${options}</select><button type="button" class="small-primary-btn" data-add-language>Choisir des langues</button></div><p class="muted-note">Les sources proposées par défaut suivent le pays correspondant : <strong data-language-country>${escapeHtml(current.countryName)}</strong>.</p>`;
+}
+
+function countryFlag(country = '') {
+  return /^[A-Z]{2}$/.test(country) ? [...country].map(letter => String.fromCodePoint(127397 + letter.charCodeAt(0))).join('') : '🌐';
+}
+
+function openLanguageCatalog() {
+  app.querySelector('[data-language-catalog]')?.remove();
+  const rows = Object.entries(LANGUAGE_PRESETS).map(([code, preset]) => {
+    const current = code === state.settings.language;
+    const installed = state.settings.enabledLanguages.includes(code);
+    return `<button type="button" class="language-option-v9805 ${current ? 'is-current' : ''}" data-language-install="${code}" ${current ? 'aria-current="true"' : ''}><span class="language-flag-v9805">${countryFlag(preset.country)}</span><span><strong>${escapeHtml(preset.label)}</strong><small>${escapeHtml(preset.countryName)}</small></span><em>${current ? 'Sélectionnée' : installed ? 'Utiliser' : 'Télécharger'}</em></button>`;
+  }).join('');
+  app.insertAdjacentHTML('beforeend', `<div class="language-catalog-backdrop-v9805" data-language-catalog><section class="language-catalog-v9805" role="dialog" aria-modal="true" aria-labelledby="language-catalog-title"><header><div><strong id="language-catalog-title">Langues disponibles</strong><span>Téléchargez une langue puis utilisez ses sources d’information.</span></div><button type="button" data-close-language-catalog aria-label="Fermer">×</button></header><div class="language-options-v9805">${rows}</div></section></div>`);
+  app.querySelector('[data-close-language-catalog]')?.focus();
 }
 
 function displaySettingsMarkup() {
@@ -768,7 +830,7 @@ function renderSettings() {
     <div class="settings-accordions-v9185">
       ${accordion('Langue', languageSettingsMarkup())}
 
-      ${accordion('Taille et densité du texte', `${rangeSetting('Taille du texte', 'textSize', 85, 125, 'Petit', 'Grand')}${rangeSetting('Densité entre les articles', 'density', 0, 100, 'Peu dense', 'Très dense')}${rangeSetting('Taille du titre', 'titleSize', 70, 140, 'Petit titre', 'Gros titre')}`)}
+      ${accordion('Taille et densité du texte', `${rangeSetting('Taille du texte des articles', 'textSize', 100, 175, 'Petit', 'Grand')}${rangeSetting('Taille du texte de l’interface', 'interfaceTextSize', 85, 150, 'Petit', 'Grand')}${rangeSetting('Densité entre les articles', 'density', 0, 100, 'Peu dense', 'Très dense')}${rangeSetting('Taille du titre', 'titleSize', 70, 140, 'Petit titre', 'Gros titre')}`)}
 
       ${accordion('Affichage', displaySettingsMarkup())}
 
@@ -1269,6 +1331,17 @@ function selectLanguage(code) {
 }
 
 app.addEventListener('click', async event => {
+  const languageInstall = event.target.closest('[data-language-install]');
+  if (languageInstall) {
+    const code = languageInstall.dataset.languageInstall;
+    if (code === state.settings.language) app.querySelector('[data-language-catalog]')?.remove();
+    else if (LANGUAGE_PRESETS[code]) selectLanguage(code);
+    return;
+  }
+  if (event.target.closest('[data-close-language-catalog]') || (event.target.matches('[data-language-catalog]'))) {
+    event.target.closest('[data-language-catalog]')?.remove();
+    return;
+  }
   if (event.target.closest('[data-reset-read]')) {
     event.preventDefault();
     resetReadStateFromNav(state.view === 'brief' ? 'brief' : 'home');
@@ -1348,13 +1421,7 @@ app.addEventListener('click', async event => {
   if (event.target.closest('[data-check-update]')) { await checkAppUpdate({ announce: true }); return; }
   if (event.target.closest('[data-refresh]')) { await syncNews(); return; }
   if (event.target.closest('[data-add-language]')) {
-    const choices = Object.entries(LANGUAGE_PRESETS).filter(([code]) => !state.settings.enabledLanguages.includes(code));
-    if (!choices.length) { toast('Toutes les langues disponibles sont déjà ajoutées'); return; }
-    const answer = window.prompt(`Code de langue à ajouter : ${choices.map(([code, value]) => `${code} (${value.label})`).join(', ')}`, choices[0][0]);
-    const code = String(answer || '').trim().toLowerCase();
-    if (!answer) return;
-    if (!LANGUAGE_PRESETS[code]) { toast('Langue non prise en charge'); return; }
-    selectLanguage(code);
+    openLanguageCatalog();
     return;
   }
   if (event.target.closest('[data-add-source]')) { addSource(); return; }
@@ -1668,7 +1735,7 @@ if ('serviceWorker' in navigator && location.protocol.startsWith('http') && !nav
     serviceWorkerRefreshing = true;
     window.location.reload();
   });
-  navigator.serviceWorker.register('./sw-v98.js?v=98.4', { updateViaCache: 'none' }).then(registration => {
+  navigator.serviceWorker.register('./sw-v98.js?v=98.5', { updateViaCache: 'none' }).then(registration => {
     if (registration.waiting) registration.waiting.postMessage('SKIP_WAITING');
     registration.addEventListener('updatefound', () => {
       const installing = registration.installing;

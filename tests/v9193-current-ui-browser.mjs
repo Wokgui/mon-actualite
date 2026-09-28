@@ -160,7 +160,7 @@ const rowAlignment = await page.$eval('[data-stable-home-feed] .article-card', c
   };
 });
 assert.ok(Math.abs(rowAlignment.imageCenter - rowAlignment.titleCenter) < 24, 'title must stay vertically balanced beside the fixed image while metadata remains visible');
-assert.ok(Math.abs(rowAlignment.imageHeight - 75) < 0.75, 'article image must keep the 75px compact height');
+assert.ok(Math.abs(rowAlignment.imageHeight - 80) < 0.75, 'article image must keep the adaptive default height');
 assert.equal(rowAlignment.borderBottomWidth, '0px', 'articles must not have bottom separators');
 assert.equal(rowAlignment.borderTopWidth, '0px', 'articles must not have top separators');
 const firstImage = page.locator('[data-stable-home-feed] .article-image').first();
@@ -202,4 +202,4 @@ const briefTitlePx = await page.$eval('.page:has(.brief-mode-tabs)>.page-masthea
 assert.ok(briefTitlePx <= 25.5, 'brief title must use the refined compact size');
 
 await browser.close();
-console.log('v98.04 current UI browser contract passed.');
+console.log('v98.05 current UI browser contract passed.');

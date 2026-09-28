@@ -15,16 +15,16 @@ function responseCapture() {
 
 try {
   const coreResponse = responseCapture();
-  await core({ method:'POST', query:{}, body:{ language:'en', locale:'en-GB', country:'GB', sources:[], keywords:['technology'], preferredCategories:[], webSearch:true }, headers:{} }, coreResponse);
+  await core({ method:'POST', query:{}, body:{ language:'ja', locale:'ja-JP', country:'JP', sources:[], keywords:['technology'], preferredCategories:[], webSearch:true }, headers:{} }, coreResponse);
   assert.equal(coreResponse.statusCode, 200);
-  const englishRequests = requests.splice(0);
-  assert.ok(englishRequests.length >= 6);
-  assert.ok(englishRequests.every(url => { const parsed=new URL(url); return parsed.searchParams.get('hl')==='en' && parsed.searchParams.get('gl')==='GB' && parsed.searchParams.get('ceid')==='GB:en'; }), 'all default and search feeds must follow selected English country');
+  const japaneseRequests = requests.splice(0);
+  assert.ok(japaneseRequests.length >= 6);
+  assert.ok(japaneseRequests.every(url => { const parsed=new URL(url); return parsed.searchParams.get('hl')==='ja' && parsed.searchParams.get('gl')==='JP' && parsed.searchParams.get('ceid')==='JP:ja'; }), 'all default and search feeds must follow selected Japanese country');
 
   const fastResponse = responseCapture();
-  await fast({ method:'GET', query:{ language:'de', interests:'Tech' }, headers:{} }, fastResponse);
+  await fast({ method:'GET', query:{ language:'id', interests:'Tech' }, headers:{} }, fastResponse);
   assert.equal(fastResponse.statusCode, 200);
   assert.ok(requests.length >= 6);
-  assert.ok(requests.every(url => { const parsed=new URL(url); return parsed.searchParams.get('hl')==='de' && parsed.searchParams.get('gl')==='DE' && parsed.searchParams.get('ceid')==='DE:de'; }), 'fast feeds must follow selected German country');
-  console.log(JSON.stringify({ coreFeeds:englishRequests.length, fastFeeds:requests.length, localeRouting:'passed' }));
+  assert.ok(requests.every(url => { const parsed=new URL(url); return parsed.searchParams.get('hl')==='id' && parsed.searchParams.get('gl')==='ID' && parsed.searchParams.get('ceid')==='ID:id'; }), 'fast feeds must follow selected Indonesian country');
+  console.log(JSON.stringify({ coreFeeds:japaneseRequests.length, fastFeeds:requests.length, localeRouting:'passed' }));
 } finally { global.fetch = originalFetch; }

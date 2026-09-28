@@ -1,2 +1,5 @@
 .vercel
 .env*
+.gradle/
+**/build/
+test-results/

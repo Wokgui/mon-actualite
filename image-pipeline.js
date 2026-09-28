@@ -1,7 +1,8 @@
-import { preparedVisualUrl, sourceTileUrl } from './services/article-visuals.js?v=98.4';
+import { preparedVisualUrl, sourceTileUrl } from './services/article-visuals.js?v=98.5';
 
-const MAX_CONCURRENT = 4;
-const PRIORITY_COUNT = 6;
+const MAX_CONCURRENT = 8;
+const PRIORITY_COUNT = 16;
+const REQUEST_TIMEOUT_MS = 6500;
 const RETRY_AFTER_MS = 60_000;
 const bound = new WeakSet();
 const queued = new WeakSet();
@@ -20,7 +21,7 @@ function articleMap() {
 
 function proxyUrl(article) {
   const params = new URLSearchParams({
-    v: '98.4', url: String(article?.url || '').slice(0, 1900),
+    v: '98.5', url: String(article?.url || '').slice(0, 1900),
     image: String(article?.visual?.url || article?.image || '').slice(0, 1900),
     title: String(article?.title || '').slice(0, 280),
     category: String(article?.category || '').slice(0, 70),
@@ -51,14 +52,16 @@ function isExternalHttp(url) {
 function rememberBlob(url, blob) {
   managedBlobs.delete(url);
   managedBlobs.set(url, blob);
-  while (managedBlobs.size > 32) managedBlobs.delete(managedBlobs.keys().next().value);
+  while (managedBlobs.size > 96) managedBlobs.delete(managedBlobs.keys().next().value);
   return blob;
 }
 
 function managedImageBlob(url) {
   if (managedBlobs.has(url)) return Promise.resolve(rememberBlob(url, managedBlobs.get(url)));
   if (managedInflight.has(url)) return managedInflight.get(url);
-  const request = fetch(url, { cache: 'force-cache', credentials: 'same-origin' }).then(async response => {
+  const controller = new AbortController();
+  const timeout = window.setTimeout(() => controller.abort(), REQUEST_TIMEOUT_MS);
+  const request = fetch(url, { cache: 'force-cache', credentials: 'same-origin', signal: controller.signal }).then(async response => {
     const status = String(response.headers.get('X-Thumbnail-Status') || '').toLowerCase();
     const contentType = String(response.headers.get('Content-Type') || '').toLowerCase();
     if (!response.ok || status.includes('fallback') || contentType.includes('image/svg+xml')) {
@@ -69,7 +72,10 @@ function managedImageBlob(url) {
       throw new Error('empty or invalid image response');
     }
     return rememberBlob(url, blob);
-  }).finally(() => managedInflight.delete(url));
+  }).finally(() => {
+    window.clearTimeout(timeout);
+    managedInflight.delete(url);
+  });
   managedInflight.set(url, request);
   return request;
 }
@@ -103,7 +109,7 @@ const observer = new IntersectionObserver(entries => {
     if (task) enqueue(task);
     observer.unobserve(entry.target);
   });
-}, { rootMargin: '480px 0px', threshold: 0.01 });
+}, { rootMargin: '1200px 0px', threshold: 0.01 });
 
 function bind(card, index, articles) {
   if (bound.has(card)) return;
@@ -172,6 +178,7 @@ function bind(card, index, articles) {
 
   image.loading = 'eager';
   image.decoding = 'async';
+  if (index < PRIORITY_COUNT) image.fetchPriority = 'high';
   image.addEventListener('load', async () => {
     if (!task.started || task.finished) return;
     if (absolute(image.src) === absolute(tile)) {

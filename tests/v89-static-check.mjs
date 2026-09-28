@@ -73,7 +73,7 @@ for (const src of scripts) {
   else ok(`service worker precaches runtime script ${src}`);
 }
 
-for (const asset of ['app-controls.css?v=98.4']) {
+for (const asset of ['app-controls.css?v=98.5']) {
   if (!index.includes(asset)) fail(`final visual layer missing from index: ${asset}`);
   if (!sw.includes(asset)) fail(`service worker does not precache final visual layer: ${asset}`);
   else ok(`service worker precaches final visual layer: ${asset}`);
@@ -121,8 +121,8 @@ for (const marker of briefWindowChecks) {
   if (!app.includes(marker)) fail(`10-day Brief/Watch marker missing: ${marker}`);
 }
 if (!process.exitCode) ok('Brief and watch 10-day window configured');
-if (app.includes('historyBriefMarkup')) fail('L’essentiel must enforce one strict total instead of appending daily history');
-else ok('L’essentiel enforces one strict total');
+if (!app.includes('brief-history-day-v9138') || !app.includes('const pickDay = candidates')) fail('L’essentiel must enforce the requested count separately for every day');
+else ok('L’essentiel enforces its count separately for every day');
 
 if (!/function effectiveWatchRules\(\)\s*{\s*return activeWatchRules\(\);\s*}/.test(app)) fail('Veille must use only rules entered in Settings > Veille');
 else ok('Veille uses only Settings > Veille rules');
@@ -130,7 +130,7 @@ if (app.match(/function effectiveWatchRules\(\)[\s\S]{0,500}briefWatchTopics/)) 
 if (!app.includes('function fetchHistoryCoverage') || !app.includes("days = topic ? BRIEF_DAYS : 31")) fail('31-day home / 10-day watch historical discovery is missing');
 else ok('31-day home and 10-day watch historical discovery configured');
 const imageSequence = read('image-pipeline.js');
-if (app.includes('scheduleVisualBackfill') || app.includes('recoverArticleVisual') || !imageSequence.includes('const MAX_CONCURRENT = 4')) fail('photo loading must have one bounded owner');
+if (app.includes('scheduleVisualBackfill') || app.includes('recoverArticleVisual') || !imageSequence.includes('const MAX_CONCURRENT = 8')) fail('photo loading must have one bounded owner');
 else ok('single bounded image pipeline owns photo loading');
 const androidGradle = read('android-app/app/build.gradle');
 const androidActivity = read('android-app/app/src/main/java/com/wokgui/monactualite/MainActivity.java');
@@ -139,8 +139,8 @@ if (!androidGradle.includes('prepareWebAssets') || !androidActivity.includes('We
 else ok('Android APK bundles current frontend independently of Vercel frontend deploys');
 if (androidActivity.includes('.hero-header h1{font-size:32px!important')) fail('Android still overrides the title-size preference');
 else ok('Android preserves the user-selected title size');
-if (!androidManifest.includes('@drawable/app_icon_sun')) fail('Android launcher does not use the existing sun icon');
-else ok('Android launcher uses the existing sun icon');
+if (!androidManifest.includes('@mipmap/ic_launcher') || !androidManifest.includes('@mipmap/ic_launcher_round')) fail('Android launcher does not use adaptive icons');
+else ok('Android launcher uses adaptive icons');
 
 const coreNews = read('lib/news-core.js');
 const apiNews = read('api/news.js');
@@ -149,7 +149,7 @@ if (!coreNews.includes('bucket.length < 12') || !coreNews.includes('selected.spl
 else ok('historical day coverage preserved in news-core');
 if (!apiNews.includes('bucket.length < 10') || !apiNews.includes('CATALOG_LIMIT = 320')) fail('historical day coverage is not preserved by API catalogue ranking');
 else ok('historical day coverage preserved by API catalogue ranking');
-if (!rowFix.includes('grid-template-rows:minmax(75px,auto)') || !rowFix.includes('height:75px!important') || !rowFix.includes('display:none!important')) fail('stable image and compact metadata contract missing');
+if (!rowFix.includes('grid-template-rows:minmax(var(--article-image-height),auto)') || !rowFix.includes('height:var(--article-image-height)!important') || !rowFix.includes('display:none!important')) fail('stable adaptive image and compact metadata contract missing');
 else ok('exact image/title centering contract configured');
 if (!rowFix.includes('border:0!important')) fail('article separators are still allowed by the final visual layer');
 else ok('article separators disabled globally');
@@ -164,7 +164,7 @@ if (!app.includes('navLongPressTimer') || !app.includes('resetReadStateFromNav(v
 else ok('long press reset on Home/Brief configured');
 if (!app.includes("const target = real || tile") || !app.includes('data-photo-src=') || !app.includes('fetchpriority=')) fail('stable placeholder and prioritized article image loading missing');
 else ok('immediate high-priority article image loading configured');
-if (!imageSequence.includes('const MAX_CONCURRENT = 4') || !imageSequence.includes('const PRIORITY_COUNT = 6') || !imageSequence.includes("rootMargin: '480px 0px'") || !imageSequence.includes('function pump()')) fail('bounded image loading pipeline missing');
+if (!imageSequence.includes('const MAX_CONCURRENT = 8') || !imageSequence.includes('const PRIORITY_COUNT = 16') || !imageSequence.includes("rootMargin: '1200px 0px'") || !imageSequence.includes('REQUEST_TIMEOUT_MS = 6500') || !imageSequence.includes('function pump()')) fail('bounded image loading pipeline missing');
 else ok('bounded image loading pipeline configured');
 
 const visualService = read('services/article-visuals.js');
