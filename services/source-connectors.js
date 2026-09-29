@@ -322,11 +322,17 @@ export async function fetchLiveNews({ sources = [], keywords = [], preferredCate
   // across Google Actualités and therefore across many publishers.
   const effectiveSourcePriority = false;
   const useSharedCatalogue = !sources.length && !discoveryKeywords.length && webSearch;
-  const apiBase = location.hostname === 'wokgui.github.io' ? 'https://mon-actualite.vercel.app' : '';
-  const endpoint = useSharedCatalogue
-    ? `${apiBase}/api/news?interests=${encodeURIComponent(interests.join(','))}&language=${encodeURIComponent(language)}&locale=${encodeURIComponent(locale)}&country=${encodeURIComponent(country)}&fresh=${Date.now()}`
+  const isPagesPreview = location.hostname === 'wokgui.github.io';
+  const apiBase = isPagesPreview ? 'https://mon-actualite.vercel.app' : '';
+  // GitHub Pages is static. For the PC preview always use the production
+  // catalogue through GET: this avoids a cross-origin POST/CORS preflight
+  // while preserving the real production feed and visual preparation.
+  const previewInterests = [...new Set([...interests, ...discoveryKeywords])].slice(0, 30);
+  const endpoint = (useSharedCatalogue || isPagesPreview)
+    ? `${apiBase}/api/news?interests=${encodeURIComponent((isPagesPreview ? previewInterests : interests).join(','))}&language=${encodeURIComponent(language)}&locale=${encodeURIComponent(locale)}&country=${encodeURIComponent(country)}&fresh=${Date.now()}`
     : `${apiBase}/api/news`;
-  const response = await fetch(endpoint, useSharedCatalogue ? {
+  const useGet = useSharedCatalogue || isPagesPreview;
+  const response = await fetch(endpoint, useGet ? {
     method: 'GET',
     cache: 'no-store',
     headers: { 'Cache-Control': 'no-cache' }
