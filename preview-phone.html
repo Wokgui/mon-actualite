@@ -6,7 +6,7 @@
 <title>Mon actualité — aperçu Android fidèle</title>
 <style>
 *{box-sizing:border-box}
-:root{--device-w:384px;--device-h:824px;--status-h:30px;--nav-h:24px}
+:root{--device-w:412px;--device-h:882px;--status-h:30px;--nav-h:24px;--webview-h:828px}
 html,body{margin:0;min-height:100%;background:#e9eaf2;font-family:system-ui,-apple-system,Segoe UI,sans-serif}
 body{min-height:100vh;display:grid;place-items:center;overflow:auto}
 .stage{position:relative;width:var(--device-w);height:var(--device-h);transform-origin:center center}
@@ -14,7 +14,7 @@ body{min-height:100vh;display:grid;place-items:center;overflow:auto}
 .statusbar{height:var(--status-h);background:#f1f2ff;color:#242530;display:flex;align-items:center;justify-content:space-between;padding:0 13px;font-size:11px;font-weight:700;line-height:1}
 .status-icons{display:flex;align-items:center;gap:5px;font-size:10px}
 .webview{position:absolute;left:7px;right:7px;top:calc(7px + var(--status-h));bottom:calc(7px + var(--nav-h));overflow:hidden;background:#fff}
-.screen{display:block;width:384px;height:770px;border:0;background:#fff}
+.screen{display:block;width:412px;height:828px;border:0;background:#fff}
 .systemnav{position:absolute;left:7px;right:7px;bottom:7px;height:var(--nav-h);background:#fff;display:grid;place-items:center}
 .gesture{width:92px;height:3px;border-radius:99px;background:#24252b;opacity:.72}
 .note{position:fixed;left:14px;bottom:9px;color:#555;font-size:12px}
@@ -25,17 +25,17 @@ body{min-height:100vh;display:grid;place-items:center;overflow:auto}
 <div class="stage" id="stage">
   <div class="phone">
     <div class="statusbar"><span id="clock">18:24</span><span class="status-icons"><span>▮▮▮</span><span>⌁</span><span>▰</span></span></div>
-    <div class="webview"><iframe id="screen" class="screen" src="./index.html?nativePreview=1&preview=phone&build=98.28"></iframe></div>
+    <div class="webview"><iframe id="screen" class="screen" src="./index.html?nativePreview=1&preview=phone&build=98.29"></iframe></div>
     <div class="systemnav"><span class="gesture"></span></div>
   </div>
 </div>
-<div class="note">Aperçu Android — viewport logique 384 × 770 + barres système</div>
+<div class="note">Aperçu Galaxy S23 Ultra — viewport logique 412 × 828 + barres système Android</div>
 <script>
 (function(){
   const stage=document.getElementById('stage');
   const fit=()=>{
-    const scale=Math.min((innerWidth-28)/384,(innerHeight-28)/824,1.28);
-    stage.style.transform='scale('+Math.max(.45,scale)+')';
+    const scale=Math.min((innerWidth-28)/412,(innerHeight-28)/882,1.22);
+    stage.style.transform='scale('+Math.max(.42,scale)+')';
   };
   addEventListener('resize',fit,{passive:true}); fit();
 
