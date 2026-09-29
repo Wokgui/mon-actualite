@@ -1,0 +1,27 @@
+name: Publish PC preview
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+permissions:
+  contents: write
+jobs:
+  publish:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Publish preview branch
+        run: |
+          rm -rf /tmp/preview
+          mkdir -p /tmp/preview
+          cp -a . /tmp/preview/
+          cd /tmp/preview
+          rm -rf .git android-app
+          git init
+          git config user.name github-actions
+          git config user.email github-actions@github.com
+          git add .
+          git commit -m "PC preview"
+          git branch -M gh-pages
+          git remote add origin "https://x-access-token:${{ github.token }}@github.com/${{ github.repository }}.git"
+          git push -f origin gh-pages
