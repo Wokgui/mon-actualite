@@ -5,7 +5,7 @@
     const interests = Array.isArray(settings?.interests)
       ? settings.interests.map(value => String(value || '').trim()).filter(Boolean).slice(0, 8)
       : [];
-    const url = new URL('/api/news', location.origin);
+    const url = new URL('/api/news', location.hostname === 'wokgui.github.io' ? 'https://mon-actualite.vercel.app' : location.origin);
     url.searchParams.set('fast', '1');
     url.searchParams.set('v', '91.83');
     url.searchParams.set('t', Date.now().toString());
