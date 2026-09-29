@@ -80,7 +80,7 @@ public class MainActivity extends Activity {
 
             int extraTop = Math.round(6f * getResources().getDisplayMetrics().density);
             int wantedTop = safeTop + extraTop;
-            int wantedBottom = 0;
+            int wantedBottom = safeBottom;
 
             if (wantedTop != lastTopInset || wantedBottom != lastBottomInset) {
                 FrameLayout.LayoutParams params = (FrameLayout.LayoutParams) webView.getLayoutParams();
