@@ -1,0 +1,80 @@
+/* v98.20 — habillage premium adaptatif, sans changer la structure ni les textes. */
+:root{
+  --premium-accent:var(--app-accent,#7461e8);
+  --premium-accent-soft:color-mix(in srgb,var(--premium-accent) 72%,#8bbcff 28%);
+  --premium-accent-deep:color-mix(in srgb,var(--premium-accent) 68%,#111936 32%);
+  --premium-accent-dark:color-mix(in srgb,var(--premium-accent) 50%,#0b1535 50%);
+  --premium-accent-light:color-mix(in srgb,var(--premium-accent) 62%,#ffffff 38%);
+}
+.hero-header,
+.settings-page-v9185>.page-masthead-v9186,
+.page:has(.brief-mode-tabs)>.page-masthead-v9186{
+  position:relative!important;
+  isolation:isolate!important;
+  overflow:hidden!important;
+  color:#fff!important;
+  border-bottom:0!important;
+  background:
+    radial-gradient(85% 120% at 94% 102%,color-mix(in srgb,var(--premium-accent-light) 75%,transparent) 0%,transparent 61%),
+    radial-gradient(92% 115% at 2% 108%,color-mix(in srgb,var(--premium-accent) 75%,transparent) 0%,transparent 64%),
+    linear-gradient(118deg,var(--premium-accent-dark) 0%,var(--premium-accent-deep) 46%,var(--premium-accent-soft) 100%)!important;
+  box-shadow:0 7px 22px color-mix(in srgb,var(--premium-accent) 16%,transparent)!important;
+}
+.hero-header::before,
+.settings-page-v9185>.page-masthead-v9186::before,
+.page:has(.brief-mode-tabs)>.page-masthead-v9186::before{
+  content:""!important;display:block!important;position:absolute!important;z-index:-1!important;
+  width:125%!important;height:76%!important;left:-16%!important;bottom:-55%!important;
+  border:1.2px solid rgba(255,255,255,.38)!important;border-radius:50%!important;
+  transform:rotate(-8deg)!important;box-shadow:0 -1px 14px rgba(255,255,255,.14)!important;
+  pointer-events:none!important;
+}
+.hero-header::after,
+.settings-page-v9185>.page-masthead-v9186::after,
+.page:has(.brief-mode-tabs)>.page-masthead-v9186::after{
+  content:""!important;display:block!important;position:absolute!important;z-index:-1!important;
+  width:76%!important;height:95%!important;right:-38%!important;bottom:-62%!important;
+  border:1px solid rgba(255,255,255,.22)!important;border-radius:50%!important;
+  transform:rotate(12deg)!important;pointer-events:none!important;
+}
+.hero-header h1,
+.settings-page-v9185>.page-masthead-v9186 h1,
+.page:has(.brief-mode-tabs)>.page-masthead-v9186 h1{
+  position:relative!important;color:#fff!important;text-shadow:0 2px 10px rgba(5,10,35,.22)!important;
+}
+.hero-header .eyebrow{
+  position:relative!important;color:#fff!important;
+  background:rgba(255,255,255,.14)!important;
+  border:1px solid rgba(255,255,255,.38)!important;
+  box-shadow:inset 0 1px 0 rgba(255,255,255,.18),0 5px 16px rgba(8,12,40,.12)!important;
+  -webkit-backdrop-filter:blur(10px)!important;backdrop-filter:blur(10px)!important;
+}
+.hero-header .hero-mark{
+  position:relative!important;background:rgba(255,255,255,.82)!important;
+  box-shadow:0 0 12px rgba(255,255,255,.24)!important;
+}
+.hero-header{margin-bottom:16px!important;}
+.settings-page-v9185>.page-masthead-v9186,
+.page:has(.brief-mode-tabs)>.page-masthead-v9186{margin-bottom:14px!important;}
+
+/* Barre basse : même matière/couleur, sans modifier géométrie ni positions. */
+.bottom-nav.stable-bottom-nav-v9184{
+  border-top:1px solid color-mix(in srgb,var(--premium-accent-light) 38%,transparent)!important;
+  background:
+    radial-gradient(80% 130% at 98% 100%,color-mix(in srgb,var(--premium-accent-light) 72%,transparent) 0%,transparent 62%),
+    linear-gradient(112deg,var(--premium-accent-deep) 0%,var(--premium-accent) 54%,var(--premium-accent-soft) 100%)!important;
+  box-shadow:0 -7px 24px color-mix(in srgb,var(--premium-accent) 17%,transparent)!important;
+}
+.bottom-nav.stable-bottom-nav-v9184 .nav-item,
+.bottom-nav.stable-bottom-nav-v9184 .nav-item:not(.active){
+  background:transparent!important;color:rgba(255,255,255,.72)!important;
+}
+.bottom-nav.stable-bottom-nav-v9184 .nav-item.active{
+  color:#fff!important;
+  background:linear-gradient(145deg,rgba(255,255,255,.20),rgba(255,255,255,.08))!important;
+  box-shadow:inset 0 0 0 1px rgba(255,255,255,.22),0 5px 18px rgba(7,12,40,.12)!important;
+}
+.bottom-nav.stable-bottom-nav-v9184 .nav-item svg,
+.bottom-nav.stable-bottom-nav-v9184 .nav-solid-hard-v9189,
+.bottom-nav.stable-bottom-nav-v9184 .nav-solid-icon-v9188{color:inherit!important;filter:drop-shadow(0 2px 4px rgba(5,10,30,.14));}
+.bottom-nav.stable-bottom-nav-v9184 .nav-item span{color:inherit!important;text-shadow:0 1px 5px rgba(5,10,30,.16)!important;}
