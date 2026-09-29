@@ -1,0 +1,14 @@
+<!doctype html>
+<html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Mon actualité — aperçu smartphone</title>
+<style>
+*{box-sizing:border-box}html,body{margin:0;height:100%;background:#e9eaf2;font-family:system-ui,-apple-system,Segoe UI,sans-serif}
+body{display:grid;place-items:center;padding:18px}
+.phone{height:min(94vh,920px);aspect-ratio:720/1536;background:#fff;border:9px solid #171820;border-radius:38px;overflow:hidden;box-shadow:0 24px 70px #0003;position:relative}
+.screen{position:absolute;inset:0;width:100%;height:100%;border:0;background:white}
+.note{position:fixed;left:16px;bottom:10px;color:#555;font-size:12px}
+@media(max-width:650px){body{padding:0}.phone{height:100dvh;width:100vw;aspect-ratio:auto;border:0;border-radius:0}.note{display:none}}
+</style></head><body>
+<div class="phone"><iframe class="screen" src="./index.html?preview=phone&build=98.23"></iframe></div>
+<div class="note">Aperçu smartphone 720 × 1536 — même interface que la version courante</div>
+</body></html>
