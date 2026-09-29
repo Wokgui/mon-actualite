@@ -10,7 +10,9 @@
     try{
       const settings=JSON.parse(localStorage.getItem('news-settings')||'{}');
       const language=String(settings.language||document.documentElement.lang||'fr').split('-')[0];
-      const url=new URL('/api/news',location.origin);
+      const url=location.hostname==='wokgui.github.io'
+        ?new URL('./preview-news.json',location.href)
+        :new URL('/api/news',location.origin);
       url.searchParams.set('language',language);
       url.searchParams.set('brief','3days');
       url.searchParams.set('t',Date.now().toString());
