@@ -1,4 +1,4 @@
-import { importOpmlPreview, fetchLiveNews } from './services/source-connectors.js?v=98.10';
+import { importOpmlPreview, fetchLiveNews } from './services/source-connectors.js?v=98.26';
 import { preparedVisualUrl, hasPreparedVisual, sourceTileUrl } from './services/article-visuals.js?v=98.10';
 
 const $ = (selector, root = document) => root.querySelector(selector);
