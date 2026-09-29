@@ -1,14 +1,60 @@
 <!doctype html>
-<html lang="fr"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width,initial-scale=1">
-<title>Mon actualité — aperçu smartphone</title>
+<html lang="fr">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Mon actualité — aperçu Android fidèle</title>
 <style>
-*{box-sizing:border-box}html,body{margin:0;height:100%;background:#e9eaf2;font-family:system-ui,-apple-system,Segoe UI,sans-serif}
-body{display:grid;place-items:center;padding:18px}
-.phone{height:min(94vh,920px);aspect-ratio:720/1536;background:#fff;border:9px solid #171820;border-radius:38px;overflow:hidden;box-shadow:0 24px 70px #0003;position:relative}
-.screen{position:absolute;inset:0;width:100%;height:100%;border:0;background:white}
-.note{position:fixed;left:16px;bottom:10px;color:#555;font-size:12px}
-@media(max-width:650px){body{padding:0}.phone{height:100dvh;width:100vw;aspect-ratio:auto;border:0;border-radius:0}.note{display:none}}
-</style></head><body>
-<div class="phone"><iframe class="screen" src="./index.html?preview=phone&build=98.23"></iframe></div>
-<div class="note">Aperçu smartphone 720 × 1536 — même interface que la version courante</div>
-</body></html>
+*{box-sizing:border-box}
+:root{--device-w:384px;--device-h:824px;--status-h:30px;--nav-h:24px}
+html,body{margin:0;min-height:100%;background:#e9eaf2;font-family:system-ui,-apple-system,Segoe UI,sans-serif}
+body{min-height:100vh;display:grid;place-items:center;overflow:auto}
+.stage{position:relative;width:var(--device-w);height:var(--device-h);transform-origin:center center}
+.phone{position:absolute;inset:0;background:#fff;border:7px solid #171820;border-radius:34px;overflow:hidden;box-shadow:0 24px 70px #0003}
+.statusbar{height:var(--status-h);background:#f1f2ff;color:#242530;display:flex;align-items:center;justify-content:space-between;padding:0 13px;font-size:11px;font-weight:700;line-height:1}
+.status-icons{display:flex;align-items:center;gap:5px;font-size:10px}
+.webview{position:absolute;left:7px;right:7px;top:calc(7px + var(--status-h));bottom:calc(7px + var(--nav-h));overflow:hidden;background:#fff}
+.screen{display:block;width:384px;height:770px;border:0;background:#fff}
+.systemnav{position:absolute;left:7px;right:7px;bottom:7px;height:var(--nav-h);background:#fff;display:grid;place-items:center}
+.gesture{width:92px;height:3px;border-radius:99px;background:#24252b;opacity:.72}
+.note{position:fixed;left:14px;bottom:9px;color:#555;font-size:12px}
+@media(max-width:520px){.note{display:none}}
+</style>
+</head>
+<body>
+<div class="stage" id="stage">
+  <div class="phone">
+    <div class="statusbar"><span id="clock">18:24</span><span class="status-icons"><span>▮▮▮</span><span>⌁</span><span>▰</span></span></div>
+    <div class="webview"><iframe id="screen" class="screen" src="./index.html?nativePreview=1&preview=phone&build=98.27"></iframe></div>
+    <div class="systemnav"><span class="gesture"></span></div>
+  </div>
+</div>
+<div class="note">Aperçu Android — viewport logique 384 × 770 + barres système</div>
+<script>
+(function(){
+  const stage=document.getElementById('stage');
+  const fit=()=>{
+    const scale=Math.min((innerWidth-28)/384,(innerHeight-28)/824,1.28);
+    stage.style.transform='scale('+Math.max(.45,scale)+')';
+  };
+  addEventListener('resize',fit,{passive:true}); fit();
+
+  const clock=document.getElementById('clock');
+  const updateClock=()=>clock.textContent=new Intl.DateTimeFormat('fr-FR',{hour:'2-digit',minute:'2-digit'}).format(new Date());
+  updateClock(); setInterval(updateClock,30000);
+
+  const frame=document.getElementById('screen');
+  frame.addEventListener('load',()=>{
+    try{
+      const d=frame.contentDocument;
+      if(!d || d.getElementById('android-ui-polish-v98')) return;
+      const st=d.createElement('style');
+      st.id='android-ui-polish-v98';
+      st.textContent='.hero-header h1{line-height:1.08!important;font-weight:840!important;letter-spacing:-.034em!important}.page-masthead-v9186 h1,.settings-page-v9185>.page-masthead-v9186 h1,.page:has(.brief-mode-tabs)>.page-masthead-v9186 h1{font-size:25px!important;line-height:1.12!important;font-weight:820!important;letter-spacing:-.026em!important}';
+      d.head.appendChild(st);
+    }catch(e){}
+  });
+})();
+</script>
+</body>
+</html>
