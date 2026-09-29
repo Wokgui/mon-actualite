@@ -107,3 +107,68 @@
  width:21px!important;height:21px!important;min-width:21px!important;min-height:21px!important;max-width:21px!important;max-height:21px!important;
 }
 #app .bottom-nav.stable-bottom-nav-v9184 .nav-item span{height:13px!important;min-height:13px!important;font-size:10.5px!important;line-height:13px!important}
+
+
+/* v98.23 — fidélité maquette : même motif ruban, mêmes métriques sélectionnées/non sélectionnées. */
+.settings-page-v9185>.page-masthead-v9186,
+.page:has(.brief-mode-tabs)>.page-masthead-v9186{
+ height:116px!important;min-height:116px!important;max-height:116px!important;
+ padding:0 8px!important;margin-bottom:14px!important;
+ display:flex!important;align-items:center!important;justify-content:center!important;
+}
+
+/* Motif vectoriel précis de la maquette, sans grandes ellipses. */
+.hero-header::before,
+.settings-page-v9185>.page-masthead-v9186::before,
+.page:has(.brief-mode-tabs)>.page-masthead-v9186::before{
+ content:""!important;position:absolute!important;inset:0!important;width:100%!important;height:100%!important;
+ left:0!important;bottom:auto!important;border:0!important;border-radius:0!important;transform:none!important;box-shadow:none!important;
+ background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 720 220' preserveAspectRatio='none'%3E%3Cdefs%3E%3ClinearGradient id='a' x1='0' y1='0' x2='1' y2='0'%3E%3Cstop stop-color='%23d65cff' stop-opacity='.78'/%3E%3Cstop offset='.48' stop-color='%237b64ff' stop-opacity='.18'/%3E%3Cstop offset='1' stop-color='%2369d5ff' stop-opacity='.78'/%3E%3C/linearGradient%3E%3Cfilter id='g'%3E%3CfeGaussianBlur stdDeviation='5'/%3E%3C/filter%3E%3C/defs%3E%3Cpath d='M-40 185 C115 102 210 235 382 166 S610 72 780 92' fill='none' stroke='url(%23a)' stroke-width='24' opacity='.48' filter='url(%23g)'/%3E%3Cpath d='M-35 178 C118 101 220 225 385 160 S615 78 770 94' fill='none' stroke='%23ffffff' stroke-width='1.5' opacity='.78'/%3E%3Cpath d='M-30 205 C150 145 245 220 410 182 S610 126 760 142' fill='none' stroke='%2388dfff' stroke-width='1.2' opacity='.58'/%3E%3Cpath d='M-50 150 C100 225 240 116 390 170 S600 230 780 170' fill='none' stroke='%23b66cff' stroke-width='1.2' opacity='.50'/%3E%3C/svg%3E")!important;
+ background-size:100% 100%!important;background-repeat:no-repeat!important;pointer-events:none!important;z-index:-1!important;
+}
+.hero-header::after,
+.settings-page-v9185>.page-masthead-v9186::after,
+.page:has(.brief-mode-tabs)>.page-masthead-v9186::after{content:none!important;display:none!important}
+
+/* Navigation : dimensions absolument identiques quel que soit l'onglet actif. */
+#app .bottom-nav.stable-bottom-nav-v9184{
+ height:58px!important;min-height:58px!important;max-height:58px!important;
+ padding:4px 7px!important;overflow:hidden!important;
+}
+#app .bottom-nav.stable-bottom-nav-v9184::before{
+ inset:0!important;height:100%!important;border:0!important;border-radius:0!important;
+ background-image:url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 720 90' preserveAspectRatio='none'%3E%3Cdefs%3E%3ClinearGradient id='b' x1='0' y1='0' x2='1' y2='0'%3E%3Cstop stop-color='%23df5dff' stop-opacity='.72'/%3E%3Cstop offset='.5' stop-color='%237665ff' stop-opacity='.10'/%3E%3Cstop offset='1' stop-color='%2365d7ff' stop-opacity='.62'/%3E%3C/linearGradient%3E%3C/defs%3E%3Cpath d='M-30 78 C110 20 220 100 365 55 S585 6 755 28' fill='none' stroke='url(%23b)' stroke-width='16' opacity='.34'/%3E%3Cpath d='M-20 72 C120 22 225 91 370 51 S590 12 750 29' fill='none' stroke='%23ffffff' stroke-width='1.1' opacity='.48'/%3E%3C/svg%3E")!important;
+ background-size:100% 100%!important;background-repeat:no-repeat!important;
+}
+#app .bottom-nav.stable-bottom-nav-v9184 button.nav-item,
+#app .bottom-nav.stable-bottom-nav-v9184 button.nav-item.active,
+#app .bottom-nav.stable-bottom-nav-v9184 button.nav-item:not(.active),
+#app .bottom-nav.stable-bottom-nav-v9184 button.nav-item:active,
+#app .bottom-nav.stable-bottom-nav-v9184 button.nav-item:focus{
+ width:calc(100% - 8px)!important;height:50px!important;min-height:50px!important;max-height:50px!important;
+ block-size:50px!important;min-block-size:50px!important;max-block-size:50px!important;
+ margin:0 4px!important;padding:5px 4px!important;border-radius:19px!important;
+ grid-template-rows:22px 13px!important;row-gap:3px!important;
+ color:rgba(255,255,255,.92)!important;font-weight:760!important;
+ transform:none!important;translate:none!important;scale:1!important;
+}
+#app .bottom-nav.stable-bottom-nav-v9184 button.nav-item:not(.active){background:transparent!important;box-shadow:none!important}
+#app .bottom-nav.stable-bottom-nav-v9184 button.nav-item.active{
+ color:rgba(255,255,255,.92)!important;
+ background:linear-gradient(145deg,rgba(255,255,255,.24),rgba(255,255,255,.10))!important;
+ box-shadow:inset 0 0 0 1px rgba(255,255,255,.32),0 3px 12px rgba(4,10,50,.15)!important;
+}
+#app .bottom-nav.stable-bottom-nav-v9184 .nav-item svg,
+#app .bottom-nav.stable-bottom-nav-v9184 .nav-item.active svg,
+#app .bottom-nav.stable-bottom-nav-v9184 .nav-solid-hard-v9189,
+#app .bottom-nav.stable-bottom-nav-v9184 .nav-item.active .nav-solid-hard-v9189,
+#app .bottom-nav.stable-bottom-nav-v9184 .nav-solid-icon-v9188,
+#app .bottom-nav.stable-bottom-nav-v9184 .nav-item.active .nav-solid-icon-v9188{
+ width:21px!important;height:21px!important;min-width:21px!important;min-height:21px!important;max-width:21px!important;max-height:21px!important;
+ color:rgba(255,255,255,.92)!important;opacity:1!important;filter:none!important;
+}
+#app .bottom-nav.stable-bottom-nav-v9184 .nav-item span,
+#app .bottom-nav.stable-bottom-nav-v9184 .nav-item.active span{
+ height:13px!important;min-height:13px!important;font-size:10.5px!important;line-height:13px!important;font-weight:760!important;
+ color:rgba(255,255,255,.92)!important;opacity:1!important;text-shadow:none!important;
+}
