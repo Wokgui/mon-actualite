@@ -56,3 +56,54 @@
 .bottom-nav.stable-bottom-nav-v9184 .nav-item.active{color:#fff!important;border-radius:28px!important;background:linear-gradient(145deg,rgba(255,255,255,.25),rgba(255,255,255,.09))!important;box-shadow:inset 0 0 0 1px rgba(255,255,255,.30),0 6px 18px rgba(4,10,50,.18)!important}
 .bottom-nav.stable-bottom-nav-v9184 .nav-item svg,.bottom-nav.stable-bottom-nav-v9184 .nav-solid-hard-v9189,.bottom-nav.stable-bottom-nav-v9184 .nav-solid-icon-v9188{color:inherit!important;filter:drop-shadow(0 2px 4px rgba(4,8,30,.18))}
 .bottom-nav.stable-bottom-nav-v9184 .nav-item span{color:inherit!important;text-shadow:0 1px 5px rgba(4,8,30,.18)!important}
+
+
+/* v98.22 — proportions et rubans affinés d'après la maquette de référence. */
+.hero-header::before,
+.settings-page-v9185>.page-masthead-v9186::before,
+.page:has(.brief-mode-tabs)>.page-masthead-v9186::before{
+ width:132%!important;height:74%!important;left:-16%!important;bottom:-58%!important;
+ border:0!important;border-radius:50%!important;transform:rotate(-7deg)!important;
+ background:transparent!important;
+ box-shadow:
+   0 -11px 0 -8px rgba(255,255,255,.72),
+   0 -24px 18px -19px color-mix(in srgb,var(--premium-cyan) 88%,transparent),
+   0 -42px 28px -27px color-mix(in srgb,var(--premium-pink) 78%,transparent)!important;
+}
+.hero-header::after,
+.settings-page-v9185>.page-masthead-v9186::after,
+.page:has(.brief-mode-tabs)>.page-masthead-v9186::after{
+ width:120%!important;height:62%!important;left:-9%!important;right:auto!important;bottom:-47%!important;
+ border:0!important;border-radius:50%!important;transform:rotate(5deg)!important;
+ background:transparent!important;
+ box-shadow:
+   0 -8px 0 -6.5px rgba(255,255,255,.42),
+   0 -20px 18px -17px color-mix(in srgb,var(--premium-blue) 82%,transparent)!important;
+}
+
+/* La barre applicative reste compacte, comme dans la proposition, et ne touche jamais la barre Android. */
+#app .bottom-nav.stable-bottom-nav-v9184{
+ height:58px!important;min-height:58px!important;max-height:58px!important;
+ padding:0 5px!important;align-items:center!important;
+}
+#app .bottom-nav.stable-bottom-nav-v9184 button.nav-item,
+#app .bottom-nav.stable-bottom-nav-v9184 button.nav-item.active,
+#app .bottom-nav.stable-bottom-nav-v9184 button.nav-item:not(.active),
+#app .bottom-nav.stable-bottom-nav-v9184 button.nav-item:active,
+#app .bottom-nav.stable-bottom-nav-v9184 button.nav-item:focus{
+ width:calc(100% - 10px)!important;height:50px!important;min-height:50px!important;max-height:50px!important;
+ block-size:50px!important;min-block-size:50px!important;max-block-size:50px!important;
+ margin:4px 5px!important;padding:5px 4px!important;
+ grid-template-rows:22px 13px!important;row-gap:3px!important;border-radius:20px!important;
+}
+#app .bottom-nav.stable-bottom-nav-v9184 button.nav-item:not(.active){background:transparent!important;box-shadow:none!important}
+#app .bottom-nav.stable-bottom-nav-v9184 button.nav-item.active{
+ background:linear-gradient(145deg,rgba(255,255,255,.27),rgba(255,255,255,.11))!important;
+ box-shadow:inset 0 0 0 1px rgba(255,255,255,.34),0 4px 14px rgba(4,10,50,.16)!important;
+}
+#app .bottom-nav.stable-bottom-nav-v9184 .nav-item svg,
+#app .bottom-nav.stable-bottom-nav-v9184 .nav-solid-hard-v9189,
+#app .bottom-nav.stable-bottom-nav-v9184 .nav-solid-icon-v9188{
+ width:21px!important;height:21px!important;min-width:21px!important;min-height:21px!important;max-width:21px!important;max-height:21px!important;
+}
+#app .bottom-nav.stable-bottom-nav-v9184 .nav-item span{height:13px!important;min-height:13px!important;font-size:10.5px!important;line-height:13px!important}
