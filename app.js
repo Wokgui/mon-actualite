@@ -6,7 +6,7 @@ const app = $('#app');
 const toastEl = $('#toast');
 const APP_VERSION = '98';
 const APP_RELEASE = '28 septembre 2026';
-const IS_NATIVE_ANDROID = /MonActualiteAndroid\//.test(navigator.userAgent) || location.pathname.startsWith('/assets/');
+const IS_NATIVE_ANDROID = /MonActualiteAndroid\//.test(navigator.userAgent) || location.pathname.startsWith('/assets/') || new URLSearchParams(location.search).get('nativePreview') === '1';
 const savedSessionView = sessionStorage.getItem('news-active-view-v9204');
 const INITIAL_VIEW = ['home', 'settings', 'brief'].includes(savedSessionView) ? savedSessionView : 'home';
 document.documentElement.dataset.appVersion = APP_VERSION;
