@@ -322,9 +322,10 @@ export async function fetchLiveNews({ sources = [], keywords = [], preferredCate
   // across Google Actualités and therefore across many publishers.
   const effectiveSourcePriority = false;
   const useSharedCatalogue = !sources.length && !discoveryKeywords.length && webSearch;
+  const apiBase = location.hostname === 'wokgui.github.io' ? 'https://mon-actualite.vercel.app' : '';
   const endpoint = useSharedCatalogue
-    ? `/api/news?interests=${encodeURIComponent(interests.join(','))}&language=${encodeURIComponent(language)}&locale=${encodeURIComponent(locale)}&country=${encodeURIComponent(country)}&fresh=${Date.now()}`
-    : '/api/news';
+    ? `${apiBase}/api/news?interests=${encodeURIComponent(interests.join(','))}&language=${encodeURIComponent(language)}&locale=${encodeURIComponent(locale)}&country=${encodeURIComponent(country)}&fresh=${Date.now()}`
+    : `${apiBase}/api/news`;
   const response = await fetch(endpoint, useSharedCatalogue ? {
     method: 'GET',
     cache: 'no-store',
