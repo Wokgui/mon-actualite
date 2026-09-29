@@ -3,6 +3,8 @@ on:
   push:
     branches: [main]
   workflow_dispatch:
+  schedule:
+    - cron: '*/30 * * * *'
 permissions:
   contents: write
 jobs:
@@ -10,6 +12,27 @@ jobs:
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
+      - name: Prepare preview news snapshot
+        run: |
+          if curl -fsSL --retry 3 --retry-delay 2 "https://mon-actualite.vercel.app/api/news?language=fr&locale=fr-FR&country=FR&preview=1&t=$(date +%s)" -o /tmp/preview-news.json; then
+            node <<'NODE'
+          const fs = require('fs');
+          const path = '/tmp/preview-news.json';
+          const payload = JSON.parse(fs.readFileSync(path, 'utf8'));
+          const absoluteApi = value => typeof value === 'string' && value.startsWith('/api/')
+            ? 'https://mon-actualite.vercel.app' + value
+            : value;
+          for (const article of Array.isArray(payload.articles) ? payload.articles : []) {
+            article.image = absoluteApi(article.image || '');
+            if (article.visual && typeof article.visual === 'object') {
+              article.visual.url = absoluteApi(article.visual.url || '');
+            }
+          }
+          fs.writeFileSync('preview-news.json', JSON.stringify(payload));
+          NODE
+          else
+            printf '{"fetchedAt":"%s","articles":[],"errors":["preview snapshot unavailable"]}\n' "$(date -u +%Y-%m-%dT%H:%M:%SZ)" > preview-news.json
+          fi
       - name: Publish preview branch
         run: |
           rm -rf /tmp/preview
