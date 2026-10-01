@@ -1,4 +1,4 @@
-:root{--app-accent:#7461e8;--header-background:#f7f8ff;--interface-text-scale:1;--interface-space-scale:1;--article-text-scale:1.15;--app-title-scale:1;--article-row-gap:9px;--header-v-pad:13px;--article-image-width:119px;--article-image-height:80px;--purple:var(--app-accent);--ui-accent:var(--app-accent);--ui-active:var(--app-accent);--purple-dark:color-mix(in srgb,var(--app-accent) 78%,#24213a);--app-accent-soft:color-mix(in srgb,var(--app-accent) 13%,white)}
+:root{--app-accent:#7461e8;--interface-text-scale:1;--interface-space-scale:1;--article-text-scale:1.15;--app-title-scale:1;--article-row-gap:9px;--header-v-pad:13px;--article-image-width:119px;--article-image-height:80px;--purple:var(--app-accent);--ui-accent:var(--app-accent);--ui-active:var(--app-accent);--purple-dark:color-mix(in srgb,var(--app-accent) 78%,#24213a);--app-accent-soft:color-mix(in srgb,var(--app-accent) 13%,white)}
 .hero-header{height:auto!important;min-height:0!important;padding:var(--header-v-pad) 8px!important}
 .hero-header h1{font-size:calc(27px * var(--app-title-scale))!important;line-height:1.08!important;margin:0!important}
 .hero-header .eyebrow,.hero-header .hero-mark,.small-primary-btn{background:var(--app-accent)!important}
@@ -92,9 +92,6 @@ html[data-show-badges="0"][data-show-age="0"] #app .article-card h2{margin-botto
 .preference-range{gap:calc(8px * var(--interface-space-scale));margin:calc(2px * var(--interface-space-scale)) 0 calc(18px * var(--interface-space-scale))}
 .preference-check,.preference-color{min-height:calc(44px * var(--interface-space-scale));font-size:calc(13px * var(--interface-text-scale))!important}
 .preference-color input{width:calc(58px * var(--interface-space-scale));height:calc(36px * var(--interface-space-scale))}
-
-/* Le fond choisi couvre tous les bandeaux supérieurs, sans modifier le contenu des pages. */
-.hero-header,.page-masthead-v9186,.topbar.page-masthead-v9186{background:var(--header-background)!important}
 
 /* Les deux segments remplissent exactement le sélecteur, sans liseré intérieur. */
 .brief-mode-tabs{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:0!important;padding:0!important;overflow:hidden!important}

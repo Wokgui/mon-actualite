@@ -35,6 +35,7 @@ const context = await browser.newContext({ viewport: { width: 412, height: 915 }
 await context.addInitScript(payload => {
   localStorage.setItem('news-live-cache', JSON.stringify({ articles: payload, fetchedAt: new Date().toISOString(), stats: {} }));
   localStorage.setItem('news-cache-language-v98', 'fr');
+  if (!localStorage.getItem('news-settings')) localStorage.setItem('news-settings', JSON.stringify({ headerBackground: '#d8f2ea' }));
 }, articles);
 const page = await context.newPage();
 const errors = [];
@@ -73,6 +74,8 @@ await page.route('**/version.json**', route => route.fulfill({ status: 200, cont
 
 const started = performance.now();
 await page.goto('http://127.0.0.1:4173/', { waitUntil: 'domcontentloaded', timeout: 15000 });
+const defaultDominantColor = await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--app-accent').trim());
+assert.equal(defaultDominantColor, '#7461e8', 'the approved violet/blue must remain the default');
 await page.waitForSelector('[data-stable-home-feed] .article-card', { timeout: 10000 });
 const readyMs = performance.now() - started;
 assert.ok(readyMs < 2500, `local mobile first render too slow: ${readyMs.toFixed(0)}ms`);
@@ -208,20 +211,32 @@ assert.ok(await page.locator('.article-age:visible').count() > 0);
 await page.locator('[data-view="settings"]').click(); await open('Affichage');
 await page.locator('[data-accent]').evaluate(input => { input.value = '#e8345f'; input.dispatchEvent(new Event('input', { bubbles:true })); });
 const colorLabels = await page.locator('.preference-color strong').allTextContents();
-assert.deepEqual(colorLabels, ['Couleur de fond du bandeau','Couleur dominante'], 'header background color must be above dominant color');
-await page.locator('[data-header-background]').evaluate(input => { input.value = '#d8f2ea'; input.dispatchEvent(new Event('input', { bubbles:true })); });
+assert.deepEqual(colorLabels, ['Couleur dominante'], 'only one colour setting must be shown');
+assert.equal(await page.locator('[data-header-background]').count(), 0, 'the obsolete header background control must be removed');
 await page.locator('[data-view="home"]').click();
 const accentHome = await page.evaluate(() => ({ mark:getComputedStyle(document.querySelector('.hero-header .hero-mark')).backgroundColor, headerBorder:getComputedStyle(document.querySelector('.hero-header')).borderBottomColor, headerBackground:getComputedStyle(document.querySelector('.hero-header')).backgroundColor, theme:document.querySelector('meta[name="theme-color"]').content, nav:getComputedStyle(document.querySelector('.bottom-nav .nav-item.active')).color }));
 assert.equal(accentHome.mark, 'rgba(255, 255, 255, 0.84)', 'the current theme keeps the decorative header mark white');
 assert.equal(await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--app-accent').trim()), '#e8345f', 'accent must drive the current adaptive gradient theme');
 assert.match(await page.locator('.hero-header').evaluate(el => getComputedStyle(el).backgroundImage), /linear-gradient/, 'current header must preserve its adaptive gradient');
 assert.match(await page.locator('.bottom-nav').evaluate(el => getComputedStyle(el).backgroundImage), /linear-gradient/, 'current navigation must preserve its adaptive gradient');
-assert.equal(accentHome.theme.toLowerCase(), '#d8f2ea', 'header background setting must update the Android/PWA theme color');
+assert.equal(accentHome.theme.toLowerCase(), '#e8345f', 'the dominant colour must also update the PWA theme color');
 await page.locator('[data-view="brief"]').click();
 assert.equal(await page.locator('.brief-mode-tab.active').evaluate(el => getComputedStyle(el).backgroundColor), 'rgb(232, 52, 95)', 'selected Brief tab must be fully filled with the accent color');
 const tabFill = await page.evaluate(() => { const tabs=document.querySelector('.brief-mode-tabs').getBoundingClientRect(); const active=document.querySelector('.brief-mode-tab.active').getBoundingClientRect(); return { left:active.left-tabs.left, top:active.top-tabs.top, bottom:tabs.bottom-active.bottom, half:tabs.width/2-active.width }; });
 assert.ok(Object.values(tabFill).every(value => Math.abs(value) < .75), `selected Brief tab must reach every edge of its half (${JSON.stringify(tabFill)})`);
 assert.match(await page.locator('.page-masthead-v9186').evaluate(el => getComputedStyle(el).backgroundImage), /linear-gradient/, 'the Brief header must share the adaptive gradient');
+
+await page.locator('[data-view="settings"]').click(); await open('Affichage');
+const preferencesBeforeColorReset = await page.evaluate(() => JSON.parse(localStorage.getItem('news-settings')));
+await page.locator('[data-reset-accent]').click();
+assert.equal(await page.locator('[data-accent]').inputValue(), '#7461e8', 'restore must restore the approved violet/blue colour');
+const preferencesAfterColorReset = await page.evaluate(() => JSON.parse(localStorage.getItem('news-settings')));
+assert.deepEqual(preferencesAfterColorReset, { ...preferencesBeforeColorReset, accent: '#7461e8' }, 'restore colour must not change any other preference');
+assert.equal(Object.hasOwn(preferencesAfterColorReset, 'headerBackground'), false, 'obsolete header setting must not be persisted');
+await page.reload({ waitUntil: 'domcontentloaded' });
+await page.locator('[data-view="settings"]').click(); await open('Affichage');
+assert.equal(await page.locator('[data-accent]').inputValue(), '#7461e8', 'restored default must survive reload');
+await page.locator('.settings-accordion-v9185').filter({ has: page.locator('[data-accent]') }).screenshot({ path: evidenceDir + '/couleur-dominante-restauree.png' });
 
 await page.locator('[data-view="settings"]').click(); await open('L’essentiel');
 await open('Actualité générale');
@@ -261,7 +276,7 @@ await page.locator('#watch-query-input').fill('Article 1');
 await page.locator('[data-add-watch-rule]').click();
 await page.locator('[data-view="brief"]').click();
 await page.locator('[data-brief-mode="watches"]').click();
-assert.equal(await page.locator('.brief-mode-tab.active').evaluate(el => getComputedStyle(el).backgroundColor), 'rgb(232, 52, 95)', 'selected Watch tab must be fully filled with the accent color');
+assert.equal(await page.locator('.brief-mode-tab.active').evaluate(el => getComputedStyle(el).backgroundColor), 'rgb(116, 97, 232)', 'selected Watch tab must use the restored default dominant colour');
 assert.equal(await page.getByText(/Aucune nouveauté correspondant/).count(), 0, 'empty watch-day messages must be removed');
 const watchDateAlignments = await page.locator('.watch-day-v9138>h3').evaluateAll(headings => headings.map(heading => getComputedStyle(heading).textAlign));
 assert.ok(watchDateAlignments.length > 0 && watchDateAlignments.every(value => value === 'center'), 'watch dates must be centered');

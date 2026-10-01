@@ -44,7 +44,7 @@ const UI_TEXT = {
     home: 'Accueil', settings: 'Réglages', brief: 'Brief', essential: 'L’essentiel', watch: 'Veille', editWatch: 'Régler la veille',
     language: 'Langue', textDensity: 'Taille et densité du texte', display: 'Affichage', generalNews: 'Actualité générale', baseSources: 'Sources d’information de base', addBlockSource: 'Ajouter / bloquer une source', keywords: 'Mots-clés', operation: 'Fonctionnement', version: 'Version',
     articleText: 'Taille du texte des articles', interfaceText: 'Taille du texte de l’interface', density: 'Densité entre les articles', titleSize: 'Taille du titre', small: 'Petit', large: 'Grand', lowDensity: 'Peu dense', highDensity: 'Très dense', smallTitle: 'Petit titre', largeTitle: 'Gros titre',
-    showBadges: 'Afficher les badges', showAge: 'Afficher depuis combien de temps l’article est sorti', headerBackground: 'Couleur de fond du bandeau', dominantColor: 'Couleur dominante', articleCount: 'Nombre d’articles', coveredDomains: 'Domaines couverts',
+    showBadges: 'Afficher les badges', showAge: 'Afficher depuis combien de temps l’article est sorti', dominantColor: 'Couleur dominante', restoreColor: 'Restaurer la couleur par défaut', colorRestored: 'Couleur par défaut restaurée', articleCount: 'Nombre d’articles', coveredDomains: 'Domaines couverts',
     chooseLanguages: 'Choisir des langues', sourcesCountry: 'Les sources proposées par défaut suivent le pays correspondant : {country}.', availableLanguages: 'Langues disponibles', catalogHelp: 'Téléchargez une langue puis utilisez ses sources d’information.', selected: 'Sélectionnée', use: 'Utiliser', download: 'Télécharger', close: 'Fermer',
     automaticRefresh: 'Actualisation automatique', automaticDesc: 'Charge les nouveautés en arrière-plan.', webSearch: 'Recherche web complémentaire', webSearchDesc: 'Complète les flux avec Google Actualités.', publication: 'Publication du {date}', checkUpdate: 'Vérifier la mise à jour', follow: 'Suivre', followed: 'Suivie', block: 'Bloquer', unblock: 'Débloquer'
   },
@@ -52,7 +52,7 @@ const UI_TEXT = {
     home: 'Home', settings: 'Settings', brief: 'Brief', essential: 'Essential', watch: 'Watch', editWatch: 'Edit watch',
     language: 'Language', textDensity: 'Text size and density', display: 'Display', generalNews: 'General news', baseSources: 'Default news sources', addBlockSource: 'Add / block a source', keywords: 'Keywords', operation: 'Operation', version: 'Version',
     articleText: 'Article text size', interfaceText: 'Interface text size', density: 'Space between articles', titleSize: 'Title size', small: 'Small', large: 'Large', lowDensity: 'More space', highDensity: 'More compact', smallTitle: 'Small title', largeTitle: 'Large title',
-    showBadges: 'Show badges', showAge: 'Show how long ago the article was published', headerBackground: 'Header background colour', dominantColor: 'Accent colour', articleCount: 'Number of articles', coveredDomains: 'Topics covered',
+    showBadges: 'Show badges', showAge: 'Show how long ago the article was published', dominantColor: 'Accent colour', restoreColor: 'Restore default colour', colorRestored: 'Default colour restored', articleCount: 'Number of articles', coveredDomains: 'Topics covered',
     chooseLanguages: 'Choose languages', sourcesCountry: 'Default sources follow the corresponding country: {country}.', availableLanguages: 'Available languages', catalogHelp: 'Download a language, then use its news sources.', selected: 'Selected', use: 'Use', download: 'Download', close: 'Close',
     automaticRefresh: 'Automatic refresh', automaticDesc: 'Loads new stories in the background.', webSearch: 'Additional web search', webSearchDesc: 'Completes feeds with Google News.', publication: 'Published on {date}', checkUpdate: 'Check for updates', follow: 'Follow', followed: 'Following', block: 'Block', unblock: 'Unblock'
   },
@@ -112,6 +112,7 @@ const categoryMeta = {
   'À suivre': { icon: 'bookmark', label: 'À suivre' }
 };
 
+const DEFAULT_ACCENT = '#7461e8';
 const defaultSettings = {
   notifications: true,
   webSearch: true,
@@ -131,8 +132,7 @@ const defaultSettings = {
   titleSize: 100,
   showBadges: true,
   showAge: true,
-  accent: '#7461e8',
-  headerBackground: '#f7f8ff'
+  accent: DEFAULT_ACCENT
 };
 
 function safeJson(key, fallback) {
@@ -156,11 +156,12 @@ const savedSettings = {
   showBadges: legacyUiSettings.showBadges,
   showAge: legacyUiSettings.showAge,
   accent: legacyUiSettings.accent,
-  headerBackground: legacyUiSettings.headerBackground,
   essentialCount: legacyUiSettings.essentialCount,
   briefEssentialCategories: legacyUiSettings.essentialDomains,
   ...storedSettings
 };
+// Retire the old independent header colour without changing a saved accent.
+delete savedSettings.headerBackground;
 const selectedLanguage = LANGUAGE_PRESETS[savedSettings.language] ? savedSettings.language : 'fr';
 const cacheLanguage = localStorage.getItem('news-cache-language-v98') || selectedLanguage;
 const rawCache = safeJson('news-live-cache', { articles: [], fetchedAt: null });
@@ -200,21 +201,19 @@ const state = {
     titleSize: boundedNumber(savedSettings.titleSize, 100, 70, 140),
     showBadges: savedSettings.showBadges !== false,
     showAge: savedSettings.showAge !== false,
-    accent: /^#[0-9a-f]{6}$/i.test(savedSettings.accent || '') ? savedSettings.accent : '#7461e8',
-    headerBackground: /^#[0-9a-f]{6}$/i.test(savedSettings.headerBackground || '') ? savedSettings.headerBackground : '#f7f8ff'
+    accent: /^#[0-9a-f]{6}$/i.test(savedSettings.accent || '') ? savedSettings.accent : DEFAULT_ACCENT
   }
 };
 
 function applyAppearanceSettings() {
   const root = document.documentElement;
-  const { accent, headerBackground, textSize, interfaceTextSize, titleSize, density, showBadges, showAge, language } = state.settings;
+  const { accent, textSize, interfaceTextSize, titleSize, density, showBadges, showAge, language } = state.settings;
   const rowGap = Math.round(20 - density * .18);
   const photoWidth = Math.round(112 + (textSize - 100) * (36 / 75));
   const photoHeight = Math.round(photoWidth * 75 / 112);
   root.style.setProperty('--app-accent', accent);
   root.style.setProperty('--ui-accent', accent);
   root.style.setProperty('--ui-active', accent);
-  root.style.setProperty('--header-background', headerBackground);
   root.style.setProperty('--article-text-scale', String(textSize / 100));
   root.style.setProperty('--interface-text-scale', String(interfaceTextSize / 100));
   root.style.setProperty('--interface-space-scale', String(interfaceTextSize / 100));
@@ -227,7 +226,7 @@ function applyAppearanceSettings() {
   root.dataset.showAge = showAge ? '1' : '0';
   root.lang = language;
   document.title = language === 'fr' ? 'Mon actualité' : `${ui('brief')} · Mon actualité`;
-  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', headerBackground);
+  document.querySelector('meta[name="theme-color"]')?.setAttribute('content', accent);
 }
 
 applyAppearanceSettings();
@@ -876,7 +875,7 @@ function openLanguageCatalog() {
 }
 
 function displaySettingsMarkup() {
-  return `<label class="preference-check"><input type="checkbox" data-display-setting="showBadges" ${state.settings.showBadges ? 'checked' : ''}><span>${escapeHtml(ui('showBadges'))}</span></label><label class="preference-check"><input type="checkbox" data-display-setting="showAge" ${state.settings.showAge ? 'checked' : ''}><span>${escapeHtml(ui('showAge'))}</span></label><label class="preference-color"><strong>${escapeHtml(ui('headerBackground'))}</strong><input type="color" value="${state.settings.headerBackground}" data-header-background aria-label="${escapeHtml(ui('headerBackground'))}"></label><label class="preference-color"><strong>${escapeHtml(ui('dominantColor'))}</strong><input type="color" value="${state.settings.accent}" data-accent aria-label="${escapeHtml(ui('dominantColor'))}"></label>`;
+  return `<label class="preference-check"><input type="checkbox" data-display-setting="showBadges" ${state.settings.showBadges ? 'checked' : ''}><span>${escapeHtml(ui('showBadges'))}</span></label><label class="preference-check"><input type="checkbox" data-display-setting="showAge" ${state.settings.showAge ? 'checked' : ''}><span>${escapeHtml(ui('showAge'))}</span></label><label class="preference-color"><strong>${escapeHtml(ui('dominantColor'))}</strong><input type="color" value="${state.settings.accent}" data-accent aria-label="${escapeHtml(ui('dominantColor'))}"></label><button type="button" class="secondary-btn" data-reset-accent>${escapeHtml(ui('restoreColor'))}</button>`;
 }
 
 function essentialSettingsMarkup() {
@@ -1583,6 +1582,15 @@ app.addEventListener('click', async event => {
   const briefWatch = event.target.closest('[data-brief-watch]');
   if (briefWatch) { const name = briefWatch.dataset.briefWatch; const current = new Set(state.settings.briefWatchTopics); current.has(name) ? current.delete(name) : current.add(name); state.settings.briefWatchTopics = [...current]; persist(); state.sheet ? refreshSheet() : render(); return; }
   if (event.target.closest('[data-saved-filter]')) { state.savedOnly = !state.savedOnly; render(); return; }
+  if (event.target.closest('[data-reset-accent]')) {
+    state.settings.accent = DEFAULT_ACCENT;
+    applyAppearanceSettings();
+    persist();
+    const colorInput = app.querySelector('[data-accent]');
+    if (colorInput) colorInput.value = DEFAULT_ACCENT;
+    toast(ui('colorRestored'));
+    return;
+  }
   if (event.target.closest('[data-reset]')) { state.settings = { ...defaultSettings, generalCategories: [...GENERAL_CATEGORIES], interests: [...PERSONAL_THEMES], briefEssentialCategories: [...GENERAL_CATEGORIES], briefWatchTopics: [...DEFAULT_WATCH_TOPICS], enabledLanguages: ['fr'] }; state.keywords = []; state.blockedTerms = []; state.domains = []; state.followedSources.clear(); state.blockedSources.clear(); state.watchRules = []; state.topicPreferences = {}; window.NewsPersonalizationV91?.reset(); persist(); applyAppearanceSettings(); render(); toast('Préférences réinitialisées'); syncNews({ silent: true }); return; }
   if (event.target.closest('[data-install]')) {
     if (isInstalled) return toast('L’application est déjà installée');
@@ -1609,11 +1617,6 @@ app.addEventListener('input', event => {
   if (updateRangeSetting(event.target)) return;
   if (event.target.matches('[data-accent]')) {
     state.settings.accent = event.target.value;
-    applyAppearanceSettings();
-    persist();
-  }
-  if (event.target.matches('[data-header-background]')) {
-    state.settings.headerBackground = event.target.value;
     applyAppearanceSettings();
     persist();
   }
