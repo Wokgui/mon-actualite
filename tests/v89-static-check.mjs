@@ -25,8 +25,10 @@ for (const ref of new Set(refs)) {
 if (!process.exitCode) ok('all local index assets exist');
 
 const scripts = [...index.matchAll(/<script[^>]+src="([^"]+)"/g)].map(match => match[1]);
-if (scripts.length > 6) fail(`startup script budget exceeded: ${scripts.length}/6`);
-else ok(`startup script budget ${scripts.length}/6`);
+const runtimeFiles = new Set(['startup-stability-v98.15.js', 'release-watch.js', 'article-access-v91.48.js', 'startup-news-prefetch-v91.83.js', 'app.js', 'image-pipeline.js', 'nav-solid-hardfix-v91.89.js', 'ui-settings-fix-v98.11.js', 'brief-three-days-v98.14.js', 'brief-prefetch-v98.15.js']);
+for (const src of scripts) if (!runtimeFiles.has(src.split('?')[0])) fail(`unexpected runtime owner: ${src}`);
+if (scripts.length !== runtimeFiles.size) fail('runtime must contain exactly the current approved modules without duplicates');
+else ok(`current runtime allowlist: ${scripts.length} scripts, no duplicate photo owner`);
 
 const requiredRuntimeScripts = [
   'release-watch.js',
@@ -73,7 +75,7 @@ for (const src of scripts) {
   else ok(`service worker precaches runtime script ${src}`);
 }
 
-for (const asset of ['app-controls.css?v=98.10']) {
+for (const asset of ['app-controls.css?v=98.31']) {
   if (!index.includes(asset)) fail(`final visual layer missing from index: ${asset}`);
   if (!sw.includes(asset)) fail(`service worker does not precache final visual layer: ${asset}`);
   else ok(`service worker precaches final visual layer: ${asset}`);
@@ -125,16 +127,17 @@ if (app.match(/function effectiveWatchRules\(\)[\s\S]{0,500}briefWatchTopics/)) 
 if (!app.includes('function fetchHistoryCoverage') || !app.includes('days = historyWindowDays()') || !app.includes('historyDays: days')) fail('calendar-month historical discovery is missing');
 else ok('calendar-month historical discovery configured');
 const imageSequence = read('image-pipeline.js');
-if (app.includes('scheduleVisualBackfill') || app.includes('recoverArticleVisual') || !imageSequence.includes('const MAX_CONCURRENT = 8')) fail('photo loading must have one bounded owner');
+const photos = read('services/article-photos.js');
+if (app.includes('scheduleVisualBackfill') || app.includes('recoverArticleVisual') || scripts.some(src => /photo-single-owner|image-sequence|image-stability/.test(src)) || !imageSequence.includes('concurrency: 4')) fail('photo loading must have one bounded owner');
 else ok('single bounded image pipeline owns photo loading');
-if (!imageSequence.includes('RECOVERY_DELAYS_MS = [8_000, 30_000]') || !imageSequence.includes("url.searchParams.set('recovery'")) fail('failed photos do not receive bounded cache-bypassing recovery attempts');
-else ok('failed photos receive bounded cache-bypassing recovery attempts');
-if (!imageSequence.includes('isExternalHttp(prepared) || isGenericResolver(prepared) ? proxyUrl(article) : prepared')) fail('validated exact same-origin images must stay ahead of refreshed generic recovery');
+if (!imageSequence.includes('record.attempts < 2') || !photos.includes('record.retryAt = Date.now() + 8000')) fail('failed photos must receive a bounded retry of the same URL');
+else ok('failed photos receive one bounded retry without changing selection identity');
+if (!photos.includes('preparedVisualUrl(article), articleVisualUrl(article)')) fail('validated exact same-origin images must stay ahead of refreshed generic recovery');
 else ok('validated same-origin prepared images keep first priority');
 const photoFast = read('api/article-photo-fast.js');
 if (!photoFast.includes('fastBingImageSearch') || !photoFast.includes('bingImageEntries') || !photoFast.includes('sourceAgreement')) fail('generic title/source photo recovery is missing');
 else ok('generic title/source photo recovery configured');
-if (!sw.includes("THUMB_CACHE='mon-actualite-thumbnails-v9'") || sw.includes('cache.put(key,fallback.clone())')) fail('negative thumbnail fallbacks must be purged and never cached');
+if (!sw.includes("THUMB_CACHE = 'mon-actualite-thumbnails-v10'") || !sw.includes('if (!positive(response)) return response')) fail('negative thumbnail fallbacks must be purged and never cached');
 else ok('negative thumbnail fallbacks are purged instead of cached');
 const androidGradle = read('android-app/app/build.gradle');
 const androidActivity = read('android-app/app/src/main/java/com/wokgui/monactualite/MainActivity.java');
@@ -168,13 +171,13 @@ if (!app.includes('settingsOpenAccordions') || !app.includes('captureOpenSetting
 else ok('settings accordion persistence configured');
 if (!app.includes('navLongPressTimer') || !app.includes('resetReadStateFromNav(view)')) fail('long press reset on Home/Brief missing');
 else ok('long press reset on Home/Brief configured');
-if (!app.includes("const target = real || tile") || !app.includes('data-photo-src=') || !app.includes('fetchpriority=')) fail('stable placeholder and prioritized article image loading missing');
+if (!app.includes('photoSnapshot(article)') || !app.includes('data-photo-final=') || !app.includes('fetchpriority=')) fail('shared renderer photo lock missing');
 else ok('immediate high-priority article image loading configured');
-if (!imageSequence.includes('const MAX_CONCURRENT = 8') || !imageSequence.includes('const PRIORITY_COUNT = 16') || !imageSequence.includes("rootMargin: '1200px 0px'") || !imageSequence.includes('REQUEST_TIMEOUT_MS = 6500') || !imageSequence.includes('function pump()')) fail('bounded image loading pipeline missing');
+if (!imageSequence.includes('Math.min(8,') || !imageSequence.includes('priorityCount: 12') || !imageSequence.includes('rootMarginPx: 1200') || !imageSequence.includes('intervalMs: 120') || !imageSequence.includes('function pump()')) fail('bounded paced image loading pipeline missing');
 else ok('bounded image loading pipeline configured');
 
 const visualService = read('services/article-visuals.js');
-if (!visualService.includes('const extracted = extractPreparedImage(rawVisual)') || !imageSequence.includes('isExternalHttp(prepared)')) fail('external visuals are not routed through the validated image proxy');
+if (!visualService.includes('let suppliedImage = extractPreparedImage(rawVisual)') || !photos.includes('response.headers.get') || !photos.includes('image.decode()')) fail('external visuals are not decoded through the validated image proxy');
 else ok('external visuals route through the validated bounded proxy');
 if (!app.includes("app.addEventListener('toggle'") || !app.includes("settingsOpenAccordions.add(title)")) fail('settings accordion toggle persistence missing');
 else ok('settings accordion toggle persistence configured');
@@ -182,10 +185,10 @@ else ok('settings accordion toggle persistence configured');
 const releaseWatch = read('release-watch.js');
 if (!releaseWatch.includes('IS_NATIVE_ANDROID') || !releaseWatch.includes('if (IS_NATIVE_ANDROID)')) fail('native Android release watcher guard missing');
 else ok('native Android release watcher guard configured');
-if (!imageSequence.includes("image.addEventListener('load'") || !imageSequence.includes("image.addEventListener('error'")) fail('image pipeline load and fallback handling missing');
-else ok('image pipeline preserves the initial source and only falls back after error');
-if (!app.includes('article.pinnedVisualV85 = remembered.url') || app.includes('live.pinnedVisualV85 = endpoint')) fail('legacy successful image migration is not isolated from the new pipeline');
-else ok('legacy successful image URLs migrate without a second recovery loop');
+if (!photos.includes('image.decode()') || !photos.includes("record.status = 'failed'")) fail('image decode and failure handling missing');
+else ok('candidate decode happens before visible assignment');
+if (app.includes('pinnedVisualV85 = remembered.url') || app.includes('visualBackfills')) fail('legacy unvalidated image pins must not bypass the shared registry');
+else ok('legacy pins cannot overwrite the final photo');
 
 if (!app.includes('if (IS_NATIVE_ANDROID) {') || !app.includes('publishedNumber > currentNumber') || !app.includes("if (!IS_NATIVE_ANDROID) window.setTimeout(() => checkAppUpdate(), 1400)")) fail('native app update guard missing');
 else ok('native app update guard configured');

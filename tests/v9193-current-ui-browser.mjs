@@ -25,6 +25,13 @@ const article = {
   publishedAt: new Date().toISOString(),
   url: 'https://example.test/article'
 };
+function fixtureHash(text, seed) {
+  let hash = seed >>> 0;
+  for (let i = 0; i < text.length; i++) { hash ^= text.charCodeAt(i); hash = Math.imul(hash, 16777619); hash ^= hash >>> 13; }
+  return (hash >>> 0).toString(16).padStart(8, '0');
+}
+const fixtureKey = `${article.url}|${article.title.normalize('NFD').replace(/[\u0300-\u036f]/g, '').toLowerCase().replace(/[^a-z0-9]+/g, ' ').trim()}`;
+article.id = `a-${fixtureHash(fixtureKey, 2166136261)}${fixtureHash(fixtureKey, 0x9e3779b1)}`;
 
 await context.addInitScript(payload => {
   localStorage.setItem('news-live-cache', JSON.stringify({
@@ -101,9 +108,11 @@ console.log('UI_STATE_SNAPSHOTS', JSON.stringify(states));
 for (const view of ['home', 'settings', 'brief']) {
   const state = states[view];
   assert.equal(state.items.length, 3, 'bottom navigation must contain exactly three equal items');
-  const expectedWidth = state.nav.width / 3;
+  // Current theme has horizontal padding and two gaps; the three remaining
+  // cells must be equal and keep the same coordinates between views.
+  const expectedWidth = state.items.reduce((sum, item) => sum + item.width, 0) / 3;
   for (const item of state.items) {
-    assert.ok(Math.abs(item.width - expectedWidth) < 0.75, `${view}: each nav item must occupy exactly one third`);
+    assert.ok(Math.abs(item.width - expectedWidth) < 0.75, `${view}: nav cells must have equal widths`);
     assert.equal(item.marginTop, '0px', `${view}: nav item top margin must stay zero`);
     assert.equal(item.marginBottom, '0px', `${view}: nav item bottom margin must stay zero`);
     assert.equal(item.transform, 'none', `${view}: nav items must not transform on selection`);

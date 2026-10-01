@@ -4,9 +4,9 @@ import vm from 'node:vm';
 import { createRequire } from 'node:module';
 
 const require = createRequire(import.meta.url);
-const source = `${fs.readFileSync('api/article-thumbnail.js', 'utf8')}\nmodule.exports.__test = { queryVariants, sameEvent };`;
+const source = `${fs.readFileSync('lib/article-photo-resolver.js', 'utf8')}\nmodule.exports.__test = { queryVariants, sameEvent };`;
 const context = {
-  require,
+  require: spec => spec === './article-photo-cache.js' ? require('../lib/article-photo-cache.js') : require(spec),
   module: { exports: {} },
   exports: {},
   Buffer,

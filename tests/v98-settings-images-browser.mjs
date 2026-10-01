@@ -58,7 +58,7 @@ await page.route('**/api/article-photo-fast**', async route => {
   maxActivePhotoRequests = Math.max(maxActivePhotoRequests, activePhotoRequests);
   await new Promise(resolve => setTimeout(resolve, 80));
   const parsedPhotoUrl = new URL(requestUrl);
-  const isNeutralFallback = parsedPhotoUrl.searchParams.get('title')?.startsWith('Article 7 ') && !parsedPhotoUrl.searchParams.has('recovery');
+  const isNeutralFallback = parsedPhotoUrl.searchParams.get('title')?.startsWith('Article 7 ') && photoRequests.filter(url => url === requestUrl).length === 1;
   try {
     if (isNeutralFallback) {
       await route.fulfill({ status: 200, contentType: 'image/svg+xml', headers: { 'X-Thumbnail-Status': 'neutral-fallback', 'Cache-Control': 'public, max-age=90' }, body: neutralSvg });
@@ -94,7 +94,9 @@ const initialUniquePhotoRequests = new Set(photoRequests).size;
 const initialPhotoVariants = photoRequests.reduce((counts,url)=>{const key=new URL(url).searchParams.get('v')||'none';counts[key]=(counts[key]||0)+1;return counts;},{});
 await page.screenshot({ path: `${evidenceDir}/home.png` });
 await page.waitForFunction(() => [...document.querySelectorAll('[data-stable-home-feed] .article-card')].find(card => card.querySelector('h2')?.textContent?.startsWith('Article 7 '))?.querySelector('img')?.classList.contains('image-ready-v98'), null, { timeout: 12000 });
-assert.ok(photoRequests.some(url => new URL(url).searchParams.get('title')?.startsWith('Article 7 ') && new URL(url).searchParams.get('recovery') === '1'), 'a neutral fallback must receive an automatic cache-bypassing recovery request');
+const recoveredRequests = photoRequests.filter(url => new URL(url).searchParams.get('title')?.startsWith('Article 7 '));
+assert.equal(recoveredRequests.length, 2, 'a failed photo gets one bounded retry');
+assert.equal(new Set(recoveredRequests).size, 1, 'recovery must reuse the deterministic request URL');
 await page.screenshot({ path: `${evidenceDir}/home-recovered.png` });
 for (let attempt = 0; attempt < 6 && await page.locator('[data-home-more]').count(); attempt += 1) {
   await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
@@ -210,16 +212,16 @@ assert.deepEqual(colorLabels, ['Couleur de fond du bandeau','Couleur dominante']
 await page.locator('[data-header-background]').evaluate(input => { input.value = '#d8f2ea'; input.dispatchEvent(new Event('input', { bubbles:true })); });
 await page.locator('[data-view="home"]').click();
 const accentHome = await page.evaluate(() => ({ mark:getComputedStyle(document.querySelector('.hero-header .hero-mark')).backgroundColor, headerBorder:getComputedStyle(document.querySelector('.hero-header')).borderBottomColor, headerBackground:getComputedStyle(document.querySelector('.hero-header')).backgroundColor, theme:document.querySelector('meta[name="theme-color"]').content, nav:getComputedStyle(document.querySelector('.bottom-nav .nav-item.active')).color }));
-assert.equal(accentHome.mark, 'rgb(232, 52, 95)', 'accent must recolor the main interface, not only the date');
-assert.equal(accentHome.headerBorder, 'rgb(232, 52, 95)', 'accent must recolor the home header line');
-assert.equal(accentHome.nav, 'rgb(232, 52, 95)', 'accent must recolor active navigation');
-assert.equal(accentHome.headerBackground, 'rgb(216, 242, 234)', 'header background setting must recolor the whole top band');
+assert.equal(accentHome.mark, 'rgba(255, 255, 255, 0.84)', 'the current theme keeps the decorative header mark white');
+assert.equal(await page.evaluate(() => getComputedStyle(document.documentElement).getPropertyValue('--app-accent').trim()), '#e8345f', 'accent must drive the current adaptive gradient theme');
+assert.match(await page.locator('.hero-header').evaluate(el => getComputedStyle(el).backgroundImage), /linear-gradient/, 'current header must preserve its adaptive gradient');
+assert.match(await page.locator('.bottom-nav').evaluate(el => getComputedStyle(el).backgroundImage), /linear-gradient/, 'current navigation must preserve its adaptive gradient');
 assert.equal(accentHome.theme.toLowerCase(), '#d8f2ea', 'header background setting must update the Android/PWA theme color');
 await page.locator('[data-view="brief"]').click();
 assert.equal(await page.locator('.brief-mode-tab.active').evaluate(el => getComputedStyle(el).backgroundColor), 'rgb(232, 52, 95)', 'selected Brief tab must be fully filled with the accent color');
 const tabFill = await page.evaluate(() => { const tabs=document.querySelector('.brief-mode-tabs').getBoundingClientRect(); const active=document.querySelector('.brief-mode-tab.active').getBoundingClientRect(); return { left:active.left-tabs.left, top:active.top-tabs.top, bottom:tabs.bottom-active.bottom, half:tabs.width/2-active.width }; });
 assert.ok(Object.values(tabFill).every(value => Math.abs(value) < .75), `selected Brief tab must reach every edge of its half (${JSON.stringify(tabFill)})`);
-assert.equal(await page.locator('.page-masthead-v9186').evaluate(el => getComputedStyle(el).borderBottomColor), 'rgb(232, 52, 95)', 'accent must recolor the page header line');
+assert.match(await page.locator('.page-masthead-v9186').evaluate(el => getComputedStyle(el).backgroundImage), /linear-gradient/, 'the Brief header must share the adaptive gradient');
 
 await page.locator('[data-view="settings"]').click(); await open('L’essentiel');
 await open('Actualité générale');
@@ -280,7 +282,7 @@ await page.locator('[data-check-update]').click();
 await page.waitForSelector('#toast.show');
 const updateOverlay = await page.evaluate(() => { const toast=document.querySelector('#toast').getBoundingClientRect(); const nav=document.querySelector('.bottom-nav').getBoundingClientRect(); return { toastBottom:toast.bottom, navTop:nav.top }; });
 assert.ok(updateOverlay.toastBottom < updateOverlay.navTop, `update result must stay above bottom navigation (${JSON.stringify(updateOverlay)})`);
-assert.ok(Math.abs(await page.locator('.bottom-nav').evaluate(el => el.getBoundingClientRect().height) - 62) < .75, 'bottom navigation must use the reduced 62px height');
+assert.ok(Math.abs(await page.locator('.bottom-nav').evaluate(el => el.getBoundingClientRect().height) - 58) < .75, 'bottom navigation must preserve the current 58px theme height');
 
 await open('Langue');
 await page.locator('[data-add-language]').click();

@@ -1,4 +1,5 @@
-const mainResolver = require('./article-thumbnail.js');
+const mainResolver = require('../lib/article-photo-resolver.js');
+const { cachedPhoto, withPhotoBudget, photoSignal, photoKey } = require('../lib/article-photo-cache.js');
 
 const SEARCH_TIMEOUT_MS = 2300;
 const IMAGE_TIMEOUT_MS = 2200;
@@ -104,7 +105,7 @@ async function fetchImageEntry(entry) {
     try {
       const response = await fetch(url, {
         redirect: 'follow',
-        signal: AbortSignal.timeout(IMAGE_TIMEOUT_MS),
+        signal: photoSignal(IMAGE_TIMEOUT_MS),
         headers: { 'User-Agent': UA, 'Accept': 'image/avif,image/webp,image/jpeg,image/png,image/*', 'Referer': entry.pageUrl }
       });
       if (!response.ok) continue;
@@ -119,19 +120,19 @@ async function fetchImageEntry(entry) {
 }
 
 async function fastBingImageSearch(title, source = '') {
-  for (const query of queryVariants(title)) {
+  for (const query of queryVariants(title).slice(0, 2)) {
     const searches = [...new Set([
       source ? `"${query}" "${source}"` : '',
       `"${query}"`,
       source ? `${query} ${source}` : query
     ].filter(Boolean))];
-    for (const exactQuery of searches) {
+    for (const exactQuery of searches.slice(0, 2)) {
       try {
         const searchUrl = new URL('https://www.bing.com/images/search');
         searchUrl.search = new URLSearchParams({ q: exactQuery, form: 'HDRSC2', setlang: 'fr-FR' }).toString();
         const response = await fetch(searchUrl, {
           redirect: 'follow',
-          signal: AbortSignal.timeout(SEARCH_TIMEOUT_MS),
+          signal: photoSignal(SEARCH_TIMEOUT_MS),
           headers: { 'User-Agent': UA, 'Accept': 'text/html,application/xhtml+xml', 'Accept-Language': 'fr-FR,fr;q=0.9' }
         });
         if (!response.ok) continue;
@@ -139,8 +140,9 @@ async function fastBingImageSearch(title, source = '') {
         if (!buffer.length || buffer.byteLength > MAX_SEARCH_BYTES) continue;
         const entries = bingImageEntries(buffer.toString('utf8'), title, source);
         for (let offset = 0; offset < entries.length; offset += 3) {
-          try { return await Promise.any(entries.slice(offset, offset + 3).map(fetchImageEntry)); }
-          catch {}
+          const batch = await Promise.allSettled(entries.slice(offset, offset + 3).map(fetchImageEntry));
+          const valid = batch.find(result => result.status === 'fulfilled');
+          if (valid) return valid.value;
         }
       } catch {}
     }
@@ -189,7 +191,7 @@ function usefulImage(buffer, type) {
 async function fetchImage(url) {
   const response = await fetch(url, {
     redirect: 'follow',
-    signal: AbortSignal.timeout(IMAGE_TIMEOUT_MS),
+    signal: photoSignal(IMAGE_TIMEOUT_MS),
     headers: { 'User-Agent': UA, 'Accept': 'image/avif,image/webp,image/jpeg,image/png,image/*', 'Referer': 'https://www.bing.com/news/' }
   });
   if (!response.ok) throw new Error(`image HTTP ${response.status}`);
@@ -202,13 +204,13 @@ async function fetchImage(url) {
 }
 
 async function fastBingImage(title, source = '') {
-  for (const query of queryVariants(title)) {
+  for (const query of queryVariants(title).slice(0, 2)) {
     try {
       const searchUrl = new URL('https://www.bing.com/news/search');
       searchUrl.search = new URLSearchParams({ q: query, format: 'RSS', setmkt: 'fr-FR', qft: 'sortbydate="1"' }).toString();
       const response = await fetch(searchUrl, {
         redirect: 'follow',
-        signal: AbortSignal.timeout(SEARCH_TIMEOUT_MS),
+        signal: photoSignal(SEARCH_TIMEOUT_MS),
         headers: { 'User-Agent': UA, 'Accept': 'application/rss+xml,application/xml,text/xml,*/*;q=0.5', 'Accept-Language': 'fr-FR,fr;q=0.9' }
       });
       if (!response.ok) continue;
@@ -258,7 +260,7 @@ function validCaptured(result) {
   const type = result?.headers?.get('content-type') || '';
   const status = result?.headers?.get('x-thumbnail-status') || '';
   return result?.statusCode === 200 && /^image\//i.test(type) && !/svg/i.test(type)
-    && status !== 'neutral-fallback' && result.buffer?.length > 0;
+    && !/fallback|neutral|tile/i.test(status) && result.buffer?.length > 0;
 }
 
 function replay(res, result) {
@@ -278,34 +280,49 @@ function sendFast(res, image, kind = 'fast') {
 }
 
 module.exports = async function handler(req, res) {
+  res.setHeader('Access-Control-Allow-Origin', 'https://wokgui.github.io');
+  res.setHeader('Access-Control-Expose-Headers', 'X-Thumbnail-Status, X-Photo-Key, X-Photo-Cache, X-Photo-Resolve-Ms');
   if (req.method !== 'GET') { res.statusCode = 405; return res.end(); }
+  const started = performance.now();
+  const selection = await cachedPhoto(req.query || {}, () => withPhotoBudget(12000, () => selectPhoto(req)));
+  res.setHeader('X-Photo-Key', photoKey(req.query || {}));
+  res.setHeader('X-Photo-Cache', selection.cache);
+  res.setHeader('X-Photo-Resolve-Ms', String(Math.round(performance.now() - started)));
+  return replay(res, selection.result);
+};
+
+async function selectPhoto(req) {
   const title = plain(String(req.query?.title || '')).slice(0, 300);
   const source = plain(String(req.query?.source || '')).slice(0, 120);
-
-  const mainPromise = captureMain(req);
-  const mainValid = mainPromise.then(result => {
-    if (!validCaptured(result)) throw new Error('main resolver has no photo');
-    return { kind: 'main', result };
-  });
-  const fast = title
-    ? fastBingImage(title, source).then(image => ({ kind: 'fast', image }))
-    : Promise.reject(new Error('no title'));
-  const searchFallback = title
-    ? fastBingImageSearch(title, source).then(image => ({ kind: 'search', image }))
-    : Promise.reject(new Error('no title'));
-
-  try {
-    const winner = await Promise.any([fast, searchFallback, mainValid]);
-    if (winner.kind === 'fast' || winner.kind === 'search') return sendFast(res, winner.image, winner.kind);
-    return replay(res, winner.result);
-  } catch {
-    try { return replay(res, await mainPromise); }
-    catch {
-      res.statusCode = 404;
-      res.setHeader('Cache-Control', 'no-store');
-      return res.end();
-    }
+  // Fixed authority order instead of arrival order. Discovery can prepare in
+  // parallel, but can never beat a valid publisher cover just by being faster.
+  const discovery = !req.query?.image && title
+    ? fastBingImage(title, source).then(image => ({ image, kind: 'fast' })).catch(() => null)
+    : Promise.resolve(null);
+  const publisherRequest = { ...req, query: { ...req.query, publisherOnly: '1' } };
+  const publisher = await withPhotoBudget(6000, () => captureMain(publisherRequest)).catch(() => null);
+  if (validCaptured(publisher)) return publisher;
+  if (String(req.query?.exact || '') === '1') return missingPhoto();
+  const news = await discovery;
+  if (news) return capturedFast(news.image, news.kind);
+  if (title) {
+    try { return capturedFast(await fastBingImageSearch(title, source), 'search'); } catch {}
   }
-};
+  try {
+    const result = await captureMain({ ...req, photoPublisherUrl: publisherRequest.photoPublisherUrl, query: { ...req.query, searchOnly: '1' } });
+    if (validCaptured(result)) return result;
+  } catch {}
+  return missingPhoto();
+}
+
+function capturedFast(image, kind) {
+  const headers = new Map();
+  const res = { setHeader: (name, value) => headers.set(name.toLowerCase(), value), end: buffer => ({ statusCode: 200, headers, buffer }) };
+  return sendFast(res, image, kind);
+}
+
+function missingPhoto() {
+  return { statusCode: 404, headers: new Map([['cache-control', 'no-store'], ['x-thumbnail-status', 'unavailable']]), buffer: Buffer.alloc(0) };
+}
 
 module.exports.__test = { bingImageEntries, sourceAgreement, titleAgreement, sameEvent };

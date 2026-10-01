@@ -1,11 +1,11 @@
 import { importOpmlPreview, fetchLiveNews } from './services/source-connectors.js?v=98.26';
-import { preparedVisualUrl, hasPreparedVisual, sourceTileUrl } from './services/article-visuals.js?v=98.10';
+import { photoSnapshot } from './services/article-photos.js?v=98.31';
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const app = $('#app');
 const toastEl = $('#toast');
 const APP_VERSION = '98';
-const APP_RELEASE = '28 septembre 2026';
+const APP_RELEASE = '1 octobre 2026';
 const IS_NATIVE_ANDROID = /MonActualiteAndroid\//.test(navigator.userAgent) || location.pathname.startsWith('/assets/') || new URLSearchParams(location.search).get('nativePreview') === '1';
 const savedSessionView = sessionStorage.getItem('news-active-view-v9204');
 const INITIAL_VIEW = ['home', 'settings', 'brief'].includes(savedSessionView) ? savedSessionView : 'home';
@@ -88,11 +88,7 @@ function localizedCountry(country) {
   try { return new Intl.DisplayNames([preset.locale], { type: 'region' }).of(country) || country; }
   catch { return Object.values(LANGUAGE_PRESETS).find(item => item.country === country)?.countryName || country; }
 }
-// v3 deliberately drops the old persisted failure markers. A single transient
-// miss used to freeze a source tile for six hours, even when the exact image
-// became available a few seconds later.
-const VISUAL_BACKFILL_KEY = 'news-visual-backfill-v3';
-const VISUAL_BACKFILL_MAX_AGE = 30 * 86400000;
+// Photo selections now belong exclusively to services/article-photos.js.
 const HISTORY_SYNC_KEY = 'news-history-sync-v9200';
 const HISTORY_SYNC_MAX_AGE = 2 * 60 * 60 * 1000;
 
@@ -169,7 +165,6 @@ const selectedLanguage = LANGUAGE_PRESETS[savedSettings.language] ? savedSetting
 const cacheLanguage = localStorage.getItem('news-cache-language-v98') || selectedLanguage;
 const rawCache = safeJson('news-live-cache', { articles: [], fetchedAt: null });
 const cache = cacheLanguage === selectedLanguage ? rawCache : { articles: [], fetchedAt: null };
-const visualBackfills = safeJson(VISUAL_BACKFILL_KEY, {});
 const state = {
   view: INITIAL_VIEW, previous: [], category: 'Politique', categoryTab: 'brief', articleId: null,
   briefMode: 'essential', homeLimit: 120, homeOrder: [],
@@ -356,12 +351,8 @@ function badgeFor(article) {
 }
 
 function articleVisual(article, index = 0) {
-  const prepared = hasPreparedVisual(article);
-  const tile = sourceTileUrl(article);
-  const real = preparedVisualUrl(article);
-  const target = real || tile;
-  const visualClass = real && real !== tile ? 'direct-visual-v9203' : 'source-tile-visual';
-  return `<img class="article-image original-article-image stable-visual image-pending-v98 ${prepared ? 'prepared-visual' : visualClass}" src="${escapeHtml(tile)}" data-photo-src="${escapeHtml(target)}" alt="" width="112" height="75" loading="lazy" fetchpriority="${index < 4 ? 'high' : 'auto'}" decoding="async" referrerpolicy="no-referrer" style="background-image:url('${escapeHtml(tile)}');background-size:cover">`;
+  const photo = photoSnapshot(article);
+  return `<img class="article-image original-article-image stable-visual ${photo.ready ? 'image-ready-v98 prepared-visual' : 'image-pending-v98 source-tile-visual'}" src="${escapeHtml(photo.url)}" data-photo-key="${escapeHtml(photo.key)}" data-photo-final="${photo.ready ? '1' : '0'}" alt="" width="112" height="75" loading="eager" fetchpriority="${index < 4 ? 'high' : 'auto'}" decoding="async" referrerpolicy="no-referrer">`;
 }
 function sourceIdentity(article = {}) {
   return normalizeTopic(article.source || article.feedTitle || '');
@@ -1154,7 +1145,7 @@ function catalogueSignature(articles = []) {
 
 function applyDownloadedNews(payload) {
   if (!payload || !Array.isArray(payload.articles)) return false;
-  const nextArticles = payload.articles.map(applyRememberedVisual);
+  const nextArticles = payload.articles;
   const changed = catalogueSignature(nextArticles) !== catalogueSignature(state.articles);
   state.articles = nextArticles;
   state.lastSync = payload.fetchedAt || new Date().toISOString();
@@ -1168,15 +1159,6 @@ function applyDownloadedNews(payload) {
 
 window.__applyNewsPayloadV9128 = applyDownloadedNews;
 
-function applyRememberedVisual(article) {
-  const remembered = visualBackfills[String(article?.id || '')];
-  if (!remembered?.url || Date.now() - Number(remembered.savedAt || 0) > VISUAL_BACKFILL_MAX_AGE) return article;
-  article.image = remembered.url;
-  article.pinnedVisualV85 = remembered.url;
-  article.visualStatus = 'ready';
-  article.visual = { status: 'ready', url: remembered.url, source: 'article-enrichment' };
-  return article;
-}
 
 function historicalDiscoveryKeywords(extraTopic = '', days = 31) {
   const recentTopics = uniqueTopics([
@@ -1206,7 +1188,7 @@ async function fetchHistoryCoverage({ force = false, topic = '', days = historyW
       country: locale.country
   });
   if (Array.isArray(history?.articles) && history.articles.length) {
-    state.articles = history.articles.map(applyRememberedVisual);
+    state.articles = history.articles;
     state.lastSync = history.fetchedAt || state.lastSync || new Date().toISOString();
     state.stats = { ...(state.stats || {}), ...(history.stats || {}), historyWindowDays: days };
     persistCache();
@@ -1249,7 +1231,7 @@ async function syncNews({ silent = false } = {}) {
         locale: locale.locale,
         country: locale.country
       });
-      const nextArticles = Array.isArray(result.articles) ? result.articles.map(applyRememberedVisual) : [];
+      const nextArticles = Array.isArray(result.articles) ? result.articles : [];
       const changed = catalogueSignature(nextArticles) !== catalogueSignature(state.articles);
       state.articles = nextArticles;
       state.lastSync = result.fetchedAt || new Date().toISOString();
@@ -1809,7 +1791,7 @@ if ('serviceWorker' in navigator && location.protocol.startsWith('http') && !nav
     serviceWorkerRefreshing = true;
     window.location.reload();
   });
-  navigator.serviceWorker.register('./sw-v98.js?v=98.10', { updateViaCache: 'none' }).then(registration => {
+  navigator.serviceWorker.register('./sw-v98.js?v=98.31', { updateViaCache: 'none' }).then(registration => {
     if (registration.waiting) registration.waiting.postMessage('SKIP_WAITING');
     registration.addEventListener('updatefound', () => {
       const installing = registration.installing;
@@ -1849,7 +1831,7 @@ function launchCacheIsFresh(articles = [], fetchedAt = '') {
 
 function applyStartupNews(payload) {
   if (!payload || !Array.isArray(payload.articles) || !payload.articles.length) return false;
-  state.articles = payload.articles.map(applyRememberedVisual);
+  state.articles = payload.articles;
   state.lastSync = payload.fetchedAt || new Date().toISOString();
   state.stats = payload.stats || null;
   state.syncStatus = 'idle';

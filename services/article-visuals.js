@@ -7,7 +7,7 @@ function isSameOriginImageProxy(raw = '') {
   if (!value) return false;
   try {
     const url = new URL(value, location.href);
-    return url.origin === location.origin
+    return (url.origin === location.origin || url.origin === 'https://mon-actualite.vercel.app')
       && ['/api/article-thumbnail', '/api/exact-news-thumbnail', '/api/article-photo-fast', '/api/image-proxy'].includes(url.pathname);
   } catch {
     return false;
@@ -19,7 +19,7 @@ function extractPreparedImage(raw = '') {
   if (!value) return '';
   try {
     const url = new URL(value, location.href);
-    if (url.origin !== location.origin) {
+    if (url.origin !== location.origin && !(url.origin === 'https://mon-actualite.vercel.app' && url.pathname.startsWith('/api/'))) {
       return ['http:', 'https:'].includes(url.protocol) ? url.href : '';
     }
 
@@ -54,10 +54,7 @@ function pinnedProxyUrl(article = {}) {
 }
 
 function feedlyProxyUrl(article = {}) {
-  const pinned = pinnedProxyUrl(article);
-  if (pinned) return pinned;
-
-  const articleUrl = clean(article.url || '');
+  const articleUrl = canonicalPhotoUrl(article.url || '');
   const title = clean(article.title || '');
   const rawVisual = clean(article.visual?.url || article.image || '');
   let suppliedImage = extractPreparedImage(rawVisual);
@@ -68,39 +65,48 @@ function feedlyProxyUrl(article = {}) {
 
   if (!articleUrl && !title && !suppliedImage) return '';
   const params = new URLSearchParams({
-    v: '85',
+    v: '98.31',
     url: articleUrl.slice(0, 1900),
     image: suppliedImage.slice(0, 1900),
     title: title.slice(0, 280),
     category: clean(article.category || '').slice(0, 70),
     source: clean(article.source || article.feedTitle || '').slice(0, 100)
   });
-  return `/api/article-photo-fast?${params}`;
+  if (!articleUrl && article.id) params.set('id', String(article.id));
+  const origin = location.hostname === 'wokgui.github.io' ? 'https://mon-actualite.vercel.app' : '';
+  return `${origin}/api/article-photo-fast?${params}`;
 }
 
 export function preparedVisualUrl(article = {}) {
-  const pinned = pinnedProxyUrl(article);
-  if (pinned) return pinned;
-
   const rawVisual = clean(article.visual?.url || article.image || '');
-  const status = clean(article.visual?.status || article.visualStatus || '').toLowerCase();
-  if (rawVisual && isSameOriginImageProxy(rawVisual) && ['ready', 'available', 'loaded'].includes(status)) {
-    try {
-      const url = new URL(rawVisual, location.href);
-      return `${url.pathname}${url.search}`;
-    } catch {}
-  }
-  const extracted = extractPreparedImage(rawVisual);
-  if (extracted) return extracted;
-
-  if (rawVisual && !isSameOriginImageProxy(rawVisual)) {
-    try {
-      const url = new URL(rawVisual, location.href);
-      if (['http:', 'https:'].includes(url.protocol)) return url.href;
-    } catch {}
-  }
-
+  // Only an exact image hint gets a separate prepared route. A legacy "ready"
+  // flag or pin is not proof that a generic resolver returned a real photo.
+  try {
+    const raw = new URL(rawVisual, location.href);
+    const exact = raw.searchParams.get('exact') === '1' && extractPreparedImage(rawVisual);
+    if (exact && ['/api/article-thumbnail', '/api/exact-news-thumbnail'].includes(raw.pathname)) {
+      const resolved = new URL(feedlyProxyUrl(article), location.href);
+      resolved.pathname = '/api/article-thumbnail';
+      resolved.searchParams.set('exact', '1');
+      return location.hostname === 'wokgui.github.io' ? resolved.href : `${resolved.pathname}${resolved.search}`;
+    }
+  } catch {}
   return feedlyProxyUrl(article);
+}
+
+export function canonicalPhotoUrl(raw = '') {
+  try {
+    const url = new URL(raw);
+    url.hash = '';
+    for (const key of [...url.searchParams.keys()]) if (/^(utm_|fbclid$|gclid$|mc_cid$|mc_eid$)/i.test(key)) url.searchParams.delete(key);
+    url.searchParams.sort();
+    url.pathname = url.pathname.replace(/\/$/, '') || '/';
+    return url.href;
+  } catch { return clean(raw); }
+}
+
+export function photoArticleKey(article = {}) {
+  return canonicalPhotoUrl(article.url) || String(article.id || `${clean(article.source)}|${clean(article.title)}`);
 }
 
 export function sourceTileUrl() {

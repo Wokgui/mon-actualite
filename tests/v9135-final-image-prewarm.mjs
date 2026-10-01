@@ -38,7 +38,7 @@ const parsed = new URL(photoUrl);
 assert.equal(parsed.pathname, '/api/article-photo-fast');
 assert.equal(parsed.searchParams.get('url'), 'https://example.test/story');
 assert.equal(parsed.searchParams.get('image'), 'https://cdn.example.test/photo.jpg');
-assert.equal(parsed.searchParams.get('v'), '85', 'server warming should align with the current Feedly visual URL generation');
+assert.equal(parsed.searchParams.get('v'), '98.31', 'server warming should align with the current photo URL generation');
 
 const rankIndex = apiSource.indexOf('rankCatalogArticles(uniqueCandidates)');
 const scheduleIndex = apiSource.indexOf('scheduleFinalImagePrewarm(req, articles)');
@@ -48,7 +48,7 @@ assert.match(apiSource, /coreHandler\(suppressCorePrewarmRequest\(req\), capture
   'the historical core prewarm must be suppressed for the wrapped /api/news route');
 assert.match(apiSource, /prewarmStageV9135:\s*'final-ranked-catalog'/,
   'production diagnostics must expose the final-ranked prewarm stage');
-assert.match(apiSource, /rankedCandidates\.slice\(0, CATALOG_LIMIT\)/,
+assert.match(apiSource, /articles\.splice\(CATALOG_LIMIT\)/,
   'the final prewarm source must be the bounded final-ranked catalogue');
 assert.match(fs.readFileSync('lib/final-image-prewarm.js', 'utf8'), /articles\.slice\(0, PREWARM_LIMIT\)/,
   'the actual prewarm worker must never warm beyond the first 16 final-ranked articles');
