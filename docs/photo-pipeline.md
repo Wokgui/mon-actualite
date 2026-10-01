@@ -111,3 +111,11 @@ historical real-photo assertions or silently treat neutral tiles as photos.
 Worker follow-up: bitmap decoding also runs before persistent storage, so a
 200/image MIME response with corrupt bytes cannot poison the cache. Worker
 cache v11 migrates v10; a retry re-fetches the same URL with cache=reload.
+
+The first CI photo test failed on timestamps recorded when Node received
+Playwright route callbacks. Browser fetch initiation is paced, but callback
+delivery may batch after driver scheduling delays. The test now measures
+both an independent browser fetch audit (including rejected responses) and
+browser ResourceTiming, retaining the exact >=110ms request-start threshold.
+Node receipt gaps remain diagnostic evidence. An optional 180ms driver-stall
+run reproduces the old false alarm without a browser pacing violation.
