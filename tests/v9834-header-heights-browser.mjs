@@ -10,7 +10,7 @@ const errors = [], results = [];
 try {
   const assets = process.env.CONTROLS_APK_ASSETS;
   const context = await browser.newContext({ viewport: { width: 412, height: 915 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true, serviceWorkers: 'block',
-    ...(assets ? { userAgent: 'Mozilla/5.0 (Linux; Android 16) AppleWebKit/537.36 Chrome/140 Mobile Safari/537.36 MonActualiteAndroid/98.34' } : {}) });
+    ...(assets ? { userAgent: 'Mozilla/5.0 (Linux; Android 16) AppleWebKit/537.36 Chrome/140 Mobile Safari/537.36 MonActualiteAndroid/98.35' } : {}) });
   if (assets) await context.route('https://mon-actualite.vercel.app/assets/**', async route => {
     const relative = decodeURIComponent(new URL(route.request().url()).pathname.slice('/assets/'.length));
     if (relative.split('/').includes('..')) return route.abort();
@@ -20,7 +20,7 @@ try {
   page.on('pageerror', error => errors.push(error.message));
   if (process.env.CONTROLS_LIVE !== '1') {
     await page.route('**/api/**', route => route.fulfill({ json: { articles: [], fetchedAt: new Date().toISOString(), stats: {} } }));
-    await page.route('**/version.json**', route => route.fulfill({ json: { version: '98', codeRelease: '98.34' } }));
+    await page.route('**/version.json**', route => route.fulfill({ json: { version: '98', codeRelease: '98.35' } }));
   }
   await page.goto(process.env.CONTROLS_BASE_URL || 'http://127.0.0.1:4173/?nativePreview=1', { waitUntil: 'domcontentloaded' });
   const open = async () => {

@@ -44,7 +44,7 @@ const UI_TEXT = {
     home: 'Accueil', settings: 'Réglages', brief: 'Brief', essential: 'L’essentiel', watch: 'Veille', editWatch: 'Régler la veille',
     language: 'Langue', textDensity: 'Taille et densité du texte', display: 'Affichage', generalNews: 'Actualité générale', baseSources: 'Sources d’information de base', addBlockSource: 'Ajouter / bloquer une source', keywords: 'Mots-clés', operation: 'Fonctionnement', version: 'Version',
     articleText: 'Taille du texte des articles', interfaceText: 'Taille du texte de l’interface', density: 'Densité entre les articles', titleSize: 'Taille du titre', small: 'Petit', large: 'Grand', lowDensity: 'Peu dense', highDensity: 'Très dense', smallTitle: 'Petit titre', largeTitle: 'Gros titre',
-    showBadges: 'Afficher les badges', showAge: 'Afficher depuis combien de temps l’article est sorti', dominantColor: 'Couleur dominante', homeHeaderHeight: 'Hauteur du bandeau — Accueil', settingsHeaderHeight: 'Hauteur du bandeau — Réglages', briefHeaderHeight: 'Hauteur du bandeau — Brief', restoreHeaderHeights: 'Restaurer les hauteurs par défaut', headerHeightsRestored: 'Hauteurs par défaut restaurées', restoreColor: 'Restaurer la couleur par défaut', colorRestored: 'Couleur par défaut restaurée', articleCount: 'Nombre d’articles', coveredDomains: 'Domaines couverts',
+    showBadges: 'Afficher les badges', showAge: 'Afficher depuis combien de temps l’article est sorti', dominantColor: 'Couleur dominante', homeHeaderSpacing: 'Espacement date / trait / titre', homeHeaderHeight: 'Hauteur du bandeau — Accueil', settingsHeaderHeight: 'Hauteur du bandeau — Réglages', briefHeaderHeight: 'Hauteur du bandeau — Brief', restoreHeaderHeights: 'Restaurer les hauteurs par défaut', headerHeightsRestored: 'Hauteurs par défaut restaurées', restoreColor: 'Restaurer la couleur par défaut', colorRestored: 'Couleur par défaut restaurée', articleCount: 'Nombre d’articles', coveredDomains: 'Domaines couverts',
     chooseLanguages: 'Choisir des langues', sourcesCountry: 'Les sources proposées par défaut suivent le pays correspondant : {country}.', availableLanguages: 'Langues disponibles', catalogHelp: 'Téléchargez une langue puis utilisez ses sources d’information.', selected: 'Sélectionnée', use: 'Utiliser', download: 'Télécharger', close: 'Fermer',
     automaticRefresh: 'Actualisation automatique', automaticDesc: 'Charge les nouveautés en arrière-plan.', webSearch: 'Recherche web complémentaire', webSearchDesc: 'Complète les flux avec Google Actualités.', publication: 'Publication du {date}', checkUpdate: 'Vérifier la mise à jour', follow: 'Suivre', followed: 'Suivie', block: 'Bloquer', unblock: 'Débloquer'
   },
@@ -52,7 +52,7 @@ const UI_TEXT = {
     home: 'Home', settings: 'Settings', brief: 'Brief', essential: 'Essential', watch: 'Watch', editWatch: 'Edit watch',
     language: 'Language', textDensity: 'Text size and density', display: 'Display', generalNews: 'General news', baseSources: 'Default news sources', addBlockSource: 'Add / block a source', keywords: 'Keywords', operation: 'Operation', version: 'Version',
     articleText: 'Article text size', interfaceText: 'Interface text size', density: 'Space between articles', titleSize: 'Title size', small: 'Small', large: 'Large', lowDensity: 'More space', highDensity: 'More compact', smallTitle: 'Small title', largeTitle: 'Large title',
-    showBadges: 'Show badges', showAge: 'Show how long ago the article was published', dominantColor: 'Accent colour', homeHeaderHeight: 'Header height — Home', settingsHeaderHeight: 'Header height — Settings', briefHeaderHeight: 'Header height — Brief', restoreHeaderHeights: 'Restore default header heights', headerHeightsRestored: 'Default header heights restored', restoreColor: 'Restore default colour', colorRestored: 'Default colour restored', articleCount: 'Number of articles', coveredDomains: 'Topics covered',
+    showBadges: 'Show badges', showAge: 'Show how long ago the article was published', dominantColor: 'Accent colour', homeHeaderSpacing: 'Date / line / title spacing', homeHeaderHeight: 'Header height — Home', settingsHeaderHeight: 'Header height — Settings', briefHeaderHeight: 'Header height — Brief', restoreHeaderHeights: 'Restore default header heights', headerHeightsRestored: 'Default header heights restored', restoreColor: 'Restore default colour', colorRestored: 'Default colour restored', articleCount: 'Number of articles', coveredDomains: 'Topics covered',
     chooseLanguages: 'Choose languages', sourcesCountry: 'Default sources follow the corresponding country: {country}.', availableLanguages: 'Available languages', catalogHelp: 'Download a language, then use its news sources.', selected: 'Selected', use: 'Use', download: 'Download', close: 'Close',
     automaticRefresh: 'Automatic refresh', automaticDesc: 'Loads new stories in the background.', webSearch: 'Additional web search', webSearchDesc: 'Completes feeds with Google News.', publication: 'Published on {date}', checkUpdate: 'Check for updates', follow: 'Follow', followed: 'Following', block: 'Block', unblock: 'Unblock'
   },
@@ -136,6 +136,7 @@ const defaultSettings = {
   textSize: 115,
   interfaceTextSize: 100,
   density: 62,
+  homeHeaderSpacing: 20,
   titleSize: 100,
   homeHeaderHeight: null,
   settingsHeaderHeight: 116,
@@ -208,8 +209,9 @@ const state = {
     textSize: boundedNumber(savedSettings.textSize, 115, 100, 175),
     interfaceTextSize: boundedNumber(savedSettings.interfaceTextSize, 100, 85, 150),
     density: boundedNumber(savedSettings.density, 62, 0, 100),
+    homeHeaderSpacing: boundedNumber(savedSettings.homeHeaderSpacing ?? 20, 20, 4, 40),
     titleSize: boundedNumber(savedSettings.titleSize, 100, 70, 140),
-    homeHeaderHeight: savedSettings.homeHeaderHeight == null ? null : boundedNumber(savedSettings.homeHeaderHeight, 118, 104, 260),
+    homeHeaderHeight: savedSettings.homeHeaderHeight == null ? null : boundedNumber(savedSettings.homeHeaderHeight, 129, 104, 260),
     settingsHeaderHeight: boundedNumber(savedSettings.settingsHeaderHeight ?? 116, 116, 72, 260),
     briefHeaderHeight: boundedNumber(savedSettings.briefHeaderHeight ?? 116, 116, 72, 260),
     showBadges: savedSettings.showBadges !== false,
@@ -232,6 +234,7 @@ function applyAppearanceSettings() {
   root.style.setProperty('--interface-text-scale', String(interfaceTextSize / 100));
   root.style.setProperty('--interface-space-scale', String(interfaceTextSize / 100));
   root.style.setProperty('--app-title-scale', String(titleSize / 100));
+  root.style.setProperty('--home-header-spacing', state.settings.homeHeaderSpacing + 'px');
   root.style.setProperty('--home-header-height', state.settings.homeHeaderHeight == null ? 'auto' : state.settings.homeHeaderHeight + 'px');
   root.style.setProperty('--settings-header-height', state.settings.settingsHeaderHeight + 'px');
   root.style.setProperty('--brief-header-height', state.settings.briefHeaderHeight + 'px');
@@ -867,7 +870,7 @@ function watchRulesMarkup() {
 }
 
 function rangeSetting(label, key, min, max, left, right) {
-  const value = state.settings[key] ?? (key === 'homeHeaderHeight' ? 118 : min);
+  const value = state.settings[key] ?? (key === 'homeHeaderHeight' ? 129 : min);
   return `<label class="preference-range"><strong>${escapeHtml(label)}</strong><input type="range" min="${min}" max="${max}" value="${value}" data-ui-range="${key}"><span><i>${escapeHtml(left)}</i><output data-ui-output="${key}">${value}</output><i>${escapeHtml(right)}</i></span></label>`;
 }
 
@@ -907,7 +910,7 @@ function renderSettings() {
     <div class="settings-accordions-v9185">
       ${accordion(ui('language'), languageSettingsMarkup())}
 
-      ${accordion(ui('textDensity'), `${rangeSetting(ui('articleText'), 'textSize', 100, 175, ui('small'), ui('large'))}${rangeSetting(ui('interfaceText'), 'interfaceTextSize', 85, 150, ui('small'), ui('large'))}${rangeSetting(ui('density'), 'density', 0, 100, ui('lowDensity'), ui('highDensity'))}${rangeSetting(ui('titleSize'), 'titleSize', 70, 140, ui('smallTitle'), ui('largeTitle'))}${rangeSetting(ui('homeHeaderHeight'), 'homeHeaderHeight', 104, 260, '104 px', '260 px')}${rangeSetting(ui('settingsHeaderHeight'), 'settingsHeaderHeight', 72, 260, '72 px', '260 px')}${rangeSetting(ui('briefHeaderHeight'), 'briefHeaderHeight', 72, 260, '72 px', '260 px')}<button type="button" class="secondary-btn" data-reset-header-heights>${escapeHtml(ui('restoreHeaderHeights'))}</button>`)}
+      ${accordion(ui('textDensity'), `${rangeSetting(ui('articleText'), 'textSize', 100, 175, ui('small'), ui('large'))}${rangeSetting(ui('interfaceText'), 'interfaceTextSize', 85, 150, ui('small'), ui('large'))}${rangeSetting(ui('density'), 'density', 0, 100, ui('lowDensity'), ui('highDensity'))}${rangeSetting(ui('homeHeaderSpacing'), 'homeHeaderSpacing', 4, 40, '4 px', '40 px')}${rangeSetting(ui('titleSize'), 'titleSize', 70, 140, ui('smallTitle'), ui('largeTitle'))}${rangeSetting(ui('homeHeaderHeight'), 'homeHeaderHeight', 104, 260, '104 px', '260 px')}${rangeSetting(ui('settingsHeaderHeight'), 'settingsHeaderHeight', 72, 260, '72 px', '260 px')}${rangeSetting(ui('briefHeaderHeight'), 'briefHeaderHeight', 72, 260, '72 px', '260 px')}<button type="button" class="secondary-btn" data-reset-header-heights>${escapeHtml(ui('restoreHeaderHeights'))}</button>`)}
 
       ${accordion(ui('display'), displaySettingsMarkup())}
 
@@ -1821,7 +1824,7 @@ if ('serviceWorker' in navigator && location.protocol.startsWith('http') && !nav
     serviceWorkerRefreshing = true;
     window.location.reload();
   });
-  navigator.serviceWorker.register('./sw-v98.js?v=98.34', { updateViaCache: 'none' }).then(registration => {
+  navigator.serviceWorker.register('./sw-v98.js?v=98.35', { updateViaCache: 'none' }).then(registration => {
     if (registration.waiting) registration.waiting.postMessage('SKIP_WAITING');
     registration.addEventListener('updatefound', () => {
       const installing = registration.installing;

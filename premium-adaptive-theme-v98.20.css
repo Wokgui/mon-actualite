@@ -77,11 +77,14 @@
  height:var(--brief-header-height,116px)!important;min-height:var(--brief-header-height,116px)!important;max-height:var(--brief-header-height,116px)!important;
 }
 html[data-custom-home-header="1"] .hero-header{
- height:var(--home-header-height)!important;min-height:var(--home-header-height)!important;max-height:var(--home-header-height)!important;
+ height:auto!important;min-height:var(--home-header-height)!important;max-height:none!important;
  padding-top:8px!important;padding-bottom:8px!important;
 }
-html[data-custom-home-header="1"] .hero-header .eyebrow{margin-bottom:6px!important;padding-top:6px!important;padding-bottom:6px!important}
-html[data-custom-home-header="1"] .hero-header .hero-mark{margin-bottom:6px!important}
+html[data-custom-home-header="1"] .hero-header .eyebrow{padding-top:6px!important;padding-bottom:6px!important}
+/* Un propriétaire unique pour les deux écarts : aucune marge héritée ni rétrécissement. */
+.hero-header{gap:var(--home-header-spacing,20px) 0!important}
+.hero-header .eyebrow,.hero-header .hero-mark{margin:0 auto!important;flex:0 0 auto!important}
+.hero-header h1{flex:0 0 auto!important}
 
 /* Le haut reprend le fond de la navigation, sans ajouter les anciennes vagues. */
 .hero-header::before,
