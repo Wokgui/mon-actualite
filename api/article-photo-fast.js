@@ -309,7 +309,7 @@ async function selectPhoto(req) {
     try { return capturedFast(await fastBingImageSearch(title, source), 'search'); } catch {}
   }
   try {
-    const result = await captureMain({ ...req, photoPublisherUrl: publisherRequest.photoPublisherUrl, query: { ...req.query, searchOnly: '1' } });
+    const result = await captureMain({ ...req, photoPublisherUrl: publisherRequest.photoPublisherUrl, photoMetadataAttempted: publisherRequest.photoMetadataAttempted, query: { ...req.query, searchOnly: '1' } });
     if (validCaptured(result)) return result;
   } catch {}
   return missingPhoto();
