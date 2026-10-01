@@ -43,7 +43,12 @@ try {
   for (let cycle = 0; cycle < 3; cycle++) {
     await page.goto(base, { waitUntil: 'domcontentloaded' });
     await page.waitForSelector('[data-stable-home-feed] .article-card', { timeout: 30000 });
-    await page.waitForFunction(() => [...document.querySelectorAll('[data-stable-home-feed] img')].slice(0, 8).every(i => i.dataset.photoFinal === '1'), null, { timeout: 45000 });
+    await page.waitForFunction(() => [...document.querySelectorAll('[data-stable-home-feed] img')].slice(0, 8).every(i => i.dataset.photoFinal === '1'), null, { timeout: 45000 }).catch(async error => {
+      const diagnosis = await page.evaluate(() => ({ metrics: window.__articlePhotoMetrics, images: [...document.querySelectorAll('[data-stable-home-feed] .article-card')].slice(0, 12).map(card => ({ title: card.querySelector('h2').textContent, image: card.querySelector('img').outerHTML })) }));
+      await writeFile(output + '/failure.json', JSON.stringify({ cycle, diagnosis, responses, errors }, null, 2));
+      await page.screenshot({ path: output + '/echec.png', scale: 'css' });
+      throw error;
+    });
     await page.waitForTimeout(6500); // Also cover the complete live synchronization.
     const data = await page.evaluate(() => ({ audit: window.__liveStart, metrics: window.__articlePhotoMetrics, visible: [...document.querySelectorAll('[data-stable-home-feed] img')].slice(0, 8).map(i => ({ key: i.dataset.photoKey, ready: i.dataset.photoFinal, width: i.naturalWidth })) }));
     assert.equal(data.audit.frames.length, 1, 'live synchronization cannot change visible article lines/order');
