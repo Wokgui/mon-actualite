@@ -1,5 +1,5 @@
 const mainResolver = require('../lib/article-photo-resolver.js');
-const { cachedPhoto, withPhotoBudget, photoSignal, photoKey } = require('../lib/article-photo-cache.js');
+const { cachedPhoto, withPhotoBudget, photoSignal, photoKey, canonicalUrl } = require('../lib/article-photo-cache.js');
 
 const SEARCH_TIMEOUT_MS = 2300;
 const IMAGE_TIMEOUT_MS = 2200;
@@ -302,6 +302,10 @@ async function selectPhoto(req) {
   const publisherRequest = { ...req, query: { ...req.query, publisherOnly: '1' } };
   const publisher = await withPhotoBudget(6000, () => captureMain(publisherRequest)).catch(() => null);
   if (validCaptured(publisher)) return publisher;
+  if (req.query?.clientRecovery === '1' && publisherRequest.photoClientCandidates?.length) {
+    return { statusCode: 424, headers: new Map([['content-type', 'application/json'], ['cache-control', 'no-store'], ['x-thumbnail-status', 'client-validation-required']]),
+      buffer: Buffer.from(JSON.stringify({ kind: 'publisher-photo-candidates', articleUrl: canonicalUrl(req.query.url), candidates: publisherRequest.photoClientCandidates.slice(0, 3) })) };
+  }
   if (String(req.query?.exact || '') === '1') return missingPhoto();
   const news = await discovery;
   if (news) return capturedFast(news.image, news.kind);

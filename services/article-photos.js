@@ -1,4 +1,4 @@
-import { preparedVisualUrl, articleVisualUrl, sourceTileUrl, photoArticleKey } from './article-visuals.js?v=98.36';
+import { preparedVisualUrl, articleVisualUrl, sourceTileUrl, photoArticleKey, canonicalPhotoUrl } from './article-visuals.js?v=98.37';
 export { photoArticleKey };
 
 // Renderer and loader share this exact module. URL identity survives id/title
@@ -16,7 +16,7 @@ try { saved = JSON.parse(localStorage.getItem(CACHE_KEY) || '{}') || {}; } catch
 export const photoMetrics = {
   startedAt: performance.now(), firstImageMs: null, requests: 0, active: 0,
   maxActive: 0, reused: 0, sourceChanges: 0, commits: [], attempts: {}, failures: 0,
-  cacheHits: 0, cacheWrites: 0, cacheErrors: 0
+  cacheHits: 0, cacheWrites: 0, cacheErrors: 0, clientRecoveries: 0, directRequests: 0
 };
 if (typeof window !== 'undefined') window.__articlePhotoMetrics = photoMetrics;
 
@@ -33,7 +33,14 @@ export function photoRecord(article = {}) {
     } catch { return false; }
   };
   // Persist only request URLs, never blobs or flags claiming a photo is ready.
-  const candidates = [...new Set([recent && allowed(remembered.requestUrl) ? remembered.requestUrl : '', preparedVisualUrl(article), articleVisualUrl(article)].filter(allowed))];
+  const upgrade = url => {
+    if (!allowed(url)) return '';
+    const request = new URL(url, location.href);
+    request.searchParams.set('clientRecovery', '1');
+    request.searchParams.set('v', '98.37');
+    return request.href;
+  };
+  const candidates = [...new Set([recent ? remembered.requestUrl : '', preparedVisualUrl(article), articleVisualUrl(article)].map(upgrade).filter(Boolean))];
   const record = { key, id: String(article.id || ''), candidates, status: 'idle', url: '', requestUrl: '', attempts: 0, retryAt: 0 };
   records.set(key, record);
   return record;
@@ -99,11 +106,7 @@ function persistSelection(record) {
   try { localStorage.setItem(CACHE_KEY, JSON.stringify(saved)); } catch {}
 }
 
-async function decodedPhoto(url, priority, timeoutMs, cache = 'default') {
-  const controller = new AbortController();
-  const timer = setTimeout(() => controller.abort(), timeoutMs);
-  let blobUrl = '';
-  try {
+async function pacedPhotoFetch(url, controller, cache, priority) {
     let responsePromise;
     // Pace the actual request, not the queue job: a disk-cache lookup can take
     // different amounts of time for two articles and otherwise bunch starts.
@@ -118,13 +121,57 @@ async function decodedPhoto(url, priority, timeoutMs, cache = 'default') {
     });
     requestTurn = turn.catch(() => {});
     await turn;
-    const response = await responsePromise;
+    return await responsePromise;
+}
+
+function recoveryCandidates(payload, requestUrl) {
+  const request = new URL(requestUrl, location.href);
+  const origin = location.hostname === 'wokgui.github.io' ? 'https://mon-actualite.vercel.app' : location.origin;
+  if (request.origin !== origin || !['/api/article-photo-fast', '/api/article-thumbnail'].includes(request.pathname)
+    || payload?.kind !== 'publisher-photo-candidates'
+    || canonicalPhotoUrl(payload.articleUrl) !== canonicalPhotoUrl(request.searchParams.get('url'))) return [];
+  return (Array.isArray(payload.candidates) ? payload.candidates : []).slice(0, 3).map(candidate => {
+    try {
+      const url = new URL(candidate.url), publisher = new URL(candidate.publisherUrl);
+      if (url.protocol !== 'https:' || publisher.protocol !== 'https:' || url.username || url.password
+        || !/\.(?:jpe?g|png|webp|avif|gif)$/i.test(url.pathname)
+        || !url.hostname.includes('.') || /(?:^|\.)localhost$|\.local$|^[\d.]+$|:/.test(url.hostname)
+        || /(?:^|[\/_\-.])(?:logo|avatar|favicon|tracking|pixel)(?:[\/_\-.]|$)/i.test(url.pathname)) return '';
+      return url.href;
+    } catch { return ''; }
+  }).filter(Boolean);
+}
+
+async function decodedResponse(response, signal) {
     const type = response.headers.get('Content-Type') || '';
     const status = response.headers.get('X-Thumbnail-Status') || '';
     if (!response.ok || !/^image\/(?:jpeg|png|webp|avif|gif)(?:;|$)/i.test(type) || /fallback|neutral|tile/i.test(status)) throw new Error('No article photo');
     const blob = await response.blob();
     if (!blob.size || blob.size > 7_000_000) throw new Error('Invalid image size');
-    const photo = await decodedBlob(blob, controller.signal);
+    return decodedBlob(blob, signal);
+}
+
+async function decodedPhoto(url, priority, timeoutMs, cache = 'default') {
+  const controller = new AbortController();
+  const timer = setTimeout(() => controller.abort(), timeoutMs);
+  let blobUrl = '';
+  try {
+    const response = await pacedPhotoFetch(url, controller, cache, priority);
+    let photo;
+    if (response.status === 424 && /^application\/json/i.test(response.headers.get('Content-Type') || '')) {
+      const text = await response.text();
+      if (text.length > 16000) throw new Error('Invalid recovery metadata');
+      const candidates = recoveryCandidates(JSON.parse(text), url);
+      for (const candidate of candidates) {
+        try {
+          photoMetrics.directRequests++;
+          photo = await decodedResponse(await pacedPhotoFetch(candidate, controller, cache, priority), controller.signal);
+          photoMetrics.clientRecoveries++;
+          break;
+        } catch {}
+      }
+      if (!photo) throw new Error('Publisher photo unavailable to this browser');
+    } else photo = await decodedResponse(response, controller.signal);
     blobUrl = photo.url;
     controller.signal.throwIfAborted();
     return { ...photo, requestUrl: url };

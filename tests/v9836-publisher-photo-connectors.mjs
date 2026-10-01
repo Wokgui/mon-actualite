@@ -61,3 +61,14 @@ for (const status of [403, 200]) {
   assert.equal(requested.length, 3, 'one public page, one exact metadata lookup, one validated cover: ' + JSON.stringify(requested));
 }
 console.log('Blocked and HTTP-200-shell publisher recovery retains exact URL identity and publisher authority before search.');
+
+// A denied exact cover is returned only as an unvalidated client candidate.
+const originalFetch = ctx.fetch;
+ctx.fetch = async input => String(input) === 'https://cdn.publisher.test/exact-cover.png'
+  ? new Response('', { status: 403 }) : originalFetch(input);
+const deniedRequest = { method: 'GET', query: { url: 'https://blocked-publisher.test/exact-story', publisherOnly: '1' } };
+let deniedType = '';
+await ctx.module.exports(deniedRequest, { setHeader: (key, value) => { if (key === 'Content-Type') deniedType = value; }, end() {} });
+assert.deepEqual(JSON.parse(JSON.stringify(deniedRequest.photoClientCandidates)), [{ url: 'https://cdn.publisher.test/exact-cover.png', publisherUrl: deniedRequest.query.url }]);
+assert.ok(!deniedType.startsWith('image/'), 'a blocked cover is never falsely marked positive');
+console.log('Exact public blocked covers remain unvalidated candidates, isolated per request.');

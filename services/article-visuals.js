@@ -65,13 +65,14 @@ function feedlyProxyUrl(article = {}) {
 
   if (!articleUrl && !title && !suppliedImage) return '';
   const params = new URLSearchParams({
-    v: '98.31',
+    v: '98.37',
     url: articleUrl.slice(0, 1900),
     image: suppliedImage.slice(0, 1900),
     title: title.slice(0, 280),
     category: clean(article.category || '').slice(0, 70),
     source: clean(article.source || article.feedTitle || '').slice(0, 100)
   });
+  params.set('clientRecovery', '1');
   if (!articleUrl && article.id) params.set('id', String(article.id));
   const origin = location.hostname === 'wokgui.github.io' ? 'https://mon-actualite.vercel.app' : '';
   return `${origin}/api/article-photo-fast?${params}`;

@@ -1,12 +1,12 @@
-const CORE_CACHE = 'mon-actualite-v98-36-core-r1';
+const CORE_CACHE = 'mon-actualite-v98-37-core-r1';
 const THUMB_CACHE = 'mon-actualite-thumbnails-v11';
 const PHOTO_BODY_CACHE = 'mon-actualite-photo-bodies-v1';
 const PHOTO_TTL_MS = 7 * 86400000;
 const thumbnailInflight = new Map();
-const ASSETS = ['./', './index.html', './version.json', './styles.css?v=53', './app-controls.css?v=98.36',
-  './app.js?v=98.36', './image-pipeline.js?v=98.36', './services/article-photos.js?v=98.36',
-  './services/article-visuals.js?v=98.36', './services/source-connectors.js?v=98.26', './manifest.webmanifest?v=98.10',
-  './startup-stability-v98.15.js?v=98.17', './release-watch.js?v=98.36', './premium-adaptive-theme-v98.20.css?v=98.36', './article-access-v91.48.js?v=91.88',
+const ASSETS = ['./', './index.html', './version.json', './styles.css?v=53', './app-controls.css?v=98.37',
+  './app.js?v=98.37', './image-pipeline.js?v=98.37', './services/article-photos.js?v=98.37',
+  './services/article-visuals.js?v=98.37', './services/source-connectors.js?v=98.26', './manifest.webmanifest?v=98.10',
+  './startup-stability-v98.15.js?v=98.17', './release-watch.js?v=98.37', './premium-adaptive-theme-v98.20.css?v=98.37', './article-access-v91.48.js?v=91.88',
   './startup-news-prefetch-v91.83.js?v=98.26', './nav-solid-hardfix-v91.89.js?v=98.10',
   './ui-settings-fix-v98.11.js?v=98.12', './brief-three-days-v98.14.js?v=98.14', './brief-prefetch-v98.15.js?v=98.26'];
 

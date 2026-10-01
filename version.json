@@ -1,6 +1,6 @@
 {
   "version": "98",
-  "codeRelease": "98.36",
-  "release": "2026-10-01",
-  "label": "v98.36 : trait centré visuellement, tuiles lisibles et démarrage stable"
+  "codeRelease": "98.37",
+  "release": "2026-10-02",
+  "label": "v98.37 : récupération des photos refusées au serveur"
 }

@@ -62,6 +62,7 @@ jobs:
           node tests/v9835-header-spacing-browser.mjs test-results/header-spacing
           node tests/v9836-optical-header-browser.mjs test-results/optical-header
           node tests/v9836-startup-browser.mjs test-results/startup-v9836
+          node tests/v9837-client-photo-recovery-browser.mjs test-results/client-photo-recovery
       - name: Photo metrics and screenshots
         if: always()
         uses: actions/upload-artifact@v4
