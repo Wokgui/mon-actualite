@@ -10,17 +10,18 @@ const errors = [], results = [];
 try {
   const assets = process.env.CONTROLS_APK_ASSETS;
   const context = await browser.newContext({ viewport: { width: 412, height: 915 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true, serviceWorkers: 'block',
-    ...(assets ? { userAgent: 'Mozilla/5.0 (Linux; Android 16) AppleWebKit/537.36 Chrome/140 Mobile Safari/537.36 MonActualiteAndroid/98.35' } : {}) });
+    ...(assets ? { userAgent: 'Mozilla/5.0 (Linux; Android 16) AppleWebKit/537.36 Chrome/140 Mobile Safari/537.36 MonActualiteAndroid/98.36' } : {}) });
   if (assets) await context.route('https://mon-actualite.vercel.app/assets/**', async route => {
     const relative = decodeURIComponent(new URL(route.request().url()).pathname.slice('/assets/'.length));
     if (relative.split('/').includes('..')) return route.abort();
     await route.fulfill({ path: assets + '/' + relative });
   });
   const page = await context.newPage();
+  await context.addInitScript(() => localStorage.setItem('news-keywords', JSON.stringify(['Une veille de contrôle'])));
   page.on('pageerror', error => errors.push(error.message));
   if (process.env.CONTROLS_LIVE !== '1') {
     await page.route('**/api/**', route => route.fulfill({ json: { articles: [], fetchedAt: new Date().toISOString(), stats: {} } }));
-    await page.route('**/version.json**', route => route.fulfill({ json: { version: '98', codeRelease: '98.35' } }));
+    await page.route('**/version.json**', route => route.fulfill({ json: { version: '98', codeRelease: '98.36' } }));
   }
   await page.goto(process.env.CONTROLS_BASE_URL || 'http://127.0.0.1:4173/?nativePreview=1', { waitUntil: 'domcontentloaded' });
   await page.locator('.nav-item[data-view="settings"]').click();
@@ -29,7 +30,7 @@ try {
     if (!await section.evaluate(node => node.open)) await section.locator('summary').click();
   }
   for (const key of ['data-general-category', 'data-brief-essential']) await page.locator('[' + key + '="Europe"]').click();
-  const colors = ['#7461e8', '#e8345f', '#1262df', '#169c54', '#ffcc00', '#00ffff', '#ffffff', '#000000', '#808080', '#f4c5e3'];
+  const colors = ['#7461e8', '#4b2b82', '#e8345f', '#1262df', '#169c54', '#ffcc00', '#00ffff', '#ffffff', '#000000', '#808080', '#f4c5e3'];
   for (const color of colors) {
     await page.locator('[data-accent]').evaluate((input, color) => { input.value = color; input.dispatchEvent(new Event('input', { bubbles: true })); }, color);
     const result = await page.evaluate(color => {
@@ -51,6 +52,7 @@ try {
     }, color);
     assert.deepEqual(result.general, result.essential, color + ': both tile groups must match');
     for (const tile of [result.general.active, result.general.inactive]) assert.ok(tile.contrast >= 4.5, color + ': text contrast ' + tile.contrast);
+    if (['#7461e8', '#4b2b82', '#1262df', '#000000'].includes(color)) assert.deepEqual(result.general.active.text, [255, 255, 255], 'readable white must be preferred on dark colours');
     assert.deepEqual(result.general.active.background, color.slice(1).match(/../g).map(channel => parseInt(channel, 16)), 'selected tile uses chosen colour');
     assert.notDeepEqual(result.general.active.background, result.general.inactive.background, 'selection stays distinguishable');
     for (const icon of result.icons) {
@@ -65,6 +67,11 @@ try {
       await page.locator('.bottom-nav').screenshot({ path: output + '/icones-' + color.slice(1) + '.png' });
     }
     results.push(result);
+    await page.locator('.nav-item[data-view="brief"]').click();
+    await page.locator('[data-brief-mode="watches"]').click();
+    const watchText = await page.locator('.brief-mode-tab.active').evaluate(node => ({ color: getComputedStyle(node).color, ink: getComputedStyle(document.documentElement).getPropertyValue('--app-accent-ink').trim() }));
+    assert.equal(watchText.color, watchText.ink === '#ffffff' ? 'rgb(255, 255, 255)' : 'rgb(0, 0, 0)', 'Veille shares the adaptive foreground');
+    await page.locator('.nav-item[data-view="settings"]').click();
   }
   await page.locator('[data-reset-accent]').click();
   assert.equal(await page.locator('[data-accent]').inputValue(), '#7461e8');

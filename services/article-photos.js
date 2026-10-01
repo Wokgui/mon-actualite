@@ -1,15 +1,22 @@
-import { preparedVisualUrl, articleVisualUrl, sourceTileUrl, photoArticleKey } from './article-visuals.js?v=98.31';
+import { preparedVisualUrl, articleVisualUrl, sourceTileUrl, photoArticleKey } from './article-visuals.js?v=98.36';
+export { photoArticleKey };
 
 // Renderer and loader share this exact module. URL identity survives id/title
 // changes on sync, and a successfully decoded photo is immutable in a document.
 const records = new Map();
 const CACHE_KEY = 'news-photo-selections-v1';
 const MAX_AGE_MS = 7 * 86400000;
+const BODY_CACHE = 'mon-actualite-photo-bodies-v1';
+const MAX_BODIES = 160;
+let cacheWrite = Promise.resolve();
+let requestTurn = Promise.resolve();
+let nextRequestAt = 0;
 let saved = {};
 try { saved = JSON.parse(localStorage.getItem(CACHE_KEY) || '{}') || {}; } catch {}
 export const photoMetrics = {
   startedAt: performance.now(), firstImageMs: null, requests: 0, active: 0,
-  maxActive: 0, reused: 0, sourceChanges: 0, commits: [], attempts: {}, failures: 0
+  maxActive: 0, reused: 0, sourceChanges: 0, commits: [], attempts: {}, failures: 0,
+  cacheHits: 0, cacheWrites: 0, cacheErrors: 0
 };
 if (typeof window !== 'undefined') window.__articlePhotoMetrics = photoMetrics;
 
@@ -38,6 +45,54 @@ export function photoSnapshot(article) {
   return { key: record.key, url: ready ? record.url : sourceTileUrl(), ready };
 }
 
+// The renderer owns article identity; a concurrent catalogue refresh must not
+// make an already rendered card disappear from the photo resolver's catalogue.
+export function photoRecordByKey(key) { return records.get(key); }
+
+function bodyKey(key) {
+  const url = new URL('/__article_photo_cache__', location.origin);
+  url.searchParams.set('article', key);
+  return url.href;
+}
+
+async function cachedPhoto(record) {
+  if (!globalThis.caches) return null;
+  let cache;
+  try {
+    cache = await caches.open(BODY_CACHE);
+    const response = await cache.match(bodyKey(record.key));
+    if (!response) return null;
+    const savedAt = Number(response.headers.get('X-Photo-Saved-At'));
+    if (!savedAt || !Number.isFinite(savedAt) || Date.now() - savedAt >= MAX_AGE_MS) {
+      await cache.delete(bodyKey(record.key)); return null;
+    }
+    const photo = await decodedBlob(await response.blob());
+    photoMetrics.cacheHits++;
+    return { ...photo, requestUrl: response.headers.get('X-Photo-Request-Url') || '' };
+  } catch {
+    photoMetrics.cacheErrors++;
+    try { await cache?.delete(bodyKey(record.key)); } catch {}
+    return null;
+  }
+}
+
+function persistBody(record) {
+  if (!globalThis.caches || !record.blob) return;
+  // Positive, decoded covers only. Native WebView deliberately has no service
+  // worker; CacheStorage is used directly so reopening does not refetch covers.
+  const { key, blob, requestUrl } = record;
+  cacheWrite = cacheWrite.then(async () => {
+    const cache = await caches.open(BODY_CACHE);
+    await cache.put(bodyKey(key), new Response(blob, { headers: {
+      'Content-Type': blob.type, 'X-Photo-Saved-At': String(Date.now()),
+      'X-Photo-Request-Url': requestUrl
+    } }));
+    const keys = await cache.keys();
+    for (const request of keys.slice(0, Math.max(0, keys.length - MAX_BODIES))) await cache.delete(request);
+    photoMetrics.cacheWrites++;
+  }).catch(() => { photoMetrics.cacheErrors++; });
+}
+
 function persistSelection(record) {
   saved[record.key] = { requestUrl: record.requestUrl, at: Date.now() };
   saved = Object.fromEntries(Object.entries(saved).filter(([, v]) => v && Date.now() - v.at < MAX_AGE_MS).sort((a, b) => b[1].at - a[1].at).slice(0, 500));
@@ -48,21 +103,47 @@ async function decodedPhoto(url, priority, timeoutMs, cache = 'default') {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   let blobUrl = '';
-  photoMetrics.requests++;
   try {
-    const response = await fetch(url, { signal: controller.signal, cache, priority });
+    let responsePromise;
+    // Pace the actual request, not the queue job: a disk-cache lookup can take
+    // different amounts of time for two articles and otherwise bunch starts.
+    const turn = requestTurn.then(async () => {
+      while (performance.now() < nextRequestAt) await new Promise(resolve => setTimeout(resolve, Math.max(1, nextRequestAt - performance.now())));
+      controller.signal.throwIfAborted();
+      const interval = Number(window.__articlePhotoConfig?.intervalMs) || 120;
+      nextRequestAt = performance.now() + interval;
+      photoMetrics.requests++;
+      responsePromise = fetch(url, { signal: controller.signal, cache, priority });
+      responsePromise.catch(() => {});
+    });
+    requestTurn = turn.catch(() => {});
+    await turn;
+    const response = await responsePromise;
     const type = response.headers.get('Content-Type') || '';
     const status = response.headers.get('X-Thumbnail-Status') || '';
     if (!response.ok || !/^image\/(?:jpeg|png|webp|avif|gif)(?:;|$)/i.test(type) || /fallback|neutral|tile/i.test(status)) throw new Error('No article photo');
     const blob = await response.blob();
     if (!blob.size || blob.size > 7_000_000) throw new Error('Invalid image size');
-    blobUrl = URL.createObjectURL(blob);
+    const photo = await decodedBlob(blob, controller.signal);
+    blobUrl = photo.url;
+    controller.signal.throwIfAborted();
+    return { ...photo, requestUrl: url };
+  } catch (error) {
+    if (blobUrl) URL.revokeObjectURL(blobUrl);
+    throw error;
+  } finally { clearTimeout(timer); }
+}
+
+async function decodedBlob(blob, signal) {
+  if (!/^image\/(?:jpeg|png|webp|avif|gif)(?:;|$)/i.test(blob.type) || !blob.size || blob.size > 7_000_000) throw new Error('Invalid cached image');
+  let blobUrl = URL.createObjectURL(blob);
+  try {
     const image = new Image();
     image.decoding = 'async';
     image.src = blobUrl;
     await Promise.race([image.decode(), new Promise((_, reject) => {
-      if (controller.signal.aborted) reject(new Error('Photo timeout'));
-      else controller.signal.addEventListener('abort', () => reject(new Error('Photo timeout')), { once: true });
+      if (signal?.aborted) reject(new Error('Photo timeout'));
+      else signal?.addEventListener('abort', () => reject(new Error('Photo timeout')), { once: true });
     })]);
     if (image.naturalWidth < 2 || image.naturalHeight < 2) throw new Error('Invalid photo dimensions');
     // Feeds often supply multi-megapixel originals for a 119px card. Retain
@@ -76,18 +157,19 @@ async function decodedPhoto(url, priority, timeoutMs, cache = 'default') {
       canvas.getContext('2d').drawImage(image, 0, 0, canvas.width, canvas.height);
       const thumbnail = await new Promise(resolve => canvas.toBlob(resolve, 'image/webp', .9));
       if (thumbnail) {
+        blob = thumbnail;
         URL.revokeObjectURL(blobUrl);
         blobUrl = URL.createObjectURL(thumbnail);
         image.src = blobUrl;
         await image.decode();
       }
     }
-    controller.signal.throwIfAborted();
-    return { url: blobUrl, requestUrl: url };
+    signal?.throwIfAborted();
+    return { url: blobUrl, blob };
   } catch (error) {
     if (blobUrl) URL.revokeObjectURL(blobUrl);
     throw error;
-  } finally { clearTimeout(timer); }
+  }
 }
 
 export function resolvePhoto(record, priority = 'auto', timeoutMs = 14000) {
@@ -99,6 +181,8 @@ export function resolvePhoto(record, priority = 'auto', timeoutMs = 14000) {
   photoMetrics.active++;
   photoMetrics.maxActive = Math.max(photoMetrics.maxActive, photoMetrics.active);
   record.promise = (async () => {
+    const cached = await cachedPhoto(record);
+    if (cached) { Object.assign(record, cached); record.status = 'ready'; return record; }
     const deadline = performance.now() + timeoutMs;
     for (const candidate of record.candidates) {
       const remaining = deadline - performance.now();
@@ -107,6 +191,7 @@ export function resolvePhoto(record, priority = 'auto', timeoutMs = 14000) {
         Object.assign(record, await decodedPhoto(candidate, priority, remaining, record.attempts > 1 ? 'reload' : 'default'));
         record.status = 'ready';
         persistSelection(record);
+        persistBody(record);
         return record;
       } catch {}
     }

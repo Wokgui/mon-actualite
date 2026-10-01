@@ -64,8 +64,10 @@ html[data-show-badges="0"][data-show-age="0"] #app .article-card h2{margin-botto
 .settings-page-v9185>.page-masthead-v9186,.page:has(.brief-mode-tabs)>.page-masthead-v9186{border-bottom-color:var(--app-accent)!important}
 .brief-mode-tabs{background:var(--app-accent-soft)!important;border:0!important;box-shadow:none!important}
 .brief-mode-tab{border:0!important;outline:0!important;box-shadow:none!important}
-.brief-mode-tab.active{background:var(--app-accent)!important;color:#fff!important;border:0!important;outline:0!important;box-shadow:none!important}
-.brief-mode-tab.active *{color:#fff!important}
+.brief-mode-tab.active{background:var(--app-accent)!important;color:var(--app-accent-ink)!important;border:0!important;outline:0!important;box-shadow:none!important}
+.brief-mode-tab.active *{color:var(--app-accent-ink)!important}
+#app .keyword-chip,#app .watch-edit-button-v9138{color:var(--app-accent-ink)!important;background:var(--app-accent)!important}
+#app .keyword-chip button{color:var(--app-accent-ink)!important;background:transparent!important}
 .interest.active,.source-actions-v9186 button.active{color:#fff!important}
 
 .essential-domains,.centered-interest-grid-v9184{justify-content:center!important}

@@ -1,5 +1,5 @@
 import { importOpmlPreview, fetchLiveNews } from './services/source-connectors.js?v=98.26';
-import { photoSnapshot } from './services/article-photos.js?v=98.31';
+import { photoSnapshot, photoArticleKey } from './services/article-photos.js?v=98.36';
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const app = $('#app');
@@ -117,8 +117,8 @@ function accentForeground(hex) {
   const rgb = hex.slice(1).match(/../g).map(channel => parseInt(channel, 16) / 255);
   const linear = rgb.map(channel => channel <= .04045 ? channel / 12.92 : ((channel + .055) / 1.055) ** 2.4);
   const luminance = linear[0] * .2126 + linear[1] * .7152 + linear[2] * .0722;
-  // Pick the higher contrast foreground; even the crossover exceeds 4.5:1.
-  return 1.05 / (luminance + .05) >= (luminance + .05) / .05 ? '#ffffff' : '#000000';
+  // Keep the requested light lettering whenever it meets readable text contrast.
+  return 1.05 / (luminance + .05) >= 4.5 ? '#ffffff' : '#000000';
 }
 const defaultSettings = {
   notifications: true,
@@ -248,7 +248,25 @@ function applyAppearanceSettings() {
   root.lang = language;
   document.title = language === 'fr' ? 'Mon actualité' : `${ui('brief')} · Mon actualité`;
   document.querySelector('meta[name="theme-color"]')?.setAttribute('content', accent);
+  updateHomeMarkAlignment();
 }
+
+function updateHomeMarkAlignment() {
+  const heading = document.querySelector('.hero-header h1');
+  if (!heading) return;
+  const style = getComputedStyle(heading);
+  const context = document.createElement('canvas').getContext('2d');
+  context.font = `${style.fontStyle} ${style.fontWeight} ${style.fontSize} ${style.fontFamily}`;
+  const metrics = context.measureText(heading.textContent);
+  const ascent = metrics.fontBoundingBoxAscent, descent = metrics.fontBoundingBoxDescent;
+  const lineHeight = parseFloat(style.lineHeight) || parseFloat(style.fontSize) * 1.08;
+  const inkTop = (lineHeight - ascent - descent) / 2 + ascent - metrics.actualBoundingBoxAscent;
+  // Move the mark, not the date/title: preserve the chosen spacing, header
+  // dimensions and the list position while centring on the actual glyph ink.
+  document.documentElement.style.setProperty('--home-mark-optical-offset', `${Number.isFinite(inkTop) ? inkTop / 2 : 0}px`);
+}
+document.fonts?.ready.then(updateHomeMarkAlignment);
+document.fonts?.addEventListener('loadingdone', updateHomeMarkAlignment);
 
 applyAppearanceSettings();
 
@@ -475,6 +493,7 @@ function nav(active = state.view) {
 }
 
 function articleCard(article, index = 0) {
+  rememberRenderedArticle(article);
   const saved = state.saved.has(article.id);
   const badge = badgeFor(article);
   const title = displayTitle(article);
@@ -501,6 +520,7 @@ function syncStrip() {
 
 function renderHome() {
   const all = stableHomeArticles();
+  renderedHomeArticles = all;
   const filtered = state.savedOnly ? all.filter(article => state.saved.has(article.id)) : all;
   const feed = filtered.slice(0, state.homeLimit);
   const remaining = Math.max(0, filtered.length - feed.length);
@@ -535,7 +555,7 @@ function renderCategory() {
 }
 
 function renderDetail() {
-  const article = state.articles.find(item => item.id === state.articleId);
+  const article = articleById(state.articleId);
   if (!article) return `<main class="page">${topbar('Article')}${emptyState('Article indisponible', 'Il n’est plus présent dans le flux actuel.')}</main>${nav('')}`;
   const saved = state.saved.has(article.id);
   const currentFeedback = state.feedback[article.id];
@@ -660,6 +680,7 @@ function clockLabel(value) {
 }
 
 function compactArticleRow(article, index = 0) {
+  rememberRenderedArticle(article);
   const title = displayTitle(article);
   return `<article class="article-card runtime-row" data-article="${escapeHtml(article.id)}" tabindex="0" aria-label="Ouvrir l’article source : ${escapeHtml(title)}">
     ${articleVisual(article, index)}
@@ -991,13 +1012,44 @@ function render({ resetScroll = false, scrollTop = null } = {}) {
   }
   const preservedScroll = Number.isFinite(scrollTop) ? scrollTop : (resetScroll ? 0 : window.scrollY);
   const views = { home: renderHome, category: renderCategory, detail: renderDetail, brief: renderBrief, news: renderNews, settings: renderSettings };
+  if (state.view === 'home' || state.view === 'brief') {
+    pendingNewsCount = 0;
+    renderedCatalogueKeys = new Set(state.articles.map(photoArticleKey));
+  }
   app.innerHTML = (views[state.view] || renderHome)() + renderSheet();
   window.scrollTo({ top: preservedScroll, behavior: 'instant' });
   if (preservedScroll > 0) requestAnimationFrame(() => window.scrollTo({ top: preservedScroll, behavior: 'instant' }));
   notifyStableRender('view');
+  showPendingNews();
 }
 function notifyStableRender(reason = 'update') {
   window.dispatchEvent(new CustomEvent('news:stable-render', { detail: { reason, view: state.view } }));
+  updateHomeMarkAlignment();
+}
+
+// A displayed feed is a reading snapshot, independent of a refreshed catalogue.
+// Retain its article records for clicks and saves even if server IDs change.
+const renderedArticles = new Map();
+let pendingNewsCount = 0;
+let renderedCatalogueKeys = new Set();
+let renderedHomeArticles = [];
+function rememberRenderedArticle(article) {
+  renderedArticles.set(String(article.id), article);
+  if (renderedArticles.size > 1000) renderedArticles.delete(renderedArticles.keys().next().value);
+}
+function articleById(id) {
+  return state.articles.find(article => String(article.id) === String(id)) || renderedArticles.get(String(id));
+}
+function showPendingNews() {
+  const button = app.querySelector('.nav-item[data-view="home"]');
+  if (!button) return;
+  button.querySelector('[data-pending-news]')?.remove();
+  if (!pendingNewsCount) return;
+  const badge = document.createElement('i');
+  badge.className = 'nav-watch-dot-v9184'; badge.dataset.pendingNews = '';
+  badge.textContent = pendingNewsCount > 9 ? '9+' : String(pendingNewsCount);
+  badge.title = 'Nouveaux articles — toucher Accueil pour actualiser';
+  button.appendChild(badge);
 }
 
 function refreshSheet() {
@@ -1053,14 +1105,15 @@ function appendHomeToLimit({ increment = false } = {}) {
   if (increment) state.homeLimit += 36;
   const feed = app.querySelector('[data-stable-home-feed]');
   if (!feed || state.view !== 'home') return;
-  const articles = (state.savedOnly ? stableHomeArticles().filter(article => state.saved.has(article.id)) : stableHomeArticles()).slice(0, state.homeLimit);
+  const snapshot = state.savedOnly ? renderedHomeArticles.filter(article => state.saved.has(article.id)) : renderedHomeArticles;
+  const articles = snapshot.slice(0, state.homeLimit);
   const currentIds = new Set([...feed.querySelectorAll(':scope > .article-card[data-article]')].map(card => String(card.dataset.article || '')));
   feed.querySelector(':scope > [data-home-more]')?.remove();
   if (!currentIds.size && articles.length) feed.replaceChildren();
   const template = document.createElement('template');
   template.innerHTML = articles.filter(article => !currentIds.has(String(article.id))).map((article, index) => articleCard(article, currentIds.size + index)).join('');
   feed.append(...template.content.childNodes);
-  const remaining = Math.max(0, (state.savedOnly ? stableHomeArticles().filter(article => state.saved.has(article.id)) : stableHomeArticles()).length - articles.length);
+  const remaining = Math.max(0, snapshot.length - articles.length);
   if (remaining) {
     const button = document.createElement('button');
     button.type = 'button';
@@ -1075,6 +1128,8 @@ function appendHomeToLimit({ increment = false } = {}) {
 function patchHomeFeedPreservingCards() {
   const feed = app.querySelector('[data-stable-home-feed]');
   if (!feed) return render({ scrollTop: window.scrollY });
+  renderedCatalogueKeys = new Set(state.articles.map(photoArticleKey));
+  renderedHomeArticles = stableHomeArticles();
   const articles = (state.savedOnly ? stableHomeArticles().filter(article => state.saved.has(article.id)) : stableHomeArticles()).slice(0, state.homeLimit);
   const existing = new Map([...feed.querySelectorAll(':scope > .article-card[data-article]')].map(card => [String(card.dataset.article || ''), card]));
   const fragment = document.createDocumentFragment();
@@ -1100,6 +1155,12 @@ function patchHomeFeedPreservingCards() {
 
 function refreshAfterNewsChange() {
   reconcileHomeOrder();
+  const overlay = document.getElementById('startup-stability-v9815');
+  if (['home', 'brief'].includes(state.view) && app.querySelector('[data-article]') && (!overlay || overlay.classList.contains('leaving'))) {
+    pendingNewsCount = state.articles.filter(article => !renderedCatalogueKeys.has(photoArticleKey(article))).length;
+    showPendingNews();
+    return;
+  }
   if (state.view === 'home') {
     patchHomeFeedPreservingCards();
     return;
@@ -1253,7 +1314,7 @@ async function syncNews({ silent = false } = {}) {
         country: locale.country
       });
       const nextArticles = Array.isArray(result.articles) ? result.articles : [];
-      const changed = catalogueSignature(nextArticles) !== catalogueSignature(state.articles);
+      const previousSignature = catalogueSignature(state.articles);
       state.articles = nextArticles;
       state.lastSync = result.fetchedAt || new Date().toISOString();
       state.stats = result.stats || null;
@@ -1262,7 +1323,8 @@ async function syncNews({ silent = false } = {}) {
 
       try { await fetchHistoryCoverage(); } catch {}
 
-      if (changed) refreshAfterNewsChange();
+      if (catalogueSignature(state.articles) !== previousSignature) refreshAfterNewsChange();
+      if (!silent && ['home', 'brief'].includes(state.view)) render({ scrollTop: window.scrollY });
       if (!silent) toast(`${state.articles.length} article${state.articles.length > 1 ? 's' : ''} actualisé${state.articles.length > 1 ? 's' : ''}`);
       return result;
     } catch (error) {
@@ -1471,7 +1533,7 @@ app.addEventListener('click', async event => {
     if (event.target.closest('[data-save], [data-category]')) return;
     event.preventDefault();
     event.stopPropagation();
-    const selected = state.articles.find(item => String(item.id) === String(article.dataset.article || ''));
+    const selected = articleById(article.dataset.article || '');
     const url = String(selected?.url || '').trim();
     if (url) window.open(url, '_blank', 'noopener,noreferrer');
     return;
@@ -1577,7 +1639,7 @@ app.addEventListener('click', async event => {
     const id = feedback.dataset.id;
     const next = feedback.dataset.feedback;
     const previous = state.feedback[id] || '';
-    const article = state.articles.find(item => String(item.id) === String(id));
+    const article = articleById(id);
     if (article) window.NewsPersonalizationV91?.recordFeedback(article, next, previous);
     state.feedback[id] = next;
     persist();
@@ -1824,7 +1886,7 @@ if ('serviceWorker' in navigator && location.protocol.startsWith('http') && !nav
     serviceWorkerRefreshing = true;
     window.location.reload();
   });
-  navigator.serviceWorker.register('./sw-v98.js?v=98.35', { updateViaCache: 'none' }).then(registration => {
+  navigator.serviceWorker.register('./sw-v98.js?v=98.36', { updateViaCache: 'none' }).then(registration => {
     if (registration.waiting) registration.waiting.postMessage('SKIP_WAITING');
     registration.addEventListener('updatefound', () => {
       const installing = registration.installing;
@@ -1904,7 +1966,7 @@ async function bootLatestNews() {
   } catch {}
 
   if (applyStartupNews(fastPayload)) {
-    render({ resetScroll: !firstScreenShown });
+    if (firstScreenShown) refreshAfterNewsChange(); else render({ resetScroll: true });
     firstScreenShown = true;
   } else if (!firstScreenShown && cachedArticles.length) {
     state.articles = cachedArticles;

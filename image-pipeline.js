@@ -1,4 +1,4 @@
-import { photoRecord, resolvePhoto, commitPhoto } from './services/article-photos.js?v=98.31';
+import { photoRecordByKey, resolvePhoto, commitPhoto } from './services/article-photos.js?v=98.36';
 
 const defaults = { intervalMs: 120, concurrency: 4, priorityCount: 12, rootMarginPx: 1200, timeoutMs: 14000 };
 const config = { ...defaults, ...window.__ARTICLE_PHOTO_CONFIG };
@@ -14,23 +14,14 @@ let timer = 0;
 let retryTimer = 0;
 let frame = 0;
 
-function articlesById() {
-  try {
-    const cache = JSON.parse(localStorage.getItem('news-live-cache') || '{}');
-    return new Map((Array.isArray(cache.articles) ? cache.articles : []).map(article => [String(article.id || ''), article]));
-  } catch { return new Map(); }
-}
-
 function scan() {
   frame = 0;
-  const articles = articlesById();
   const previous = new Map(jobs.map(job => [job.record.key, job]));
   const next = new Map();
   app?.querySelectorAll('.article-card[data-article]').forEach((card, index) => {
     const image = card.querySelector('img.article-image');
-    const article = articles.get(String(card.dataset.article || ''));
-    if (!image || !article) return;
-    const record = photoRecord(article);
+    const record = photoRecordByKey(image?.dataset.photoKey);
+    if (!image || !record) return;
     const rect = card.getBoundingClientRect();
     const visible = rect.bottom > 0 && rect.top < innerHeight;
     if (image.dataset.photoFinal === '1') return;
@@ -87,7 +78,12 @@ function pump() {
     resolvePhoto(waiting.record, waiting.visible || waiting.rank < 4 ? 'high' : 'auto', config.timeoutMs).then(() => {
       waiting.settled = true;
       for (const job of jobs) if (job.record === waiting.record) job.settled = true;
-    }).finally(() => { active--; scheduleScan(); });
+    }).finally(() => {
+      active--;
+      // A successful decode needs no DOM walk, forced geometry read, or frame
+      // delay. Only failures need a scan to arm their bounded retry deadline.
+      if (waiting.record.status === 'failed') scheduleScan(); else pump();
+    });
   }
   const delays = [];
   if (jobs[0]?.settled) delays.push(Math.max(1, nextCommit - performance.now()));

@@ -10,7 +10,7 @@ const results = [], errors = [];
 try {
   const assets = process.env.CONTROLS_APK_ASSETS;
   const context = await browser.newContext({ viewport: { width: 412, height: 915 }, deviceScaleFactor: 2, isMobile: true, hasTouch: true, serviceWorkers: 'block',
-    ...(assets ? { userAgent: 'Mozilla/5.0 (Linux; Android 16) AppleWebKit/537.36 Chrome/140 Mobile Safari/537.36 MonActualiteAndroid/98.35' } : {}) });
+    ...(assets ? { userAgent: 'Mozilla/5.0 (Linux; Android 16) AppleWebKit/537.36 Chrome/140 Mobile Safari/537.36 MonActualiteAndroid/98.36' } : {}) });
   if (assets) await context.route('https://mon-actualite.vercel.app/assets/**', async route => {
     const relative = decodeURIComponent(new URL(route.request().url()).pathname.slice('/assets/'.length));
     if (relative.split('/').includes('..')) return route.abort();
@@ -20,7 +20,7 @@ try {
   page.on('pageerror', error => errors.push(error.message));
   if (process.env.CONTROLS_LIVE !== '1') {
     await page.route('**/api/**', route => route.fulfill({ json: { articles: [], fetchedAt: new Date().toISOString(), stats: {} } }));
-    await page.route('**/version.json**', route => route.fulfill({ json: { version: '98', codeRelease: '98.35' } }));
+    await page.route('**/version.json**', route => route.fulfill({ json: { version: '98', codeRelease: '98.36' } }));
   }
   await page.goto(process.env.CONTROLS_BASE_URL || 'http://127.0.0.1:4173/?nativePreview=1', { waitUntil: 'domcontentloaded' });
   const home = async () => {
@@ -29,6 +29,7 @@ try {
       const rect = node => { const r = node.getBoundingClientRect(); return { top: r.top, bottom: r.bottom, height: r.height }; };
       const date = rect(header.querySelector('.eyebrow')), mark = rect(header.querySelector('.hero-mark')), title = rect(header.querySelector('h1')), h = rect(header);
       return { dateToMark: mark.top - date.bottom, markToTitle: title.top - mark.bottom, header: h.height,
+        opticalOffset: parseFloat(getComputedStyle(document.documentElement).getPropertyValue('--home-mark-optical-offset')) || 0,
         dateHeight: date.height, markHeight: mark.height, titleHeight: title.height,
         fits: date.top >= h.top && title.bottom <= h.bottom,
         navHeight: document.querySelector('.bottom-nav').getBoundingClientRect().height,
@@ -43,8 +44,8 @@ try {
   } else {
     const check = async value => {
       const metrics = await home();
-      assert.ok(Math.abs(metrics.dateToMark - value) < .1, 'date → trait must equal chosen spacing');
-      assert.ok(Math.abs(metrics.markToTitle - value) < .1, 'trait → titre must equal chosen spacing');
+      assert.ok(Math.abs(metrics.dateToMark - value - metrics.opticalOffset) < .1, 'chosen spacing plus optical correction above mark');
+      assert.ok(Math.abs(metrics.markToTitle - value + metrics.opticalOffset) < .1, 'optical correction preserves date/title position');
       assert.equal(metrics.fits, true); assert.equal(metrics.overflow, false); assert.equal(metrics.navHeight, 58);
       results.push({ value, ...metrics });
       return metrics;
@@ -66,7 +67,7 @@ try {
       await set('homeHeaderSpacing', value);
       const actual = await check(value);
       assert.equal(actual.dateHeight, defaults.dateHeight, 'spacing never changes the date tile size');
-      assert.equal(actual.markHeight, defaults.markHeight);
+      assert.ok(Math.abs(actual.markHeight - defaults.markHeight) < .0001, 'optical translation never resizes the 2px mark');
       assert.equal(actual.titleHeight, defaults.titleHeight, 'spacing never changes the title size');
     }
     const after = await page.evaluate(() => JSON.parse(localStorage.getItem('news-settings')));

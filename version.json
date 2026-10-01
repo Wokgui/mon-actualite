@@ -1,6 +1,6 @@
 {
   "version": "98",
-  "codeRelease": "98.35",
+  "codeRelease": "98.36",
   "release": "2026-10-01",
-  "label": "v98.35 : espaces date / trait / titre égaux et réglables"
+  "label": "v98.36 : trait centré visuellement, tuiles lisibles et démarrage stable"
 }

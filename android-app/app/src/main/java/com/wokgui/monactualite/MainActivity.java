@@ -24,7 +24,7 @@ import android.webkit.WebResourceResponse;
 import androidx.webkit.WebViewAssetLoader;
 
 public class MainActivity extends Activity {
-    private static final String APP_URL = "https://mon-actualite.vercel.app/assets/index.html?native=98.35";
+    private static final String APP_URL = "https://mon-actualite.vercel.app/assets/index.html?native=98.36";
     private static final String APP_HOST = "mon-actualite.vercel.app";
 
     private FrameLayout root;
@@ -105,7 +105,7 @@ public class MainActivity extends Activity {
         settings.setMediaPlaybackRequiresUserGesture(false);
         settings.setSupportMultipleWindows(true);
         settings.setJavaScriptCanOpenWindowsAutomatically(true);
-        settings.setUserAgentString(settings.getUserAgentString() + " MonActualiteAndroid/98.35");
+        settings.setUserAgentString(settings.getUserAgentString() + " MonActualiteAndroid/98.36");
 
         assetLoader = new WebViewAssetLoader.Builder()
             .setDomain(APP_HOST)
@@ -136,11 +136,6 @@ public class MainActivity extends Activity {
                 return true;
             }
 
-            @Override
-            public void onPageFinished(WebView view, String url) {
-                super.onPageFinished(view, url);
-                applyAndroidHeaderPolish();
-            }
         });
 
         webView.setWebChromeClient(new WebChromeClient() {
@@ -184,15 +179,6 @@ public class MainActivity extends Activity {
 
         if (savedInstanceState == null) webView.loadUrl(APP_URL);
         else webView.restoreState(savedInstanceState);
-    }
-
-    private void applyAndroidHeaderPolish() {
-        String js = "(function(){if(document.getElementById('android-ui-polish-v98'))return;" +
-            "var s=document.createElement('style');s.id='android-ui-polish-v98';" +
-            "s.textContent='.hero-header h1{line-height:1.08!important;font-weight:840!important;letter-spacing:-.034em!important}" +
-            ".page-masthead-v9186 h1,.settings-page-v9185>.page-masthead-v9186 h1,.page:has(.brief-mode-tabs)>.page-masthead-v9186 h1{font-size:25px!important;line-height:1.12!important;font-weight:820!important;letter-spacing:-.026em!important}';" +
-            "document.head.appendChild(s);})();";
-        webView.evaluateJavascript(js, null);
     }
 
     private void openExternal(Uri uri) {

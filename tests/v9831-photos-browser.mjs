@@ -127,6 +127,9 @@ try {
   assert.equal(final.metrics.sourceChanges, 0);
   assert.ok(requests.filter(request => request.index === 5).length === 2, 'one retry recovers a neutral fallback');
   assert.ok(requests.filter(request => request.index === 4).length <= 2, 'a corrupt image has a strict retry budget');
+  const bodies = await page.evaluate(async () => (await (await caches.open('mon-actualite-photo-bodies-v1')).keys()).map(request => new URL(request.url).searchParams.get('article')));
+  assert.ok(!bodies.includes('https://example.test/photo/4'), 'corrupt photos must never enter the native body cache');
+  assert.ok(bodies.includes('https://example.test/photo/5'), 'a recovered real cover is cached, never its initial neutral fallback');
   assert.ok(requests.filter(request => ![4, 5].includes(request.index)).every(request => requests.filter(other => other.key === request.key).length === 1), 'successful photos get one request across rerenders');
   assert.deepEqual(errors, [], 'no browser script errors');
   const report = { firstImageMs: Math.round(initial.metrics.firstImageMs), first10Ms: Math.round(commits[9].at - initial.metrics.startedAt), cadenceMs: cadence.map(Math.round), requestStartGapsMs: browserStartGaps.map(Math.round), observerGapsMs: observerGaps.map(Math.round), maxActive, requests: requests.length, requestsByArticle: Object.fromEntries([...new Set(requests.map(request => request.key))].map(key => [key, requests.filter(request => request.key === key).length])), sourceChanges: final.audit.changes.length, exposedCandidates: final.audit.candidates.length, geometry: geometryAfter, elapsedMs: Math.round(performance.now() - started), errors };

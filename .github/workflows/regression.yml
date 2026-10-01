@@ -59,6 +59,8 @@ jobs:
           node tests/v9834-adaptive-controls-browser.mjs test-results/adaptive-controls
           node tests/v9834-header-heights-browser.mjs test-results/header-heights
           node tests/v9835-header-spacing-browser.mjs test-results/header-spacing
+          node tests/v9836-optical-header-browser.mjs test-results/optical-header
+          node tests/v9836-startup-browser.mjs test-results/startup-v9836
       - name: Photo metrics and screenshots
         if: always()
         uses: actions/upload-artifact@v4

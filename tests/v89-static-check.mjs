@@ -75,7 +75,7 @@ for (const src of scripts) {
   else ok(`service worker precaches runtime script ${src}`);
 }
 
-for (const asset of ['app-controls.css?v=98.35']) {
+for (const asset of ['app-controls.css?v=98.36']) {
   if (!index.includes(asset)) fail(`final visual layer missing from index: ${asset}`);
   if (!sw.includes(asset)) fail(`service worker does not precache final visual layer: ${asset}`);
   else ok(`service worker precaches final visual layer: ${asset}`);
@@ -175,6 +175,12 @@ if (!app.includes('photoSnapshot(article)') || !app.includes('data-photo-final='
 else ok('immediate high-priority article image loading configured');
 if (!imageSequence.includes('Math.min(8,') || !imageSequence.includes('priorityCount: 12') || !imageSequence.includes('rootMarginPx: 1200') || !imageSequence.includes('intervalMs: 120') || !imageSequence.includes('function pump()')) fail('bounded paced image loading pipeline missing');
 else ok('bounded image loading pipeline configured');
+if (imageSequence.includes("localStorage.getItem('news-live-cache')") || !imageSequence.includes('photoRecordByKey(image?.dataset.photoKey)')) fail('photo queue must bind renderer records, never changing storage IDs');
+else ok('photo queue identity is independent of catalogue storage');
+if (androidActivity.includes('applyAndroidHeaderPolish') || androidActivity.includes('android-ui-polish')) fail('native typography must not mutate after first render');
+else ok('native typography has no late injection');
+if (!photos.includes('mon-actualite-photo-bodies-v1') || !photos.includes('MAX_BODIES = 160') || !photos.includes('cachedPhoto(record)')) fail('bounded durable validated photo-body cache missing');
+else ok('native reopening reuses a bounded positive photo cache');
 
 const visualService = read('services/article-visuals.js');
 if (!visualService.includes('let suppliedImage = extractPreparedImage(rawVisual)') || !photos.includes('response.headers.get') || !photos.includes('image.decode()')) fail('external visuals are not decoded through the validated image proxy');

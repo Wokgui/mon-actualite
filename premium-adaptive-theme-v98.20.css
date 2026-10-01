@@ -84,7 +84,10 @@ html[data-custom-home-header="1"] .hero-header .eyebrow{padding-top:6px!importan
 /* Un propriétaire unique pour les deux écarts : aucune marge héritée ni rétrécissement. */
 .hero-header{gap:var(--home-header-spacing,20px) 0!important}
 .hero-header .eyebrow,.hero-header .hero-mark{margin:0 auto!important;flex:0 0 auto!important}
-.hero-header h1{flex:0 0 auto!important}
+.hero-header h1{flex:0 0 auto!important;font-weight:840!important;letter-spacing:-.034em!important;line-height:1.08!important}
+.hero-header .hero-mark{transform:translateY(var(--home-mark-optical-offset,0px))!important}
+/* Native typography is part of the first stylesheet, never a late Java injection. */
+.page-masthead-v9186 h1,.settings-page-v9185>.page-masthead-v9186 h1,.page:has(.brief-mode-tabs)>.page-masthead-v9186 h1{font-size:25px!important;line-height:1.12!important;font-weight:820!important;letter-spacing:-.026em!important}
 
 /* Le haut reprend le fond de la navigation, sans ajouter les anciennes vagues. */
 .hero-header::before,
