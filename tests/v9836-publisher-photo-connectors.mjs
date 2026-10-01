@@ -72,3 +72,13 @@ await ctx.module.exports(deniedRequest, { setHeader: (key, value) => { if (key =
 assert.deepEqual(JSON.parse(JSON.stringify(deniedRequest.photoClientCandidates)), [{ url: 'https://cdn.publisher.test/exact-cover.png', publisherUrl: deniedRequest.query.url }]);
 assert.ok(!deniedType.startsWith('image/'), 'a blocked cover is never falsely marked positive');
 console.log('Exact public blocked covers remain unvalidated candidates, isolated per request.');
+ctx.fetch = async input => {
+  const url = String(input);
+  if (url.startsWith('https://blocked-publisher.test/')) return new Response('<script type="application/ld+json">' + JSON.stringify({ image: [0, 1, 2].map(i => `https://cdn.publisher.test/ordered-${i}.jpg`) }) + '</script>', { headers: { 'content-type': 'text/html' } });
+  const match = url.match(/ordered-(\d)/);
+  if (match) { await new Promise(r => setTimeout(r, (2 - Number(match[1])) * 15)); return new Response('', { status: 403 }); }
+  return String(input) === 'https://cdn.publisher.test/exact-cover.png' ? new Response('', { status: 403 }) : originalFetch(input);
+};
+const orderedRequest = { method: 'GET', query: { ...deniedRequest.query } };
+await ctx.module.exports(orderedRequest, { setHeader() {}, end() {} });
+assert.deepEqual(JSON.parse(JSON.stringify(orderedRequest.photoClientCandidates.map(c => c.url))), [0, 1, 2].map(i => `https://cdn.publisher.test/ordered-${i}.jpg`), 'client candidates preserve metadata authority order, not HTTP completion order');

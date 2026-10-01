@@ -1,4 +1,4 @@
-import { mkdir, writeFile } from 'node:fs/promises';
+import { mkdir, readFile, writeFile } from 'node:fs/promises';
 let playwright;
 try { playwright = await import('playwright'); }
 catch { playwright = await import('file:///C:/Users/Wokgui/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright/index.mjs'); }
@@ -24,6 +24,18 @@ try {
     }, 80);
   });
   const page = await context.newPage(), responses = [], errors = [];
+  if (process.env.PHOTO_REPLAY_REPORT) {
+    // Reuse the exact before-run article URLs/titles. Only catalogue delivery is
+    // fixed; every photo still comes from the live production API/publisher.
+    const before = JSON.parse(await readFile(process.env.PHOTO_REPLAY_REPORT, 'utf8'));
+    const articles = before.cards.filter(c => c.seenAt !== null).sort((a, b) => a.index - b.index).map((card, i) => {
+      const request = before.responses.find(r => new URL(r.url).searchParams.get('url') === card.key);
+      const query = new URL(request.url).searchParams;
+      return { id: 'replay-' + i, url: card.key, title: query.get('title'), source: query.get('source'), category: query.get('category'), image: query.get('image') || '', publishedAt: new Date(Date.now() - i * 60000).toISOString() };
+    });
+    await context.addInitScript(articles => localStorage.setItem('news-live-cache', JSON.stringify({ articles, fetchedAt: new Date().toISOString(), stats: {} })), articles);
+    await page.route('**/api/news**', route => route.fulfill({ json: { articles, fetchedAt: new Date().toISOString(), stats: {} } }));
+  }
   page.on('pageerror', e => errors.push(e.message));
   page.on('response', response => {
     if (/\/api\/article-(photo|thumbnail)/.test(new URL(response.url()).pathname)) responses.push({ url: response.url(), code: response.status(), status: response.headers()['x-thumbnail-status'], serverMs: Number(response.headers()['x-photo-resolve-ms']) });
@@ -46,7 +58,7 @@ try {
     await page.waitForTimeout(screen === 0 ? 14000 : 8000);
     await page.screenshot({ path: output + `/ecran-${screen}.png`, scale: 'css' });
     const report = await page.evaluate(() => ({ metrics: window.__articlePhotoMetrics, resourceTimings: performance.getEntriesByType('resource').filter(r => /\/api\/article-(photo|thumbnail)/.test(new URL(r.name).pathname)).map(r => ({ url: r.name, start: r.startTime, end: r.responseEnd, duration: r.duration })), cards: Object.values(window.__scrollPhotos).map(({ sources, ...item }) => ({ ...item, sourceCount: sources.length, visibleWaitMs: item.seenAt == null || item.readyAt == null ? null : Math.max(0, item.readyAt - item.seenAt) })) }));
-    await writeFile(output + '/verification.json', JSON.stringify({ ...report, responses, errors }, null, 2));
+    await writeFile(output + '/verification.json', JSON.stringify({ replay: Boolean(process.env.PHOTO_REPLAY_REPORT), ...report, responses, errors }, null, 2));
     console.log(JSON.stringify({ screen, tracked: report.cards.length, seen: report.cards.filter(c => c.seenAt !== null).length, missing: report.cards.filter(c => c.seenAt !== null && c.readyAt === null).map(c => ({ index: c.index, title: c.title })), failures: responses.filter(r => r.code !== 200).length }));
   }
 } finally { await browser.close(); }

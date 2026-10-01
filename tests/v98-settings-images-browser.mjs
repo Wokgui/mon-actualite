@@ -81,7 +81,7 @@ const readyMs = performance.now() - started;
 assert.ok(readyMs < 2500, `local mobile first render too slow: ${readyMs.toFixed(0)}ms`);
 await page.waitForTimeout(500);
 const geometry = await page.locator('[data-stable-home-feed] .article-card').evaluateAll(cards => cards.slice(0, 8).map(card => { const image=card.querySelector('img'); const r=image.getBoundingClientRect(); return { width:r.width,height:r.height,border:getComputedStyle(card).borderTopWidth,src:image.currentSrc||image.src }; }));
-assert.ok(geometry.every(item => Math.abs(item.width-119)<.75 && Math.abs(item.height-80)<.75), 'article images must reserve the same adaptive default space');
+assert.ok(geometry.every(item => Math.abs(item.width-119)<.75 && Math.abs(item.height-80)<.75), 'article images must reserve the same adaptive default space: ' + JSON.stringify(geometry));
 assert.ok(geometry.every(item => item.border === '0px'), 'article separators must stay removed');
 const requestCounts = [...photoRequests.reduce((map,url)=>map.set(url,(map.get(url)||0)+1),new Map()).values()];
 assert.ok(Math.max(...requestCounts) <= 1, 'rerenders must share the same photo request instead of repeating it');
