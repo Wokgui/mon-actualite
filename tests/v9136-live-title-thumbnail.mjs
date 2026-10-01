@@ -3,10 +3,10 @@ import fs from 'node:fs';
 import vm from 'node:vm';
 import { createRequire } from 'node:module';
 
-const require = createRequire(import.meta.url);
+const require = createRequire(new URL('../lib/article-photo-resolver.js', import.meta.url));
 const source = `${fs.readFileSync('lib/article-photo-resolver.js', 'utf8')}\nmodule.exports.__test = { queryVariants, sameEvent };`;
 const context = {
-  require: spec => spec === './article-photo-cache.js' ? require('../lib/article-photo-cache.js') : require(spec),
+  require,
   module: { exports: {} },
   exports: {},
   Buffer,
