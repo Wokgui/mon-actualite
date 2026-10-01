@@ -35,6 +35,21 @@ html[data-show-badges="0"][data-show-age="0"] #app .article-card h2{margin-botto
 .essential-domains{margin-top:10px}
 .interest.active,.switch.on{background:var(--app-accent)!important;border-color:var(--app-accent)!important}
 
+/* Les domaines des deux rubriques utilisent la même palette adaptative. */
+#app .interest[data-general-category],#app .interest[data-brief-essential]{
+ background:color-mix(in srgb,var(--app-accent-soft) 97%,#172033)!important;
+ border-color:color-mix(in srgb,var(--app-accent) 45%,white)!important;
+ color:color-mix(in srgb,var(--app-accent) 25%,#172033)!important;
+}
+#app .interest[data-general-category].active,#app .interest[data-brief-essential].active{
+ background:var(--app-accent)!important;border-color:var(--app-accent)!important;
+ color:var(--app-accent-ink,#fff)!important;
+ box-shadow:inset 0 0 0 1px color-mix(in srgb,var(--app-accent-ink,#fff) 24%,transparent)!important;
+}
+#app .interest[data-general-category]:focus-visible,#app .interest[data-brief-essential]:focus-visible{
+ outline:2px solid color-mix(in srgb,var(--app-accent) 55%,#172033)!important;outline-offset:2px!important;
+}
+
 /* Le réglage d’interface couvre tout sauf le titre principal, qui garde son curseur dédié. */
 .title-row h1,.page-masthead h1,.settings-page-v9185 .settings-accordion-v9185>summary,.settings-accordions-v9185 details>summary{font-size:calc(20px * var(--interface-text-scale))!important}
 .settings-accordion-content-v9185,.settings-accordion-content-v9185 button,.settings-accordion-content-v9185 input,.settings-accordion-content-v9185 select,.setting-label strong,.setting-label span,.muted-note,.settings-field-title{font-size:calc(12px * var(--interface-text-scale))!important}

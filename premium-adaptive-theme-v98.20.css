@@ -69,10 +69,19 @@
 /* v98.23 — fidélité maquette : même motif ruban, mêmes métriques sélectionnées/non sélectionnées. */
 .settings-page-v9185>.page-masthead-v9186,
 .page:has(.brief-mode-tabs)>.page-masthead-v9186{
- height:116px!important;min-height:116px!important;max-height:116px!important;
+ height:var(--settings-header-height,116px)!important;min-height:var(--settings-header-height,116px)!important;max-height:var(--settings-header-height,116px)!important;
  padding:0 8px!important;margin-bottom:14px!important;
  display:flex!important;align-items:center!important;justify-content:center!important;
 }
+.page:has(.brief-mode-tabs)>.page-masthead-v9186{
+ height:var(--brief-header-height,116px)!important;min-height:var(--brief-header-height,116px)!important;max-height:var(--brief-header-height,116px)!important;
+}
+html[data-custom-home-header="1"] .hero-header{
+ height:var(--home-header-height)!important;min-height:var(--home-header-height)!important;max-height:var(--home-header-height)!important;
+ padding-top:8px!important;padding-bottom:8px!important;
+}
+html[data-custom-home-header="1"] .hero-header .eyebrow{margin-bottom:6px!important;padding-top:6px!important;padding-bottom:6px!important}
+html[data-custom-home-header="1"] .hero-header .hero-mark{margin-bottom:6px!important}
 
 /* Le haut reprend le fond de la navigation, sans ajouter les anciennes vagues. */
 .hero-header::before,
@@ -117,7 +126,17 @@
 #app .bottom-nav.stable-bottom-nav-v9184 .nav-solid-icon-v9188,
 #app .bottom-nav.stable-bottom-nav-v9184 .nav-item.active .nav-solid-icon-v9188{
  width:21px!important;height:21px!important;min-width:21px!important;min-height:21px!important;max-width:21px!important;max-height:21px!important;
- color:rgba(255,255,255,.92)!important;opacity:1!important;filter:none!important;
+ color:#fff!important;opacity:1!important;fill:currentColor!important;stroke:none!important;
+ filter:drop-shadow(0 1px .5px rgba(10,15,40,.55))!important;
+}
+#app .bottom-nav.stable-bottom-nav-v9184 .nav-item svg path:not([stroke="#fff"]):not(.nav-solid-cut-v9188),
+#app .bottom-nav.stable-bottom-nav-v9184 .nav-item svg rect{
+ fill:currentColor!important;stroke:#1b2347!important;stroke-width:.75px!important;
+ paint-order:stroke fill!important;stroke-linejoin:round!important;
+}
+#app .bottom-nav.stable-bottom-nav-v9184 .nav-item svg path[stroke="#fff"],
+#app .bottom-nav.stable-bottom-nav-v9184 .nav-item svg .nav-solid-cut-v9188{
+ fill:none!important;stroke:#1b2347!important;stroke-width:1.8px!important;stroke-linecap:round!important;
 }
 #app .bottom-nav.stable-bottom-nav-v9184 .nav-item span,
 #app .bottom-nav.stable-bottom-nav-v9184 .nav-item.active span{

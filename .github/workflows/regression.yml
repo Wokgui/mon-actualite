@@ -56,6 +56,8 @@ jobs:
           node tests/v98-settings-images-browser.mjs test-results/v98
           node tests/v9831-photos-browser.mjs test-results/photos-v9831
           HEADER_BASE_URL=http://127.0.0.1:4173/?nativePreview=1 node tests/v9832-header-background-browser.mjs test-results/header-background
+          node tests/v9834-adaptive-controls-browser.mjs test-results/adaptive-controls
+          node tests/v9834-header-heights-browser.mjs test-results/header-heights
       - name: Photo metrics and screenshots
         if: always()
         uses: actions/upload-artifact@v4
