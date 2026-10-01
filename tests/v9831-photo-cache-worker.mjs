@@ -3,9 +3,13 @@ import vm from 'node:vm';
 import { readFile } from 'node:fs/promises';
 const listeners = new Map(), stores = new Map();
 const key = request => typeof request === 'string' ? request : request.url;
-let fetches = 0, neutral = false;
+let fetches = 0, neutral = false, corrupt = false;
 const context = {
   URL, Request, Response, Headers, Date, Map, Promise,
+  createImageBitmap: async blob => {
+    if (new Uint8Array(await blob.arrayBuffer())[0] === 9) throw new Error('Corrupt bytes');
+    return { width: 600, height: 338, close() {} };
+  },
   self: { location: { origin: 'https://app.test' }, addEventListener: (name, fn) => listeners.set(name, fn), skipWaiting() {}, clients: { claim() {} } },
   caches: {
     async open(name) {
@@ -23,7 +27,7 @@ const context = {
   fetch: async () => {
     fetches++;
     await new Promise(resolve => setTimeout(resolve, 20));
-    return new Response(new Uint8Array([1, 2, 3, 4]), { headers: { 'Content-Type': neutral ? 'image/svg+xml' : 'image/jpeg', 'X-Thumbnail-Status': neutral ? 'neutral-fallback' : 'publisher-metadata' } });
+    return new Response(new Uint8Array([corrupt ? 9 : 1, 2, 3, 4]), { headers: { 'Content-Type': neutral ? 'image/svg+xml' : 'image/jpeg', 'X-Thumbnail-Status': neutral ? 'neutral-fallback' : 'publisher-metadata' } });
   }
 };
 vm.runInNewContext(await readFile(new URL('../sw-v98.js', import.meta.url), 'utf8'), context);
@@ -49,14 +53,19 @@ await request('/api/article-photo-fast', 'https://publisher.test/negative');
 neutral = false;
 assert.equal((await request('/api/article-photo-fast', 'https://publisher.test/negative')).headers.get('X-Thumbnail-Status'), 'publisher-metadata');
 assert.equal(fetches, 3, 'temporary fallback is never cached');
-const store = stores.get('mon-actualite-thumbnails-v10');
+corrupt = true;
+assert.equal((await request('/api/article-photo-fast', 'https://publisher.test/corrupt')).status, 422);
+corrupt = false;
+assert.equal((await request('/api/article-photo-fast', 'https://publisher.test/corrupt')).status, 200);
+assert.equal(fetches, 5, 'corrupt raster bytes are rejected and never pinned');
+const store = stores.get('mon-actualite-thumbnails-v11');
 for (const [url, response] of store) {
   const headers = new Headers(response.headers);
   headers.set('X-Photo-Cached-At', '1');
   store.set(url, new Response(await response.arrayBuffer(), { headers }));
 }
 await request('/api/article-photo-fast', 'https://publisher.test/story');
-assert.equal(fetches, 4, 'expired positives are fetched again');
+assert.equal(fetches, 6, 'expired positives are fetched again');
 stores.set('mon-actualite-thumbnails-v9', new Map());
 stores.set('unrelated-cache', new Map());
 let activation;

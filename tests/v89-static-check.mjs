@@ -137,7 +137,7 @@ else ok('validated same-origin prepared images keep first priority');
 const photoFast = read('api/article-photo-fast.js');
 if (!photoFast.includes('fastBingImageSearch') || !photoFast.includes('bingImageEntries') || !photoFast.includes('sourceAgreement')) fail('generic title/source photo recovery is missing');
 else ok('generic title/source photo recovery configured');
-if (!sw.includes("THUMB_CACHE = 'mon-actualite-thumbnails-v10'") || !sw.includes('if (!positive(response)) return response')) fail('negative thumbnail fallbacks must be purged and never cached');
+if (!sw.includes("THUMB_CACHE = 'mon-actualite-thumbnails-v11'") || !sw.includes('if (!positive(response)) return response') || !sw.includes('await createImageBitmap')) fail('negative or undecodable thumbnail responses must never be cached');
 else ok('negative thumbnail fallbacks are purged instead of cached');
 const androidGradle = read('android-app/app/build.gradle');
 const androidActivity = read('android-app/app/src/main/java/com/wokgui/monactualite/MainActivity.java');

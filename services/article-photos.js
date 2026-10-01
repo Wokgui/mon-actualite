@@ -44,13 +44,13 @@ function persistSelection(record) {
   try { localStorage.setItem(CACHE_KEY, JSON.stringify(saved)); } catch {}
 }
 
-async function decodedPhoto(url, priority, timeoutMs) {
+async function decodedPhoto(url, priority, timeoutMs, cache = 'default') {
   const controller = new AbortController();
   const timer = setTimeout(() => controller.abort(), timeoutMs);
   let blobUrl = '';
   photoMetrics.requests++;
   try {
-    const response = await fetch(url, { signal: controller.signal, cache: 'default', priority });
+    const response = await fetch(url, { signal: controller.signal, cache, priority });
     const type = response.headers.get('Content-Type') || '';
     const status = response.headers.get('X-Thumbnail-Status') || '';
     if (!response.ok || !/^image\/(?:jpeg|png|webp|avif|gif)(?:;|$)/i.test(type) || /fallback|neutral|tile/i.test(status)) throw new Error('No article photo');
@@ -104,7 +104,7 @@ export function resolvePhoto(record, priority = 'auto', timeoutMs = 14000) {
       const remaining = deadline - performance.now();
       if (remaining < 100) break;
       try {
-        Object.assign(record, await decodedPhoto(candidate, priority, remaining));
+        Object.assign(record, await decodedPhoto(candidate, priority, remaining, record.attempts > 1 ? 'reload' : 'default'));
         record.status = 'ready';
         persistSelection(record);
         return record;

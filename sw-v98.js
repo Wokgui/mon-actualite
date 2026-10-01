@@ -1,5 +1,5 @@
-const CORE_CACHE = 'mon-actualite-v98-31-core-r1';
-const THUMB_CACHE = 'mon-actualite-thumbnails-v10';
+const CORE_CACHE = 'mon-actualite-v98-31-core-r2';
+const THUMB_CACHE = 'mon-actualite-thumbnails-v11';
 const PHOTO_TTL_MS = 7 * 86400000;
 const thumbnailInflight = new Map();
 const ASSETS = ['./', './index.html', './version.json', './styles.css?v=53', './app-controls.css?v=98.31',
@@ -54,7 +54,7 @@ function thumbnailKey(request) {
     identity = article.href;
   } catch {}
   identity ||= source.searchParams.get('id') || source.searchParams.get('image') || (source.searchParams.get('source') || '') + '|' + (source.searchParams.get('title') || '');
-  const key = new URL('/__cached-article-photo-v10', self.location.origin);
+  const key = new URL('/__cached-article-photo-v11', self.location.origin);
   key.searchParams.set('article', identity);
   return new Request(key.href);
 }
@@ -80,6 +80,18 @@ async function thumbnail(request) {
         const headers = new Headers(response.headers);
         headers.set('X-Photo-Cached-At', String(Date.now()));
         const stored = new Response(await response.arrayBuffer(), { status: response.status, headers });
+        // MIME/header checks alone can accept truncated or undecodable bytes.
+        // Persist only images that this browser can actually decode. Without
+        // worker bitmap support the page still validates, but no bytes are pinned.
+        if (typeof createImageBitmap !== 'function') return stored;
+        try {
+          const bitmap = await createImageBitmap(await stored.clone().blob());
+          const valid = bitmap.width >= 2 && bitmap.height >= 2;
+          bitmap.close();
+          if (!valid) throw new Error('Invalid photo dimensions');
+        } catch {
+          return new Response('', { status: 422, headers: { 'Cache-Control': 'no-store', 'X-Thumbnail-Status': 'invalid-image' } });
+        }
         await cache.put(key, stored.clone());
         return stored;
       } catch { return new Response('', { status: 503, headers: { 'Cache-Control': 'no-store' } }); }

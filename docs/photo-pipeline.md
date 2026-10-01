@@ -57,7 +57,7 @@ worker caching provide continuity rather than a new distributed database.
 
 localStorage news-photo-selections-v1 holds only validated request URLs,
 maximum 500 entries, seven days. Reloading still decodes the response before
-display; old ready/pin flags are not trusted. SW thumbnail cache v10 uses the
+display; old ready/pin flags are not trusted. SW thumbnail cache v11 uses the
 same article identity across endpoint aliases and hint changes, raster-only
 positives, a seven-day TTL and cloned Response bodies for each caller.
 Old app caches are migrated without deleting unrelated caches.
@@ -108,3 +108,6 @@ return unavailable; the original 6ad53c9 resolver also returned neutral SVG
 for these same two cases. A first 3s publisher budget regressed ANVOL, so it
 was corrected to 6s within the unchanged 12s global bound. Do not relax the
 historical real-photo assertions or silently treat neutral tiles as photos.
+Worker follow-up: bitmap decoding also runs before persistent storage, so a
+200/image MIME response with corrupt bytes cannot poison the cache. Worker
+cache v11 migrates v10; a retry re-fetches the same URL with cache=reload.
