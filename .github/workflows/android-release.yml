@@ -89,10 +89,10 @@ jobs:
           set -euo pipefail
           TAG="v98-98.10"
           APK="mon-actualite-v98-98.10.apk"
-          NOTES="APK Android installable de Mon Actualité. Version web intégrée : v98 / codeRelease 98.31 (Android 98.0.31, code 109). Pipeline photo unique : validation hors DOM, verrou par article, priorité aux cartes visibles et cadence régulière. Lien de téléchargement historique conservé."
+          NOTES="APK Android installable de Mon Actualité. Version web intégrée : v98 / codeRelease 98.32 (Android 98.0.32, code 110). Accueil, Réglages et Brief : le haut reprend le fond actuel de la barre du bas, sans vagues ajoutées. Barre du bas et dimensions conservées. Pipeline photo stable conservé. Lien de téléchargement historique conservé."
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release upload "$TAG" "$APK" --clobber
-            gh release edit "$TAG" --title "Mon Actualité v98 / 98.31" --notes "$NOTES"
+            gh release edit "$TAG" --title "Mon Actualité v98 / 98.32" --notes "$NOTES"
           else
-            gh release create "$TAG" "$APK" --title "Mon Actualité v98 / 98.31" --notes "$NOTES"
+            gh release create "$TAG" "$APK" --title "Mon Actualité v98 / 98.32" --notes "$NOTES"
           fi
