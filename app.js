@@ -1794,7 +1794,7 @@ if ('serviceWorker' in navigator && location.protocol.startsWith('http') && !nav
     serviceWorkerRefreshing = true;
     window.location.reload();
   });
-  navigator.serviceWorker.register('./sw-v98.js?v=98.32', { updateViaCache: 'none' }).then(registration => {
+  navigator.serviceWorker.register('./sw-v98.js?v=98.33', { updateViaCache: 'none' }).then(registration => {
     if (registration.waiting) registration.waiting.postMessage('SKIP_WAITING');
     registration.addEventListener('updatefound', () => {
       const installing = registration.installing;
