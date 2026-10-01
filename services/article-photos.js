@@ -134,7 +134,7 @@ function recoveryCandidates(payload, requestUrl) {
     try {
       const url = new URL(candidate.url), publisher = new URL(candidate.publisherUrl);
       if (url.protocol !== 'https:' || publisher.protocol !== 'https:' || url.username || url.password
-        || !/\.(?:jpe?g|png|webp|avif|gif)$/i.test(url.pathname)
+        || /\.svg$/i.test(url.pathname)
         || !url.hostname.includes('.') || /(?:^|\.)localhost$|\.local$|^[\d.]+$|:/.test(url.hostname)
         || /(?:^|[\/_\-.])(?:logo|avatar|favicon|tracking|pixel)(?:[\/_\-.]|$)/i.test(url.pathname)) return '';
       return url.href;
@@ -142,13 +142,14 @@ function recoveryCandidates(payload, requestUrl) {
   }).filter(Boolean);
 }
 
-async function decodedResponse(response, signal) {
+async function decodedResponse(response, signal, requireCover = false) {
     const type = response.headers.get('Content-Type') || '';
     const status = response.headers.get('X-Thumbnail-Status') || '';
     if (!response.ok || !/^image\/(?:jpeg|png|webp|avif|gif)(?:;|$)/i.test(type) || /fallback|neutral|tile/i.test(status)) throw new Error('No article photo');
     const blob = await response.blob();
     if (!blob.size || blob.size > 7_000_000) throw new Error('Invalid image size');
-    return decodedBlob(blob, signal);
+    if (requireCover && blob.size < 3500) throw new Error('Weak publisher cover');
+    return decodedBlob(blob, signal, requireCover);
 }
 
 async function decodedPhoto(url, priority, timeoutMs, cache = 'default') {
@@ -165,7 +166,7 @@ async function decodedPhoto(url, priority, timeoutMs, cache = 'default') {
       for (const candidate of candidates) {
         try {
           photoMetrics.directRequests++;
-          photo = await decodedResponse(await pacedPhotoFetch(candidate, controller, cache, priority), controller.signal);
+          photo = await decodedResponse(await pacedPhotoFetch(candidate, controller, cache, priority), controller.signal, true);
           photoMetrics.clientRecoveries++;
           break;
         } catch {}
@@ -181,7 +182,7 @@ async function decodedPhoto(url, priority, timeoutMs, cache = 'default') {
   } finally { clearTimeout(timer); }
 }
 
-async function decodedBlob(blob, signal) {
+async function decodedBlob(blob, signal, requireCover = false) {
   if (!/^image\/(?:jpeg|png|webp|avif|gif)(?:;|$)/i.test(blob.type) || !blob.size || blob.size > 7_000_000) throw new Error('Invalid cached image');
   let blobUrl = URL.createObjectURL(blob);
   try {
@@ -193,6 +194,8 @@ async function decodedBlob(blob, signal) {
       else signal?.addEventListener('abort', () => reject(new Error('Photo timeout')), { once: true });
     })]);
     if (image.naturalWidth < 2 || image.naturalHeight < 2) throw new Error('Invalid photo dimensions');
+    if (requireCover && (image.naturalWidth < 180 || image.naturalHeight < 100 || image.naturalWidth * image.naturalHeight < 45000
+      || (image.naturalWidth <= 260 && image.naturalHeight <= 260 && Math.abs(image.naturalWidth - image.naturalHeight) < 25))) throw new Error('Weak publisher cover dimensions');
     // Feeds often supply multi-megapixel originals for a 119px card. Retain
     // enough pixels for high-DPI / enlarged text without keeping every full
     // decoded original alive through navigation.

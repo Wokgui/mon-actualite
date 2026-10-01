@@ -27,7 +27,7 @@ try {
     assert.equal(url.searchParams.get('clientRecovery'), '1', 'old persisted request URLs must be upgraded before their first attempt');
     const index = Number(url.searchParams.get('url').split('/').pop());
     if (index === 4) return route.fulfill({ contentType: 'image/png', body: png });
-    const candidates = index === 0 ? ['https://cdn.publisher.test/corrupt.png', 'https://cdn.publisher.test/cover.png']
+    const candidates = index === 0 ? ['https://cdn.publisher.test/corrupt.png', 'https://cdn.publisher.test/cover']
       : index === 2 ? ['https://127.0.0.1/private.png']
       : index === 3 ? ['https://cdn.publisher.test/logo.svg']
       : ['https://cdn.publisher.test/denied.png'];
@@ -61,7 +61,7 @@ try {
   assert.equal(data.metrics.sourceChanges, 0);
   assert.ok(data.cached.includes(articles[0].url), 'recovered photo bytes enter the same positive native cache');
   assert.ok(!external.some(url => /private|logo/.test(url)));
-  assert.equal(external.filter(url => url.endsWith('/cover.png')).length, 1);
+  assert.equal(external.filter(url => url.endsWith('/cover')).length, 1, 'extensionless CDN covers are validated by MIME and decoded dimensions');
   assert.ok([1, 2, 3, 5].every(i => data.ready[i] === '0'), 'mismatched, private, SVG and refused candidates stay invisible');
   assert.deepEqual(errors, []);
   await page.screenshot({ path: output + '/recovery.png', scale: 'css' });
