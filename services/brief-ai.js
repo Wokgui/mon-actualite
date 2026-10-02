@@ -18,7 +18,7 @@ const initial = read(CONFIG_KEY, {});
 const clean = (value, max) => typeof value === 'string' ? value.trim().slice(0, max) : '';
 export const briefAI = {
   provider: AI_PROVIDERS.some(provider => provider.id === initial.provider) ? initial.provider : 'chatgpt',
-  prompt: clean(initial.prompt, 6000) || DEFAULT_AI_PROMPT,
+  prompt: typeof initial.prompt === 'string' ? initial.prompt.slice(0, 6000) : DEFAULT_AI_PROMPT,
   model: clean(initial.model, 100),
   autoAtOpen: initial.autoAtOpen !== false,
   busy: '', progress: '', error: '', account: { profiles: [], activeId: '', models: [] },

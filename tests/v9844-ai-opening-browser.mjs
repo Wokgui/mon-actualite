@@ -9,7 +9,7 @@ const png = await readFile(new URL('../assets/icon-192.png', import.meta.url));
 const sources = Array.from({ length: 8 }, (_, i) => ({ id: 'opening-' + i, url: 'https://example.test/news/' + i, title: 'Innovation ' + i, summary: 'Extrait vérifié ' + i, publishedAt: new Date(Date.now() - i * 86400000).toISOString(), category: 'Science', source: 'Source ' + i, image: '' }));
 const prompt = 'En un paragraphe résume les innovations de la semaine avec liens vers les articles';
 const errors = [];
-async function scenario({ enabled = true, connected = true, cached = true } = {}) {
+async function scenario({ enabled = true, connected = true, cached = true, savedPrompt = prompt } = {}) {
   const context = await browser.newContext({ viewport: { width: 412, height: 915 }, isMobile: true, hasTouch: true, serviceWorkers: 'block' });
   const assets = process.env.AI_APK_ASSETS;
   if (assets) await context.route('https://mon-actualite.vercel.app/assets/**', route => {
@@ -34,7 +34,7 @@ async function scenario({ enabled = true, connected = true, cached = true } = {}
       }
       setTimeout(() => window.MonActualiteAI.onmessage?.({ data: JSON.stringify({ id: request.id, ok: !error, data, error }) }), request.action === 'generate' ? 250 : 20);
     }};
-  }, { sources, prompt, enabled, connected, cached });
+  }, { sources, prompt: savedPrompt, enabled, connected, cached });
   const page = await context.newPage();
   page.on('pageerror', error => errors.push(error.message));
   await page.route('**/api/news**', async route => { if (!cached) await new Promise(resolve => setTimeout(resolve, 350)); return route.fulfill({ json: { articles: sources, fetchedAt: new Date().toISOString(), stats: {} } }); });
@@ -84,6 +84,10 @@ try {
   await absent.page.waitForFunction(() => document.querySelectorAll('[data-stable-home-feed] .article-card').length > 0);
   assert.equal(await absent.page.evaluate(() => window.__OPENING_REQUESTS.filter(request => request.action === 'generate').length), 0, 'no generation without connected authorized account');
   await absent.context.close();
+  const blank = await scenario({ savedPrompt: '  ' });
+  await blank.page.waitForFunction(() => window.__OPENING_REQUESTS.some(request => request.action === 'models'));
+  assert.equal(await blank.page.evaluate(() => window.__OPENING_REQUESTS.filter(request => request.action === 'generate').length), 0, 'an intentionally blank saved prompt cannot generate or become the default');
+  await blank.context.close();
   const cold = await scenario({ cached: false });
   await cold.page.waitForFunction(() => !!localStorage.getItem('news-brief-ai-results-v1'));
   assert.equal(await cold.page.evaluate(() => window.__OPENING_REQUESTS.filter(request => request.action === 'generate').length), 1, 'cold opening waits for articles then generates once');
