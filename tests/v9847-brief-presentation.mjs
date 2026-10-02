@@ -1,5 +1,5 @@
 import assert from 'node:assert/strict';
-import {newestBriefCards,briefSummaryParagraphs,briefArticleBlocks,briefDateLabel} from '../services/brief-presentation.js';
+import {newestBriefCards,briefSummaryParagraphs,briefArticleBlocks,briefDateLabel,briefSentenceStart} from '../services/brief-presentation.js';
 const cards=[{article:{id:'old',publishedAt:'2026-09-27T10:00:00Z'}},{article:{id:'invalid',publishedAt:'bad'}},{article:{id:'new',publishedAt:'2026-10-02T10:00:00Z'}},{article:{id:'same',publishedAt:'2026-10-02T10:00:00Z'}}];
 const before=JSON.stringify(cards);
 assert.deepEqual(newestBriefCards(cards).map(card=>card.article.id),['new','same','old','invalid']);
@@ -21,4 +21,9 @@ assert.deepEqual(briefArticleBlocks('Résumé factuel'),[{type:'paragraph',text:
 assert.deepEqual(briefArticleBlocks('<img src=x onerror=alert(1)>'),[{type:'paragraph',text:'<img src=x onerror=alert(1)>'}]);
 assert.equal(briefSummaryParagraphs('Cette semaine a été riche en innovations.')[0].topic,'');
 assert.deepEqual(briefSummaryParagraphs('Cette semaine a été riche en innovations : voici les faits.'),[{topic:'',text:'Cette semaine a été riche en innovations : voici les faits.'}]);
-console.log('PASS Brief presentation: stable chronological sorting, legacy cache, topic paragraphs and safe date labels');
+assert.deepEqual(briefSummaryParagraphs('automobile : une nouvelle voiture est annoncée.\nVR : «un casque» reste expérimental.\nscience : évaluation en cours [source](https://example.test/path).'),[{topic:'Automobile',text:'Une nouvelle voiture est annoncée.'},{topic:'VR',text:'«Un casque» reste expérimental.'},{topic:'Science',text:'Évaluation en cours [source](https://example.test/path).'}]);
+assert.deepEqual(briefArticleBlocks('lancements spatiaux\nune mission est prévue.\nUtilité : étudier le climat.'),[{type:'heading',text:'Lancements spatiaux'},{type:'paragraph',text:'Une mission est prévue.'},{type:'paragraph',text:'Étudier le climat.'}]);
+assert.equal(briefSentenceStart('[source](https://example.test/path)'), '[Source](https://example.test/path)');
+assert.equal(briefSentenceStart('https://example.test/path'),'https://example.test/path');
+assert.equal(briefSentenceStart('VR et IA'),'VR et IA');
+console.log('PASS Brief presentation: stable sorting, immutable legacy cache, topic paragraphs, capitalized sentences and safe links/date labels');

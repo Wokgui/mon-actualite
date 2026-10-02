@@ -3,12 +3,18 @@ export function newestBriefCards(cards) {
   const time = card => { const value = Date.parse(card?.article?.publishedAt || ''); return Number.isFinite(value) ? value : -Infinity; };
   return (Array.isArray(cards) ? [...cards] : []).sort((a,b) => time(b) - time(a) || 0);
 }
+// Presentation only: keep source text, Markdown link destinations and cache intact.
+export function briefSentenceStart(text) {
+  const value = String(text || '');
+  if (/^\s*(?:https?:\/\/|www\.)/iu.test(value)) return value;
+  return value.replace(/^([\s«“"'‘(\[*_•-]*)(\p{Ll})/u, (_, prefix, letter) => prefix + letter.toLocaleUpperCase('fr-FR'));
+}
 export function briefSummaryParagraphs(summary) {
   return String(summary || '').replace(/\r\n?/g,'\n').split(/\n+/).map(text => text.trim()).filter(Boolean).map(text => {
     // Topic labels are plain text, not model-supplied HTML.
     const introductory = /^(?:Cette semaine|Cette journée|Ce mois|Aujourd’hui|En résumé|En bref|Les derniers jours|La semaine)\b/iu.test(text);
     const topic = !introductory && text.match(/^(?:\*\*)?([^:!?\.\[\]<>\n]{2,55})(?:\*\*)?\s*:\s+(.+)$/u);
-    return topic ? { topic:topic[1].replace(/\*\*/g,'').trim(),text:topic[2] } : {topic:'',text};
+    return topic ? { topic:briefSentenceStart(topic[1].replace(/\*\*/g,'').trim()),text:briefSentenceStart(topic[2]) } : {topic:'',text:briefSentenceStart(text)};
   });
 }
 export function briefDateLabel(value) {
@@ -20,7 +26,7 @@ export function briefDateLabel(value) {
 export function briefArticleBlocks(summary) {
   const blocks = [];
   const field = /^(?:[-*•]\s*)?(?:\*\*)?(Utilit[ée]|Statut|Sources?)(?:\*\*)?\s*[:：–-]\s*(?:\*\*)?\s*/iu;
-  const append = (type, text) => { if (text.trim()) blocks.push({type, text:text.trim()}); };
+  const append = (type, text) => { if (text.trim()) blocks.push({type, text:briefSentenceStart(text.trim())}); };
   const lines = String(summary || '').replace(/\r\n?/g, '\n')
     .replace(/([.!?;])\s+(?=(?:\*\*)?(?:Utilit[ée]|Statut|Sources?)(?:\*\*)?\s*[:：])/gu, '$1\n')
     .split(/\n+/).map(text => text.trim()).filter(Boolean);

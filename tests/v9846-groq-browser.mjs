@@ -30,7 +30,7 @@ try {
       if(request.action==='disconnect'){configured=false;sessionStorage.setItem('__groqConfigured','false');}
       if(request.action==='generate') void window.__recordGeneration();
       const error=request.action==='generate'?window.__GROQ_ERROR:'';
-      const result={summary:'Cette semaine a été riche en innovations : plusieurs nouveautés pratiques ou théoriques méritent d’être suivies.\n\nVR : Un nouveau casque apporte des améliorations pratiques pour la réalité virtuelle [Source](A1).\n\nAutomobile : Les innovations automobiles ouvrent de nouvelles perspectives.\n\nScience : Une découverte théorique reste à confirmer. <img src=x onerror=alert(1)>',cards:request.articles?.slice(0,3).map(article=>({sourceId:article.sourceId,title:'Analyse '+article.title,summary:'Lancements spatiaux\nDes innovations ouvrent de nouvelles perspectives pour les recherches pratiques et théoriques.\nUtilité : Suivre les évolutions et leurs conséquences concrètes.\nStatut : Expérimental, selon les extraits fournis.\nSource : Informations répétées\nDétails à supprimer sous source.'}))||[]};
+      const result={summary:'Cette semaine a été riche en innovations : plusieurs nouveautés pratiques ou théoriques méritent d’être suivies.\n\nVR : un nouveau casque apporte des améliorations pratiques pour la réalité virtuelle [Source](A1).\n\nautomobile : les innovations automobiles ouvrent de nouvelles perspectives.\n\nscience : une découverte théorique reste à confirmer. <img src=x onerror=alert(1)>',cards:request.articles?.slice(0,3).map(article=>({sourceId:article.sourceId,title:'Analyse '+article.title,summary:'lancements spatiaux\ndes innovations ouvrent de nouvelles perspectives pour les recherches pratiques et théoriques.\nUtilité : suivre les évolutions et leurs conséquences concrètes.\nStatut : expérimental, selon les extraits fournis.\nSource : Informations répétées\nDétails à supprimer sous source.'}))||[]};
       const data=request.action==='generate'?{result,model:'openai/gpt-oss-120b',credentialVersion:'key-1'}:{configured,credentialVersion:'key-1'};
       setTimeout(()=>window.MonActualiteGroq.onmessage?.({data:JSON.stringify({id:request.id,ok:!error,error,data})}),request.action==='generate'?window.__GROQ_DELAY:10);
     }};
@@ -42,7 +42,7 @@ try {
     return route.fulfill({json:{articles:isBrief?[...sources,discovered]:sources,fetchedAt:new Date().toISOString(),stats:{}}});
   });
   await page.route('**/api/article-photo-fast**',route=>{photoRequests.push(route.request().url());return route.fulfill({body:png,contentType:'image/png',headers:{'X-Thumbnail-Status':'feed'}});});
-  await page.route('**/version.json**',route=>route.fulfill({json:{version:'98',codeRelease:'98.50'}}));
+  await page.route('**/version.json**',route=>route.fulfill({json:{version:'98',codeRelease:'98.51'}}));
   await page.goto(process.env.AI_BASE_URL||'http://127.0.0.1:4173/?nativePreview=1',{waitUntil:'domcontentloaded'});
   await page.waitForFunction(()=>document.querySelectorAll('[data-stable-home-feed] img.image-ready-v98').length>=8);
   const homeBefore=await page.locator('[data-stable-home-feed] .article-card').evaluateAll(cards=>cards.map(card=>({id:card.dataset.article,src:card.querySelector('img').src})));
@@ -179,15 +179,17 @@ try {
     assert.ok(!(await page.locator('.ai-brief-v9840').textContent()).includes('Dernière synthèse conservée'));
     const layout=await page.locator('.ai-brief-v9840').evaluate(root=>{
       const rect=selector=>document.querySelector(selector).getBoundingClientRect();
-      const header=rect('.ai-brief-page-v9848>.page-masthead-v9186'),tabs=rect('.brief-mode-tabs'),note=rect('.brief-preferences-note-v9849');
-      return {headerGap:tabs.top-header.bottom,preferencesGap:note.top-tabs.bottom,footers:root.querySelectorAll('footer').length,
-        headings:[...root.querySelectorAll('.ai-card-title-v9849')].map(node=>({align:getComputedStyle(node).textAlign,weight:getComputedStyle(node).fontWeight,beforePreview:node.getBoundingClientRect().bottom<=node.nextElementSibling.getBoundingClientRect().top})),
+      const header=rect('.ai-brief-page-v9848>.page-masthead-v9186'),tabs=rect('.brief-mode-tabs'),summary=rect('.ai-news-summary-v9840');
+      return {headerGap:tabs.top-header.bottom,contentGap:summary.top-tabs.bottom,preferencesCount:document.querySelectorAll('.brief-preferences-note-v9849').length,footers:root.querySelectorAll('footer').length,
+        headings:[...root.querySelectorAll('.ai-card-title-v9849')].map(node=>({align:getComputedStyle(node).textAlign,weight:getComputedStyle(node).fontWeight,font:parseFloat(getComputedStyle(node).fontSize),bodyFont:parseFloat(getComputedStyle(node.parentElement.querySelector('.ai-card-summary-v9840')).fontSize),beforePreview:node.getBoundingClientRect().bottom<=node.nextElementSibling.getBoundingClientRect().top})),
         dates:[...root.querySelectorAll('.ai-publication-v9848')].map(node=>({inHeader:!!node.closest('.article-card'),toRight:node.getBoundingClientRect().left>=node.previousElementSibling.getBoundingClientRect().right,text:node.textContent})),
         bodies:[...root.querySelectorAll('.ai-card-summary-v9840')].map(node=>node.textContent),
         borders:[...root.querySelectorAll('.ai-result-v9840')].slice(1).map(node=>({width:getComputedStyle(node).borderTopWidth,color:getComputedStyle(node).borderTopColor})),overflow:document.documentElement.scrollWidth>innerWidth};
     });
-    assert.equal(layout.footers,0);assert.ok(Math.abs(layout.headerGap-layout.preferencesGap)<1,JSON.stringify(layout));assert.equal(layout.headerGap,14);
-    assert.ok(layout.headings.length===3&&layout.headings.every(value=>value.align==='center'&&Number(value.weight)>=700&&value.beforePreview));
+    assert.equal(layout.footers,0);assert.equal(layout.preferencesCount,0);assert.ok(Math.abs(layout.headerGap-layout.contentGap)<1,JSON.stringify(layout));assert.equal(layout.headerGap,14);
+    assert.ok(layout.headings.length===3&&layout.headings.every(value=>value.align==='center'&&Number(value.weight)>=700&&value.beforePreview&&value.font>value.bodyFont));
+    assert.ok(await page.locator('.ai-summary-paragraph-v9847').evaluateAll(nodes=>nodes.every(node=>{const clone=node.cloneNode(true);clone.querySelector('strong')?.remove();return /^[\p{Lu}]/u.test(clone.textContent.trim());})),'each category paragraph starts with a capital');
+    assert.ok(await page.locator('.ai-card-summary-v9840 p').evaluateAll(nodes=>nodes.every(node=>/^[\p{Lu}]/u.test(node.textContent.trim()))),'card prose starts with capitals');
     assert.ok(layout.dates.length===3&&layout.dates.every(value=>value.inHeader&&value.toRight&&/\d{2}\/\d{2}\/\d{4}/.test(value.text)));
     assert.ok(layout.bodies.every(value=>!/(Utilité|Statut|Source|Détails à supprimer)/.test(value)&&value.includes('Suivre les évolutions')&&value.includes('Expérimental')));
     assert.ok(!(await page.locator('.ai-brief-v9840').textContent()).includes('Synthèse de tes sujets'));
@@ -235,6 +237,35 @@ try {
     await page.waitForFunction(()=>document.querySelectorAll('[data-stable-home-feed] img.image-ready-v98').length>=8);
     // Blob URLs are document-scoped and legitimately change after a reload.
     assert.deepEqual(await page.locator('[data-stable-home-feed] .article-card').evaluateAll(cards=>cards.map(card=>card.dataset.article)),homeBefore.map(card=>card.id),'Brief discovery does not mutate Home identity or order');
+  }
+  // Watch instructions depend on actual visible articles, not merely on saved rules.
+  const generationsBeforeWatch=generations;
+  await page.locator('.bottom-nav [data-view="brief"]').click();await page.locator('[data-brief-mode="watches"]').click();
+  assert.equal(await page.locator('.brief-preferences-note-v9849').count(),1);
+  await settings();await openSection('[data-add-watch-rule]');await page.locator('#watch-query-input').fill('NoMatchingTopic987654');await page.locator('[data-add-watch-rule]').click();
+  await page.locator('.bottom-nav [data-view="brief"]').click();await page.locator('[data-brief-mode="watches"]').click();
+  assert.equal(await page.locator('.brief-preferences-note-v9849').count(),1,'rules without matching articles remain empty');
+  await settings();await openSection('[data-add-watch-rule]');await page.locator('[data-watch-rule-delete]').first().click();
+  await page.locator('#watch-query-input').fill('VR');await page.locator('[data-add-watch-rule]').click();
+  await page.locator('.bottom-nav [data-view="brief"]').click();await page.locator('[data-brief-mode="watches"]').click();
+  assert.ok(await page.locator('.watch-filtered-feed-v9138 .article-card').count()>0);assert.equal(await page.locator('.brief-preferences-note-v9849').count(),0);
+  const watchLayout=await page.evaluate(()=>{const r=s=>document.querySelector(s).getBoundingClientRect(),header=r('.page-masthead-v9186'),tabs=r('.brief-mode-tabs'),content=r('.watch-day-v9138');return {headerGap:tabs.top-header.bottom,contentGap:content.top-tabs.bottom};});
+  assert.equal(watchLayout.headerGap,14);assert.ok(Math.abs(watchLayout.contentGap-watchLayout.headerGap)<1,JSON.stringify(watchLayout));
+  await page.screenshot({path:output+'/brief-veille-remplie.png',fullPage:true});
+  await settings();await openSection('[data-add-watch-rule]');await page.locator('[data-watch-rule-delete]').first().click();
+  await page.locator('.bottom-nav [data-view="brief"]').click();await page.locator('[data-brief-mode="watches"]').click();
+  assert.equal(await page.locator('.brief-preferences-note-v9849').count(),1,'instruction returns when all matching rules are removed');
+  assert.equal(generations,generationsBeforeWatch,'presentation/navigation does not regenerate IA');
+  if(native){
+    const prior=await page.evaluate(()=>localStorage.getItem('news-brief-ai-results-v1'));
+    await page.evaluate(()=>{const key='news-brief-ai-results-v1',value=JSON.parse(localStorage.getItem(key));localStorage.setItem(key,JSON.stringify({...value,cards:[]}));const config=JSON.parse(localStorage.getItem('news-brief-ai-settings-v1'));localStorage.setItem('news-brief-ai-settings-v1',JSON.stringify({...config,autoAtOpen:false}));});
+    await page.reload({waitUntil:'domcontentloaded'});await page.locator('[data-brief-mode="ai"]').click();await page.waitForSelector('.ai-news-summary-v9840');
+    assert.equal(await page.locator('.ai-result-v9840').count(),0);assert.equal(await page.locator('.brief-preferences-note-v9849').count(),0,'summary without cards is still content');
+    await page.evaluate(()=>localStorage.removeItem('news-brief-ai-results-v1'));await page.reload({waitUntil:'domcontentloaded'});
+    await page.waitForSelector('.brief-preferences-note-v9849');assert.equal(await page.locator('.ai-news-summary-v9840').count(),0);
+    await page.evaluate(value=>localStorage.setItem('news-brief-ai-results-v1',value),prior);await page.reload({waitUntil:'domcontentloaded'});await page.waitForSelector('.ai-result-v9840');
+    assert.equal(await page.evaluate(()=>localStorage.getItem('news-brief-ai-results-v1')),prior,'rendering preserves the source cache');
+    assert.equal(generations,generationsBeforeWatch,'restoring/capitalizing cached results does not consume Groq');
   }
   assert.deepEqual(await page.evaluate(()=>window.__OLD_AI),[]);assert.deepEqual(await page.evaluate(()=>window.__CHAT),[]);
   assert.deepEqual(errors,[]);

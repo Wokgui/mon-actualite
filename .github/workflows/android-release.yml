@@ -89,10 +89,10 @@ jobs:
           set -euo pipefail
           TAG="v98-98.10"
           APK="mon-actualite-v98-98.10.apk"
-          NOTES="Mon Actualité 98.50 (Android 98.0.50, code 128). Importer un fichier OPML centré; bouton Vérifier la mise à jour coloré; titre Langue et flèche identiques aux autres rubriques; libellé Ta clé Groq; badge v98 en blanc. Synthèse automatique Groq, cache, prompt personnel et photos stables conservés. Le lien APK historique est conservé."
+          NOTES="Mon Actualité 98.51 (Android 98.0.51, code 129). Consigne de préférences uniquement dans Veille et IA vides; contenu remonté à 14 px sous les onglets. Titres de domaines IA centrés agrandis. Phrases complètes par catégorie demandée et débuts de paragraphes en majuscules, y compris les synthèses conservées sans appel IA supplémentaire. Prompt personnel, clé Groq, cache et verrous photo conservés. Le lien APK historique est conservé."
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release upload "$TAG" "$APK" --clobber
-            gh release edit "$TAG" --title "Mon Actualité v98 / 98.50" --notes "$NOTES"
+            gh release edit "$TAG" --title "Mon Actualité v98 / 98.51" --notes "$NOTES"
           else
-            gh release create "$TAG" "$APK" --title "Mon Actualité v98 / 98.50" --notes "$NOTES"
+            gh release create "$TAG" "$APK" --title "Mon Actualité v98 / 98.51" --notes "$NOTES"
           fi

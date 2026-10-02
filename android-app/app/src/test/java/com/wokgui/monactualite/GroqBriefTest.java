@@ -22,6 +22,8 @@ public class GroqBriefTest {
         assertEquals(2200,body.getInt("max_completion_tokens"));
         assertTrue(body.getJSONArray("messages").getJSONObject(0).getString("content").contains("un paragraphe court par sujet"));
         assertTrue(body.getJSONArray("messages").getJSONObject(0).getString("content").contains("sans les libellés Utilité, Statut ou Source"));
+        assertTrue(body.getJSONArray("messages").getJSONObject(0).getString("content").contains("Pour chaque catégorie demandée"));
+        assertTrue(body.getJSONArray("messages").getJSONObject(0).getString("content").contains("chaque phrase commence par une majuscule"));
     }
     @Test public void validatesKeyWithoutEcho() throws Exception {
         assertEquals("gsk_abcdefghijklmnopqrstuv", GroqBrief.key(" gsk_abcdefghijklmnopqrstuv "));

@@ -144,6 +144,8 @@ html[data-show-badges="0"][data-show-age="0"] #app .article-card h2{margin-botto
 #app .brief-preferences-page-v9849>.page-masthead-v9186{margin-bottom:var(--brief-ai-gap)!important}
 #app .brief-preferences-page-v9849>.brief-mode-tabs{margin-top:0!important;margin-bottom:var(--brief-ai-gap)!important}
 #app .brief-preferences-page-v9849>.runtime-brief-content{margin:0!important;padding-top:0!important}
+#app .brief-preferences-page-v9849 .watch-layout-v9138{display:flow-root;margin:0!important}
+#app .brief-preferences-page-v9849 .watch-day-v9138:first-of-type{margin-top:0!important}
 #app .brief-preferences-note-v9849{margin:0 0 12px;padding:0;color:#000;text-align:center;font-size:calc(13px * var(--interface-text-scale));line-height:1.5;overflow-wrap:anywhere}
 #app .ai-brief-v9840>[data-ai-state]:empty{display:none}
 #app .ai-news-summary-v9840{margin:0;padding:18px 20px;border:1px solid color-mix(in srgb,var(--app-accent) 12%,#ececf2);border-radius:20px;box-shadow:0 5px 20px rgba(26,24,44,.035)}
@@ -157,10 +159,10 @@ html[data-show-badges="0"][data-show-age="0"] #app .article-card h2{margin-botto
 #app .ai-result-v9840:last-child{padding-bottom:0}
 #app .ai-result-v9840+.ai-result-v9840{border-top:2px solid #111;border-radius:0}
 #app .ai-card-summary-v9840{margin:8px 0 0}
-#app .ai-card-title-v9849{margin:0 0 8px;font-size:calc(14px * var(--article-text-scale));line-height:1.35;font-weight:750;text-align:center;overflow-wrap:anywhere}
+#app .ai-card-title-v9849{margin:0 0 8px;font-size:calc(16px * var(--article-text-scale));line-height:1.35;font-weight:750;text-align:center;overflow-wrap:anywhere}
 #app .ai-card-summary-v9840 p{margin:0 0 10px;white-space:normal}
 #app .ai-card-summary-v9840>:last-child{margin-bottom:0}
-#app .ai-card-summary-v9840 .ai-card-topic-v9848{font-size:inherit;line-height:1.4;text-align:center;font-weight:750;margin:12px 0 8px}
+#app .ai-card-summary-v9840 .ai-card-topic-v9848{font-size:calc(16px * var(--article-text-scale));line-height:1.4;text-align:center;font-weight:750;margin:12px 0 8px}
 #app .ai-card-summary-v9840 .ai-card-topic-v9848:first-child{margin-top:0}
 #app .ai-result-v9840 .article-card .meta{flex-wrap:wrap!important;overflow:visible!important;line-height:1.4!important}
 #app .ai-source-meta-v9848{display:inline-flex!important;align-items:baseline;gap:5px;flex:1 1 155px;min-width:0;max-width:100%}

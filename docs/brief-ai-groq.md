@@ -26,6 +26,12 @@ Langue utilise maintenant les mêmes métriques de titre et de flèche que Taill
 
 Les tests mobiles comparent les hauteurs et flèches à 320 et 412 px sur trois tailles de texte, mesurent le centrage OPML et vérifient les couleurs, le badge et le libellé de clé. La sauvegarde PC est une archive séparée des fichiers versionnés, du projet Android, de l’historique Git et de l’APK; elle ne prétend pas extraire les données personnelles du téléphone.
 
+## Présentation 98.51
+
+La consigne de préférences n’est affichée dans Veille et IA que tant que la rubrique n’a pas de contenu : articles réellement présents dans Veille ou synthèse conservée dans IA. Une synthèse sans cartes est néanmoins du contenu. Le contenu remonte à 14 px sous les onglets, comme les 14 px entre le bandeau et les onglets; les marges initiales de Veille ne réintroduisent pas d’espace. Les erreurs et états de génération utiles restent visibles.
+
+Les titres de domaines centrés des cartes IA passent à 16 px, contre 14 px pour les paragraphes, en conservant le réglage de taille. Les consignes de génération demandent des phrases complètes pour chaque catégorie demandée, commençant par une majuscule, et signalent un manque de sources sans inventer. Le formateur met aussi une majuscule au début des paragraphes et domaines des résultats déjà conservés, sans modifier le cache ou les destinations de liens et sans déclencher une génération supplémentaire. La sauvegarde PC est renouvelée séparément, avec le nouvel APK et la même signature.
+
 ## Activation unique dans l’APK
 
 Créer un compte sur https://console.groq.com/keys, rester sur Free sans activer de facturation, créer une clé, puis l’enregistrer dans Réglages → IA. Ne jamais transmettre la clé dans une conversation. Le compte et les limites Groq sont indépendants de l’abonnement ChatGPT. L’app ne crée aucun compte et ne souscrit aucune offre payante.
