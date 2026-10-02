@@ -110,11 +110,20 @@ html[data-show-badges="0"][data-show-age="0"] #app .article-card h2{margin-botto
 .preference-check,.preference-color{min-height:calc(44px * var(--interface-space-scale));font-size:calc(13px * var(--interface-text-scale))!important}
 .preference-color input{width:calc(58px * var(--interface-space-scale));height:calc(36px * var(--interface-space-scale))}
 
-/* Les deux segments remplissent exactement le sélecteur, sans liseré intérieur. */
-.brief-mode-tabs{display:grid!important;grid-template-columns:repeat(2,minmax(0,1fr))!important;gap:0!important;padding:0!important;overflow:hidden!important}
+/* Les trois segments remplissent exactement le sélecteur, sans liseré intérieur. */
+.brief-mode-tabs{display:grid!important;grid-template-columns:repeat(3,minmax(0,1fr))!important;gap:0!important;padding:0!important;overflow:hidden!important}
 .brief-mode-tab{width:100%!important;height:100%!important;min-height:44px!important;margin:0!important;border-radius:0!important}
 .brief-mode-tab:first-child{border-radius:18px 0 0 18px!important}
 .brief-mode-tab:last-child{border-radius:0 18px 18px 0!important}
+
+/* Subscription-only Brief. Plain text output, source-anchored immutable photos. */
+.ai-brief-v9840{padding:8px 0 24px}.ai-section-title-v9840{font-size:calc(19px * var(--interface-text-scale));margin:8px 0 18px}
+.ai-account-v9840,.ai-actions-v9840{display:grid;gap:10px}.ai-field-v9840{display:grid;gap:8px;margin:12px 0;font-size:calc(13px * var(--interface-text-scale))}.ai-field-v9840 .text-input{width:100%;min-width:0;box-sizing:border-box}.ai-prompt-v9840{resize:vertical;line-height:1.5}
+.ai-account-v9840 a.secondary-btn{box-sizing:border-box;text-align:center;text-decoration:none}.ai-plan-status-v9840{font-size:calc(13px * var(--interface-text-scale));color:#18533a;background:#eef8f2;padding:12px;border-radius:12px}.ai-error-v9840{white-space:pre-line;background:#fff0ee;color:#8b241d;padding:12px;border-radius:12px;font-size:calc(13px * var(--interface-text-scale))}
+.ai-usage-v9840,.ai-settings-link-v9840,.ai-source-v9840{color:#443b91;text-decoration:underline;font-size:calc(13px * var(--interface-text-scale));line-height:1.4}.ai-settings-link-v9840{border:0;background:none;min-height:44px;padding:8px 0}.ai-brief-v9840>[data-ai-generate]{width:100%;margin-top:14px}.ai-brief-v9840 button:disabled{opacity:.55}
+.ai-news-summary-v9840{margin:20px 0;padding:16px;background:#f5f5fb;border-radius:16px}.ai-news-summary-v9840 h3{margin:0 0 10px;font-size:calc(17px * var(--interface-text-scale))}.ai-news-summary-v9840 p,.ai-card-summary-v9840{white-space:pre-line;line-height:1.5;font-size:calc(14px * var(--article-text-scale))}.ai-news-summary-v9840 small{color:#655f70}.ai-card-summary-v9840{margin:8px 0}.ai-result-v9840{padding:14px 0}.ai-empty-v9840{padding:22px 8px;color:#655f70;line-height:1.5}
+
+.ai-connected-v9840{padding:10px 12px;background:#f5f5fb;border-radius:12px;font-size:calc(13px * var(--interface-text-scale))}.ai-connected-v9840 p{margin:0 0 6px;overflow-wrap:anywhere}#app .ai-result-v9840 .article-card .meta .ai-source-name-v9840{display:inline!important;color:#655f70;font-size:calc(10px * var(--article-text-scale))}
 
 /* Barre basse encore raccourcie, sans réduire les icônes ni les libellés. */
 .bottom-nav.stable-bottom-nav-v9184{height:calc(62px + env(safe-area-inset-bottom))!important;min-height:calc(62px + env(safe-area-inset-bottom))!important;max-height:calc(62px + env(safe-area-inset-bottom))!important}

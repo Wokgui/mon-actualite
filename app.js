@@ -1,5 +1,6 @@
 import { importOpmlPreview, fetchLiveNews } from './services/source-connectors.js?v=98.26';
-import { photoSnapshot, photoArticleKey } from './services/article-photos.js?v=98.39';
+import { photoSnapshot, photoArticleKey } from './services/article-photos.js?v=98.40';
+import { AI_PROVIDERS, briefAI, aiProvider, nativeAIAvailable, setAISettings, onAIChange, refreshAIAccount, aiAccountAction, loadAIModels, generateAIBrief } from './services/brief-ai.js?v=98.40';
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const app = $('#app');
@@ -762,8 +763,8 @@ function renderBrief() {
     }).filter(Boolean).join('');
   const watchCount = watchNewCount();
   return `<main class="page">${topbar(ui('brief'), false)}
-    <div class="brief-mode-tabs"><button class="brief-mode-tab ${state.briefMode === 'essential' ? 'active' : ''}" data-brief-mode="essential">${escapeHtml(ui('essential'))}</button><button class="brief-mode-tab watch-tab-v9184 ${state.briefMode === 'watches' ? 'active' : ''}" data-brief-mode="watches">${escapeHtml(ui('watch'))}${watchCount ? `<span class="watch-new-badge-v9184">${watchCount > 9 ? '9+' : watchCount}</span>` : ''}</button></div>
-    <div class="runtime-brief-content" data-stable-brief-content>${state.briefMode === 'essential' ? essential : renderWatchesFinal()}</div>
+    <div class="brief-mode-tabs"><button class="brief-mode-tab ${state.briefMode === 'essential' ? 'active' : ''}" data-brief-mode="essential">${escapeHtml(ui('essential'))}</button><button class="brief-mode-tab watch-tab-v9184 ${state.briefMode === 'watches' ? 'active' : ''}" data-brief-mode="watches">${escapeHtml(ui('watch'))}${watchCount ? `<span class="watch-new-badge-v9184">${watchCount > 9 ? '9+' : watchCount}</span>` : ''}</button><button class="brief-mode-tab ${state.briefMode === 'ai' ? 'active' : ''}" data-brief-mode="ai">IA</button></div>
+    <div class="runtime-brief-content" data-stable-brief-content>${state.briefMode === 'essential' ? essential : state.briefMode === 'ai' ? renderAIBrief() : renderWatchesFinal()}</div>
   </main>${nav('brief')}`;
 }
 
@@ -925,6 +926,35 @@ function essentialSettingsMarkup() {
   return `${rangeSetting(ui('articleCount'), 'essentialCount', 3, 12, '3', '12')}<strong class="settings-field-title">${escapeHtml(ui('coveredDomains'))}</strong><div class="interest-grid centered-interest-grid-v9184 essential-domains">${GENERAL_CATEGORIES.map(category => `<button type="button" class="interest ${state.settings.briefEssentialCategories.includes(category) ? 'active' : ''}" data-brief-essential="${escapeHtml(category)}" aria-pressed="${state.settings.briefEssentialCategories.includes(category)}">${escapeHtml(category)}</button>`).join('')}</div>`;
 }
 
+function aiAccountMarkup() {
+  const provider = aiProvider(), account = briefAI.account;
+  const profiles = Array.isArray(account.profiles) ? account.profiles : [];
+  const models = Array.isArray(account.models) ? account.models : [];
+  const availability = provider.integrated
+    ? nativeAIAvailable() ? 'Connexion officielle. Ton abonnement reste soumis à ses limites et aux crédits que tu as autorisés chez ChatGPT.' : 'La connexion intégrée avec l’abonnement ChatGPT nécessite l’application Android. Elle n’est pas activée sur le site web.'
+    : `Tu peux choisir ${provider.name} et ouvrir ton compte habituel. Le retour automatique des réponses dans Brief n’est pas disponible pour cet abonnement dans Mon Actualité. Aucune API payante ne sera utilisée.`;
+  return `<div class="ai-account-v9840" data-ai-account><label class="ai-field-v9840"><strong>Service d’intelligence artificielle</strong><select class="text-input" data-ai-provider>${AI_PROVIDERS.map(item => `<option value="${item.id}"${item.id === briefAI.provider ? ' selected' : ''}>${item.name}${item.integrated ? ' — intégré dans Android' : ' — accès au compte'}</option>`).join('')}</select></label><p class="muted-note">${escapeHtml(availability)}</p>
+    ${provider.integrated && nativeAIAvailable() ? `<div class="ai-actions-v9840">${profiles.length ? `<label class="ai-field-v9840"><strong>Compte ChatGPT</strong><select class="text-input" data-ai-profile><option value="">Choisir un compte</option>${profiles.map((profile, i) => `<option value="${escapeHtml(profile.id)}"${profile.id === account.activeId ? ' selected' : ''}>${escapeHtml(profile.email || 'Compte ChatGPT')} · ${i + 1}${profile.connected ? '' : ' (reconnexion)'}</option>`).join('')}</select></label>` : ''}<button type="button" class="secondary-btn" data-ai-connect${briefAI.busy ? ' disabled' : ''}>${briefAI.busy === 'connect' ? 'Connexion dans ton navigateur…' : 'Continue with ChatGPT'}</button>${profiles.length ? `<button type="button" class="secondary-btn" data-ai-add-account${briefAI.busy ? ' disabled' : ''}>Ajouter un autre compte</button>` : ''}${account.connected ? `<p class="ai-plan-status-v9840">${account.planEnabled ? 'Utilisation de ton abonnement ChatGPT autorisée' : 'Compte connecté · autorise l’utilisation de l’abonnement pour générer le Brief.'}</p><button type="button" class="secondary-btn" data-ai-disconnect${briefAI.busy ? ' disabled' : ''}>Déconnecter ce compte</button>` : ''}${briefAI.busy === 'connect' ? '<button type="button" class="secondary-btn" data-ai-cancel>Annuler la connexion</button>' : ''}</div>` : `<a class="secondary-btn" href="${provider.url}" target="_blank" rel="noopener noreferrer">Ouvrir mon compte ${escapeHtml(provider.name)}</a>`}
+    ${provider.integrated ? `<a class="ai-usage-v9840" href="https://chatgpt.com/settings/usage" target="_blank" rel="noopener noreferrer">Gérer l’utilisation de mon abonnement</a>` : ''}
+    ${provider.integrated && models.length ? `<label class="ai-field-v9840"><strong>Modèle disponible dans ton compte</strong><select class="text-input" data-ai-model><option value="">Premier modèle disponible</option>${models.map(model => `<option value="${escapeHtml(model.slug)}"${model.slug === briefAI.model ? ' selected' : ''}>${escapeHtml(model.name)}</option>`).join('')}</select></label>` : ''}
+    ${briefAI.error ? `<p class="ai-error-v9840" role="alert">${escapeHtml(briefAI.error)}</p>` : ''}</div>`;
+}
+
+function aiSettingsMarkup() {
+  return `${aiAccountMarkup()}<label class="ai-field-v9840"><strong>Ton prompt pour le résumé de l’actualité</strong><textarea class="text-input ai-prompt-v9840" data-ai-prompt rows="6" maxlength="6000" placeholder="Ce que tu veux demander à ton IA…">${escapeHtml(briefAI.prompt)}</textarea></label><p class="muted-note">Enregistré automatiquement sur cet appareil. Les résultats apparaissent dans Brief → IA. L’IA reçoit les titres, extraits et sources de tes actualités ; elle ne peut pas ajouter une photo ou une source inventée.</p><button type="button" class="secondary-btn" data-ai-open-brief>Voir Brief → IA</button>`;
+}
+
+function renderAIBrief() {
+  const result = briefAI.result?.provider === briefAI.provider && briefAI.result?.prompt === briefAI.prompt && briefAI.result?.accountId === briefAI.account.activeId && briefAI.account.connected ? briefAI.result : null;
+  const canGenerate = aiProvider().integrated && nativeAIAvailable() && briefAI.account.planEnabled;
+  const accountPanel = canGenerate ? `<div class="ai-connected-v9840"><p>Compte ${escapeHtml(briefAI.account.email || 'ChatGPT')} · abonnement ChatGPT</p><a class="ai-usage-v9840" href="https://chatgpt.com/settings/usage" target="_blank" rel="noopener noreferrer">Gérer l’utilisation de mon abonnement</a>${briefAI.error ? `<p class="ai-error-v9840" role="alert">${escapeHtml(briefAI.error)}</p>` : ''}</div>` : aiAccountMarkup();
+  return `<section class="ai-brief-v9840"><h2 class="ai-section-title-v9840">Mon actualité avec ${escapeHtml(aiProvider().name)}</h2>${accountPanel}<button type="button" class="secondary-btn" data-ai-generate${briefAI.busy || !canGenerate ? ' disabled' : ''}>${briefAI.busy === 'generate' ? 'Préparation du Brief IA…' : result ? 'Actualiser mon Brief IA' : 'Générer mon Brief IA'}</button><button type="button" class="ai-settings-link-v9840" data-ai-open-settings>Choisir mon service, mon compte ou mon prompt</button><p class="muted-note">Génération uniquement à ta demande. Aucun appel IA automatique à l’ouverture.</p>
+    ${result ? `<section class="ai-news-summary-v9840"><h3>Résumé de l’actualité</h3><p>${escapeHtml(result.summary)}</p><small>${escapeHtml(new Date(result.generatedAt).toLocaleString('fr-FR'))} · ${escapeHtml(result.model)}</small></section><div class="feed stable-owned-list ai-results-v9840">${result.cards.map((card, index) => {
+      rememberRenderedArticle(card.article);
+      return `<section class="ai-result-v9840"><article class="article-card runtime-row" data-article="${escapeHtml(card.article.id)}" tabindex="0" aria-label="Ouvrir l’article source : ${escapeHtml(card.title)}">${articleVisual(card.article, index)}<div class="article-body"><h2>${escapeHtml(card.title)}</h2><div class="meta"><span class="article-category-badge">IA</span><span class="ai-source-name-v9840">${escapeHtml(card.article.source)}</span></div></div></article><p class="ai-card-summary-v9840">${escapeHtml(card.summary)}</p><a class="ai-source-v9840" href="${escapeHtml(card.article.url)}" target="_blank" rel="noopener noreferrer">Lire la source originale</a></section>`;
+    }).join('')}</div>` : '<p class="ai-empty-v9840">Ton résumé et tes articles IA apparaîtront ici après la première génération. Aucun résultat fictif n’est affiché.</p>'}</section>`;
+}
+
 function renderSettings() {
   const accordion = (title, body) => `<details class="settings-accordion-v9185"${settingsOpenAccordions.has(title) ? ' open' : ''}><summary>${escapeHtml(title)}</summary><div class="settings-accordion-content-v9185">${body}</div></details>`;
   return `<main class="page settings-page-v9185">${topbar(ui('settings'), false)}
@@ -961,6 +991,8 @@ function renderSettings() {
       ${accordion(ui('watch'), `
         <div class="form-stack"><input id="watch-query-input" class="text-input" maxlength="160" placeholder="Ex. Meta + Quest 4 | Quest 4"><input id="watch-exclude-input" class="text-input" maxlength="160" placeholder="À exclure : rumeur, promotion…"><button class="secondary-btn" data-add-watch-rule>${icon('plus')} Ajouter la veille</button></div>
         ${watchRulesMarkup()}`)}
+
+      ${accordion('IA', aiSettingsMarkup())}
 
       ${accordion(ui('operation'), `<div class="function-settings-v9186">${settingRow(ui('automaticRefresh'), ui('automaticDesc'), 'autoRefresh')}${settingRow(ui('webSearch'), ui('webSearchDesc'), 'webSearch')}</div>`)}
 
@@ -1466,11 +1498,18 @@ app.addEventListener('click', async event => {
   const briefMode = event.target.closest('[data-brief-mode]');
   if (briefMode) {
     event.preventDefault();
-    state.briefMode = briefMode.dataset.briefMode === 'watches' ? 'watches' : 'essential';
+    state.briefMode = ['watches', 'ai'].includes(briefMode.dataset.briefMode) ? briefMode.dataset.briefMode : 'essential';
     if (state.briefMode === 'watches') { state.watchLastSeen = Date.now(); persist(); }
     render({ scrollTop: 0 });
+    if (state.briefMode === 'ai') { void refreshAIAccount(); void loadAIModels(); }
     return;
   }
+  if (event.target.closest('[data-ai-connect],[data-ai-add-account]')) { void aiAccountAction('connect', event.target.closest('[data-ai-add-account]') ? '' : briefAI.account.activeId); return; }
+  if (event.target.closest('[data-ai-disconnect]')) { void aiAccountAction('disconnect', briefAI.account.activeId); return; }
+  if (event.target.closest('[data-ai-cancel]')) { window.MonActualiteAI?.postMessage(JSON.stringify({ id: crypto.randomUUID(), action: 'cancel' })); return; }
+  if (event.target.closest('[data-ai-generate]')) { void generateAIBrief(visibleArticles()); return; }
+  if (event.target.closest('[data-ai-open-settings]')) { state.view = 'settings'; settingsOpenAccordions.add('IA'); render({ scrollTop: 0 }); return; }
+  if (event.target.closest('[data-ai-open-brief]')) { state.view = 'brief'; state.briefMode = 'ai'; render({ scrollTop: 0 }); void refreshAIAccount(); void loadAIModels(); return; }
   const watchAll = event.target.closest('[data-watch-all-toggle]');
   if (watchAll) {
     event.preventDefault();
@@ -1686,6 +1725,7 @@ function updateRangeSetting(target) {
 }
 
 app.addEventListener('input', event => {
+  if (event.target.matches('[data-ai-prompt]')) { setAISettings({ prompt: event.target.value }, { announce: false }); return; }
   if (updateRangeSetting(event.target)) return;
   if (event.target.matches('[data-accent]')) {
     state.settings.accent = event.target.value;
@@ -1695,6 +1735,9 @@ app.addEventListener('input', event => {
 });
 
 app.addEventListener('change', async event => {
+  if (event.target.matches('[data-ai-provider]')) { setAISettings({ provider: event.target.value }); return; }
+  if (event.target.matches('[data-ai-model]')) { setAISettings({ model: event.target.value }); return; }
+  if (event.target.matches('[data-ai-profile]') && event.target.value) { void aiAccountAction('select', event.target.value); return; }
   if (updateRangeSetting(event.target)) return;
   if (event.target.matches('[data-date]')) { state[event.target.dataset.date === 'from' ? 'customFrom' : 'customTo'] = event.target.value; render(); }
   if (event.target.matches('[data-setting-select]')) { state.settings[event.target.dataset.settingSelect] = event.target.value; persist(); toast('Réglage enregistré'); }
@@ -1866,7 +1909,7 @@ if ('serviceWorker' in navigator && location.protocol.startsWith('http') && !nav
     serviceWorkerRefreshing = true;
     window.location.reload();
   });
-  navigator.serviceWorker.register('./sw-v98.js?v=98.39', { updateViaCache: 'none' }).then(registration => {
+  navigator.serviceWorker.register('./sw-v98.js?v=98.40', { updateViaCache: 'none' }).then(registration => {
     if (registration.waiting) registration.waiting.postMessage('SKIP_WAITING');
     registration.addEventListener('updatefound', () => {
       const installing = registration.installing;
@@ -1962,5 +2005,11 @@ async function bootLatestNews() {
   }
 }
 
+onAIChange(() => {
+  // Account/results updates must never rebuild the unrelated Home feed.
+  if (state.view === 'settings' || (state.view === 'brief' && state.briefMode === 'ai')) render();
+});
+window.addEventListener('focus', () => { void refreshAIAccount(); });
+void refreshAIAccount();
 bootLatestNews();
 if (!IS_NATIVE_ANDROID) window.setTimeout(() => checkAppUpdate(), 1400);

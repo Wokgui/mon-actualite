@@ -222,8 +222,9 @@ assert.match(await page.locator('.bottom-nav').evaluate(el => getComputedStyle(e
 assert.equal(accentHome.theme.toLowerCase(), '#e8345f', 'the dominant colour must also update the PWA theme color');
 await page.locator('[data-view="brief"]').click();
 assert.equal(await page.locator('.brief-mode-tab.active').evaluate(el => getComputedStyle(el).backgroundColor), 'rgb(232, 52, 95)', 'selected Brief tab must be fully filled with the accent color');
-const tabFill = await page.evaluate(() => { const tabs=document.querySelector('.brief-mode-tabs').getBoundingClientRect(); const active=document.querySelector('.brief-mode-tab.active').getBoundingClientRect(); return { left:active.left-tabs.left, top:active.top-tabs.top, bottom:tabs.bottom-active.bottom, half:tabs.width/2-active.width }; });
-assert.ok(Object.values(tabFill).every(value => Math.abs(value) < .75), `selected Brief tab must reach every edge of its half (${JSON.stringify(tabFill)})`);
+assert.equal(await page.locator('.brief-mode-tab').count(), 3, 'Brief has Essential, Watches and IA');
+const tabFill = await page.evaluate(() => { const tabs=document.querySelector('.brief-mode-tabs').getBoundingClientRect(); const active=document.querySelector('.brief-mode-tab.active').getBoundingClientRect(); return { left:active.left-tabs.left, top:active.top-tabs.top, bottom:tabs.bottom-active.bottom, third:tabs.width/3-active.width }; });
+assert.ok(Object.values(tabFill).every(value => Math.abs(value) < .75), `selected Brief tab must reach every edge of its third (${JSON.stringify(tabFill)})`);
 assert.match(await page.locator('.page-masthead-v9186').evaluate(el => getComputedStyle(el).backgroundImage), /linear-gradient/, 'the Brief header must share the adaptive gradient');
 
 await page.locator('[data-view="settings"]').click(); await open('Affichage');

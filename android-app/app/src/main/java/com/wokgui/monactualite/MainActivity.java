@@ -24,12 +24,13 @@ import android.webkit.WebResourceResponse;
 import androidx.webkit.WebViewAssetLoader;
 
 public class MainActivity extends Activity {
-    private static final String APP_URL = "https://mon-actualite.vercel.app/assets/index.html?native=98.39";
+    private static final String APP_URL = "https://mon-actualite.vercel.app/assets/index.html?native=98.40";
     private static final String APP_HOST = "mon-actualite.vercel.app";
 
     private FrameLayout root;
     private WebView webView;
     private WebViewAssetLoader assetLoader;
+    private SubscriptionAiBridge subscriptionAI;
     private int lastTopInset = -1;
     private int lastBottomInset = -1;
 
@@ -105,7 +106,7 @@ public class MainActivity extends Activity {
         settings.setMediaPlaybackRequiresUserGesture(false);
         settings.setSupportMultipleWindows(true);
         settings.setJavaScriptCanOpenWindowsAutomatically(true);
-        settings.setUserAgentString(settings.getUserAgentString() + " MonActualiteAndroid/98.39");
+        settings.setUserAgentString(settings.getUserAgentString() + " MonActualiteAndroid/98.40");
 
         assetLoader = new WebViewAssetLoader.Builder()
             .setDomain(APP_HOST)
@@ -122,7 +123,7 @@ public class MainActivity extends Activity {
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
                 Uri uri = request.getUrl();
-                if (APP_HOST.equalsIgnoreCase(uri.getHost())) return false;
+                if (SubscriptionAiBridge.isAppPage(uri)) return false;
                 openExternal(uri);
                 return true;
             }
@@ -131,7 +132,7 @@ public class MainActivity extends Activity {
             @SuppressWarnings("deprecation")
             public boolean shouldOverrideUrlLoading(WebView view, String url) {
                 Uri uri = Uri.parse(url);
-                if (APP_HOST.equalsIgnoreCase(uri.getHost())) return false;
+                if (SubscriptionAiBridge.isAppPage(uri)) return false;
                 openExternal(uri);
                 return true;
             }
@@ -177,6 +178,7 @@ public class MainActivity extends Activity {
             }
         });
 
+        subscriptionAI = new SubscriptionAiBridge(this, webView);
         if (savedInstanceState == null) webView.loadUrl(APP_URL);
         else webView.restoreState(savedInstanceState);
     }
@@ -185,6 +187,15 @@ public class MainActivity extends Activity {
         try {
             startActivity(new Intent(Intent.ACTION_VIEW, uri));
         } catch (Exception ignored) {
+        }
+    }
+
+    @Override
+    protected void onNewIntent(Intent intent) {
+        super.onNewIntent(intent);
+        setIntent(intent);
+        if (webView != null && Uri.parse("monactualite://brief/ia").equals(intent.getData())) {
+            webView.evaluateJavascript("window.dispatchEvent(new Event('focus'))", null);
         }
     }
 
@@ -203,6 +214,7 @@ public class MainActivity extends Activity {
 
     @Override
     protected void onDestroy() {
+        if (subscriptionAI != null) subscriptionAI.destroy();
         if (webView != null) {
             webView.stopLoading();
             webView.destroy();

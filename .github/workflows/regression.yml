@@ -64,6 +64,8 @@ jobs:
           node tests/v9836-startup-browser.mjs test-results/startup-v9836
           node tests/v9837-client-photo-recovery-browser.mjs test-results/client-photo-recovery
           node tests/v9839-failure-replacement-browser.mjs test-results/replacement-v9839
+          node tests/v9840-brief-ai-browser.mjs test-results/brief-ai
+          AI_NATIVE_FIXTURE=0 node tests/v9840-brief-ai-browser.mjs test-results/brief-ai-web
       - name: Photo metrics and screenshots
         if: always()
         uses: actions/upload-artifact@v4

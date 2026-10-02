@@ -75,7 +75,7 @@ for (const src of scripts) {
   else ok(`service worker precaches runtime script ${src}`);
 }
 
-for (const asset of ['app-controls.css?v=98.39']) {
+for (const asset of ['app-controls.css?v=98.40']) {
   if (!index.includes(asset)) fail(`final visual layer missing from index: ${asset}`);
   if (!sw.includes(asset)) fail(`service worker does not precache final visual layer: ${asset}`);
   else ok(`service worker precaches final visual layer: ${asset}`);
