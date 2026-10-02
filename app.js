@@ -1,5 +1,5 @@
 import { importOpmlPreview, fetchLiveNews } from './services/source-connectors.js?v=98.26';
-import { photoSnapshot, photoArticleKey } from './services/article-photos.js?v=98.37';
+import { photoSnapshot, photoArticleKey } from './services/article-photos.js?v=98.38';
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const app = $('#app');
@@ -1012,15 +1012,10 @@ function render({ resetScroll = false, scrollTop = null } = {}) {
   }
   const preservedScroll = Number.isFinite(scrollTop) ? scrollTop : (resetScroll ? 0 : window.scrollY);
   const views = { home: renderHome, category: renderCategory, detail: renderDetail, brief: renderBrief, news: renderNews, settings: renderSettings };
-  if (state.view === 'home' || state.view === 'brief') {
-    pendingNewsCount = 0;
-    renderedCatalogueKeys = new Set(state.articles.map(photoArticleKey));
-  }
   app.innerHTML = (views[state.view] || renderHome)() + renderSheet();
   window.scrollTo({ top: preservedScroll, behavior: 'instant' });
   if (preservedScroll > 0) requestAnimationFrame(() => window.scrollTo({ top: preservedScroll, behavior: 'instant' }));
   notifyStableRender('view');
-  showPendingNews();
 }
 function notifyStableRender(reason = 'update') {
   window.dispatchEvent(new CustomEvent('news:stable-render', { detail: { reason, view: state.view } }));
@@ -1030,8 +1025,6 @@ function notifyStableRender(reason = 'update') {
 // A displayed feed is a reading snapshot, independent of a refreshed catalogue.
 // Retain its article records for clicks and saves even if server IDs change.
 const renderedArticles = new Map();
-let pendingNewsCount = 0;
-let renderedCatalogueKeys = new Set();
 let renderedHomeArticles = [];
 function rememberRenderedArticle(article) {
   renderedArticles.set(String(article.id), article);
@@ -1040,18 +1033,6 @@ function rememberRenderedArticle(article) {
 function articleById(id) {
   return state.articles.find(article => String(article.id) === String(id)) || renderedArticles.get(String(id));
 }
-function showPendingNews() {
-  const button = app.querySelector('.nav-item[data-view="home"]');
-  if (!button) return;
-  button.querySelector('[data-pending-news]')?.remove();
-  if (!pendingNewsCount) return;
-  const badge = document.createElement('i');
-  badge.className = 'nav-watch-dot-v9184'; badge.dataset.pendingNews = '';
-  badge.textContent = pendingNewsCount > 9 ? '9+' : String(pendingNewsCount);
-  badge.title = 'Nouveaux articles — toucher Accueil pour actualiser';
-  button.appendChild(badge);
-}
-
 function refreshSheet() {
   const current = app.querySelector('.sheet-backdrop');
   if (!state.sheet) { current?.remove(); return; }
@@ -1128,7 +1109,6 @@ function appendHomeToLimit({ increment = false } = {}) {
 function patchHomeFeedPreservingCards() {
   const feed = app.querySelector('[data-stable-home-feed]');
   if (!feed) return render({ scrollTop: window.scrollY });
-  renderedCatalogueKeys = new Set(state.articles.map(photoArticleKey));
   renderedHomeArticles = stableHomeArticles();
   const articles = (state.savedOnly ? stableHomeArticles().filter(article => state.saved.has(article.id)) : stableHomeArticles()).slice(0, state.homeLimit);
   const existing = new Map([...feed.querySelectorAll(':scope > .article-card[data-article]')].map(card => [String(card.dataset.article || ''), card]));
@@ -1157,8 +1137,8 @@ function refreshAfterNewsChange() {
   reconcileHomeOrder();
   const overlay = document.getElementById('startup-stability-v9815');
   if (['home', 'brief'].includes(state.view) && app.querySelector('[data-article]') && (!overlay || overlay.classList.contains('leaving'))) {
-    pendingNewsCount = state.articles.filter(article => !renderedCatalogueKeys.has(photoArticleKey(article))).length;
-    showPendingNews();
+    // Keep the reading snapshot stable. Home accepts updates when tapped,
+    // without adding a notification badge to the navigation bar.
     return;
   }
   if (state.view === 'home') {
@@ -1886,7 +1866,7 @@ if ('serviceWorker' in navigator && location.protocol.startsWith('http') && !nav
     serviceWorkerRefreshing = true;
     window.location.reload();
   });
-  navigator.serviceWorker.register('./sw-v98.js?v=98.37', { updateViaCache: 'none' }).then(registration => {
+  navigator.serviceWorker.register('./sw-v98.js?v=98.38', { updateViaCache: 'none' }).then(registration => {
     if (registration.waiting) registration.waiting.postMessage('SKIP_WAITING');
     registration.addEventListener('updatefound', () => {
       const installing = registration.installing;

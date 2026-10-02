@@ -1,4 +1,4 @@
-import { photoRecordByKey, resolvePhoto, commitPhoto } from './services/article-photos.js?v=98.37';
+import { photoRecordByKey, resolvePhoto, commitPhoto } from './services/article-photos.js?v=98.38';
 
 const defaults = { intervalMs: 120, concurrency: 4, priorityCount: 12, rootMarginPx: 1200, timeoutMs: 14000 };
 const config = { ...defaults, ...window.__ARTICLE_PHOTO_CONFIG };

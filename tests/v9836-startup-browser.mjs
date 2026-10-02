@@ -62,6 +62,7 @@ try {
     assert.equal(before.ready, 8, 'cache ID changes cannot strand the rendered photo queue');
     assert.deepEqual(before.audit.sourceChanges, []);
     assert.ok(before.cacheUrls.includes('https://example.test/new-story'), 'synchronization must still update the catalogue');
+    assert.equal(await page.locator('.nav-item[data-view="home"] .nav-watch-dot-v9184, .nav-item[data-view="home"] [data-pending-news]').count(), 0, 'new articles must never add a badge to Home');
     await page.evaluate(() => window.scrollTo(0, document.documentElement.scrollHeight));
     await page.waitForTimeout(500);
     const scrolledKeys = await page.locator('[data-stable-home-feed] img').evaluateAll(images => images.map(i => i.dataset.photoKey));
@@ -70,6 +71,7 @@ try {
     assert.ok(!scrolledKeys.includes('https://example.test/new-story'), 'incoming stories are accepted explicitly, never inserted while scrolling');
     await page.locator('.nav-item[data-view="home"]').click();
     await page.waitForFunction(() => document.querySelector('[data-stable-home-feed] h2')?.textContent.includes('nouvelle actualité'));
+    assert.equal(await page.locator('.nav-item[data-view="home"] .nav-watch-dot-v9184').count(), 0, 'explicit Home refresh remains badge-free');
     await page.waitForFunction(() => document.querySelector('[data-stable-home-feed] img')?.dataset.photoFinal === '1');
     // Reload the native-like app: successful photos must survive across documents,
     // with no API requests for those exact article URLs, including offline.
