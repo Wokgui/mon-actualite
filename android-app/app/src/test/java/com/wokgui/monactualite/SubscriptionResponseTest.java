@@ -39,7 +39,42 @@ public class SubscriptionResponseTest {
     @Test public void partialStreamCannotBecomeSuccess() { assertTrue(rejected("data: {\"type\":\"response.output_text.delta\",\"delta\":\"SECRET\"}\n\ndata: [DONE]\n\n", 200, "text/event-stream").contains("interrompue")); }
     @Test public void terminalIncompleteCannotBecomeSuccess() { rejected("data: {\"type\":\"response.incomplete\",\"response\":{\"error\":{\"code\":\"max_output_tokens\"}}}\n\n", 200, "text/event-stream"); }
     @Test public void terminalFailureRetainsCorrectCode() { assertTrue(rejected("data: {\"type\":\"response.failed\",\"response\":{\"error\":{\"code\":\"subscription_sharing_route_not_supported\"}}}\n\n", 200, "text/event-stream").contains("subscription_sharing_route_not_supported")); }
-    @Test public void malformedStreamIsSafelyDiagnosed() { assertTrue(rejected("data: {SECRET}\n\n", 200, "text/event-stream").contains("mal formé")); }
+    @Test public void malformedStreamIsSafelyDiagnosed() { assertTrue(rejected("data: {SECRET}\n\n", 200, "text/event-stream").contains("événement SSE")); }
+    @Test public void completedPlainTextIsNotMisdiagnosedAsMalformedStream() throws Exception {
+        JSONObject event = completed();
+        event.getJSONObject("response").getJSONArray("output").getJSONObject(0).getJSONArray("content").getJSONObject(0).put("text", "Un paragraphe SECRET non structuré.");
+        String message = rejected("data: " + event + "\n\n", 200, null);
+        assertTrue(message.contains("résultat JSON")); assertFalse(message.contains("flux IA est mal formé"));
+    }
+    @Test public void missingCompletedOutputHasItsOwnStage() { assertTrue(rejected("data: {\"type\":\"response.completed\",\"response\":{\"status\":\"completed\"}}\n\n", 200, null).contains("réponse complète")); }
+    @Test public void malformedBriefStructureHasItsOwnStage() throws Exception {
+        JSONObject event = completed(); event.getJSONObject("response").getJSONArray("output").getJSONObject(0).getJSONArray("content").getJSONObject(0).put("text", "{\"summary\":\"SECRET\"}");
+        assertTrue(rejected("data: " + event + "\n\n", 200, null).contains("structure du Brief"));
+    }
+    @Test public void schemaConstrainsBothRootAndArticleObjects() throws Exception {
+        JSONObject format = SubscriptionBrief.textFormat().getJSONObject("format");
+        assertEquals("json_schema", format.getString("type")); assertTrue(format.getBoolean("strict"));
+        JSONObject schema = format.getJSONObject("schema"); assertFalse(schema.getBoolean("additionalProperties")); assertEquals(2, schema.getJSONArray("required").length());
+        JSONObject card = schema.getJSONObject("properties").getJSONObject("cards").getJSONObject("items");
+        assertFalse(card.getBoolean("additionalProperties")); assertEquals(3, card.getJSONArray("required").length());
+    }
+    @Test public void refusalIsNotMalformedStream() throws Exception {
+        JSONObject event = completed(); event.getJSONObject("response").getJSONArray("output").getJSONObject(0).put("content", new JSONArray().put(new JSONObject().put("type", "refusal").put("refusal", "SECRET")));
+        assertTrue(rejected("data: " + event + "\n\n", 200, null).contains("refusé"));
+    }
+    @Test public void acceptsFencedCompletedJson() throws Exception {
+        JSONObject event = completed(), part = event.getJSONObject("response").getJSONArray("output").getJSONObject(0).getJSONArray("content").getJSONObject(0);
+        part.put("text", "```json\n" + part.getString("text") + "\n```");
+        assertEquals("Synthèse", read("data: " + event + "\n\n", 200, null).getString("summary"));
+    }
+    @Test public void incompleteJsonInsideCompletedResponseIsStillFailure() throws Exception {
+        JSONObject event = completed(); event.getJSONObject("response").getJSONArray("output").getJSONObject(0).getJSONArray("content").getJSONObject(0).put("text", "{\"summary\":\"SECRET\"");
+        assertTrue(rejected("data: " + event + "\n\n", 200, null).contains("résultat JSON"));
+    }
+    @Test public void invalidArticleShapeCannotPassNativeValidation() throws Exception {
+        JSONObject event = completed(); event.getJSONObject("response").getJSONArray("output").getJSONObject(0).getJSONArray("content").getJSONObject(0).put("text", "{\"summary\":\"SECRET\",\"cards\":[null]}");
+        assertTrue(rejected("data: " + event + "\n\n", 200, null).contains("structure du Brief"));
+    }
     @Test public void emptyResponseIsDiagnosed() { assertTrue(rejected("", 200, null).contains("format absent · contenu vide")); }
     @Test public void metadataCannotInjectPrivateText() { String message = SubscriptionResponse.metadata(403, "SECRET\r\nx/header", "JSON", "SECRET\r\nheader"); assertFalse(message.contains("SECRET")); assertFalse(message.contains("\n")); }
     @Test public void unsafeErrorCodeIsNotExposed() { rejected("{\"code\":\"SECRET/private-token\"}", 400, "application/json"); }

@@ -1,6 +1,6 @@
 import { importOpmlPreview, fetchLiveNews } from './services/source-connectors.js?v=98.26';
-import { photoSnapshot, photoArticleKey } from './services/article-photos.js?v=98.43';
-import { AI_PROVIDERS, briefAI, aiProvider, nativeAIAvailable, setAISettings, onAIChange, refreshAIAccount, aiAccountAction, loadAIModels, generateAIBrief } from './services/brief-ai.js?v=98.43';
+import { photoSnapshot, photoArticleKey } from './services/article-photos.js?v=98.44';
+import { AI_PROVIDERS, briefAI, aiProvider, nativeAIAvailable, setAISettings, onAIChange, refreshAIAccount, aiAccountAction, loadAIModels, generateAIBrief, maybeGenerateStartupBrief } from './services/brief-ai.js?v=98.44';
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const app = $('#app');
@@ -942,13 +942,25 @@ function aiAccountMarkup() {
 
 function aiSettingsMarkup() {
   const canGenerate = aiProvider().integrated && nativeAIAvailable() && briefAI.account.planEnabled;
-  return `${aiAccountMarkup()}<label class="ai-field-v9840 ai-prompt-field-v9841"><strong>Ton prompt pour le résumé de l’actualité</strong><textarea class="text-input ai-prompt-v9840" data-ai-prompt rows="6" maxlength="6000" placeholder="Ce que tu veux demander à ton IA…">${escapeHtml(briefAI.prompt)}</textarea></label><p class="muted-note">Enregistré automatiquement sur cet appareil. Les résultats apparaissent dans Brief → IA. L’IA reçoit les titres, extraits et sources de tes actualités ; elle ne peut pas ajouter une photo ou une source inventée.</p><div class="ai-settings-generation-v9841"><button type="button" class="secondary-btn" data-ai-generate${briefAI.busy || !canGenerate ? ' disabled' : ''}>${briefAI.busy === 'generate' ? 'Préparation du Brief IA…' : 'Générer mon Brief IA'}</button><button type="button" class="secondary-btn" data-ai-open-brief>Voir Brief → IA</button></div>`;
+  return `${aiAccountMarkup()}<label class="ai-field-v9840 ai-prompt-field-v9841"><strong>Ton prompt pour le résumé de l’actualité</strong><textarea class="text-input ai-prompt-v9840" data-ai-prompt rows="6" maxlength="6000" placeholder="Ce que tu veux demander à ton IA…">${escapeHtml(briefAI.prompt)}</textarea></label><p class="muted-note">Enregistré automatiquement sur cet appareil. Les résultats apparaissent dans Brief → IA. L’IA reçoit les titres, extraits et sources de tes actualités ; elle ne peut pas ajouter une photo ou une source inventée.</p><label class="ai-field-v9840"><span><input type="checkbox" data-ai-auto${briefAI.autoAtOpen ? ' checked' : ''}> Générer automatiquement à l’ouverture</span></label><p class="muted-note">Une demande par lancement, dès que ton compte et les articles sont disponibles. Elle utilise les limites de ton abonnement. Aucune relance automatique en cas d’erreur.</p><div class="ai-settings-generation-v9841"><button type="button" class="secondary-btn" data-ai-generate${briefAI.busy || !canGenerate ? ' disabled' : ''}>${briefAI.busy === 'generate' ? 'Préparation du Brief IA…' : 'Générer mon Brief IA'}</button><button type="button" class="secondary-btn" data-ai-open-brief>Voir Brief → IA</button></div>`;
 }
 
+function aiSummaryLinks(result) {
+  const allowed = new Set(result.cards.map(card => card.article.url));
+  const pattern = /\[([^\]\n]{1,240})\]\((https?:\/\/[^\s)]+)\)/g;
+  let output = '', cursor = 0;
+  for (const match of result.summary.matchAll(pattern)) {
+    output += escapeHtml(result.summary.slice(cursor, match.index));
+    output += allowed.has(match[2]) ? `<a href="${escapeHtml(match[2])}" target="_blank" rel="noopener noreferrer">${escapeHtml(match[1])}</a>` : escapeHtml(match[0]);
+    cursor = match.index + match[0].length;
+  }
+  return output + escapeHtml(result.summary.slice(cursor));
+}
 function renderAIBrief() {
   const result = briefAI.result?.provider === briefAI.provider && briefAI.result?.prompt === briefAI.prompt && briefAI.result?.accountId === briefAI.account.activeId && briefAI.account.connected ? briefAI.result : null;
   return `<section class="ai-brief-v9840">
-    ${result ? `<section class="ai-news-summary-v9840"><h3>Résumé de l’actualité</h3><p>${escapeHtml(result.summary)}</p><small>${escapeHtml(new Date(result.generatedAt).toLocaleString('fr-FR'))} · ${escapeHtml(result.model)}</small></section><div class="feed stable-owned-list ai-results-v9840">${result.cards.map((card, index) => {
+    ${briefAI.busy === 'generate' ? '<p class="muted-note" role="status">Ton Brief IA se prépare avec ton prompt enregistré…</p>' : briefAI.error ? `<p class="ai-error-v9840" role="alert">${escapeHtml(briefAI.error)}</p>` : ''}
+    ${result ? `<section class="ai-news-summary-v9840"><h3>Résumé de l’actualité</h3><p>${aiSummaryLinks(result)}</p><small>${escapeHtml(new Date(result.generatedAt).toLocaleString('fr-FR'))} · ${escapeHtml(result.model)}</small></section><div class="feed stable-owned-list ai-results-v9840">${result.cards.map((card, index) => {
       rememberRenderedArticle(card.article);
       return `<section class="ai-result-v9840"><article class="article-card runtime-row" data-article="${escapeHtml(card.article.id)}" tabindex="0" aria-label="Ouvrir l’article source : ${escapeHtml(card.title)}">${articleVisual(card.article, index)}<div class="article-body"><h2>${escapeHtml(card.title)}</h2><div class="meta"><span class="article-category-badge">IA</span><span class="ai-source-name-v9840">${escapeHtml(card.article.source)}</span></div></div></article><p class="ai-card-summary-v9840">${escapeHtml(card.summary)}</p><a class="ai-source-v9840" href="${escapeHtml(card.article.url)}" target="_blank" rel="noopener noreferrer">Lire la source originale</a></section>`;
     }).join('')}</div>` : '<p class="ai-empty-v9840">Ton résumé et tes articles IA apparaîtront ici après la première génération.</p>'}</section>`;
@@ -1166,6 +1178,7 @@ function patchHomeFeedPreservingCards() {
 
 function refreshAfterNewsChange() {
   reconcileHomeOrder();
+  maybeGenerateStartupBrief(visibleArticles());
   const overlay = document.getElementById('startup-stability-v9815');
   if (['home', 'brief'].includes(state.view) && app.querySelector('[data-article]') && (!overlay || overlay.classList.contains('leaving'))) {
     // Keep the reading snapshot stable. Home accepts updates when tapped,
@@ -1736,6 +1749,7 @@ app.addEventListener('input', event => {
 app.addEventListener('change', async event => {
   if (event.target.matches('[data-ai-provider]')) { setAISettings({ provider: event.target.value }); return; }
   if (event.target.matches('[data-ai-model]')) { setAISettings({ model: event.target.value }); return; }
+  if (event.target.matches('[data-ai-auto]')) { setAISettings({ autoAtOpen: event.target.checked }); return; }
   if (event.target.matches('[data-ai-profile]') && event.target.value) { void aiAccountAction('select', event.target.value); return; }
   if (updateRangeSetting(event.target)) return;
   if (event.target.matches('[data-date]')) { state[event.target.dataset.date === 'from' ? 'customFrom' : 'customTo'] = event.target.value; render(); }
@@ -1908,7 +1922,7 @@ if ('serviceWorker' in navigator && location.protocol.startsWith('http') && !nav
     serviceWorkerRefreshing = true;
     window.location.reload();
   });
-  navigator.serviceWorker.register('./sw-v98.js?v=98.43', { updateViaCache: 'none' }).then(registration => {
+  navigator.serviceWorker.register('./sw-v98.js?v=98.44', { updateViaCache: 'none' }).then(registration => {
     if (registration.waiting) registration.waiting.postMessage('SKIP_WAITING');
     registration.addEventListener('updatefound', () => {
       const installing = registration.installing;
@@ -1955,6 +1969,7 @@ function applyStartupNews(payload) {
   state.syncError = '';
   state.homeOrder = [];
   persistCache();
+  maybeGenerateStartupBrief(visibleArticles());
   return true;
 }
 
@@ -2005,10 +2020,13 @@ async function bootLatestNews() {
 }
 
 onAIChange(() => {
+  queueMicrotask(() => maybeGenerateStartupBrief(visibleArticles()));
   // Account/results updates must never rebuild the unrelated Home feed.
   if (state.view === 'settings' || (state.view === 'brief' && state.briefMode === 'ai')) render();
 });
 window.addEventListener('focus', () => { void refreshAIAccount(); });
+document.addEventListener('visibilitychange', () => { if (!document.hidden) { maybeGenerateStartupBrief(visibleArticles()); void refreshAIAccount(); } });
+window.addEventListener('online', () => { maybeGenerateStartupBrief(visibleArticles()); void refreshAIAccount(); });
 void refreshAIAccount();
 bootLatestNews();
 if (!IS_NATIVE_ANDROID) window.setTimeout(() => checkAppUpdate(), 1400);

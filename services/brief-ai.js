@@ -20,6 +20,7 @@ export const briefAI = {
   provider: AI_PROVIDERS.some(provider => provider.id === initial.provider) ? initial.provider : 'chatgpt',
   prompt: clean(initial.prompt, 6000) || DEFAULT_AI_PROMPT,
   model: clean(initial.model, 100),
+  autoAtOpen: initial.autoAtOpen !== false,
   busy: '', progress: '', error: '', account: { profiles: [], activeId: '', models: [] },
   result: null
 };
@@ -36,8 +37,9 @@ export function setAISettings(settings, { announce = true } = {}) {
   if (AI_PROVIDERS.some(provider => provider.id === settings.provider)) briefAI.provider = settings.provider;
   if (typeof settings.prompt === 'string') briefAI.prompt = settings.prompt.slice(0, 6000);
   if (typeof settings.model === 'string') briefAI.model = settings.model.slice(0, 100);
+  if (typeof settings.autoAtOpen === 'boolean') briefAI.autoAtOpen = settings.autoAtOpen;
   briefAI.error = '';
-  try { localStorage.setItem(CONFIG_KEY, JSON.stringify({ provider: briefAI.provider, prompt: briefAI.prompt, model: briefAI.model })); } catch {}
+  try { localStorage.setItem(CONFIG_KEY, JSON.stringify({ provider: briefAI.provider, prompt: briefAI.prompt, model: briefAI.model, autoAtOpen: briefAI.autoAtOpen })); } catch {}
   if (announce) notify();
 }
 function nativeRequest(action, payload = {}, timeoutMs = 90000) {
@@ -133,21 +135,32 @@ export function normalizeAIResult(payload, articles) {
   if (!cards.length) throw new Error('L’IA n’a pas fourni de résultats reliés aux articles transmis. Le résultat précédent est conservé.');
   return { provider: clean(payload.provider, 40), accountId: clean(payload.accountId, 100), prompt: clean(payload.prompt, 6000), model: clean(payload.model, 100), summary: clean(payload.summary, 10000), generatedAt: clean(payload.generatedAt, 40) || new Date().toISOString(), cards };
 }
+let openingAttempted = false;
+export function maybeGenerateStartupBrief(articles) {
+  if (openingAttempted || !briefAI.autoAtOpen || briefAI.busy || !nativeAIAvailable() || !aiProvider().integrated
+    || !briefAI.account.connected || !briefAI.account.planEnabled || !briefAI.prompt.trim()
+    || !Array.isArray(articles) || !articles.length || document.hidden || navigator.onLine === false) return;
+  // Claim before notifying subscribers: account/news/render updates cannot duplicate it.
+  openingAttempted = true;
+  void generateAIBrief(articles);
+}
 export async function generateAIBrief(articles) {
   if (briefAI.busy) return;
   const provider = aiProvider();
   if (!provider.integrated) { briefAI.error = `L’accès automatique à Brief avec l’abonnement ${provider.name} n’est pas disponible dans cette application. Tu peux ouvrir ton compte sur son site officiel. Aucune API payante ne sera utilisée.`; notify(); return; }
   if (!briefAI.prompt.trim()) { briefAI.error = 'Écris ton prompt dans Réglages → IA.'; notify(); return; }
   if (!briefAI.account.planEnabled) { briefAI.error = 'Connecte un compte ChatGPT et autorise l’utilisation de ton abonnement dans Réglages → IA.'; notify(); return; }
+  if (!Array.isArray(articles) || !articles.length) { briefAI.error = 'Les actualités ne sont pas encore disponibles. Le résultat précédent est conservé.'; notify(); return; }
+  openingAttempted = true;
   briefAI.busy = 'generate'; briefAI.error = ''; notify();
-  // A single deliberate user request. No paid/automatic retry or background AI.
+  // One request per opening (when enabled) or explicit click; never an inference retry.
   const snapshot = articles.slice(0, 60).map(article => ({ id: String(article.id), url: article.url, title: clean(article.title, 280), source: clean(article.source, 100), category: clean(article.category, 70), summary: clean(article.summary, 1200), publishedAt: article.publishedAt, image: article.image || '' }));
   const requestSettings = { provider: briefAI.provider, accountId: briefAI.account.activeId, prompt: briefAI.prompt, model: briefAI.model };
   try {
     const response = await nativeRequest('generate', { prompt: requestSettings.prompt, model: requestSettings.model, articles: snapshot }, 180000);
     const result = normalizeAIResult({ ...response, ...requestSettings, model: response.model }, snapshot);
     // A response cannot leak into a different provider/prompt after navigation.
-    if (briefAI.provider !== requestSettings.provider || briefAI.prompt !== requestSettings.prompt || briefAI.account.activeId !== requestSettings.accountId) return;
+    if (briefAI.provider !== requestSettings.provider || briefAI.prompt !== requestSettings.prompt || briefAI.model !== requestSettings.model || briefAI.account.activeId !== requestSettings.accountId) return;
     briefAI.result = result;
     try { localStorage.setItem(RESULT_KEY, JSON.stringify(result)); } catch {}
   } catch (error) { briefAI.error = error.message; }

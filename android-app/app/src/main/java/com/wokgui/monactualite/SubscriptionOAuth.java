@@ -81,23 +81,16 @@ final class SubscriptionOAuth {
             if (data.length() == 0) continue;
             String eventText = data.toString(); data.setLength(0);
             if ("[DONE]".equals(eventText)) break;
-            JSONObject event = new JSONObject(eventText);
+            JSONObject event;
+            try { event = new JSONObject(eventText); }
+            catch (Exception error) { throw new IOException("Le flux IA contient un événement illisible. Étape : événement SSE."); }
             String type = event.optString("type");
             if (type.equals("response.failed") || type.equals("response.incomplete") || type.equals("error")) throw new IOException(SubscriptionResponse.failureText(event));
             if (!type.equals("response.completed")) continue;
-            JSONObject response = event.getJSONObject("response");
+            JSONObject response = event.optJSONObject("response");
+            if (response == null) throw new IOException("Événement final sans réponse. Étape : réponse complète.");
             if (!"completed".equals(response.optString("status"))) throw new IOException("Génération incomplète.");
-            StringBuilder output = new StringBuilder();
-            JSONArray items = response.getJSONArray("output");
-            for (int i = 0; i < items.length(); i++) {
-                JSONArray content = items.getJSONObject(i).optJSONArray("content");
-                if (content == null) continue;
-                for (int j = 0; j < content.length(); j++) { JSONObject part = content.getJSONObject(j); if ("output_text".equals(part.optString("type"))) output.append(part.optString("text")); }
-            }
-            if (output.length() > 160000) throw new IOException("Réponse IA trop longue.");
-            String text = output.toString().trim();
-            if (text.startsWith("```")) { int start = text.indexOf('\n'); int end = text.lastIndexOf("```"); if (start >= 0 && end > start) text = text.substring(start + 1, end).trim(); }
-            return new JSONObject(text);
+            return SubscriptionBrief.completed(response);
         }
         throw new IOException("Génération interrompue : le résultat précédent est conservé.");
     }

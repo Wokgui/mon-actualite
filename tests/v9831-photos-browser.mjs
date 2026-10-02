@@ -75,6 +75,10 @@ try {
   await page.waitForSelector('[data-stable-home-feed] .article-card');
   const geometryBefore = await page.locator('.article-image').first().evaluate(image => { const r = image.getBoundingClientRect(); return { width: r.width, height: r.height }; });
   await page.waitForFunction(() => document.querySelectorAll('.image-ready-v98').length >= 10);
+  // ResourceTiming publishes only completed fetches. Ten revealed photos do not
+  // imply twelve completed attempts (failed candidates also count in this audit).
+  // Wait for the required independent sample without changing any timing gate.
+  await page.waitForFunction(() => performance.getEntriesByType('resource').filter(entry => new URL(entry.name).pathname === '/api/article-photo-fast').length >= 12, null, { timeout: 5000 });
   const initial = await page.evaluate(() => ({
     metrics: window.__articlePhotoMetrics, audit: window.__photoDomAudit,
     requestStarts: window.__photoFetchStarts,

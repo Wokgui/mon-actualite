@@ -18,6 +18,7 @@ try {
     return route.fulfill({ path: assets + '/' + relative });
   });
   await context.addInitScript(({ sources, nativeFixtures }) => {
+    if (!localStorage.getItem('news-brief-ai-settings-v1')) localStorage.setItem('news-brief-ai-settings-v1', JSON.stringify({ autoAtOpen: false }));
     localStorage.setItem('news-live-cache', JSON.stringify({ articles: sources, fetchedAt: new Date().toISOString(), stats: {} }));
     localStorage.setItem('news-cache-language-v98', 'fr');
     window.__AI_REQUESTS = []; window.__AI_FAILURE = false; window.__AI_CONNECT_FAILURE = false;
@@ -47,7 +48,7 @@ try {
   page.on('dialog', dialog => dialog.accept());
   await page.route('**/api/news**', route => route.fulfill({ json: { articles: sources, fetchedAt: new Date().toISOString(), stats: {} } }));
   await page.route('**/api/article-photo-fast**', route => { photoRequests.push(route.request().url()); return route.fulfill({ contentType: 'image/png', headers: { 'X-Thumbnail-Status': 'feed' }, body: png }); });
-  await page.route('**/version.json**', route => route.fulfill({ json: { version: '98', codeRelease: '98.43' } }));
+  await page.route('**/version.json**', route => route.fulfill({ json: { version: '98', codeRelease: '98.44' } }));
   await page.goto(process.env.AI_BASE_URL || 'http://127.0.0.1:4173/?nativePreview=1', { waitUntil: 'domcontentloaded' });
   await page.waitForFunction(() => document.querySelectorAll('[data-stable-home-feed] img.image-ready-v98').length >= 8);
   let homePhotos = await page.locator('[data-stable-home-feed] .article-card').evaluateAll(cards => Object.fromEntries(cards.map(card => [card.dataset.article, card.querySelector('img').src])));
@@ -133,7 +134,7 @@ try {
       await page.locator('.bottom-nav [data-view="settings"]').click();
     }
     const invalid = await page.evaluate(async () => {
-      const module = await import('./services/brief-ai.js?v=98.43');
+      const module = await import('./services/brief-ai.js?v=98.44');
       try { module.normalizeAIResult({ cards: [{ sourceId: 'bad', title: 'X', summary: 'X' }] }, [{ id: 'bad', url: 'javascript:alert(1)' }]); return false; } catch { return true; }
     });
     assert.equal(invalid, true, 'malformed persisted URLs rejected');
