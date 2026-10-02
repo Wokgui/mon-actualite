@@ -89,10 +89,10 @@ jobs:
           set -euo pipefail
           TAG="v98-98.10"
           APK="mon-actualite-v98-98.10.apk"
-          NOTES="Mon Actualité 98.45 (Android 98.0.45, code 123). Brief IA via le chat habituel : préparation locale des titres, extraits et liens, copie et ouverture du site officiel, envoi manuel dans le chat, import de la réponse dans Brief IA. Aucun appel automatique ni utilisation de l’ancien accès par abonnement Work/Codex. Six services au choix. Sources figées pendant le passage dans le chat et conservées entre ouvertures. JSON ou texte normal acceptés; photos et liens rattachés aux sources connues uniquement. Dernier résultat préservé sur import invalide. Le lien APK historique est conservé."
+          NOTES="Mon Actualité 98.46 (Android 98.0.46, code 124). Brief IA automatique via Groq : prompt personnel, recherche ciblée sur sept jours et synthèse dans Brief IA avec photos et liens des sources réelles. Une clé Groq à enregistrer une seule fois dans l’APK, chiffrée via Android Keystore et exclue des sauvegardes. Actualisation à l’ouverture toutes les 12 heures maximum pour le même prompt et la même clé; demande unique et dernière synthèse conservée en cas d’erreur. Aucun appel à l’ancien partage d’abonnement Work/Codex ni transfert manuel dans ChatGPT. La connexion nécessite un compte Groq et reste soumise à ses limites. Le lien APK historique est conservé."
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release upload "$TAG" "$APK" --clobber
-            gh release edit "$TAG" --title "Mon Actualité v98 / 98.45" --notes "$NOTES"
+            gh release edit "$TAG" --title "Mon Actualité v98 / 98.46" --notes "$NOTES"
           else
-            gh release create "$TAG" "$APK" --title "Mon Actualité v98 / 98.45" --notes "$NOTES"
+            gh release create "$TAG" "$APK" --title "Mon Actualité v98 / 98.46" --notes "$NOTES"
           fi

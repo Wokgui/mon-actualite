@@ -24,11 +24,12 @@ import android.webkit.WebResourceResponse;
 import androidx.webkit.WebViewAssetLoader;
 
 public class MainActivity extends Activity {
-    private static final String APP_URL = "https://mon-actualite.vercel.app/assets/index.html?native=98.45";
+    private static final String APP_URL = "https://mon-actualite.vercel.app/assets/index.html?native=98.46";
     private static final String APP_HOST = "mon-actualite.vercel.app";
 
     private FrameLayout root;
     private WebView webView;
+    private GroqAiBridge groqAI;
     private WebViewAssetLoader assetLoader;
     private int lastTopInset = -1;
     private int lastBottomInset = -1;
@@ -105,7 +106,7 @@ public class MainActivity extends Activity {
         settings.setMediaPlaybackRequiresUserGesture(false);
         settings.setSupportMultipleWindows(true);
         settings.setJavaScriptCanOpenWindowsAutomatically(true);
-        settings.setUserAgentString(settings.getUserAgentString() + " MonActualiteAndroid/98.45");
+        settings.setUserAgentString(settings.getUserAgentString() + " MonActualiteAndroid/98.46");
 
         assetLoader = new WebViewAssetLoader.Builder()
             .setDomain(APP_HOST)
@@ -122,7 +123,7 @@ public class MainActivity extends Activity {
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
                 Uri uri = request.getUrl();
-                if (ChatHandoffBridge.isAppPage(uri)) return false;
+                if (GroqAiBridge.isAppPage(uri)) return false;
                 openExternal(uri);
                 return true;
             }
@@ -131,7 +132,7 @@ public class MainActivity extends Activity {
             @SuppressWarnings("deprecation")
             public boolean shouldOverrideUrlLoading(WebView view, String url) {
                 Uri uri = Uri.parse(url);
-                if (ChatHandoffBridge.isAppPage(uri)) return false;
+                if (GroqAiBridge.isAppPage(uri)) return false;
                 openExternal(uri);
                 return true;
             }
@@ -177,7 +178,7 @@ public class MainActivity extends Activity {
             }
         });
 
-        ChatHandoffBridge.install(this, webView);
+        groqAI = new GroqAiBridge(this, webView);
         if (savedInstanceState == null) webView.loadUrl(APP_URL);
         else webView.restoreState(savedInstanceState);
     }
@@ -213,6 +214,7 @@ public class MainActivity extends Activity {
 
     @Override
     protected void onDestroy() {
+        if (groqAI != null) groqAI.destroy();
         if (webView != null) {
             webView.stopLoading();
             webView.destroy();

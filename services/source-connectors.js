@@ -314,6 +314,21 @@ function buildDiscoveryKeywords(keywords, preferredCategories) {
   return [...new Set([...explicit, ...learned, ...interests].filter(value => value.length >= 2))].slice(0, 8);
 }
 
+// Independent Brief discovery: never merges into the Home feed or its caches.
+export async function fetchBriefCandidates(keywords, { sources = [], language = 'fr', locale = 'fr-FR', country = 'FR' } = {}) {
+  if (location.hostname === 'wokgui.github.io') throw new Error('Recherche ciblée indisponible dans cet aperçu.');
+  const controller = new AbortController(), timeout = setTimeout(() => controller.abort(), 18000);
+  try {
+    const response = await fetch('/api/news?brief=1', { method: 'POST', cache: 'no-store', signal: controller.signal,
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ sources: sources.filter(source => source.enabled !== false).slice(0,12), keywords: keywords.slice(0,6), preferredCategories: [], webSearch: true, sourcePriority: false, language, locale, country, historyDays: 7 }) });
+    if (!response.ok) throw new Error('Recherche ciblée indisponible.');
+    const payload = await response.json();
+    if (!Array.isArray(payload.articles)) throw new Error('Catalogue ciblé invalide.');
+    return payload.articles.map(raw => { const article = normalizeArticle(raw); return { ...article, id: stableArticleId(article) }; });
+  } finally { clearTimeout(timeout); }
+}
+
 export async function fetchLiveNews({ sources = [], keywords = [], preferredCategories = [], webSearch = true, sourcePriority = true, language = 'fr', locale = 'fr-FR', country = 'FR', historyDays = 31 } = {}) {
   const interests = [...new Set(preferredCategories.map(cleanText).filter(Boolean))].sort((a, b) => a.localeCompare(b, language));
   const discoveryKeywords = webSearch ? buildDiscoveryKeywords(keywords, interests) : keywords.map(cleanText).filter(Boolean);

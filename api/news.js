@@ -85,7 +85,8 @@ module.exports = async function handler(req, res) {
           dayBuckets.get(key).forEach(addArticle);
         });
         articles.splice(CATALOG_LIMIT);
-        const prewarmScheduled = await scheduleFinalImagePrewarm(req, articles);
+        // Brief discovery is not a visible feed: do not spend Home's photo budget.
+        const prewarmScheduled = String(req.query?.brief || '') === '1' || /[?&]brief=1(?:&|$)/.test(req.url || '') ? 0 : await scheduleFinalImagePrewarm(req, articles);
         payload.articles = articles;
         payload.stats = {
           ...(payload.stats || {}),

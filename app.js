@@ -1,6 +1,6 @@
-import { importOpmlPreview, fetchLiveNews } from './services/source-connectors.js?v=98.26';
-import { photoSnapshot, photoArticleKey } from './services/article-photos.js?v=98.45';
-import { AI_PROVIDERS, briefAI, aiProvider, setAISettings, onAIChange, currentChatDraft, prepareChatRequest, copyChatRequest, importChatResponse } from './services/brief-chat.js?v=98.45';
+import { importOpmlPreview, fetchLiveNews, fetchBriefCandidates } from './services/source-connectors.js?v=98.46';
+import { photoSnapshot, photoArticleKey } from './services/article-photos.js?v=98.46';
+import { briefAI, setAISettings, onAIChange, initializeBrief, maybeGenerateBrief, generateBrief, saveGroqKey, disconnectGroq } from './services/brief-groq.js?v=98.46';
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const app = $('#app');
@@ -10,6 +10,7 @@ const APP_RELEASE = '1 octobre 2026';
 const IS_NATIVE_ANDROID = /MonActualiteAndroid\//.test(navigator.userAgent) || location.pathname.startsWith('/assets/') || new URLSearchParams(location.search).get('nativePreview') === '1';
 const savedSessionView = sessionStorage.getItem('news-active-view-v9204');
 const INITIAL_VIEW = ['home', 'settings', 'brief'].includes(savedSessionView) ? savedSessionView : 'home';
+const savedBriefMode = sessionStorage.getItem('news-active-brief-mode-v9846');
 document.documentElement.dataset.appVersion = APP_VERSION;
 
 const GENERAL_CATEGORIES = ['Politique', 'International', 'Économie', 'Société', 'Santé', 'Environnement', 'Science', 'Culture', 'Éducation', 'Europe'];
@@ -180,7 +181,7 @@ const rawCache = safeJson('news-live-cache', { articles: [], fetchedAt: null });
 const cache = cacheLanguage === selectedLanguage ? rawCache : { articles: [], fetchedAt: null };
 const state = {
   view: INITIAL_VIEW, previous: [], category: 'Politique', categoryTab: 'brief', articleId: null,
-  briefMode: 'essential', homeLimit: 120, homeOrder: [],
+  briefMode: ['watches', 'ai'].includes(savedBriefMode) ? savedBriefMode : 'essential', homeLimit: 120, homeOrder: [],
   saved: new Set(safeJson('news-saved', [])),
   feedback: safeJson('news-feedback', {}),
   topicPreferences: safeJson('news-topic-preferences-v1', {}),
@@ -927,21 +928,21 @@ function essentialSettingsMarkup() {
 }
 
 function aiAccountMarkup() {
-  const provider = aiProvider();
-  return `<div class="ai-account-v9840" data-ai-account><label class="ai-field-v9840 ai-provider-field-v9841"><strong>Service d’intelligence artificielle</strong><select class="text-input" data-ai-provider>${AI_PROVIDERS.map(item => `<option value="${item.id}"${item.id === briefAI.provider ? ' selected' : ''}>${item.name} — chat normal</option>`).join('')}</select></label><p class="muted-note ai-connection-note-v9841">Utilise ton chat habituel. Mon Actualité prépare la demande, mais ne l’envoie pas : tu la colles et l’envoies dans ton chat, puis tu importes sa réponse ici. Aucun accès Work/Codex ni API payante n’est utilisé pour ce Brief.</p><a class="secondary-btn" href="${provider.url}" target="_blank" rel="noopener noreferrer">Ouvrir le chat ${escapeHtml(provider.name)}</a></div>`;
+  return `<div class="ai-account-v9840" data-ai-account><strong class="settings-field-title">Service d’intelligence artificielle</strong><p class="muted-note">Groq · formule gratuite · indépendant de ChatGPT, Work et Codex.</p><a class="secondary-btn" href="https://console.groq.com/keys" target="_blank" rel="noopener noreferrer">Créer ma clé gratuite Groq</a>
+    ${briefAI.supported ? `<p class="muted-note">${briefAI.configured ? 'Une clé est enregistrée sur cet appareil. Sa validité est vérifiée lors de la génération.' : 'Crée une clé Groq, puis enregistre-la ici une seule fois. Reste sur la formule Free, sans activer la facturation.'}</p><label class="ai-field-v9840"><strong>${briefAI.configured ? 'Remplacer ma clé Groq' : 'Ma clé Groq'}</strong><input class="text-input" type="password" data-ai-key autocomplete="off" spellcheck="false" maxlength="250" placeholder="gsk_…"${briefAI.busy ? ' disabled' : ''}></label><button class="secondary-btn" type="button" data-ai-save-key${briefAI.busy ? ' disabled' : ''}>Enregistrer la clé sur cet appareil</button>${briefAI.configured || briefAI.error.includes('chiffrée est inaccessible') ? '<button class="secondary-btn" type="button" data-ai-disconnect>Retirer la clé</button>' : ''}` : `<p class="muted-note">${briefAI.initialized ? 'Le stockage sécurisé de la clé et la synthèse automatique sont disponibles dans l’APK Android actuel, pas dans cet aperçu Web.' : 'Vérification de la connexion Android…'}</p>`}
+    <p class="muted-note">Sur Android, la clé est chiffrée et exclue des sauvegardes. Ton prompt et les titres/extraits sélectionnés sont envoyés à Groq. Aucun accès à ton compte ChatGPT n’est demandé.</p></div>`;
 }
 
 function aiSettingsMarkup() {
-  const draft = currentChatDraft();
-  return `${aiAccountMarkup()}<label class="ai-field-v9840 ai-prompt-field-v9841"><strong>Ton prompt pour le résumé de l’actualité</strong><textarea class="text-input ai-prompt-v9840" data-ai-prompt rows="6" maxlength="6000" placeholder="Ce que tu veux demander à ton IA…">${escapeHtml(briefAI.prompt)}</textarea></label><p class="muted-note">Ton prompt est enregistré sur cet appareil. La demande contient jusqu’à 40 articles de ton fil, avec leurs titres, extraits et liens. Ce n’est pas une recherche exhaustive du Web.</p><div class="ai-settings-generation-v9841"><button type="button" class="secondary-btn" data-ai-prepare>Préparer / actualiser la demande</button><button type="button" class="secondary-btn" data-ai-copy-open${briefAI.busy ? ' disabled' : ''}>Copier la demande et ouvrir ${escapeHtml(aiProvider().name)}</button></div>
-    ${draft ? `<label class="ai-field-v9840"><strong>Demande prête · ${draft.articles.length} articles</strong><textarea class="text-input ai-prompt-v9840 ai-chat-request-v9845" data-ai-request rows="5" readonly>${escapeHtml(draft.text)}</textarea></label><button type="button" class="secondary-btn" data-ai-copy${briefAI.busy ? ' disabled' : ''}>Copier seulement la demande</button><p class="muted-note">Cette liste de sources est conservée pendant ton passage dans le chat, même si les actualités changent.</p>` : ''}
-    <label class="ai-field-v9840"><strong>Réponse de ton chat</strong><textarea class="text-input ai-prompt-v9840" data-ai-response rows="6" maxlength="100000" placeholder="Colle ici toute la réponse de ton chat, puis importe-la…">${escapeHtml(briefAI.importText)}</textarea></label><p class="muted-note">Copie toute la réponse, y compris le bloc de résultat si ton chat en fournit un. Un texte normal est aussi accepté : ses liens vers les sources préparées donnent des cartes avec les photos de ces articles. Sans lien reconnu, seul le résumé est affiché.</p>
-    ${briefAI.error ? `<p class="ai-error-v9840" role="alert">${escapeHtml(briefAI.error)}</p>` : ''}${briefAI.notice ? `<p class="ai-chat-notice-v9845" role="status">${escapeHtml(briefAI.notice)}</p>` : ''}
-    <div class="ai-settings-generation-v9841"><button type="button" class="secondary-btn" data-ai-import>Importer dans Brief → IA</button><button type="button" class="secondary-btn" data-ai-open-brief>Voir Brief → IA</button></div>`;
+  return `${aiAccountMarkup()}<label class="ai-field-v9840 ai-prompt-field-v9841"><strong>Ton prompt pour la synthèse</strong><textarea class="text-input ai-prompt-v9840" data-ai-prompt rows="7" maxlength="6000" placeholder="Tes sujets et la présentation souhaitée…">${escapeHtml(briefAI.prompt)}</textarea></label><p class="muted-note">Enregistré automatiquement. Recherche ciblée sur les sept derniers jours, puis sélection diversifiée de 24 articles maximum. L’IA reçoit des titres et extraits, pas nécessairement les articles complets ; ce n’est pas une recherche exhaustive du Web.</p><label class="ai-auto-v9844"><input type="checkbox" data-ai-auto${briefAI.autoAtOpen ? ' checked' : ''}> Actualiser automatiquement à l’ouverture</label><p class="muted-note">Au maximum toutes les 12 heures pour le même prompt et la même clé. La dernière synthèse reste visible pendant l’actualisation. Pas de relance en boucle après une erreur.</p>${aiStatusMarkup()}<div class="ai-settings-generation-v9841"><button type="button" class="secondary-btn" data-ai-generate${briefAI.busy || !briefAI.configured ? ' disabled' : ''}>Actualiser ma synthèse</button><button type="button" class="secondary-btn" data-ai-open-brief>Voir Brief → IA</button></div>`;
+}
+
+function aiStatusMarkup() {
+  return `<div data-ai-state>${briefAI.busy ? `<p class="muted-note" role="status">${escapeHtml(briefAI.busy)}</p>` : ''}${briefAI.error ? `<p class="ai-error-v9840" role="alert">${escapeHtml(briefAI.error)}</p>` : ''}${briefAI.notice ? `<p class="muted-note" role="status">${escapeHtml(briefAI.notice)}</p>` : ''}</div>`;
 }
 
 function aiSummaryLinks(result) {
-  const allowed = new Set([...result.cards.map(card => card.article.url), ...(currentChatDraft()?.articles || []).map(article => article.url)]);
+  const allowed = new Set([...result.cards.map(card => card.article.url), ...(result.sources || []).map(article => article.url)]);
   const pattern = /\[([^\]\n]{1,240})\]\((https?:\/\/[^\s)]+)\)/g;
   let output = '', cursor = 0;
   for (const match of result.summary.matchAll(pattern)) {
@@ -952,12 +953,12 @@ function aiSummaryLinks(result) {
   return output + escapeHtml(result.summary.slice(cursor));
 }
 function renderAIBrief() {
-  const result = briefAI.result?.provider === briefAI.provider && briefAI.result?.prompt === briefAI.prompt.trim() ? briefAI.result : null;
+  const result = briefAI.result;
   return `<section class="ai-brief-v9840">
-    ${result ? `<section class="ai-news-summary-v9840"><h3>Résumé de l’actualité</h3><p>${aiSummaryLinks(result)}</p><small>${escapeHtml(new Date(result.generatedAt).toLocaleString('fr-FR'))} · ${escapeHtml(result.model)}</small></section><div class="feed stable-owned-list ai-results-v9840">${result.cards.map((card, index) => {
+    ${aiStatusMarkup()}${result ? `<section class="ai-news-summary-v9840"><h3>Synthèse de tes sujets</h3>${result.prompt !== briefAI.prompt.trim() ? '<p class="muted-note">Dernière synthèse conservée · ton prompt a changé. Actualise pour appliquer le nouveau prompt.</p>' : ''}${result.partialSources ? '<p class="muted-note">Recherche ciblée indisponible lors de cette synthèse : articles déjà présents dans l’appli uniquement.</p>' : ''}<p>${aiSummaryLinks(result)}</p><small>${escapeHtml(new Date(result.generatedAt).toLocaleString('fr-FR'))} · ${escapeHtml(result.model || 'Ancienne synthèse')}</small></section><div class="feed stable-owned-list ai-results-v9840">${result.cards.map((card, index) => {
       rememberRenderedArticle(card.article);
       return `<section class="ai-result-v9840"><article class="article-card runtime-row" data-article="${escapeHtml(card.article.id)}" tabindex="0" aria-label="Ouvrir l’article source : ${escapeHtml(card.title)}">${articleVisual(card.article, index)}<div class="article-body"><h2>${escapeHtml(card.title)}</h2><div class="meta"><span class="article-category-badge">IA</span><span class="ai-source-name-v9840">${escapeHtml(card.article.source)}</span></div></div></article><p class="ai-card-summary-v9840">${escapeHtml(card.summary)}</p><a class="ai-source-v9840" href="${escapeHtml(card.article.url)}" target="_blank" rel="noopener noreferrer">Lire la source originale</a></section>`;
-    }).join('')}</div>` : '<p class="ai-empty-v9840">Ton résumé et tes articles IA apparaîtront ici après l’import de la réponse de ton chat dans Réglages → IA.</p>'}</section>`;
+    }).join('')}</div>` : '<p class="ai-empty-v9840">Ta synthèse et les articles IA apparaîtront ici automatiquement. Enregistre une fois ta clé gratuite Groq dans Réglages → IA.</p>'}</section>`;
 }
 
 function renderSettings() {
@@ -1045,7 +1046,10 @@ function captureOpenSettingsAccordions() {
 function render({ resetScroll = false, scrollTop = null } = {}) {
   captureOpenSettingsAccordions();
   if (['home', 'settings', 'brief'].includes(state.view)) {
-    try { sessionStorage.setItem('news-active-view-v9204', state.view); } catch {}
+    try {
+      sessionStorage.setItem('news-active-view-v9204', state.view);
+      sessionStorage.setItem('news-active-brief-mode-v9846', state.briefMode);
+    } catch {}
   }
   const preservedScroll = Number.isFinite(scrollTop) ? scrollTop : (resetScroll ? 0 : window.scrollY);
   const views = { home: renderHome, category: renderCategory, detail: renderDetail, brief: renderBrief, news: renderNews, settings: renderSettings };
@@ -1508,14 +1512,9 @@ app.addEventListener('click', async event => {
     render({ scrollTop: 0 });
     return;
   }
-  if (event.target.closest('[data-ai-prepare]')) { prepareChatRequest(visibleArticles()); return; }
-  if (event.target.closest('[data-ai-copy-open]')) { void copyChatRequest(visibleArticles(), { open: true }); return; }
-  if (event.target.closest('[data-ai-copy]')) { void copyChatRequest(visibleArticles()); return; }
-  if (event.target.closest('[data-ai-import]')) {
-    const text = document.querySelector('[data-ai-response]')?.value || briefAI.importText;
-    if (importChatResponse(text)) { state.view = 'brief'; state.briefMode = 'ai'; render({ scrollTop: 0 }); }
-    return;
-  }
+  if (event.target.closest('[data-ai-save-key]')) { const key = app.querySelector('[data-ai-key]')?.value || ''; void saveGroqKey(key); return; }
+  if (event.target.closest('[data-ai-disconnect]')) { void disconnectGroq(); return; }
+  if (event.target.closest('[data-ai-generate]')) { void generateBrief({ force: true }); return; }
   if (event.target.closest('[data-ai-open-brief]')) { state.view = 'brief'; state.briefMode = 'ai'; render({ scrollTop: 0 }); return; }
   const watchAll = event.target.closest('[data-watch-all-toggle]');
   if (watchAll) {
@@ -1734,11 +1733,8 @@ function updateRangeSetting(target) {
 app.addEventListener('input', event => {
   if (event.target.matches('[data-ai-prompt]')) {
     setAISettings({ prompt: event.target.value }, { announce: false });
-    const prepared = app.querySelector('[data-ai-request]');
-    if (prepared && !currentChatDraft()) prepared.value = 'Prompt modifié : prépare une nouvelle demande avant de la copier.';
     return;
   }
-  if (event.target.matches('[data-ai-response]')) { briefAI.importText = event.target.value; return; }
   if (updateRangeSetting(event.target)) return;
   if (event.target.matches('[data-accent]')) {
     state.settings.accent = event.target.value;
@@ -1748,7 +1744,7 @@ app.addEventListener('input', event => {
 });
 
 app.addEventListener('change', async event => {
-  if (event.target.matches('[data-ai-provider]')) { setAISettings({ provider: event.target.value }); return; }
+  if (event.target.matches('[data-ai-auto]')) { setAISettings({ autoAtOpen: event.target.checked }); void maybeGenerateBrief(); return; }
   if (updateRangeSetting(event.target)) return;
   if (event.target.matches('[data-date]')) { state[event.target.dataset.date === 'from' ? 'customFrom' : 'customTo'] = event.target.value; render(); }
   if (event.target.matches('[data-setting-select]')) { state.settings[event.target.dataset.settingSelect] = event.target.value; persist(); toast('Réglage enregistré'); }
@@ -1920,7 +1916,7 @@ if ('serviceWorker' in navigator && location.protocol.startsWith('http') && !nav
     serviceWorkerRefreshing = true;
     window.location.reload();
   });
-  navigator.serviceWorker.register('./sw-v98.js?v=98.45', { updateViaCache: 'none' }).then(registration => {
+  navigator.serviceWorker.register('./sw-v98.js?v=98.46', { updateViaCache: 'none' }).then(registration => {
     if (registration.waiting) registration.waiting.postMessage('SKIP_WAITING');
     registration.addEventListener('updatefound', () => {
       const installing = registration.installing;
@@ -2017,8 +2013,24 @@ async function bootLatestNews() {
 }
 
 onAIChange(() => {
-  // Chat/import updates must never rebuild the unrelated Home feed.
-  if (state.view === 'settings' || (state.view === 'brief' && state.briefMode === 'ai')) render();
+  // Generation progress must not rebuild Home or interrupt an edited prompt/key.
+  if (state.view === 'settings' && document.activeElement?.matches('[data-ai-prompt],[data-ai-key]')) {
+    const status = app.querySelector('[data-ai-state]');
+    if (status) status.outerHTML = aiStatusMarkup();
+    for (const button of app.querySelectorAll('[data-ai-generate],[data-ai-save-key]')) button.disabled = !!briefAI.busy || (button.hasAttribute('data-ai-generate') && !briefAI.configured);
+  } else if (state.view === 'settings' || (state.view === 'brief' && state.briefMode === 'ai')) render({ scrollTop: window.scrollY });
 });
-bootLatestNews();
+function allowedBriefArticle(article) {
+  if (!article || state.feedback[article.id] === 'not' || isVideoOnlyArticle(article) || state.blockedSources.has(sourceIdentity(article))) return false;
+  const text = normalizeTopic([article.title, article.summary, article.source, article.category].join(' '));
+  return !(state.blockedTerms || []).some(term => normalizeTopic(term).length >= 2 && text.includes(normalizeTopic(term)));
+}
+bootLatestNews().finally(() => initializeBrief({ getArticles: visibleArticles, filter: allowedBriefArticle, discover: keywords => {
+  if (!state.settings.webSearch) return Promise.reject(Error('Recherche Web désactivée.'));
+  const locale = LANGUAGE_PRESETS[state.settings.language] || LANGUAGE_PRESETS.fr;
+  return fetchBriefCandidates(keywords, { sources: state.sources, language: state.settings.language, locale: locale.locale, country: locale.country });
+} }));
+window.addEventListener('focus', () => void maybeGenerateBrief());
+window.addEventListener('online', () => void maybeGenerateBrief());
+document.addEventListener('visibilitychange', () => { if (!document.hidden) void maybeGenerateBrief(); });
 if (!IS_NATIVE_ANDROID) window.setTimeout(() => checkAppUpdate(), 1400);

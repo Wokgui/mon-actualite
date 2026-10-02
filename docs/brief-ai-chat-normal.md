@@ -1,5 +1,7 @@
 # Brief IA — chat normal, import manuel (98.45)
 
+Document historique. Ce parcours est remplacé en 98.46 par [le Brief Groq automatique](brief-ai-groq.md). Les anciens modules ne sont plus chargés ni enregistrés dans MainActivity.
+
 ## Parcours utilisateur
 
 Dans Réglages → IA, choisir un service, conserver ou modifier le prompt, puis utiliser « Copier la demande et ouvrir ChatGPT ». La demande est écrite dans le presse-papiers uniquement après le clic. Le chat officiel est ouvert dans une application externe ou dans le navigateur. L’utilisateur colle et envoie la demande dans le chat, puis colle sa réponse dans « Réponse de ton chat » et choisit « Importer dans Brief → IA ».

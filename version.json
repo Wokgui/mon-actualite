@@ -1,6 +1,6 @@
 {
   "version": "98",
-  "codeRelease": "98.45",
+  "codeRelease": "98.46",
   "release": "2026-10-02",
-  "label": "v98.45 : chat normal et import manuel du Brief IA"
+  "label": "v98.46 : synthèse Groq automatique, prompt personnel et clé Android chiffrée"
 }
