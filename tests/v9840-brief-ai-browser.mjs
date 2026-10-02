@@ -20,22 +20,26 @@ try {
   await context.addInitScript(({ sources, nativeFixtures }) => {
     localStorage.setItem('news-live-cache', JSON.stringify({ articles: sources, fetchedAt: new Date().toISOString(), stats: {} }));
     localStorage.setItem('news-cache-language-v98', 'fr');
-    window.__AI_REQUESTS = []; window.__AI_FAILURE = false;
+    window.__AI_REQUESTS = []; window.__AI_FAILURE = false; window.__AI_CONNECT_FAILURE = false;
     if (!nativeFixtures) return;
     // A protocol fixture, not a real subscription or successful provider login.
     let account = { profiles: [], activeId: '', connected: false, planEnabled: false, email: '' };
     window.MonActualiteAI = { onmessage: null, postMessage(text) {
       const request = JSON.parse(text); window.__AI_REQUESTS.push(request);
       let data, error;
+      if (request.action === 'connect') setTimeout(() => window.MonActualiteAI.onmessage?.({ data: JSON.stringify({ id: request.id, progress: 'Reviens dans Mon Actualité pour terminer…' }) }), 10);
       if (request.action === 'status') data = account;
-      else if (request.action === 'connect') data = account = { profiles: [{ id: 'fixture-account', email: 'compte-test@example.test', connected: true }], activeId: 'fixture-account', connected: true, planEnabled: true, email: 'compte-test@example.test' };
+      else if (request.action === 'connect') {
+        if (window.__AI_CONNECT_FAILURE) error = 'Le téléphone ne parvient pas à joindre OpenAI (DNS). Étape : échange de connexion. Ta configuration est conservée.';
+        else data = account = { profiles: [{ id: 'fixture-account', email: 'compte-test@example.test', connected: true }], activeId: 'fixture-account', connected: true, planEnabled: true, email: 'compte-test@example.test' };
+      }
       else if (request.action === 'models') data = [{ slug: 'fixture-model', name: 'Modèle de test' }];
       else if (request.action === 'disconnect') data = account = { profiles: [], activeId: '', connected: false, planEnabled: false, email: '' };
       else if (request.action === 'generate') {
         if (window.__AI_FAILURE) error = 'Limite d’utilisation atteinte. Consulte ChatGPT.';
         else data = { summary: 'Synthèse des actualités transmises.', model: request.model || 'fixture-model', generatedAt: new Date().toISOString(), cards: request.articles.slice(0, 3).map((article, index) => ({ sourceId: article.id, title: 'Analyse IA ' + (index + 1), summary: 'Résumé factuel ' + (index + 1), image: 'https://evil.test/invented.png', url: 'javascript:alert(1)' })).concat([{ sourceId: 'invented', title: 'Faux article', summary: 'À refuser' }]) };
       }
-      setTimeout(() => window.MonActualiteAI.onmessage?.({ data: JSON.stringify({ id: request.id, ok: !error, data, error }) }), request.action === 'generate' ? 100 : 15);
+      setTimeout(() => window.MonActualiteAI.onmessage?.({ data: JSON.stringify({ id: request.id, ok: !error, data, error }) }), request.action === 'connect' ? 300 : request.action === 'generate' ? 100 : 15);
     }};
   }, { sources, nativeFixtures });
   const page = await context.newPage();
@@ -43,7 +47,7 @@ try {
   page.on('dialog', dialog => dialog.accept());
   await page.route('**/api/news**', route => route.fulfill({ json: { articles: sources, fetchedAt: new Date().toISOString(), stats: {} } }));
   await page.route('**/api/article-photo-fast**', route => { photoRequests.push(route.request().url()); return route.fulfill({ contentType: 'image/png', headers: { 'X-Thumbnail-Status': 'feed' }, body: png }); });
-  await page.route('**/version.json**', route => route.fulfill({ json: { version: '98', codeRelease: '98.41' } }));
+  await page.route('**/version.json**', route => route.fulfill({ json: { version: '98', codeRelease: '98.42' } }));
   await page.goto(process.env.AI_BASE_URL || 'http://127.0.0.1:4173/?nativePreview=1', { waitUntil: 'domcontentloaded' });
   await page.waitForFunction(() => document.querySelectorAll('[data-stable-home-feed] img.image-ready-v98').length >= 8);
   let homePhotos = await page.locator('[data-stable-home-feed] .article-card').evaluateAll(cards => Object.fromEntries(cards.map(card => [card.dataset.article, card.querySelector('img').src])));
@@ -82,6 +86,17 @@ try {
   assert.ok(Math.abs(alignment.above - alignment.below) <= .75, 'selector/note and note/action gaps must be equal: ' + JSON.stringify(alignment));
   await page.screenshot({ path: output + '/reglages-ia.png', fullPage: true });
   if (nativeFixtures) {
+    await page.evaluate(() => { window.__AI_CONNECT_FAILURE = true; });
+    await page.locator('[data-ai-connect]').click();
+    await page.waitForFunction(() => document.querySelector('[data-ai-connect]')?.textContent.includes('Reviens dans Mon Actualité'));
+    assert.equal(await page.locator('[data-ai-connect]').isDisabled(), true, 'progress does not complete the pending request');
+    await page.waitForSelector('.ai-error-v9840');
+    assert.match(await page.locator('.ai-error-v9840').textContent(), /DNS.*Étape : échange de connexion/);
+    assert.equal(await page.locator('[data-ai-prompt]').inputValue(), custom, 'network failure preserves the prompt');
+    assert.equal(await page.locator('[data-ai-connect]').isEnabled(), true, 'connection can be retried deliberately');
+    assert.equal(await page.evaluate(() => window.__AI_REQUESTS.filter(request => request.action === 'connect').length), 1, 'no automatic OAuth loop');
+    await page.screenshot({ path: output + '/connexion-dns.png', fullPage: true });
+    await page.evaluate(() => { window.__AI_CONNECT_FAILURE = false; });
     await page.locator('[data-ai-connect]').click();
     await page.waitForSelector('[data-ai-model]');
     await page.locator('[data-ai-model]').selectOption('fixture-model');
@@ -106,7 +121,7 @@ try {
     await page.locator('[data-ai-open-brief]').click();
     assert.equal(await page.locator('.ai-results-v9840').textContent(), previous, 'failure never overwrites a complete result');
     const invalid = await page.evaluate(async () => {
-      const module = await import('./services/brief-ai.js?v=98.41');
+      const module = await import('./services/brief-ai.js?v=98.42');
       try { module.normalizeAIResult({ cards: [{ sourceId: 'bad', title: 'X', summary: 'X' }] }, [{ id: 'bad', url: 'javascript:alert(1)' }]); return false; } catch { return true; }
     });
     assert.equal(invalid, true, 'malformed persisted URLs rejected');

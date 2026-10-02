@@ -20,7 +20,7 @@ export const briefAI = {
   provider: AI_PROVIDERS.some(provider => provider.id === initial.provider) ? initial.provider : 'chatgpt',
   prompt: clean(initial.prompt, 6000) || DEFAULT_AI_PROMPT,
   model: clean(initial.model, 100),
-  busy: '', error: '', account: { profiles: [], activeId: '', models: [] },
+  busy: '', progress: '', error: '', account: { profiles: [], activeId: '', models: [] },
   result: null
 };
 const persistedResult = read(RESULT_KEY, null);
@@ -47,14 +47,19 @@ function nativeRequest(action, payload = {}, timeoutMs = 90000) {
     const timer = setTimeout(() => {
       requests.delete(id);
       if (action === 'generate') try { window.MonActualiteAI.postMessage(JSON.stringify({ id: crypto.randomUUID(), action: 'cancel_generation' })); } catch {}
+      if (action === 'connect') try { window.MonActualiteAI.postMessage(JSON.stringify({ id: crypto.randomUUID(), action: 'cancel' })); } catch {}
       reject(new Error('La demande a expiré. Réessaie depuis l’application.'));
     }, timeoutMs);
-    requests.set(id, { resolve, reject, timer });
+    requests.set(id, { resolve, reject, timer, action });
     window.MonActualiteAI.onmessage = event => {
       let response;
       try { response = JSON.parse(event.data); } catch { return; }
       const request = requests.get(response.id);
       if (!request) return;
+      if (typeof response.progress === 'string') {
+        if (request.action === 'connect' && briefAI.busy === 'connect') { briefAI.progress = clean(response.progress, 100); notify(); }
+        return;
+      }
       requests.delete(response.id); clearTimeout(request.timer);
       if (response.ok) request.resolve(response.data);
       else request.reject(new Error(clean(response.error, 500) || 'La demande IA n’a pas abouti.'));
@@ -73,22 +78,22 @@ export async function refreshAIAccount() {
 }
 export async function aiAccountAction(action, profileId = '') {
   if (briefAI.busy) return;
-  briefAI.busy = action; briefAI.error = ''; notify();
+  briefAI.busy = action; briefAI.progress = ''; briefAI.error = ''; notify();
   try {
-    briefAI.account = await nativeRequest(action, { profileId }, action === 'connect' ? 310000 : action === 'disconnect' ? 150000 : 30000);
+    briefAI.account = await nativeRequest(action, { profileId }, action === 'connect' ? 420000 : action === 'disconnect' ? 150000 : 90000);
     if (action === 'connect' && briefAI.account.planEnabled && !localStorage.getItem('news-brief-ai-welcome-v1')) {
       window.alert('Tu utilises ton abonnement ChatGPT. Les demandes IA de Mon Actualité consomment ses limites et, selon tes réglages ChatGPT, les crédits que tu as autorisés. Tu peux gérer cette utilisation dans les réglages ChatGPT.');
       localStorage.setItem('news-brief-ai-welcome-v1', '1');
     }
     if (action === 'connect' || action === 'select') {
       setAISettings({ model: '' }, { announce: false });
-      if (briefAI.account.planEnabled) briefAI.account.models = await nativeRequest('models', {}, 30000);
+      if (briefAI.account.planEnabled) briefAI.account.models = await nativeRequest('models', {}, 90000);
     }
   } catch (error) {
     briefAI.error = error.message;
-    if (action === 'disconnect') try { briefAI.account = await nativeRequest('status', {}, 10000); } catch {}
+    if (action === 'disconnect' || action === 'connect') try { briefAI.account = await nativeRequest('status', {}, 10000); } catch {}
   }
-  finally { briefAI.busy = ''; notify(); }
+  finally { briefAI.busy = ''; briefAI.progress = ''; notify(); }
 }
 let modelsRequest = null;
 export async function loadAIModels() {
@@ -96,7 +101,7 @@ export async function loadAIModels() {
   if (modelsRequest) return modelsRequest;
   const activeId = briefAI.account.activeId;
   modelsRequest = (async () => {
-    try { const models = await nativeRequest('models', {}, 30000); if (activeId === briefAI.account.activeId) briefAI.account.models = models; notify(); }
+    try { const models = await nativeRequest('models', {}, 90000); if (activeId === briefAI.account.activeId) briefAI.account.models = models; notify(); }
     catch (error) { briefAI.error = error.message; notify(); }
     finally { modelsRequest = null; }
   })();

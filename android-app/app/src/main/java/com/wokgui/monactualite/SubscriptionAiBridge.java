@@ -50,6 +50,9 @@ final class SubscriptionAiBridge {
     private final Object refreshLock = new Object();
     private final AtomicBoolean connecting = new AtomicBoolean(false);
     private final AtomicBoolean generating = new AtomicBoolean(false);
+    private final SubscriptionConnection.Foreground foreground = new SubscriptionConnection.Foreground();
+    private final ThreadLocal<Long> connectionSession = new ThreadLocal<>();
+    private final ThreadLocal<String> networkStep = new ThreadLocal<>();
     private final AtomicFile file;
     private JSONObject vault;
     private JSONArray modelCache = new JSONArray();
@@ -89,11 +92,12 @@ final class SubscriptionAiBridge {
         try {
             JSONObject request = new JSONObject(text); id = request.getString("id");
             if (id.length() > 80) return;
+            networkStep.set("requête IA");
             if (vault == null) throw new Exception("La connexion enregistrée est inaccessible. Réinstalle la connexion depuis les réglages Android.");
             Object data;
             switch (request.optString("action")) {
                 case "status": data = status(); break;
-                case "connect": data = connect(request.optString("profileId")); break;
+                case "connect": data = connect(request.optString("profileId"), reply, id); break;
                 case "cancel": cancelConnection(); data = status(); break;
                 case "cancel_generation": synchronized (lock) { epoch++; } if (inference != null) inference.disconnect(); data = status(); break;
                 case "select":
@@ -111,10 +115,14 @@ final class SubscriptionAiBridge {
         } catch (Exception error) {
             // Never relay raw server bodies, URLs, stack traces or credentials.
             String message = error.getMessage();
+            if (error instanceof java.net.UnknownHostException) {
+                message = "Le téléphone ne parvient pas à joindre OpenAI (DNS). Étape : " + networkStep.get() + ". Ta configuration est conservée.";
+                android.util.Log.w("MonActualiteAI", "network_failure=DNS step=" + networkStep.get());
+            }
             boolean safe = error.getClass() == Exception.class || error instanceof java.io.IOException;
             if (!safe || message == null || message.length() > 300 || message.contains("https://") || message.contains("access_token")) message = "La demande IA a échoué. Vérifie ta connexion et reconnecte ton compte si nécessaire.";
             try { respond(reply, new JSONObject().put("id", id).put("ok", false).put("error", message)); } catch (Exception ignored) {}
-        }
+        } finally { networkStep.remove(); }
     }
     private void respond(JavaScriptReplyProxy reply, JSONObject message) {
         activity.runOnUiThread(() -> { if (!destroyed) reply.postMessage(message.toString()); });
@@ -142,7 +150,10 @@ final class SubscriptionAiBridge {
         throw new Exception("Choisis un compte enregistré.");
     }
     private String random() { byte[] bytes = new byte[32]; new SecureRandom().nextBytes(bytes); return SubscriptionOAuth.encode(bytes); }
-    private JSONObject connect(String profileId) throws Exception {
+    private void connectionProgress(JavaScriptReplyProxy reply, String id, String progress) throws Exception {
+        respond(reply, new JSONObject().put("id", id).put("progress", progress));
+    }
+    private JSONObject connect(String profileId, JavaScriptReplyProxy reply, String id) throws Exception {
         if (!connecting.compareAndSet(false, true)) throw new Exception("Une connexion est déjà en cours.");
         ServerSocket server = null;
         try {
@@ -153,6 +164,7 @@ final class SubscriptionAiBridge {
                 connectionEpoch = epoch;
                 if (!profileId.isEmpty()) { JSONObject previous = profile(profileId); previousClient = previous.getString("client_id"); previousSubject = previous.getString("sub"); email = previous.optString("email"); }
             }
+            connectionSession.set(connectionEpoch);
             server = new ServerSocket(0, 1, InetAddress.getByName("127.0.0.1"));
             listener = server; server.setSoTimeout(300000);
             String redirect = "http://127.0.0.1:" + server.getLocalPort() + "/auth/callback";
@@ -182,7 +194,7 @@ final class SubscriptionAiBridge {
                     Uri candidate = parts.length == 3 && "GET".equals(parts[0]) ? Uri.parse(parts[1]) : Uri.EMPTY;
                     boolean valid = !candidate.isAbsolute() && "/auth/callback".equals(candidate.getPath()) && ("127.0.0.1:" + server.getLocalPort()).equals(host)
                         && candidate.getQueryParameters("state").size() == 1 && SubscriptionOAuth.equal(state, candidate.getQueryParameter("state"));
-                    String html = valid ? "<!doctype html><meta charset=utf-8><h1>Mon Actualité</h1><p>La connexion se termine dans l’application.</p><a href=\"monactualite://brief/ia\">Revenir dans Mon Actualité</a>" : "Callback refusé.";
+                    String html = valid ? "<!doctype html><meta charset=utf-8><h1>Mon Actualité</h1><p>Reviens dans l’application pour terminer la connexion.</p><a href=\"monactualite://brief/ia\">Revenir dans Mon Actualité</a>" : "Callback refusé.";
                     byte[] body = html.getBytes(StandardCharsets.UTF_8);
                     socket.getOutputStream().write(("HTTP/1.1 " + (valid ? "200 OK" : "400 Bad Request") + "\r\nContent-Type: text/html; charset=utf-8\r\nCache-Control: no-store\r\nContent-Security-Policy: default-src 'none'\r\nConnection: close\r\nContent-Length: " + body.length + "\r\n\r\n").getBytes(StandardCharsets.US_ASCII));
                     socket.getOutputStream().write(body); socket.getOutputStream().flush();
@@ -192,13 +204,21 @@ final class SubscriptionAiBridge {
             if (callback == null) throw new Exception("Connexion annulée ou expirée.");
             if (callback.getQueryParameter("error") != null) throw new Exception("Connexion refusée. Ton compte précédent est conservé.");
             if (callback.getQueryParameters("code").size() != 1 || callback.getQueryParameters("client_id").size() > 1) throw new Exception("Callback incomplet.");
+            connectionProgress(reply, id, "Reviens dans Mon Actualité pour terminer…");
             String issued = SubscriptionOAuth.issuedClient(previousClient, callback.getQueryParameter("client_id") == null ? "" : callback.getQueryParameter("client_id"));
             Map<String, String> exchange = new HashMap<>();
             exchange.put("grant_type", "authorization_code"); exchange.put("client_id", issued); exchange.put("code", callback.getQueryParameter("code"));
             exchange.put("code_verifier", verifier); exchange.put("redirect_uri", redirect); exchange.put("resource", SubscriptionOAuth.RESOURCE);
+            networkStep.set("échange de connexion");
+            android.util.Log.i("MonActualiteAI", "connection_step=token_exchange");
             JSONObject tokens = jsonRequest(SubscriptionOAuth.ISSUER + "/api/accounts/oauth/token", form(exchange), "application/x-www-form-urlencoded", "");
+            connectionProgress(reply, id, "Vérification de ton compte…");
+            networkStep.set("configuration OpenAI");
+            android.util.Log.i("MonActualiteAI", "connection_step=discovery");
             JSONObject discovery = discovery();
             String jwksUrl = discovery.getString("jwks_uri"); requireAuthUrl(jwksUrl);
+            networkStep.set("vérification du compte");
+            android.util.Log.i("MonActualiteAI", "connection_step=identity_validation");
             JSONObject claims = SubscriptionOAuth.verifyIdentity(tokens.getString("id_token"), jsonRequest(jwksUrl, null, "", ""), issued, nonce, System.currentTimeMillis() / 1000);
             if (!previousSubject.isEmpty() && !SubscriptionOAuth.equal(previousSubject, claims.getString("sub"))) throw new Exception("Le compte connecté ne correspond pas au compte choisi.");
             synchronized (lock) {
@@ -210,7 +230,7 @@ final class SubscriptionAiBridge {
                 updateTokens(record, tokens, false); vault.put("activeId", record.getString("id")); epoch++; saveVault(); modelCache = new JSONArray();
             }
             return status();
-        } finally { if (server != null) try { server.close(); } catch (Exception ignored) {} listener = null; connecting.set(false); }
+        } finally { if (server != null) try { server.close(); } catch (Exception ignored) {} listener = null; connecting.set(false); connectionSession.remove(); }
     }
     private String readHeaderLine(BufferedReader reader) throws Exception {
         StringBuilder line = new StringBuilder(); int c;
@@ -317,15 +337,36 @@ final class SubscriptionAiBridge {
         return result.toString();
     }
     private HttpsURLConnection open(String url, String body, String contentType, String bearer) throws Exception {
-        HttpsURLConnection connection = (HttpsURLConnection)new URL(url).openConnection();
-        connection.setInstanceFollowRedirects(false); connection.setConnectTimeout(15000); connection.setReadTimeout(30000);
-        if (!bearer.isEmpty()) connection.setRequestProperty("Authorization", "Bearer " + bearer);
-        if (body != null) {
-            connection.setRequestMethod("POST"); connection.setRequestProperty("Content-Type", contentType); connection.setDoOutput(true);
-            byte[] bytes = body.getBytes(StandardCharsets.UTF_8); connection.setFixedLengthStreamingMode(bytes.length);
-            try (java.io.OutputStream out = connection.getOutputStream()) { out.write(bytes); }
+        final long requestEpoch;
+        synchronized (lock) { requestEpoch = connectionSession.get() == null ? epoch : connectionSession.get(); }
+        SubscriptionConnection.Call<Void> readiness = () -> {
+            foreground.await(() -> { synchronized (lock) { return !destroyed && requestEpoch == epoch; } }, 30000);
+            return null;
+        };
+        // Retry only socket/TLS establishment, never a request body or response.
+        // No custom resolver, hard-coded IP, proxy or weakened hostname/TLS checks.
+        HttpsURLConnection connection = SubscriptionConnection.resolveBeforeSend(() -> {
+            HttpsURLConnection candidate = (HttpsURLConnection)new URL(url).openConnection();
+            try {
+                candidate.setInstanceFollowRedirects(false); candidate.setConnectTimeout(15000); candidate.setReadTimeout(30000);
+                if (!bearer.isEmpty()) candidate.setRequestProperty("Authorization", "Bearer " + bearer);
+                if (body != null) {
+                    candidate.setRequestMethod("POST"); candidate.setRequestProperty("Content-Type", contentType); candidate.setDoOutput(true);
+                    candidate.setFixedLengthStreamingMode(body.getBytes(StandardCharsets.UTF_8).length);
+                }
+                candidate.connect();
+                return candidate;
+            } catch (Exception error) { candidate.disconnect(); throw error; }
+        }, readiness, Thread::sleep);
+        try {
+            readiness.run();
+            if (body != null) {
+                try (java.io.OutputStream out = connection.getOutputStream()) { out.write(body.getBytes(StandardCharsets.UTF_8)); }
+            }
+            return connection;
+        } catch (Exception error) {
+            connection.disconnect(); throw error;
         }
-        return connection;
     }
     private void checkHttp(HttpsURLConnection connection) throws Exception {
         int status = connection.getResponseCode();
@@ -369,6 +410,7 @@ final class SubscriptionAiBridge {
         FileOutputStream output = file.startWrite();
         try { output.write(envelope.toString().getBytes(StandardCharsets.UTF_8)); file.finishWrite(output); } catch (Exception error) { file.failWrite(output); throw error; }
     }
-    private void cancelConnection() { synchronized (lock) { epoch++; } ServerSocket current = listener; if (current != null) try { current.close(); } catch (Exception ignored) {} }
-    void destroy() { destroyed = true; cancelConnection(); if (inference != null) inference.disconnect(); executor.shutdownNow(); }
+    void setResumed(boolean resumed) { foreground.setResumed(resumed); }
+    private void cancelConnection() { synchronized (lock) { epoch++; } foreground.signal(); ServerSocket current = listener; if (current != null) try { current.close(); } catch (Exception ignored) {} }
+    void destroy() { destroyed = true; foreground.close(); cancelConnection(); if (inference != null) inference.disconnect(); executor.shutdownNow(); }
 }

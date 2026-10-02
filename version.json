@@ -1,6 +1,6 @@
 {
   "version": "98",
-  "codeRelease": "98.41",
+  "codeRelease": "98.42",
   "release": "2026-10-02",
-  "label": "v98.41 : Connexion ChatGPT corrigée et Brief IA épuré"
+  "label": "v98.42 : Retour Android et reprise DNS avant envoi"
 }
