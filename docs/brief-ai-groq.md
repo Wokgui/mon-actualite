@@ -1,5 +1,9 @@
 # Brief IA automatique — Groq (98.46)
 
+## Espacements 98.54
+
+Version : suppression de la hauteur minimale superflue sous les deux lignes centrées; l’écart visible publication → bouton passe de 31 à 15,5 px à taille d’interface 100. IA : la marge titre de domaine → aperçu article passe de 8 à 16 px; la synthèse générale → premier domaine utilise le même écart de 16 px. Une variable commune porte ces deux espacements. Les mesures navigateur sont ajoutées aux tests existants, sans changement de prompt, de génération, de cache ou de photo.
+
 ## Présentation et ouverture 98.53
 
 Le rendu initial de L’essentiel contient uniquement un message de chargement sous les onglets, sans cartes ni images dans le DOM. Une seule préparation de données par langue complète ce rendu en une fois; les anciens observateurs de visibilité et l’interception des clics de navigation sont retirés. Une réponse complète d’une ou deux journées est utilisable, sans attente infinie de trois journées. Le délai réseau est limité à douze secondes avec repli sur le catalogue disponible. L’historique dédié ne remplace plus le catalogue d’Accueil pendant la lecture.

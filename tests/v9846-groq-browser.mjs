@@ -42,7 +42,7 @@ try {
     return route.fulfill({json:{articles:isBrief?[...sources,discovered]:sources,fetchedAt:new Date().toISOString(),stats:{}}});
   });
   await page.route('**/api/article-photo-fast**',route=>{photoRequests.push(route.request().url());return route.fulfill({body:png,contentType:'image/png',headers:{'X-Thumbnail-Status':'feed'}});});
-  await page.route('**/version.json**',route=>route.fulfill({json:{version:'98',codeRelease:'98.53'}}));
+  await page.route('**/version.json**',route=>route.fulfill({json:{version:'98',codeRelease:'98.54'}}));
   await page.goto(process.env.AI_BASE_URL||'http://127.0.0.1:4173/?nativePreview=1',{waitUntil:'domcontentloaded'});
   await page.waitForFunction(()=>document.querySelectorAll('[data-stable-home-feed] img.image-ready-v98').length>=8);
   const homeBefore=await page.locator('[data-stable-home-feed] .article-card').evaluateAll(cards=>cards.map(card=>({id:card.dataset.article,src:card.querySelector('img').src})));
@@ -106,6 +106,8 @@ try {
   assert.equal(await page.locator('.app-version-badge').count(),0,'redundant v98 tile removed');
   const versionLayout=await page.locator('.app-version-row').evaluate(row=>{const parent=row.parentElement.getBoundingClientRect();return [...row.querySelectorAll('strong,div>span')].map(node=>{const r=node.getBoundingClientRect();return {align:getComputedStyle(node).textAlign,centerOffset:r.x+r.width/2-parent.x-parent.width/2,text:node.textContent};});});
   assert.equal(versionLayout.length,2);assert.ok(versionLayout.every(line=>line.align==='center'&&Math.abs(line.centerOffset)<1),JSON.stringify(versionLayout));
+  const versionPublicationGap=await page.evaluate(()=>document.querySelector('[data-check-update]').getBoundingClientRect().top-document.querySelector('.app-version-row div>span').getBoundingClientRect().bottom);
+  assert.ok(Math.abs(versionPublicationGap-15.5)<.1,'publication/update gap is half the previous 31px: '+versionPublicationGap);
   if(native) assert.equal(await page.locator('.ai-field-v9840:has([data-ai-key])>strong').textContent(),'Ta clé Groq');
   const actions=await page.locator('.settings-page-v9185').evaluate(root=>{
     const selectors=['[data-source-follow]','[data-source-block]','[data-add-source]','.opml-button-v9186','[data-add-watch-rule]','.ai-account-v9840>a.secondary-btn','[data-ai-save-key]','[data-ai-disconnect]','[data-ai-generate]','[data-ai-open-brief]','[data-check-update]','[data-reset-accent]','[data-reset-header-heights]'];
@@ -154,7 +156,7 @@ try {
   await page.locator('[data-setting-toggle="autoRefresh"]').click();
   await page.evaluate(()=>window.scrollTo(0,0));
   await page.screenshot({path:output+'/reglages-actions.png',fullPage:true});
-  settingsLayout={languageHeaders,actions,actionColors,switches,versionLayout,restoredHeaderHeights:heightsBefore};
+  settingsLayout={languageHeaders,actions,actionColors,switches,versionLayout,versionPublicationGap,restoredHeaderHeights:heightsBefore};
   if(!native){
     assert.equal(await page.locator('[data-ai-key]').count(),0);assert.match(await page.locator('[data-ai-account]').textContent(),/APK Android/);
     assert.equal(generations,0);assert.equal(discoveryRequests,0);
@@ -192,12 +194,14 @@ try {
       const rect=selector=>document.querySelector(selector).getBoundingClientRect();
       const header=rect('.ai-brief-page-v9848>.page-masthead-v9186'),tabs=rect('.brief-mode-tabs'),summary=rect('.ai-news-summary-v9840');
       return {headerGap:tabs.top-header.bottom,contentGap:summary.top-tabs.bottom,preferencesCount:document.querySelectorAll('.brief-preferences-note-v9849').length,footers:root.querySelectorAll('footer').length,
+        summaryToDomain:root.querySelector('.ai-card-title-v9849').getBoundingClientRect().top-summary.bottom,domainToArticles:[...root.querySelectorAll('.ai-card-title-v9849')].map(node=>node.nextElementSibling.getBoundingClientRect().top-node.getBoundingClientRect().bottom),
         headings:[...root.querySelectorAll('.ai-card-title-v9849')].map(node=>({align:getComputedStyle(node).textAlign,weight:getComputedStyle(node).fontWeight,font:parseFloat(getComputedStyle(node).fontSize),bodyFont:parseFloat(getComputedStyle(node.parentElement.querySelector('.ai-card-summary-v9840')).fontSize),beforePreview:node.getBoundingClientRect().bottom<=node.nextElementSibling.getBoundingClientRect().top})),
         dates:[...root.querySelectorAll('.ai-publication-v9848')].map(node=>({inHeader:!!node.closest('.article-card'),toRight:node.getBoundingClientRect().left>=node.previousElementSibling.getBoundingClientRect().right,text:node.textContent})),
         bodies:[...root.querySelectorAll('.ai-card-summary-v9840')].map(node=>node.textContent),
         borders:[...root.querySelectorAll('.ai-result-v9840')].slice(1).map(node=>({width:getComputedStyle(node).borderTopWidth,color:getComputedStyle(node).borderTopColor})),overflow:document.documentElement.scrollWidth>innerWidth};
     });
     assert.equal(layout.footers,0);assert.equal(layout.preferencesCount,0);assert.ok(Math.abs(layout.headerGap-layout.contentGap)<1,JSON.stringify(layout));assert.equal(layout.headerGap,14);
+    assert.ok(Math.abs(layout.summaryToDomain-16)<.1,JSON.stringify(layout));assert.ok(layout.domainToArticles.every(gap=>Math.abs(gap-16)<.1),JSON.stringify(layout));
     assert.ok(layout.headings.length===3&&layout.headings.every(value=>value.align==='center'&&Number(value.weight)>=700&&value.beforePreview&&value.font/value.bodyFont>=1.28));
     assert.ok(await page.locator('.ai-summary-paragraph-v9847').evaluateAll(nodes=>nodes.every(node=>{const clone=node.cloneNode(true);clone.querySelector('strong')?.remove();return /^[\p{Lu}]/u.test(clone.textContent.trim());})),'each category paragraph starts with a capital');
     assert.ok(await page.locator('.ai-card-summary-v9840 p').evaluateAll(nodes=>nodes.every(node=>/^[\p{Lu}]/u.test(node.textContent.trim()))),'card prose starts with capitals');
