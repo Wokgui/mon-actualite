@@ -22,6 +22,7 @@ jobs:
         run: |
           node tests/v89-static-check.mjs
           node tests/v9846-groq.mjs
+          node tests/v9847-brief-presentation.mjs
           node tests/v98-locale-backend.mjs
           node tests/v9831-photo-selection.mjs
           node tests/v9836-publisher-photo-connectors.mjs

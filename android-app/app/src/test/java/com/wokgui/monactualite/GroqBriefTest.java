@@ -20,6 +20,7 @@ public class GroqBriefTest {
         assertTrue(body.getJSONObject("response_format").getJSONObject("json_schema").getBoolean("strict"));
         assertFalse(body.toString().contains("SECRET")); assertFalse(body.toString().contains("evil.test"));
         assertEquals(2200,body.getInt("max_completion_tokens"));
+        assertTrue(body.getJSONArray("messages").getJSONObject(0).getString("content").contains("un paragraphe court par sujet"));
     }
     @Test public void validatesKeyWithoutEcho() throws Exception {
         assertEquals("gsk_abcdefghijklmnopqrstuv", GroqBrief.key(" gsk_abcdefghijklmnopqrstuv "));

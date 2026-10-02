@@ -89,10 +89,10 @@ jobs:
           set -euo pipefail
           TAG="v98-98.10"
           APK="mon-actualite-v98-98.10.apk"
-          NOTES="Mon Actualité 98.46 (Android 98.0.46, code 124). Brief IA automatique via Groq : prompt personnel, recherche ciblée sur sept jours et synthèse dans Brief IA avec photos et liens des sources réelles. Une clé Groq à enregistrer une seule fois dans l’APK, chiffrée via Android Keystore et exclue des sauvegardes. Actualisation à l’ouverture toutes les 12 heures maximum pour le même prompt et la même clé; demande unique et dernière synthèse conservée en cas d’erreur. Aucun appel à l’ancien partage d’abonnement Work/Codex ni transfert manuel dans ChatGPT. La connexion nécessite un compte Groq et reste soumise à ses limites. Le lien APK historique est conservé."
+          NOTES="Mon Actualité 98.47 (Android 98.0.47, code 125). Présentation IA harmonisée : tailles identiques dans les réglages, titre centré, synthèse justifiée par sujets, dates et liens centrés, séparateurs noirs et articles récents en premier. Brief IA automatique via Groq : prompt personnel, recherche ciblée sur sept jours et synthèse dans Brief IA avec photos et liens des sources réelles. Une clé Groq à enregistrer une seule fois dans l’APK, chiffrée via Android Keystore et exclue des sauvegardes. Actualisation à l’ouverture toutes les 12 heures maximum pour le même prompt et la même clé; demande unique et dernière synthèse conservée en cas d’erreur. Aucun appel à l’ancien partage d’abonnement Work/Codex ni transfert manuel dans ChatGPT. La connexion nécessite un compte Groq et reste soumise à ses limites. Le lien APK historique est conservé."
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release upload "$TAG" "$APK" --clobber
-            gh release edit "$TAG" --title "Mon Actualité v98 / 98.46" --notes "$NOTES"
+            gh release edit "$TAG" --title "Mon Actualité v98 / 98.47" --notes "$NOTES"
           else
-            gh release create "$TAG" "$APK" --title "Mon Actualité v98 / 98.46" --notes "$NOTES"
+            gh release create "$TAG" "$APK" --title "Mon Actualité v98 / 98.47" --notes "$NOTES"
           fi

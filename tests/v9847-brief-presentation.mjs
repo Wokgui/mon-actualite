@@ -1,0 +1,13 @@
+import assert from 'node:assert/strict';
+import {newestBriefCards,briefSummaryParagraphs,briefDateLabel} from '../services/brief-presentation.js';
+const cards=[{article:{id:'old',publishedAt:'2026-09-27T10:00:00Z'}},{article:{id:'invalid',publishedAt:'bad'}},{article:{id:'new',publishedAt:'2026-10-02T10:00:00Z'}},{article:{id:'same',publishedAt:'2026-10-02T10:00:00Z'}}];
+const before=JSON.stringify(cards);
+assert.deepEqual(newestBriefCards(cards).map(card=>card.article.id),['new','same','old','invalid']);
+assert.equal(JSON.stringify(cards),before);assert.equal(newestBriefCards(cards)[0],cards[2]);
+assert.deepEqual(briefSummaryParagraphs('VR : Un nouveau casque.\r\n\r\nAutomobile : Une nouveauté.\nScience : Une découverte.'),[{topic:'VR',text:'Un nouveau casque.'},{topic:'Automobile',text:'Une nouveauté.'},{topic:'Science',text:'Une découverte.'}]);
+assert.deepEqual(briefSummaryParagraphs('Ancien résumé sans saut de ligne.'),[{topic:'',text:'Ancien résumé sans saut de ligne.'}]);
+assert.equal(briefSummaryParagraphs('<img src=x onerror=alert(1)>')[0].topic,'');
+assert.deepEqual(briefSummaryParagraphs('**VR** : Texte.'),[{topic:'VR',text:'Texte.'}]);
+assert.equal(briefDateLabel('bad'),'');assert.equal(briefDateLabel(undefined),'');
+assert.match(briefDateLabel('2026-10-02T10:00:00Z'),/02\/10\/2026/);
+console.log('PASS Brief presentation: stable chronological sorting, legacy cache, topic paragraphs and safe date labels');

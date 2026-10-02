@@ -1,5 +1,13 @@
 # Brief IA automatique — Groq (98.46)
 
+## Présentation 98.47
+
+Réglages → IA utilise partout la taille de « Service d’intelligence artificielle », tout en respectant le réglage de taille de l’interface. Les intitulés de service et de clé sont centrés et le prompt est justifié.
+
+Brief → IA affiche une synthèse justifiée avec un titre centré et des paragraphes distincts par sujet. Les notifications de réussite et le sous-titre de prompt obsolète sont retirés de cette vue; les erreurs et l’avertissement de recherche partielle restent visibles. La date de génération et le lien vers les articles sont centrés; chaque article possède sa date de publication et son lien centrés en dessous. Un trait noir de 2 px sépare les articles, uniquement dans IA.
+
+Les cartes sont triées par date de publication décroissante lors de la normalisation et du rendu, y compris pour les anciens caches, sans mutation des sources ou des photos. Les résultats invalides ou sans date valide restent à la fin. Le prompt système demande désormais un paragraphe court par sujet séparé par deux sauts de ligne. Les anciens résultats sont lus sans réécriture de leur texte; leurs sauts de ligne existants sont respectés. Aucun appel Groq supplémentaire n’est lancé pour remettre en forme un cache.
+
 ## Activation unique dans l’APK
 
 Créer un compte sur https://console.groq.com/keys, rester sur Free sans activer de facturation, créer une clé, puis l’enregistrer dans Réglages → IA. Ne jamais transmettre la clé dans une conversation. Le compte et les limites Groq sont indépendants de l’abonnement ChatGPT. L’app ne crée aucun compte et ne souscrit aucune offre payante.

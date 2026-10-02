@@ -30,7 +30,7 @@ try {
       if(request.action==='disconnect'){configured=false;sessionStorage.setItem('__groqConfigured','false');}
       if(request.action==='generate') void window.__recordGeneration();
       const error=request.action==='generate'?window.__GROQ_ERROR:'';
-      const result={summary:'Synthèse de la semaine [Source](A1). <img src=x onerror=alert(1)>',cards:request.articles?.slice(0,3).map(article=>({sourceId:article.sourceId,title:'Analyse '+article.title,summary:'Synthèse factuelle'}))||[]};
+      const result={summary:'VR : Un nouveau casque apporte des améliorations pratiques pour la réalité virtuelle [Source](A1).\n\nAutomobile : Les innovations automobiles ouvrent de nouvelles perspectives.\n\nScience : Une découverte théorique reste à confirmer. <img src=x onerror=alert(1)>',cards:request.articles?.slice(0,3).map(article=>({sourceId:article.sourceId,title:'Analyse '+article.title,summary:'Synthèse factuelle'}))||[]};
       const data=request.action==='generate'?{result,model:'openai/gpt-oss-120b',credentialVersion:'key-1'}:{configured,credentialVersion:'key-1'};
       setTimeout(()=>window.MonActualiteGroq.onmessage?.({data:JSON.stringify({id:request.id,ok:!error,error,data})}),request.action==='generate'?window.__GROQ_DELAY:10);
     }};
@@ -42,7 +42,7 @@ try {
     return route.fulfill({json:{articles:isBrief?[...sources,discovered]:sources,fetchedAt:new Date().toISOString(),stats:{}}});
   });
   await page.route('**/api/article-photo-fast**',route=>{photoRequests.push(route.request().url());return route.fulfill({body:png,contentType:'image/png',headers:{'X-Thumbnail-Status':'feed'}});});
-  await page.route('**/version.json**',route=>route.fulfill({json:{version:'98',codeRelease:'98.46'}}));
+  await page.route('**/version.json**',route=>route.fulfill({json:{version:'98',codeRelease:'98.47'}}));
   await page.goto(process.env.AI_BASE_URL||'http://127.0.0.1:4173/?nativePreview=1',{waitUntil:'domcontentloaded'});
   await page.waitForFunction(()=>document.querySelectorAll('[data-stable-home-feed] img.image-ready-v98').length>=8);
   const homeBefore=await page.locator('[data-stable-home-feed] .article-card').evaluateAll(cards=>cards.map(card=>({id:card.dataset.article,src:card.querySelector('img').src})));
@@ -55,6 +55,22 @@ try {
   assert.equal(await page.locator('[data-ai-response],[data-ai-copy-open],[data-ai-provider],[data-ai-import]').count(),0);
   assert.equal(await page.locator('[data-ai-prompt]').inputValue(),'Innovations pratiques, VR et voitures');
   assert.equal(await page.locator('[data-ai-auto]').isChecked(),true);
+  const typography=await page.locator('.ai-settings-v9847').evaluate(root=>{
+    const reference=getComputedStyle(root.querySelector('.settings-field-title')).fontSize;
+    return {reference,sizes:[...root.querySelectorAll('p,strong,label,textarea,input,button,a')].map(node=>getComputedStyle(node).fontSize),service:getComputedStyle(root.querySelector('.settings-field-title')).textAlign,prompt:getComputedStyle(root.querySelector('textarea')).textAlign,labels:[...root.querySelectorAll('.ai-field-v9840>strong')].map(node=>getComputedStyle(node).textAlign)};
+  });
+  assert.ok(typography.sizes.every(size=>size===typography.reference),JSON.stringify(typography));
+  assert.equal(typography.service,'center');assert.equal(typography.prompt,'justify');assert.ok(typography.labels.every(value=>value==='center'));
+  const scales=await page.locator('.ai-settings-v9847').evaluate(root=>{
+    const html=document.documentElement,original=html.style.getPropertyValue('--interface-text-scale'),results=[];
+    for(const scale of [.85,1,1.5]){
+      html.style.setProperty('--interface-text-scale',String(scale));
+      const reference=getComputedStyle(root.querySelector('.settings-field-title')).fontSize;
+      results.push({scale,reference,equal:[...root.querySelectorAll('p,strong,label,textarea,input,button,a')].every(node=>getComputedStyle(node).fontSize===reference)});
+    }
+    html.style.setProperty('--interface-text-scale',original);return results;
+  });
+  assert.ok(scales.every(result=>result.equal));assert.notEqual(scales[0].reference,scales[2].reference,'interface size preference retained');
   if(!native){
     assert.equal(await page.locator('[data-ai-key]').count(),0);assert.match(await page.locator('[data-ai-account]').textContent(),/APK Android/);
     assert.equal(generations,0);assert.equal(discoveryRequests,0);
@@ -67,6 +83,18 @@ try {
     assert.equal(await page.locator('.ai-news-summary-v9840 img').count(),0);
     await page.waitForFunction(()=>document.querySelectorAll('.ai-result-v9840 img.image-ready-v98').length===3);
     const cache=await page.evaluate(()=>JSON.parse(localStorage.getItem('news-brief-ai-results-v1')));
+    const expected=cache.cards.slice().sort((a,b)=>Date.parse(b.article.publishedAt)-Date.parse(a.article.publishedAt)).map(card=>card.article.id);
+    assert.deepEqual(await page.locator('.ai-result-v9840 article').evaluateAll(nodes=>nodes.map(node=>node.dataset.article)),expected);
+    assert.equal(await page.locator('.ai-summary-paragraph-v9847').count(),3);
+    assert.equal(await page.locator('.ai-news-summary-v9840 h3').evaluate(node=>getComputedStyle(node).textAlign),'center');
+    assert.equal(await page.locator('.ai-summary-paragraph-v9847').first().evaluate(node=>getComputedStyle(node).textAlign),'justify');
+    assert.ok(!(await page.locator('.ai-brief-v9840').textContent()).includes('Synthèse actualisée'));
+    assert.ok(!(await page.locator('.ai-brief-v9840').textContent()).includes('Dernière synthèse conservée'));
+    const layout=await page.locator('.ai-brief-v9840').evaluate(root=>({footers:[...root.querySelectorAll('footer')].map(node=>getComputedStyle(node).textAlign),borders:[...root.querySelectorAll('.ai-result-v9840')].slice(1).map(node=>({width:getComputedStyle(node).borderTopWidth,color:getComputedStyle(node).borderTopColor})),overflow:document.documentElement.scrollWidth>innerWidth}));
+    assert.ok(layout.footers.every(value=>value==='center'));assert.ok(layout.borders.every(border=>border.width==='2px'&&border.color==='rgb(17, 17, 17)'));assert.equal(layout.overflow,false);
+    await page.setViewportSize({width:320,height:915});
+    assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false,'no horizontal overflow on narrow phones');
+    await page.setViewportSize({width:412,height:915});
     assert.ok(cache.sources.some(article=>article.url==='https://example.test/discovered'),'discovery includes older relevant news');
     await page.screenshot({path:output+'/brief-ia-automatique.png',fullPage:true});
     await page.locator('.bottom-nav [data-view="home"]').click();
@@ -100,6 +128,6 @@ try {
   }
   assert.deepEqual(await page.evaluate(()=>window.__OLD_AI),[]);assert.deepEqual(await page.evaluate(()=>window.__CHAT),[]);
   assert.deepEqual(errors,[]);
-  await writeFile(output+'/report.json',JSON.stringify({nativeFixture:native,generations,discoveryRequests,pageErrors:errors,photoRequests:photoRequests.length,note:'Browser/native bridge fixture, not a real Groq account or physical Android device'},null,2));
+  await writeFile(output+'/report.json',JSON.stringify({nativeFixture:native,typography,scales,generations,discoveryRequests,pageErrors:errors,photoRequests:photoRequests.length,note:'Browser/native bridge fixture, not a real Groq account or physical Android device'},null,2));
   console.log('PASS Groq mobile UI',JSON.stringify({native,generations,discoveryRequests,pageErrors:errors}));
 }finally{await browser.close();}

@@ -1,6 +1,7 @@
-import { importOpmlPreview, fetchLiveNews, fetchBriefCandidates } from './services/source-connectors.js?v=98.46';
-import { photoSnapshot, photoArticleKey } from './services/article-photos.js?v=98.46';
-import { briefAI, setAISettings, onAIChange, initializeBrief, maybeGenerateBrief, generateBrief, saveGroqKey, disconnectGroq } from './services/brief-groq.js?v=98.46';
+import { importOpmlPreview, fetchLiveNews, fetchBriefCandidates } from './services/source-connectors.js?v=98.47';
+import { photoSnapshot, photoArticleKey } from './services/article-photos.js?v=98.47';
+import { briefAI, setAISettings, onAIChange, initializeBrief, maybeGenerateBrief, generateBrief, saveGroqKey, disconnectGroq } from './services/brief-groq.js?v=98.47';
+import { newestBriefCards, briefSummaryParagraphs, briefDateLabel } from './services/brief-presentation.js?v=98.47';
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const app = $('#app');
@@ -934,30 +935,31 @@ function aiAccountMarkup() {
 }
 
 function aiSettingsMarkup() {
-  return `${aiAccountMarkup()}<label class="ai-field-v9840 ai-prompt-field-v9841"><strong>Ton prompt pour la synthèse</strong><textarea class="text-input ai-prompt-v9840" data-ai-prompt rows="7" maxlength="6000" placeholder="Tes sujets et la présentation souhaitée…">${escapeHtml(briefAI.prompt)}</textarea></label><p class="muted-note">Enregistré automatiquement. Recherche ciblée sur les sept derniers jours, puis sélection diversifiée de 24 articles maximum. L’IA reçoit des titres et extraits, pas nécessairement les articles complets ; ce n’est pas une recherche exhaustive du Web.</p><label class="ai-auto-v9844"><input type="checkbox" data-ai-auto${briefAI.autoAtOpen ? ' checked' : ''}> Actualiser automatiquement à l’ouverture</label><p class="muted-note">Au maximum toutes les 12 heures pour le même prompt et la même clé. La dernière synthèse reste visible pendant l’actualisation. Pas de relance en boucle après une erreur.</p>${aiStatusMarkup()}<div class="ai-settings-generation-v9841"><button type="button" class="secondary-btn" data-ai-generate${briefAI.busy || !briefAI.configured ? ' disabled' : ''}>Actualiser ma synthèse</button><button type="button" class="secondary-btn" data-ai-open-brief>Voir Brief → IA</button></div>`;
+  return `<div class="ai-settings-v9847">${aiAccountMarkup()}<label class="ai-field-v9840 ai-prompt-field-v9841"><strong>Ton prompt pour la synthèse</strong><textarea class="text-input ai-prompt-v9840" data-ai-prompt rows="7" maxlength="6000" placeholder="Tes sujets et la présentation souhaitée…">${escapeHtml(briefAI.prompt)}</textarea></label><p class="muted-note">Enregistré automatiquement. Recherche ciblée sur les sept derniers jours, puis sélection diversifiée de 24 articles maximum. L’IA reçoit des titres et extraits, pas nécessairement les articles complets ; ce n’est pas une recherche exhaustive du Web.</p><label class="ai-auto-v9844"><input type="checkbox" data-ai-auto${briefAI.autoAtOpen ? ' checked' : ''}> Actualiser automatiquement à l’ouverture</label><p class="muted-note">Au maximum toutes les 12 heures pour le même prompt et la même clé. La dernière synthèse reste visible pendant l’actualisation. Pas de relance en boucle après une erreur.</p>${aiStatusMarkup()}<div class="ai-settings-generation-v9841"><button type="button" class="secondary-btn" data-ai-generate${briefAI.busy || !briefAI.configured ? ' disabled' : ''}>Actualiser ma synthèse</button><button type="button" class="secondary-btn" data-ai-open-brief>Voir Brief → IA</button></div></div>`;
 }
 
-function aiStatusMarkup() {
-  return `<div data-ai-state>${briefAI.busy ? `<p class="muted-note" role="status">${escapeHtml(briefAI.busy)}</p>` : ''}${briefAI.error ? `<p class="ai-error-v9840" role="alert">${escapeHtml(briefAI.error)}</p>` : ''}${briefAI.notice ? `<p class="muted-note" role="status">${escapeHtml(briefAI.notice)}</p>` : ''}</div>`;
+function aiStatusMarkup({ notices = true } = {}) {
+  return `<div data-ai-state>${briefAI.busy ? `<p class="muted-note" role="status">${escapeHtml(briefAI.busy)}</p>` : ''}${briefAI.error ? `<p class="ai-error-v9840" role="alert">${escapeHtml(briefAI.error)}</p>` : ''}${notices && briefAI.notice ? `<p class="muted-note" role="status">${escapeHtml(briefAI.notice)}</p>` : ''}</div>`;
 }
 
-function aiSummaryLinks(result) {
+function aiSummaryLinks(result, text = result.summary) {
   const allowed = new Set([...result.cards.map(card => card.article.url), ...(result.sources || []).map(article => article.url)]);
   const pattern = /\[([^\]\n]{1,240})\]\((https?:\/\/[^\s)]+)\)/g;
   let output = '', cursor = 0;
-  for (const match of result.summary.matchAll(pattern)) {
-    output += escapeHtml(result.summary.slice(cursor, match.index));
+  for (const match of text.matchAll(pattern)) {
+    output += escapeHtml(text.slice(cursor, match.index));
     output += allowed.has(match[2]) ? `<a href="${escapeHtml(match[2])}" target="_blank" rel="noopener noreferrer">${escapeHtml(match[1])}</a>` : escapeHtml(match[0]);
     cursor = match.index + match[0].length;
   }
-  return output + escapeHtml(result.summary.slice(cursor));
+  return output + escapeHtml(text.slice(cursor));
 }
 function renderAIBrief() {
   const result = briefAI.result;
+  const summary = result ? briefSummaryParagraphs(result.summary).map(paragraph => `<p class="ai-summary-paragraph-v9847">${paragraph.topic ? `<strong class="ai-summary-topic-v9847">${escapeHtml(paragraph.topic)}</strong>` : ''}${aiSummaryLinks(result, paragraph.text)}</p>`).join('') : '';
   return `<section class="ai-brief-v9840">
-    ${aiStatusMarkup()}${result ? `<section class="ai-news-summary-v9840"><h3>Synthèse de tes sujets</h3>${result.prompt !== briefAI.prompt.trim() ? '<p class="muted-note">Dernière synthèse conservée · ton prompt a changé. Actualise pour appliquer le nouveau prompt.</p>' : ''}${result.partialSources ? '<p class="muted-note">Recherche ciblée indisponible lors de cette synthèse : articles déjà présents dans l’appli uniquement.</p>' : ''}<p>${aiSummaryLinks(result)}</p><small>${escapeHtml(new Date(result.generatedAt).toLocaleString('fr-FR'))} · ${escapeHtml(result.model || 'Ancienne synthèse')}</small></section><div class="feed stable-owned-list ai-results-v9840">${result.cards.map((card, index) => {
+    ${aiStatusMarkup({ notices: false })}${result ? `<section class="ai-news-summary-v9840"><h3>Synthèse de tes sujets</h3>${result.partialSources ? '<p class="muted-note">Recherche ciblée indisponible lors de cette synthèse : articles déjà présents dans l’appli uniquement.</p>' : ''}<div class="ai-summary-text-v9847">${summary}</div><footer class="ai-summary-footer-v9847"><time datetime="${escapeHtml(result.generatedAt || '')}">${escapeHtml(briefDateLabel(result.generatedAt))}</time>${result.cards.length ? '<a href="#ai-articles-v9847">Voir les articles sources</a>' : ''}</footer></section><div id="ai-articles-v9847" class="feed stable-owned-list ai-results-v9840">${newestBriefCards(result.cards).map((card, index) => {
       rememberRenderedArticle(card.article);
-      return `<section class="ai-result-v9840"><article class="article-card runtime-row" data-article="${escapeHtml(card.article.id)}" tabindex="0" aria-label="Ouvrir l’article source : ${escapeHtml(card.title)}">${articleVisual(card.article, index)}<div class="article-body"><h2>${escapeHtml(card.title)}</h2><div class="meta"><span class="article-category-badge">IA</span><span class="ai-source-name-v9840">${escapeHtml(card.article.source)}</span></div></div></article><p class="ai-card-summary-v9840">${escapeHtml(card.summary)}</p><a class="ai-source-v9840" href="${escapeHtml(card.article.url)}" target="_blank" rel="noopener noreferrer">Lire la source originale</a></section>`;
+      return `<section class="ai-result-v9840"><article class="article-card runtime-row" data-article="${escapeHtml(card.article.id)}" tabindex="0" aria-label="Ouvrir l’article source : ${escapeHtml(card.title)}">${articleVisual(card.article, index)}<div class="article-body"><h2>${escapeHtml(card.title)}</h2><div class="meta"><span class="article-category-badge">IA</span><span class="ai-source-name-v9840">${escapeHtml(card.article.source)}</span></div></div></article><p class="ai-card-summary-v9840">${escapeHtml(card.summary)}</p><footer class="ai-article-footer-v9847">${briefDateLabel(card.article.publishedAt) ? `<time datetime="${escapeHtml(card.article.publishedAt)}">${escapeHtml(briefDateLabel(card.article.publishedAt))}</time>` : ''}<a class="ai-source-v9840" href="${escapeHtml(card.article.url)}" target="_blank" rel="noopener noreferrer">Lire la source originale</a></footer></section>`;
     }).join('')}</div>` : '<p class="ai-empty-v9840">Ta synthèse et les articles IA apparaîtront ici automatiquement. Enregistre une fois ta clé gratuite Groq dans Réglages → IA.</p>'}</section>`;
 }
 
@@ -1916,7 +1918,7 @@ if ('serviceWorker' in navigator && location.protocol.startsWith('http') && !nav
     serviceWorkerRefreshing = true;
     window.location.reload();
   });
-  navigator.serviceWorker.register('./sw-v98.js?v=98.46', { updateViaCache: 'none' }).then(registration => {
+  navigator.serviceWorker.register('./sw-v98.js?v=98.47', { updateViaCache: 'none' }).then(registration => {
     if (registration.waiting) registration.waiting.postMessage('SKIP_WAITING');
     registration.addEventListener('updatefound', () => {
       const installing = registration.installing;

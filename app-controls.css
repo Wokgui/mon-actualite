@@ -116,7 +116,7 @@ html[data-show-badges="0"][data-show-age="0"] #app .article-card h2{margin-botto
 .brief-mode-tab:first-child{border-radius:18px 0 0 18px!important}
 .brief-mode-tab:last-child{border-radius:0 18px 18px 0!important}
 
-/* Subscription-only Brief. Plain text output, source-anchored immutable photos. */
+/* Automatic Brief. Plain text output, source-anchored immutable photos. */
 .ai-brief-v9840{padding:8px 0 24px}.ai-section-title-v9840{font-size:calc(19px * var(--interface-text-scale));margin:8px 0 18px}
 .ai-account-v9840,.ai-actions-v9840{display:grid;gap:10px}.ai-field-v9840{display:grid;gap:8px;margin:12px 0;font-size:calc(13px * var(--interface-text-scale))}.ai-field-v9840 .text-input{width:100%;min-width:0;box-sizing:border-box}.ai-prompt-v9840{resize:vertical;line-height:1.5}
 .ai-account-v9840 a.secondary-btn{box-sizing:border-box;text-align:center;text-decoration:none}.ai-plan-status-v9840{font-size:calc(13px * var(--interface-text-scale));color:#18533a;background:#eef8f2;padding:12px;border-radius:12px}.ai-error-v9840{white-space:pre-line;background:#fff0ee;color:#8b241d;padding:12px;border-radius:12px;font-size:calc(13px * var(--interface-text-scale))}
@@ -133,3 +133,23 @@ html[data-show-badges="0"][data-show-age="0"] #app .article-card h2{margin-botto
 #app .bottom-nav.stable-bottom-nav-v9184 button.nav-item,#app .bottom-nav.stable-bottom-nav-v9184 button.nav-item.active,#app .bottom-nav.stable-bottom-nav-v9184 button.nav-item:not(.active),#app .bottom-nav.stable-bottom-nav-v9184 button.nav-item:active,#app .bottom-nav.stable-bottom-nav-v9184 button.nav-item:focus{height:calc(62px + env(safe-area-inset-bottom))!important;min-height:calc(62px + env(safe-area-inset-bottom))!important;max-height:calc(62px + env(safe-area-inset-bottom))!important;block-size:calc(62px + env(safe-area-inset-bottom))!important;min-block-size:calc(62px + env(safe-area-inset-bottom))!important;max-block-size:calc(62px + env(safe-area-inset-bottom))!important;padding:2px 4px calc(2px + env(safe-area-inset-bottom))!important}
 .ai-chat-notice-v9845{background:#eef8f2;color:#18533a;padding:12px;border-radius:12px;font-size:calc(13px * var(--interface-text-scale));line-height:1.5}
 .ai-chat-request-v9845{font-size:calc(12px * var(--interface-text-scale));max-height:240px}
+
+/* IA: one Settings type scale and a quiet, readable editorial layout. */
+#app .ai-settings-v9847,#app .ai-settings-v9847 :where(div,p,strong,label,textarea,input,button,a,small,span){font-size:calc(12px * var(--interface-text-scale))!important}
+#app .ai-settings-v9847{line-height:1.6}
+#app .ai-settings-v9847 .muted-note{color:#655f70!important}
+#app .ai-settings-v9847 .settings-field-title,#app .ai-settings-v9847 .ai-field-v9840>strong{display:block;text-align:center}
+#app .ai-settings-v9847 .ai-prompt-v9840{text-align:justify;text-align-last:left;font-family:inherit;line-height:1.65}
+#app .ai-news-summary-v9840{padding:22px 20px;border:1px solid color-mix(in srgb,var(--app-accent) 12%,#ececf2);border-radius:20px;box-shadow:0 5px 20px rgba(26,24,44,.035)}
+#app .ai-news-summary-v9840 h3{text-align:center;margin-bottom:20px;line-height:1.35}
+#app .ai-summary-text-v9847 p,#app .ai-card-summary-v9840{text-align:justify;text-align-last:left;hyphens:auto;overflow-wrap:anywhere;line-height:1.75}
+#app .ai-summary-text-v9847 p{white-space:normal;margin:0 0 16px}
+#app .ai-summary-text-v9847 p:last-child{margin-bottom:0}
+#app .ai-summary-text-v9847 strong{color:var(--ink);font-weight:750}
+#app .ai-summary-text-v9847 .ai-summary-topic-v9847{display:block;text-align:left;margin-bottom:4px;line-height:1.45}
+#app .ai-summary-footer-v9847,#app .ai-article-footer-v9847{display:grid;justify-items:center;text-align:center;gap:5px;margin-top:18px;font-size:calc(12px * var(--interface-text-scale));line-height:1.5;color:#655f70}
+#app .ai-summary-footer-v9847 a,#app .ai-article-footer-v9847 a{display:block;text-align:center;color:#443b91;text-underline-offset:3px;text-decoration-thickness:1px;max-width:100%;overflow-wrap:anywhere;padding:5px 8px}
+#app .ai-results-v9840{gap:0!important;scroll-margin-top:20px}
+#app .ai-result-v9840{padding:24px 0}
+#app .ai-result-v9840+.ai-result-v9840{border-top:2px solid #111;border-radius:0}
+#app .ai-card-summary-v9840{margin:16px 0 0}
