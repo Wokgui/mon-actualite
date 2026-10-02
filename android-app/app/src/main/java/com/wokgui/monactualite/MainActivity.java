@@ -24,13 +24,12 @@ import android.webkit.WebResourceResponse;
 import androidx.webkit.WebViewAssetLoader;
 
 public class MainActivity extends Activity {
-    private static final String APP_URL = "https://mon-actualite.vercel.app/assets/index.html?native=98.44";
+    private static final String APP_URL = "https://mon-actualite.vercel.app/assets/index.html?native=98.45";
     private static final String APP_HOST = "mon-actualite.vercel.app";
 
     private FrameLayout root;
     private WebView webView;
     private WebViewAssetLoader assetLoader;
-    private SubscriptionAiBridge subscriptionAI;
     private int lastTopInset = -1;
     private int lastBottomInset = -1;
 
@@ -106,7 +105,7 @@ public class MainActivity extends Activity {
         settings.setMediaPlaybackRequiresUserGesture(false);
         settings.setSupportMultipleWindows(true);
         settings.setJavaScriptCanOpenWindowsAutomatically(true);
-        settings.setUserAgentString(settings.getUserAgentString() + " MonActualiteAndroid/98.44");
+        settings.setUserAgentString(settings.getUserAgentString() + " MonActualiteAndroid/98.45");
 
         assetLoader = new WebViewAssetLoader.Builder()
             .setDomain(APP_HOST)
@@ -123,7 +122,7 @@ public class MainActivity extends Activity {
             @Override
             public boolean shouldOverrideUrlLoading(WebView view, WebResourceRequest request) {
                 Uri uri = request.getUrl();
-                if (SubscriptionAiBridge.isAppPage(uri)) return false;
+                if (ChatHandoffBridge.isAppPage(uri)) return false;
                 openExternal(uri);
                 return true;
             }
@@ -132,7 +131,7 @@ public class MainActivity extends Activity {
             @SuppressWarnings("deprecation")
             public boolean shouldOverrideUrlLoading(WebView view, String url) {
                 Uri uri = Uri.parse(url);
-                if (SubscriptionAiBridge.isAppPage(uri)) return false;
+                if (ChatHandoffBridge.isAppPage(uri)) return false;
                 openExternal(uri);
                 return true;
             }
@@ -178,7 +177,7 @@ public class MainActivity extends Activity {
             }
         });
 
-        subscriptionAI = new SubscriptionAiBridge(this, webView);
+        ChatHandoffBridge.install(this, webView);
         if (savedInstanceState == null) webView.loadUrl(APP_URL);
         else webView.restoreState(savedInstanceState);
     }
@@ -200,18 +199,6 @@ public class MainActivity extends Activity {
     }
 
     @Override
-    protected void onResume() {
-        super.onResume();
-        if (subscriptionAI != null) subscriptionAI.setResumed(true);
-    }
-
-    @Override
-    protected void onPause() {
-        if (subscriptionAI != null) subscriptionAI.setResumed(false);
-        super.onPause();
-    }
-
-    @Override
     protected void onSaveInstanceState(Bundle outState) {
         webView.saveState(outState);
         super.onSaveInstanceState(outState);
@@ -226,7 +213,6 @@ public class MainActivity extends Activity {
 
     @Override
     protected void onDestroy() {
-        if (subscriptionAI != null) subscriptionAI.destroy();
         if (webView != null) {
             webView.stopLoading();
             webView.destroy();

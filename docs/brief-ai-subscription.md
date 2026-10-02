@@ -1,5 +1,7 @@
 # Brief IA — contrat de connexion par abonnement (98.41)
 
+> Historique : ce parcours est désactivé depuis 98.45. Voir [le parcours chat normal](brief-ai-chat-normal.md). Le pont d’abonnement n’est plus enregistré par MainActivity et le frontend n’appelle plus ce module.
+
 ## Correction 98.41
 
 La réponse visible sur le téléphone refusait ext_agent_host_id. La version 98.40 envoyait un UUID nu; le format UUID accepté par OpenAI est une URI urn:uuid:<UUIDv4>. La mise à jour migre atomiquement la représentation de l’identifiant enregistré, sans générer un autre UUID ni effacer les comptes ou les réglages. Les nouvelles installations utilisent directement le format URI. Trois tests JVM couvrent la migration, son idempotence et le rejet des formats invalides.
