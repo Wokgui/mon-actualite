@@ -1,7 +1,7 @@
-import { importOpmlPreview, fetchLiveNews, fetchBriefCandidates } from './services/source-connectors.js?v=98.48';
-import { photoSnapshot, photoArticleKey } from './services/article-photos.js?v=98.48';
-import { briefAI, setAISettings, onAIChange, initializeBrief, maybeGenerateBrief, generateBrief, saveGroqKey, disconnectGroq } from './services/brief-groq.js?v=98.48';
-import { newestBriefCards, briefSummaryParagraphs, briefArticleBlocks, briefDateLabel } from './services/brief-presentation.js?v=98.48';
+import { importOpmlPreview, fetchLiveNews, fetchBriefCandidates } from './services/source-connectors.js?v=98.49';
+import { photoSnapshot, photoArticleKey } from './services/article-photos.js?v=98.49';
+import { briefAI, setAISettings, onAIChange, initializeBrief, maybeGenerateBrief, generateBrief, saveGroqKey, disconnectGroq } from './services/brief-groq.js?v=98.49';
+import { newestBriefCards, briefSummaryParagraphs, briefArticleBlocks, briefDateLabel } from './services/brief-presentation.js?v=98.49';
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const app = $('#app');
@@ -708,7 +708,7 @@ function renderWatchesFinal() {
     const filtered = `<div class="feed stable-owned-list watch-filtered-feed-v9138">${watched.slice(0, 30).map((article, index) => compactArticleRow(article, dayIndex * 40 + index)).join('')}</div>`;
     return `<section class="watch-day-v9138"><h3>${escapeHtml(dayLabel(watched[0]?.publishedAt))}</h3>${filtered}</section>`;
   }).filter(Boolean).join('');
-  return `<section class="watches-by-day-v9138 watch-layout-v9138"><div class="watches-head-v9138"><strong>${escapeHtml(ui('watch'))}</strong><button type="button" class="watch-edit-button-v9138" data-view="settings">${escapeHtml(ui('editWatch'))}</button></div>${groups}</section>`;
+  return `<section class="watches-by-day-v9138 watch-layout-v9138">${groups ? `<div class="watches-head-v9138"><strong>${escapeHtml(ui('watch'))}</strong><button type="button" class="watch-edit-button-v9138" data-view="settings">${escapeHtml(ui('editWatch'))}</button></div>` : ''}${groups}</section>`;
 }
 
 function renderBrief() {
@@ -764,9 +764,9 @@ function renderBrief() {
       return `<section class="brief-history-day-v9138 journal-section"><div class="brief-history-date-v9138">${escapeHtml(dayLabel(picks[0].article.publishedAt))}</div><div class="feed stable-owned-list">${picks.map(({ article }, index) => compactArticleRow(article, dayIndex * essentialCount + index)).join('')}</div></section>`;
     }).filter(Boolean).join('');
   const watchCount = watchNewCount();
-  return `<main class="page ${state.briefMode === 'ai' ? 'ai-brief-page-v9848' : ''}">${topbar(ui('brief'), false)}
+  return `<main class="page ${state.briefMode !== 'essential' ? 'brief-preferences-page-v9849' : ''} ${state.briefMode === 'ai' ? 'ai-brief-page-v9848' : ''}">${topbar(ui('brief'), false)}
     <div class="brief-mode-tabs"><button class="brief-mode-tab ${state.briefMode === 'essential' ? 'active' : ''}" data-brief-mode="essential">${escapeHtml(ui('essential'))}</button><button class="brief-mode-tab watch-tab-v9184 ${state.briefMode === 'watches' ? 'active' : ''}" data-brief-mode="watches">${escapeHtml(ui('watch'))}${watchCount ? `<span class="watch-new-badge-v9184">${watchCount > 9 ? '9+' : watchCount}</span>` : ''}</button><button class="brief-mode-tab ${state.briefMode === 'ai' ? 'active' : ''}" data-brief-mode="ai">IA</button></div>
-    <div class="runtime-brief-content" data-stable-brief-content>${state.briefMode === 'essential' ? essential : state.briefMode === 'ai' ? renderAIBrief() : renderWatchesFinal()}</div>
+    <div class="runtime-brief-content" data-stable-brief-content>${state.briefMode !== 'essential' ? '<p class="brief-preferences-note-v9849">Réglez vos préférences dans l’onglet Réglages</p>' : ''}${state.briefMode === 'essential' ? essential : state.briefMode === 'ai' ? renderAIBrief() : renderWatchesFinal()}</div>
   </main>${nav('brief')}`;
 }
 
@@ -959,9 +959,11 @@ function renderAIBrief() {
   return `<section class="ai-brief-v9840">
     ${aiStatusMarkup({ notices: false })}${result ? `<section class="ai-news-summary-v9840">${result.partialSources ? '<p class="muted-note">Recherche ciblée indisponible lors de cette synthèse : articles déjà présents dans l’appli uniquement.</p>' : ''}<div class="ai-summary-text-v9847">${summary}</div></section><div id="ai-articles-v9847" class="feed stable-owned-list ai-results-v9840">${newestBriefCards(result.cards).map((card, index) => {
       rememberRenderedArticle(card.article);
-      const paragraphs = briefArticleBlocks(card.summary).map(block => block.type === 'heading' ? `<h3 class="ai-card-topic-v9848">${escapeHtml(block.text)}</h3>` : `<p>${escapeHtml(block.text)}</p>`).join('');
-      return `<section class="ai-result-v9840"><article class="article-card runtime-row" data-article="${escapeHtml(card.article.id)}" tabindex="0" aria-label="Ouvrir l’article source : ${escapeHtml(card.title)}">${articleVisual(card.article, index)}<div class="article-body"><h2>${escapeHtml(card.title)}</h2><div class="meta"><span class="article-category-badge">IA</span><span class="ai-source-meta-v9848"><span class="ai-source-name-v9840">${escapeHtml(card.article.source)}</span>${briefDateLabel(card.article.publishedAt) ? `<time class="ai-publication-v9848" datetime="${escapeHtml(card.article.publishedAt)}">${escapeHtml(briefDateLabel(card.article.publishedAt))}</time>` : ''}</span></div></div></article>${paragraphs ? `<div class="ai-card-summary-v9840">${paragraphs}</div>` : ''}</section>`;
-    }).join('')}</div>` : '<p class="ai-empty-v9840">Ta synthèse et les articles IA apparaîtront ici automatiquement. Enregistre une fois ta clé gratuite Groq dans Réglages → IA.</p>'}</section>`;
+      const blocks = briefArticleBlocks(card.summary);
+      const title = blocks[0]?.type === 'heading' ? blocks.shift().text : card.title;
+      const paragraphs = blocks.map(block => block.type === 'heading' ? `<h3 class="ai-card-topic-v9848">${escapeHtml(block.text)}</h3>` : `<p>${escapeHtml(block.text)}</p>`).join('');
+      return `<section class="ai-result-v9840"><h3 class="ai-card-title-v9849">${escapeHtml(title)}</h3><article class="article-card runtime-row" data-article="${escapeHtml(card.article.id)}" tabindex="0" aria-label="Ouvrir l’article source : ${escapeHtml(displayTitle(card.article))}">${articleVisual(card.article, index)}<div class="article-body"><h2>${escapeHtml(displayTitle(card.article))}</h2><div class="meta"><span class="article-category-badge">IA</span><span class="ai-source-meta-v9848"><span class="ai-source-name-v9840">${escapeHtml(card.article.source)}</span>${briefDateLabel(card.article.publishedAt) ? `<time class="ai-publication-v9848" datetime="${escapeHtml(card.article.publishedAt)}">${escapeHtml(briefDateLabel(card.article.publishedAt))}</time>` : ''}</span></div></div></article>${paragraphs ? `<div class="ai-card-summary-v9840">${paragraphs}</div>` : ''}</section>`;
+    }).join('')}</div>` : ''}</section>`;
 }
 
 function renderSettings() {
@@ -992,7 +994,6 @@ function renderSettings() {
 
       ${accordion(ui('keywords'), `
         <div class="inline-form"><input id="keyword-input" class="text-input" type="text" maxlength="70" placeholder="À surveiller"><button class="small-primary-btn" data-add-keyword>Ajouter</button></div>${keywordChips()}
-        <h3 class="settings-subtitle-v9184">À éviter</h3>
         <div class="inline-form"><input id="blocked-keyword-input" class="text-input" type="text" maxlength="70" placeholder="À éviter"><button class="small-primary-btn" data-add-blocked-keyword>Éviter</button></div>${blockedKeywordChips()}`)}
 
       ${accordion(ui('essential'), essentialSettingsMarkup())}
@@ -1919,7 +1920,7 @@ if ('serviceWorker' in navigator && location.protocol.startsWith('http') && !nav
     serviceWorkerRefreshing = true;
     window.location.reload();
   });
-  navigator.serviceWorker.register('./sw-v98.js?v=98.48', { updateViaCache: 'none' }).then(registration => {
+  navigator.serviceWorker.register('./sw-v98.js?v=98.49', { updateViaCache: 'none' }).then(registration => {
     if (registration.waiting) registration.waiting.postMessage('SKIP_WAITING');
     registration.addEventListener('updatefound', () => {
       const installing = registration.installing;

@@ -140,10 +140,11 @@ html[data-show-badges="0"][data-show-age="0"] #app .article-card h2{margin-botto
 #app .ai-settings-v9847 .muted-note{color:#655f70!important}
 #app .ai-settings-v9847 .settings-field-title,#app .ai-settings-v9847 .ai-field-v9840>strong{display:block;text-align:center}
 #app .ai-settings-v9847 .ai-prompt-v9840{text-align:justify;text-align-last:left;font-family:inherit;line-height:1.65}
-#app .ai-brief-page-v9848{--brief-ai-gap:14px;padding-bottom:calc(74px + env(safe-area-inset-bottom))!important}
-#app .ai-brief-page-v9848>.page-masthead-v9186{margin-bottom:var(--brief-ai-gap)!important}
-#app .ai-brief-page-v9848>.brief-mode-tabs{margin-top:0!important;margin-bottom:var(--brief-ai-gap)!important}
-#app .ai-brief-page-v9848>.runtime-brief-content{margin:0!important;padding-top:0!important}
+#app .brief-preferences-page-v9849{--brief-ai-gap:14px;padding-bottom:calc(74px + env(safe-area-inset-bottom))!important}
+#app .brief-preferences-page-v9849>.page-masthead-v9186{margin-bottom:var(--brief-ai-gap)!important}
+#app .brief-preferences-page-v9849>.brief-mode-tabs{margin-top:0!important;margin-bottom:var(--brief-ai-gap)!important}
+#app .brief-preferences-page-v9849>.runtime-brief-content{margin:0!important;padding-top:0!important}
+#app .brief-preferences-note-v9849{margin:0 0 12px;padding:0;color:#000;text-align:center;font-size:calc(13px * var(--interface-text-scale));line-height:1.5;overflow-wrap:anywhere}
 #app .ai-brief-v9840>[data-ai-state]:empty{display:none}
 #app .ai-news-summary-v9840{margin:0;padding:18px 20px;border:1px solid color-mix(in srgb,var(--app-accent) 12%,#ececf2);border-radius:20px;box-shadow:0 5px 20px rgba(26,24,44,.035)}
 #app .ai-summary-text-v9847 p,#app .ai-card-summary-v9840 p{text-align:justify;text-align-last:left;hyphens:auto;overflow-wrap:anywhere;line-height:1.75}
@@ -152,10 +153,11 @@ html[data-show-badges="0"][data-show-age="0"] #app .article-card h2{margin-botto
 #app .ai-summary-text-v9847 strong{color:var(--ink);font-weight:750}
 #app .ai-summary-text-v9847 .ai-summary-topic-v9847{display:block;text-align:left;margin-bottom:4px;line-height:1.45}
 #app .ai-results-v9840{gap:0!important;scroll-margin-top:20px}
-#app .ai-result-v9840{padding:16px 0}
+#app .ai-result-v9840{padding:12px 0}
 #app .ai-result-v9840:last-child{padding-bottom:0}
 #app .ai-result-v9840+.ai-result-v9840{border-top:2px solid #111;border-radius:0}
-#app .ai-card-summary-v9840{margin:12px 0 0}
+#app .ai-card-summary-v9840{margin:8px 0 0}
+#app .ai-card-title-v9849{margin:0 0 8px;font-size:calc(14px * var(--article-text-scale));line-height:1.35;font-weight:750;text-align:center;overflow-wrap:anywhere}
 #app .ai-card-summary-v9840 p{margin:0 0 10px;white-space:normal}
 #app .ai-card-summary-v9840>:last-child{margin-bottom:0}
 #app .ai-card-summary-v9840 .ai-card-topic-v9848{font-size:inherit;line-height:1.4;text-align:center;font-weight:750;margin:12px 0 8px}
@@ -164,3 +166,19 @@ html[data-show-badges="0"][data-show-age="0"] #app .article-card h2{margin-botto
 #app .ai-source-meta-v9848{display:inline-flex!important;align-items:baseline;gap:5px;flex:1 1 155px;min-width:0;max-width:100%}
 #app .ai-result-v9840 .article-card .meta .ai-source-name-v9840{font-size:calc(10px * var(--interface-text-scale));flex:0 1 auto;min-width:0;overflow:hidden;text-overflow:ellipsis}
 #app .ai-result-v9840 .article-card .meta .ai-publication-v9848{display:inline!important;flex:0 0 auto;color:#655f70;font-size:calc(10px * var(--interface-text-scale));white-space:nowrap}
+
+/* Settings: symmetric heading rhythm and content-sized, readable actions. */
+#app .settings-page-v9185>.page-masthead-v9186{margin-bottom:0!important}
+#app .settings-page-v9185 .settings-accordions-v9185{margin-top:0!important;padding-top:0!important}
+#app .settings-page-v9185 .settings-accordion-v9185:first-child>summary{padding-top:calc(22px * var(--interface-space-scale) + 1px)!important;padding-bottom:calc(22px * var(--interface-space-scale))!important}
+#app .settings-page-v9185 .preference-range>strong,#app .settings-page-v9185 .settings-field-title{display:block;text-align:center}
+#app .settings-page-v9185 :is([data-source-follow],[data-add-source],.opml-button-v9186,[data-add-watch-rule],.ai-account-v9840>a.secondary-btn,[data-ai-save-key],[data-ai-disconnect],[data-ai-generate],[data-ai-open-brief]){background:var(--app-accent)!important;border-color:var(--app-accent)!important;color:var(--app-accent-ink,#fff)!important;box-shadow:0 2px 5px rgba(30,25,65,.08)!important;font-weight:700;text-align:center;text-decoration:none}
+#app .settings-page-v9185 [data-source-block]{background:#a74450!important;border-color:#a74450!important;color:#fff!important;box-shadow:none!important}
+#app .settings-page-v9185 :is([data-add-source],.opml-button-v9186,[data-add-watch-rule],.ai-account-v9840>a.secondary-btn,[data-ai-save-key],[data-ai-disconnect],[data-ai-generate],[data-ai-open-brief]){display:inline-flex!important;justify-content:center;align-items:center;justify-self:center;align-self:center;width:fit-content!important;min-width:0!important;max-width:100%!important;min-height:44px!important;padding:9px 16px!important;border-radius:14px!important;box-sizing:border-box;white-space:normal;overflow-wrap:anywhere;line-height:1.4;gap:6px}
+#app .settings-page-v9185 :is([data-add-source],.opml-button-v9186,[data-add-watch-rule],.ai-account-v9840>a.secondary-btn,[data-ai-save-key],[data-ai-disconnect],[data-ai-generate],[data-ai-open-brief]):focus-visible{outline:2px solid var(--app-accent);outline-offset:3px}
+#app .settings-page-v9185 .opml-button-v9186{margin-left:auto!important;margin-right:auto!important;display:flex!important}
+#app .function-settings-v9186 .switch{width:38px!important;min-width:38px!important;height:22px!important;min-height:22px!important;padding:0!important;overflow:visible;box-shadow:inset 0 1px 3px rgba(25,20,45,.12)}
+#app .function-settings-v9186 .switch::before{content:"";position:absolute;inset:50% auto auto 50%;width:44px;height:44px;transform:translate(-50%,-50%)}
+#app .function-settings-v9186 .switch::after{width:16px!important;height:16px!important;left:3px!important;top:3px!important;box-shadow:0 1px 3px rgba(20,18,40,.18)}
+#app .function-settings-v9186 .switch.on::after{transform:translateX(16px)!important}
+#app .function-settings-v9186 .switch:focus-visible{outline:2px solid var(--app-accent);outline-offset:4px}

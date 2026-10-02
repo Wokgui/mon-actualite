@@ -14,6 +14,12 @@ Brief → IA retire le titre de synthèse et les pieds de carte. L’introductio
 
 La date et l’heure de publication sont à droite de la source dans l’en-tête de chaque article. Les titres intermédiaires des cartes sont centrés et gras. Un formateur pur nettoie aussi les anciens résultats : les libellés Utilité et Statut disparaissent mais leur contenu reste; le bloc Source et sa continuation sont retirés puisque la provenance et l’accès à l’article existent dans l’en-tête. Le cache, le prompt personnel, la clé et les verrous de photos sont inchangés. Les futures générations reçoivent également cette consigne de présentation. Le test mobile mesure les espacements, les dates en en-tête, le nettoyage des anciens blocs et l’absence des pieds de carte, en plus des contrôles précédents.
 
+## Présentation 98.49
+
+Le titre intermédiaire en tête de chaque carte IA est déplacé au-dessus de l’aperçu source et de sa photo; à défaut le titre de la carte IA sert de titre. L’aperçu conserve le titre réel de l’article source. Les espacements des cartes sont réduits et les dimensions des photos restent inchangées. Brief → Veille et IA affichent une consigne noire centrée, « Réglez vos préférences dans l’onglet Réglages », avec le même écart de 14 px entre les onglets et cette consigne qu’entre le bandeau et les onglets. L’ancien message vide IA est retiré; erreurs et état de génération restent visibles.
+
+Les réglages utilisent des actions ajustées au contenu, avec la couleur dominante et son premier plan adaptatif; Bloquer garde un rouge doux et du texte blanc. Les curseurs et Domaines couverts ont des titres centrés, le premier titre Langue est équilibré entre le bandeau et son séparateur, le doublon À éviter disparaît, et les interrupteurs Fonctionnement sont visuellement de 38 × 22 px avec une zone tactile de 44 × 44 px. Aucune migration de clé, de prompt ou de cache n’est nécessaire. Le test navigateur couvre ces éléments et leur fonctionnement, en modes Android simulé et Web.
+
 ## Activation unique dans l’APK
 
 Créer un compte sur https://console.groq.com/keys, rester sur Free sans activer de facturation, créer une clé, puis l’enregistrer dans Réglages → IA. Ne jamais transmettre la clé dans une conversation. Le compte et les limites Groq sont indépendants de l’abonnement ChatGPT. L’app ne crée aucun compte et ne souscrit aucune offre payante.
