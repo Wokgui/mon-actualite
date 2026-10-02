@@ -1,4 +1,4 @@
-import { preparedVisualUrl, articleVisualUrl, sourceTileUrl, photoArticleKey, canonicalPhotoUrl } from './article-visuals.js?v=98.38';
+import { preparedVisualUrl, articleVisualUrl, sourceTileUrl, photoArticleKey, canonicalPhotoUrl } from './article-visuals.js?v=98.39';
 export { photoArticleKey };
 
 // Renderer and loader share this exact module. URL identity survives id/title
@@ -11,12 +11,15 @@ const MAX_BODIES = 160;
 let cacheWrite = Promise.resolve();
 let requestTurn = Promise.resolve();
 let nextRequestAt = 0;
+let replacementPromise;
+const REPLACEMENT_ASSET = new URL('../assets/article-image-unavailable-v98.39.png', import.meta.url);
 let saved = {};
 try { saved = JSON.parse(localStorage.getItem(CACHE_KEY) || '{}') || {}; } catch {}
 export const photoMetrics = {
   startedAt: performance.now(), firstImageMs: null, requests: 0, active: 0,
   maxActive: 0, reused: 0, sourceChanges: 0, commits: [], attempts: {}, failures: 0,
-  cacheHits: 0, cacheWrites: 0, cacheErrors: 0, clientRecoveries: 0, directRequests: 0
+  cacheHits: 0, cacheWrites: 0, cacheErrors: 0, clientRecoveries: 0, directRequests: 0,
+  replacements: [], replacementLoads: 0
 };
 if (typeof window !== 'undefined') window.__articlePhotoMetrics = photoMetrics;
 
@@ -37,7 +40,7 @@ export function photoRecord(article = {}) {
     if (!allowed(url)) return '';
     const request = new URL(url, location.href);
     request.searchParams.set('clientRecovery', '1');
-    request.searchParams.set('v', '98.38');
+    request.searchParams.set('v', '98.39');
     return request.href;
   };
   const candidates = [...new Set([recent ? remembered.requestUrl : '', preparedVisualUrl(article), articleVisualUrl(article)].map(upgrade).filter(Boolean))];
@@ -49,7 +52,26 @@ export function photoRecord(article = {}) {
 export function photoSnapshot(article) {
   const record = photoRecord(article);
   const ready = record.status === 'ready' && record.committed === true;
-  return { key: record.key, url: ready ? record.url : sourceTileUrl(), ready };
+  const replacement = !ready && record.status === 'failed' && record.attempts >= 2 && record.fallbackCommitted === true;
+  return { key: record.key, url: ready ? record.url : replacement ? record.fallbackUrl : sourceTileUrl(), ready, replacement };
+}
+
+// One packaged, off-DOM decoded illustration per document. It is deliberately
+// separate from positive article-photo caches, selection locks and perf metrics.
+function replacementPhoto() {
+  if (!replacementPromise) {
+    replacementPromise = (async () => {
+      const controller = new AbortController();
+      const timer = setTimeout(() => controller.abort(), 5000);
+      try {
+        photoMetrics.replacementLoads++;
+        const response = await fetch(REPLACEMENT_ASSET, { signal: controller.signal });
+        if (!response.ok) throw new Error('Replacement asset unavailable');
+        return await decodedBlob(await response.blob(), controller.signal);
+      } finally { clearTimeout(timer); }
+    })().catch(error => { replacementPromise = null; throw error; });
+  }
+  return replacementPromise;
 }
 
 // The renderer owns article identity; a concurrent catalogue refresh must not
@@ -225,6 +247,7 @@ async function decodedBlob(blob, signal, requireCover = false) {
 export function resolvePhoto(record, priority = 'auto', timeoutMs = 14000) {
   if (record.status === 'ready') return Promise.resolve(record);
   if (record.promise) return record.promise;
+  if (record.status === 'failed' && record.attempts >= 2) return Promise.resolve(record);
   record.status = 'loading';
   record.attempts++;
   photoMetrics.attempts[record.key] = (photoMetrics.attempts[record.key] || 0) + 1;
@@ -248,6 +271,9 @@ export function resolvePhoto(record, priority = 'auto', timeoutMs = 14000) {
     record.status = 'failed';
     record.retryAt = Date.now() + 8000;
     photoMetrics.failures++;
+    if (record.attempts >= 2) {
+      try { record.fallbackUrl = (await replacementPhoto()).url; } catch {}
+    }
     return record;
   })().finally(() => { photoMetrics.active--; record.promise = null; });
   return record.promise;
@@ -255,6 +281,7 @@ export function resolvePhoto(record, priority = 'auto', timeoutMs = 14000) {
 
 export function commitPhoto(image, record) {
   if (!image?.isConnected || record.status !== 'ready') return false;
+  if (image.dataset.photoReplacement === '1') return false;
   if (image.dataset.photoFinal === '1') {
     if (image.getAttribute('src') !== record.url) photoMetrics.sourceChanges++;
     else photoMetrics.reused++;
@@ -272,5 +299,19 @@ export function commitPhoto(image, record) {
   photoMetrics.commits.push({ key: record.key, id: record.id, at, requestUrl: record.requestUrl });
   if (photoMetrics.commits.length > 1000) photoMetrics.commits.shift();
   window.dispatchEvent(new CustomEvent('news:photo-locked', { detail: { id: record.id, key: record.key, url: record.url } }));
+  return true;
+}
+
+export function commitReplacement(image, record) {
+  if (!image?.isConnected || record.status !== 'failed' || record.attempts < 2
+    || !record.fallbackUrl || image.dataset.photoFinal === '1' || image.dataset.photoReplacement === '1') return false;
+  record.fallbackCommitted = true;
+  image.src = record.fallbackUrl;
+  image.dataset.photoReplacement = '1';
+  image.alt = 'Illustration de remplacement — photo de l’article indisponible';
+  image.classList.remove('image-pending-v98', 'source-tile-visual');
+  image.classList.add('image-fallback-v98', 'image-replacement-v9839');
+  photoMetrics.replacements.push({ key: record.key, id: record.id, at: performance.now() });
+  if (photoMetrics.replacements.length > 1000) photoMetrics.replacements.shift();
   return true;
 }

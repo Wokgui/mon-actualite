@@ -1,5 +1,5 @@
 import { importOpmlPreview, fetchLiveNews } from './services/source-connectors.js?v=98.26';
-import { photoSnapshot, photoArticleKey } from './services/article-photos.js?v=98.38';
+import { photoSnapshot, photoArticleKey } from './services/article-photos.js?v=98.39';
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const app = $('#app');
@@ -390,7 +390,7 @@ function badgeFor(article) {
 
 function articleVisual(article, index = 0) {
   const photo = photoSnapshot(article);
-  return `<img class="article-image original-article-image stable-visual ${photo.ready ? 'image-ready-v98 prepared-visual' : 'image-pending-v98 source-tile-visual'}" src="${escapeHtml(photo.url)}" data-photo-key="${escapeHtml(photo.key)}" data-photo-final="${photo.ready ? '1' : '0'}" alt="" width="112" height="75" loading="eager" fetchpriority="${index < 4 ? 'high' : 'auto'}" decoding="async" referrerpolicy="no-referrer">`;
+  return `<img class="article-image original-article-image stable-visual ${photo.ready ? 'image-ready-v98 prepared-visual' : photo.replacement ? 'image-fallback-v98 image-replacement-v9839' : 'image-pending-v98 source-tile-visual'}" src="${escapeHtml(photo.url)}" data-photo-key="${escapeHtml(photo.key)}" data-photo-final="${photo.ready ? '1' : '0'}" data-photo-replacement="${photo.replacement ? '1' : '0'}" alt="${photo.replacement ? 'Illustration de remplacement — photo de l’article indisponible' : ''}" width="112" height="75" loading="eager" fetchpriority="${index < 4 ? 'high' : 'auto'}" decoding="async" referrerpolicy="no-referrer">`;
 }
 function sourceIdentity(article = {}) {
   return normalizeTopic(article.source || article.feedTitle || '');
@@ -1866,7 +1866,7 @@ if ('serviceWorker' in navigator && location.protocol.startsWith('http') && !nav
     serviceWorkerRefreshing = true;
     window.location.reload();
   });
-  navigator.serviceWorker.register('./sw-v98.js?v=98.38', { updateViaCache: 'none' }).then(registration => {
+  navigator.serviceWorker.register('./sw-v98.js?v=98.39', { updateViaCache: 'none' }).then(registration => {
     if (registration.waiting) registration.waiting.postMessage('SKIP_WAITING');
     registration.addEventListener('updatefound', () => {
       const installing = registration.installing;

@@ -65,7 +65,7 @@ function feedlyProxyUrl(article = {}) {
 
   if (!articleUrl && !title && !suppliedImage) return '';
   const params = new URLSearchParams({
-    v: '98.38',
+    v: '98.39',
     url: articleUrl.slice(0, 1900),
     image: suppliedImage.slice(0, 1900),
     title: title.slice(0, 280),

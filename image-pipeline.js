@@ -1,4 +1,4 @@
-import { photoRecordByKey, resolvePhoto, commitPhoto } from './services/article-photos.js?v=98.38';
+import { photoRecordByKey, resolvePhoto, commitPhoto, commitReplacement } from './services/article-photos.js?v=98.39';
 
 const defaults = { intervalMs: 120, concurrency: 4, priorityCount: 12, rootMarginPx: 1200, timeoutMs: 14000 };
 const config = { ...defaults, ...window.__ARTICLE_PHOTO_CONFIG };
@@ -24,7 +24,7 @@ function scan() {
     if (!image || !record) return;
     const rect = card.getBoundingClientRect();
     const visible = rect.bottom > 0 && rect.top < innerHeight;
-    if (image.dataset.photoFinal === '1') return;
+    if (image.dataset.photoFinal === '1' || image.dataset.photoReplacement === '1') return;
     if (!visible && index >= config.priorityCount && (rect.top > innerHeight + config.rootMarginPx || rect.bottom < -config.rootMarginPx)) return;
     let job = next.get(record.key);
     if (!job) {
@@ -56,6 +56,14 @@ function pump() {
   while (jobs[0]?.settled) {
     const job = jobs[0];
     if (job.record.status === 'failed') {
+      if (job.record.attempts >= 2 && job.record.fallbackUrl) {
+        if (now < nextCommit) break;
+        jobs.shift();
+        let committed = false;
+        for (const image of job.images) committed = commitReplacement(image, job.record) || committed;
+        if (committed) { nextCommit = performance.now() + config.intervalMs; break; }
+        continue;
+      }
       for (const image of job.images) if (image.isConnected) {
         image.classList.remove('image-pending-v98');
         image.classList.add('image-fallback-v98');
