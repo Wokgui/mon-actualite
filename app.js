@@ -1,7 +1,7 @@
-import { importOpmlPreview, fetchLiveNews, fetchBriefCandidates } from './services/source-connectors.js?v=98.49';
-import { photoSnapshot, photoArticleKey } from './services/article-photos.js?v=98.49';
-import { briefAI, setAISettings, onAIChange, initializeBrief, maybeGenerateBrief, generateBrief, saveGroqKey, disconnectGroq } from './services/brief-groq.js?v=98.49';
-import { newestBriefCards, briefSummaryParagraphs, briefArticleBlocks, briefDateLabel } from './services/brief-presentation.js?v=98.49';
+import { importOpmlPreview, fetchLiveNews, fetchBriefCandidates } from './services/source-connectors.js?v=98.50';
+import { photoSnapshot, photoArticleKey } from './services/article-photos.js?v=98.50';
+import { briefAI, setAISettings, onAIChange, initializeBrief, maybeGenerateBrief, generateBrief, saveGroqKey, disconnectGroq } from './services/brief-groq.js?v=98.50';
+import { newestBriefCards, briefSummaryParagraphs, briefArticleBlocks, briefDateLabel } from './services/brief-presentation.js?v=98.50';
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const app = $('#app');
@@ -930,7 +930,7 @@ function essentialSettingsMarkup() {
 
 function aiAccountMarkup() {
   return `<div class="ai-account-v9840" data-ai-account><strong class="settings-field-title">Service d’intelligence artificielle</strong><p class="muted-note">Groq · formule gratuite · indépendant de ChatGPT, Work et Codex.</p><a class="secondary-btn" href="https://console.groq.com/keys" target="_blank" rel="noopener noreferrer">Créer ma clé gratuite Groq</a>
-    ${briefAI.supported ? `<p class="muted-note">${briefAI.configured ? 'Une clé est enregistrée sur cet appareil. Sa validité est vérifiée lors de la génération.' : 'Crée une clé Groq, puis enregistre-la ici une seule fois. Reste sur la formule Free, sans activer la facturation.'}</p><label class="ai-field-v9840"><strong>${briefAI.configured ? 'Remplacer ma clé Groq' : 'Ma clé Groq'}</strong><input class="text-input" type="password" data-ai-key autocomplete="off" spellcheck="false" maxlength="250" placeholder="gsk_…"${briefAI.busy ? ' disabled' : ''}></label><button class="secondary-btn" type="button" data-ai-save-key${briefAI.busy ? ' disabled' : ''}>Enregistrer la clé sur cet appareil</button>${briefAI.configured || briefAI.error.includes('chiffrée est inaccessible') ? '<button class="secondary-btn" type="button" data-ai-disconnect>Retirer la clé</button>' : ''}` : `<p class="muted-note">${briefAI.initialized ? 'Le stockage sécurisé de la clé et la synthèse automatique sont disponibles dans l’APK Android actuel, pas dans cet aperçu Web.' : 'Vérification de la connexion Android…'}</p>`}
+    ${briefAI.supported ? `<p class="muted-note">${briefAI.configured ? 'Une clé est enregistrée sur cet appareil. Sa validité est vérifiée lors de la génération.' : 'Crée une clé Groq, puis enregistre-la ici une seule fois. Reste sur la formule Free, sans activer la facturation.'}</p><label class="ai-field-v9840"><strong>Ta clé Groq</strong><input class="text-input" type="password" data-ai-key autocomplete="off" spellcheck="false" maxlength="250" placeholder="gsk_…"${briefAI.busy ? ' disabled' : ''}></label><button class="secondary-btn" type="button" data-ai-save-key${briefAI.busy ? ' disabled' : ''}>Enregistrer la clé sur cet appareil</button>${briefAI.configured || briefAI.error.includes('chiffrée est inaccessible') ? '<button class="secondary-btn" type="button" data-ai-disconnect>Retirer la clé</button>' : ''}` : `<p class="muted-note">${briefAI.initialized ? 'Le stockage sécurisé de la clé et la synthèse automatique sont disponibles dans l’APK Android actuel, pas dans cet aperçu Web.' : 'Vérification de la connexion Android…'}</p>`}
     <p class="muted-note">Sur Android, la clé est chiffrée et exclue des sauvegardes. Ton prompt et les titres/extraits sélectionnés sont envoyés à Groq. Aucun accès à ton compte ChatGPT n’est demandé.</p></div>`;
 }
 
@@ -1920,7 +1920,7 @@ if ('serviceWorker' in navigator && location.protocol.startsWith('http') && !nav
     serviceWorkerRefreshing = true;
     window.location.reload();
   });
-  navigator.serviceWorker.register('./sw-v98.js?v=98.49', { updateViaCache: 'none' }).then(registration => {
+  navigator.serviceWorker.register('./sw-v98.js?v=98.50', { updateViaCache: 'none' }).then(registration => {
     if (registration.waiting) registration.waiting.postMessage('SKIP_WAITING');
     registration.addEventListener('updatefound', () => {
       const installing = registration.installing;

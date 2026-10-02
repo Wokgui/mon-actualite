@@ -42,7 +42,7 @@ try {
     return route.fulfill({json:{articles:isBrief?[...sources,discovered]:sources,fetchedAt:new Date().toISOString(),stats:{}}});
   });
   await page.route('**/api/article-photo-fast**',route=>{photoRequests.push(route.request().url());return route.fulfill({body:png,contentType:'image/png',headers:{'X-Thumbnail-Status':'feed'}});});
-  await page.route('**/version.json**',route=>route.fulfill({json:{version:'98',codeRelease:'98.49'}}));
+  await page.route('**/version.json**',route=>route.fulfill({json:{version:'98',codeRelease:'98.50'}}));
   await page.goto(process.env.AI_BASE_URL||'http://127.0.0.1:4173/?nativePreview=1',{waitUntil:'domcontentloaded'});
   await page.waitForFunction(()=>document.querySelectorAll('[data-stable-home-feed] img.image-ready-v98').length>=8);
   const homeBefore=await page.locator('[data-stable-home-feed] .article-card').evaluateAll(cards=>cards.map(card=>({id:card.dataset.article,src:card.querySelector('img').src})));
@@ -78,12 +78,23 @@ try {
   };
   const language=page.locator('.settings-accordion-v9185').first();
   if(await language.evaluate(node=>node.open)) await language.locator('summary').click();
-  const languageGaps=await language.evaluate(root=>{
-    const summary=root.querySelector('summary'),range=document.createRange();range.selectNodeContents(summary);
-    const text=range.getBoundingClientRect(),header=document.querySelector('.settings-page-v9185>.page-masthead-v9186').getBoundingClientRect(),tile=root.getBoundingClientRect();
-    return {above:text.top-header.bottom,below:tile.bottom-text.bottom};
-  });
-  assert.ok(Math.abs(languageGaps.above-languageGaps.below)<=1,JSON.stringify(languageGaps));
+  const languageHeaders=[];
+  for(const width of [320,412]){
+    await page.setViewportSize({width,height:915});
+    for(const scale of [.85,1,1.5]){
+      const measured=await page.evaluate(scale=>{
+        const html=document.documentElement,original=html.style.getPropertyValue('--interface-text-scale');html.style.setProperty('--interface-text-scale',String(scale));
+        const headings=[...document.querySelectorAll('.settings-accordion-v9185>summary')].slice(0,2).map(node=>{
+          const rect=node.getBoundingClientRect(),style=getComputedStyle(node),arrow=getComputedStyle(node,'::after');return {height:rect.height,minHeight:style.minHeight,paddingTop:style.paddingTop,paddingBottom:style.paddingBottom,lineHeight:style.lineHeight,right:arrow.right,centerRatio:parseFloat(arrow.top)/rect.height,transform:arrow.transform,font:arrow.fontSize};
+        });html.style.setProperty('--interface-text-scale',original);return headings;
+      },scale);
+      const {height:firstHeight,...firstMetrics}=measured[0],{height:secondHeight,...secondMetrics}=measured[1];
+      assert.deepEqual(firstMetrics,secondMetrics,JSON.stringify({width,scale,measured}));
+      // Equal single-line headings; longer labels may wrap at narrow widths or large accessible text sizes.
+      if(width===412&&scale<=1) assert.equal(firstHeight,secondHeight);
+      assert.equal(firstMetrics.centerRatio,.5);languageHeaders.push({width,scale,measured});
+    }
+  }
   await openSection('[data-ui-range="textSize"]');await openSection('[data-brief-essential]');
   assert.ok(await page.locator('.preference-range>strong,.settings-accordion-content-v9185>.settings-field-title').evaluateAll(nodes=>nodes.every(node=>getComputedStyle(node).textAlign==='center')));
   await openSection('[data-source-follow]');await openSection('[data-add-source]');await openSection('[data-add-watch-rule]');
@@ -91,17 +102,21 @@ try {
   assert.equal(await keywordsSection.locator('h3').count(),0,'duplicate À éviter heading removed');
   assert.equal(await keywordsSection.locator('#blocked-keyword-input').getAttribute('placeholder'),'À éviter');
   await openSection('[data-setting-toggle="autoRefresh"]');
+  await openSection('[data-check-update]');
+  assert.equal(await page.locator('.app-version-badge').evaluate(node=>getComputedStyle(node).color),'rgb(255, 255, 255)');
+  if(native) assert.equal(await page.locator('.ai-field-v9840:has([data-ai-key])>strong').textContent(),'Ta clé Groq');
   const actions=await page.locator('.settings-page-v9185').evaluate(root=>{
-    const selectors=['[data-source-follow]','[data-source-block]','[data-add-source]','.opml-button-v9186','[data-add-watch-rule]','.ai-account-v9840>a.secondary-btn','[data-ai-save-key]','[data-ai-disconnect]','[data-ai-generate]','[data-ai-open-brief]'];
+    const selectors=['[data-source-follow]','[data-source-block]','[data-add-source]','.opml-button-v9186','[data-add-watch-rule]','.ai-account-v9840>a.secondary-btn','[data-ai-save-key]','[data-ai-disconnect]','[data-ai-generate]','[data-ai-open-brief]','[data-check-update]'];
     return selectors.flatMap(selector=>{const node=root.querySelector(selector);if(!node)return[];
       const style=getComputedStyle(node),rect=node.getBoundingClientRect(),parent=node.parentElement.getBoundingClientRect();
-      return [{selector,color:style.color,background:style.backgroundColor,width:rect.width,parentWidth:parent.width,height:rect.height,padding:style.padding,disabled:!!node.disabled}];
+      return [{selector,color:style.color,background:style.backgroundColor,width:rect.width,parentWidth:parent.width,height:rect.height,padding:style.padding,disabled:!!node.disabled,centerOffset:rect.x+rect.width/2-parent.x-parent.width/2}];
     });
   });
   for(const action of actions){
     assert.equal(action.color,'rgb(255, 255, 255)',JSON.stringify(action));
     assert.equal(action.background,action.selector==='[data-source-block]'?'rgb(167, 68, 80)':'rgb(116, 97, 232)',JSON.stringify(action));
     if(!action.selector.startsWith('[data-source-')){assert.ok(action.width<action.parentWidth,JSON.stringify(action));assert.ok(action.height>=44);}
+    if(action.selector==='.opml-button-v9186') assert.ok(Math.abs(action.centerOffset)<=1,JSON.stringify(action));
   }
   await openSection('[data-accent]');
   const actionColors=[];
@@ -115,7 +130,7 @@ try {
     actionColors.push({color,...checked});
   }
   await page.locator('[data-reset-accent]').click();
-  for(const [name,selector] of [['sources','[data-source-follow]'],['ajouter-source','[data-add-source]'],['curseurs','[data-ui-range="textSize"]'],['essentiel','[data-brief-essential]'],['veille','[data-add-watch-rule]'],['ia','[data-ai-prompt]'],['fonctionnement','[data-setting-toggle="autoRefresh"]']]){
+  for(const [name,selector] of [['sources','[data-source-follow]'],['ajouter-source','[data-add-source]'],['curseurs','[data-ui-range="textSize"]'],['essentiel','[data-brief-essential]'],['veille','[data-add-watch-rule]'],['ia','[data-ai-prompt]'],['fonctionnement','[data-setting-toggle="autoRefresh"]'],['version','[data-check-update]']]){
     await page.locator('.settings-accordion-v9185').filter({has:page.locator(selector).first()}).screenshot({path:output+'/reglages-'+name+'.png'});
   }
   const switches=await page.locator('.function-settings-v9186 .switch').evaluateAll(nodes=>nodes.map(node=>{
@@ -128,7 +143,7 @@ try {
   await page.locator('[data-setting-toggle="autoRefresh"]').click();
   await page.evaluate(()=>window.scrollTo(0,0));
   await page.screenshot({path:output+'/reglages-actions.png',fullPage:true});
-  settingsLayout={languageGaps,actions,actionColors,switches};
+  settingsLayout={languageHeaders,actions,actionColors,switches};
   if(!native){
     assert.equal(await page.locator('[data-ai-key]').count(),0);assert.match(await page.locator('[data-ai-account]').textContent(),/APK Android/);
     assert.equal(generations,0);assert.equal(discoveryRequests,0);

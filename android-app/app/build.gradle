@@ -12,8 +12,8 @@ android {
         applicationId 'com.wokgui.monactualite'
         minSdk 26
         targetSdk 35
-        versionCode 127
-        versionName '98.0.49'
+        versionCode 128
+        versionName '98.0.50'
     }
 
     signingConfigs {

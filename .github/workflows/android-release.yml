@@ -89,10 +89,10 @@ jobs:
           set -euo pipefail
           TAG="v98-98.10"
           APK="mon-actualite-v98-98.10.apk"
-          NOTES="Mon Actualité 98.49 (Android 98.0.49, code 127). Titres des cartes IA au-dessus des aperçus et photos; cartes compactes. Réglages harmonisés : boutons colorés ajustés au texte, rouge doux pour Bloquer, titres de curseurs centrés et interrupteurs affinés. Consigne de préférences centrée dans Brief Veille et IA; ancien texte vide retiré. Séparateurs noirs et articles récents en premier conservés. Brief IA automatique via Groq : prompt personnel, recherche ciblée sur sept jours et synthèse dans Brief IA avec photos et liens des sources réelles. Une clé Groq à enregistrer une seule fois dans l’APK, chiffrée via Android Keystore et exclue des sauvegardes. Actualisation à l’ouverture toutes les 12 heures maximum pour le même prompt et la même clé; demande unique et dernière synthèse conservée en cas d’erreur. Aucun appel à l’ancien partage d’abonnement Work/Codex ni transfert manuel dans ChatGPT. La connexion nécessite un compte Groq et reste soumise à ses limites. Le lien APK historique est conservé."
+          NOTES="Mon Actualité 98.50 (Android 98.0.50, code 128). Importer un fichier OPML centré; bouton Vérifier la mise à jour coloré; titre Langue et flèche identiques aux autres rubriques; libellé Ta clé Groq; badge v98 en blanc. Synthèse automatique Groq, cache, prompt personnel et photos stables conservés. Le lien APK historique est conservé."
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release upload "$TAG" "$APK" --clobber
-            gh release edit "$TAG" --title "Mon Actualité v98 / 98.49" --notes "$NOTES"
+            gh release edit "$TAG" --title "Mon Actualité v98 / 98.50" --notes "$NOTES"
           else
-            gh release create "$TAG" "$APK" --title "Mon Actualité v98 / 98.49" --notes "$NOTES"
+            gh release create "$TAG" "$APK" --title "Mon Actualité v98 / 98.50" --notes "$NOTES"
           fi

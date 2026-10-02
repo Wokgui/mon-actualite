@@ -20,6 +20,12 @@ Le titre intermédiaire en tête de chaque carte IA est déplacé au-dessus de l
 
 Les réglages utilisent des actions ajustées au contenu, avec la couleur dominante et son premier plan adaptatif; Bloquer garde un rouge doux et du texte blanc. Les curseurs et Domaines couverts ont des titres centrés, le premier titre Langue est équilibré entre le bandeau et son séparateur, le doublon À éviter disparaît, et les interrupteurs Fonctionnement sont visuellement de 38 × 22 px avec une zone tactile de 44 × 44 px. Aucune migration de clé, de prompt ou de cache n’est nécessaire. Le test navigateur couvre ces éléments et leur fonctionnement, en modes Android simulé et Web.
 
+## Présentation 98.50
+
+Langue utilise maintenant les mêmes métriques de titre et de flèche que Taille et densité du texte. L’import OPML est centré réellement : les actions ajustées au contenu utilisent un conteneur flex de bloc, avec marges automatiques, plutôt qu’un affichage inline-flex. Vérifier la mise à jour reprend la couleur dominante avec texte adaptatif; le badge v98 garde un texte blanc. Le champ de clé est intitulé Ta clé Groq, qu’une clé soit déjà enregistrée ou non. Aucun changement de clé, de cache, de prompt ou de pipeline photo.
+
+Les tests mobiles comparent les hauteurs et flèches à 320 et 412 px sur trois tailles de texte, mesurent le centrage OPML et vérifient les couleurs, le badge et le libellé de clé. La sauvegarde PC est une archive séparée des fichiers versionnés, du projet Android, de l’historique Git et de l’APK; elle ne prétend pas extraire les données personnelles du téléphone.
+
 ## Activation unique dans l’APK
 
 Créer un compte sur https://console.groq.com/keys, rester sur Free sans activer de facturation, créer une clé, puis l’enregistrer dans Réglages → IA. Ne jamais transmettre la clé dans une conversation. Le compte et les limites Groq sont indépendants de l’abonnement ChatGPT. L’app ne crée aucun compte et ne souscrit aucune offre payante.
