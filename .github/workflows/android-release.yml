@@ -89,10 +89,10 @@ jobs:
           set -euo pipefail
           TAG="v98-98.10"
           APK="mon-actualite-v98-98.10.apk"
-          NOTES="Mon Actualité 98.51 (Android 98.0.51, code 129). Consigne de préférences uniquement dans Veille et IA vides; contenu remonté à 14 px sous les onglets. Titres de domaines IA centrés agrandis. Phrases complètes par catégorie demandée et débuts de paragraphes en majuscules, y compris les synthèses conservées sans appel IA supplémentaire. Prompt personnel, clé Groq, cache et verrous photo conservés. Le lien APK historique est conservé."
+          NOTES="Mon Actualité 98.52 (Android 98.0.52, code 130). Boutons de restauration colorés et ajustés au texte; badge v98 retiré; informations de version centrées. Domaines des articles IA agrandis à 18 px de base contre 14 px pour le texte. Présentation du Brief, prompt personnel, clé Groq, cache et photos stables conservés. Le lien APK historique est conservé."
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release upload "$TAG" "$APK" --clobber
-            gh release edit "$TAG" --title "Mon Actualité v98 / 98.51" --notes "$NOTES"
+            gh release edit "$TAG" --title "Mon Actualité v98 / 98.52" --notes "$NOTES"
           else
-            gh release create "$TAG" "$APK" --title "Mon Actualité v98 / 98.51" --notes "$NOTES"
+            gh release create "$TAG" "$APK" --title "Mon Actualité v98 / 98.52" --notes "$NOTES"
           fi

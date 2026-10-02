@@ -1,7 +1,7 @@
-import { importOpmlPreview, fetchLiveNews, fetchBriefCandidates } from './services/source-connectors.js?v=98.51';
-import { photoSnapshot, photoArticleKey } from './services/article-photos.js?v=98.51';
-import { briefAI, setAISettings, onAIChange, initializeBrief, maybeGenerateBrief, generateBrief, saveGroqKey, disconnectGroq } from './services/brief-groq.js?v=98.51';
-import { newestBriefCards, briefSummaryParagraphs, briefArticleBlocks, briefDateLabel } from './services/brief-presentation.js?v=98.51';
+import { importOpmlPreview, fetchLiveNews, fetchBriefCandidates } from './services/source-connectors.js?v=98.52';
+import { photoSnapshot, photoArticleKey } from './services/article-photos.js?v=98.52';
+import { briefAI, setAISettings, onAIChange, initializeBrief, maybeGenerateBrief, generateBrief, saveGroqKey, disconnectGroq } from './services/brief-groq.js?v=98.52';
+import { newestBriefCards, briefSummaryParagraphs, briefArticleBlocks, briefDateLabel } from './services/brief-presentation.js?v=98.52';
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const app = $('#app');
@@ -1008,7 +1008,7 @@ function renderSettings() {
 
       ${accordion(ui('operation'), `<div class="function-settings-v9186">${settingRow(ui('automaticRefresh'), ui('automaticDesc'), 'autoRefresh')}${settingRow(ui('webSearch'), ui('webSearchDesc'), 'webSearch')}</div>`)}
 
-      ${accordion(ui('version'), `<div class="app-version-row"><div><strong>Mon actualité · ${escapeHtml(ui('version').toLowerCase())} ${APP_VERSION}</strong><span>${escapeHtml(ui('publication', { date: APP_RELEASE }))}</span></div><span class="app-version-badge">v${APP_VERSION}</span></div><button class="secondary-btn compact-btn version-update-v9186" data-check-update>${icon('refresh')} ${escapeHtml(ui('checkUpdate'))}</button>`)}
+      ${accordion(ui('version'), `<div class="app-version-row"><div><strong>Mon actualité · ${escapeHtml(ui('version').toLowerCase())} ${APP_VERSION}</strong><span>${escapeHtml(ui('publication', { date: APP_RELEASE }))}</span></div></div><button class="secondary-btn compact-btn version-update-v9186" data-check-update>${icon('refresh')} ${escapeHtml(ui('checkUpdate'))}</button>`)}
     </div>
   </main>${nav('settings')}`;
 }
@@ -1922,7 +1922,7 @@ if ('serviceWorker' in navigator && location.protocol.startsWith('http') && !nav
     serviceWorkerRefreshing = true;
     window.location.reload();
   });
-  navigator.serviceWorker.register('./sw-v98.js?v=98.51', { updateViaCache: 'none' }).then(registration => {
+  navigator.serviceWorker.register('./sw-v98.js?v=98.52', { updateViaCache: 'none' }).then(registration => {
     if (registration.waiting) registration.waiting.postMessage('SKIP_WAITING');
     registration.addEventListener('updatefound', () => {
       const installing = registration.installing;

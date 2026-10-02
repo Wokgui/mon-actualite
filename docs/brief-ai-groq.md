@@ -32,6 +32,10 @@ La consigne de préférences n’est affichée dans Veille et IA que tant que la
 
 Les titres de domaines centrés des cartes IA passent à 16 px, contre 14 px pour les paragraphes, en conservant le réglage de taille. Les consignes de génération demandent des phrases complètes pour chaque catégorie demandée, commençant par une majuscule, et signalent un manque de sources sans inventer. Le formateur met aussi une majuscule au début des paragraphes et domaines des résultats déjà conservés, sans modifier le cache ou les destinations de liens et sans déclencher une génération supplémentaire. La sauvegarde PC est renouvelée séparément, avec le nouvel APK et la même signature.
 
+## Présentation 98.52
+
+Les boutons Restaurer la couleur par défaut et Restaurer les hauteurs par défaut reprennent les règles communes de couleur dominante, premier plan adaptatif, largeur ajustée au contenu, centrage, zone tactile et focus. Les fonctions de restauration restent inchangées. Le badge v98 séparé est retiré; Mon actualité avec sa version et la ligne de publication sont centrés. Les titres de domaines des cartes IA passent de 16 à 18 px, contre 14 px pour le corps, avec le réglage de taille conservé. Les tests vérifient les couleurs claires et foncées, la taille/position des actions, les clics de restauration, les deux lignes centrées et le rapport de taille des domaines. La sauvegarde PC est renouvelée, sans remplacer les précédentes.
+
 ## Activation unique dans l’APK
 
 Créer un compte sur https://console.groq.com/keys, rester sur Free sans activer de facturation, créer une clé, puis l’enregistrer dans Réglages → IA. Ne jamais transmettre la clé dans une conversation. Le compte et les limites Groq sont indépendants de l’abonnement ChatGPT. L’app ne crée aucun compte et ne souscrit aucune offre payante.

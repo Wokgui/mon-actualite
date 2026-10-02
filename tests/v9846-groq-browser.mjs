@@ -42,7 +42,7 @@ try {
     return route.fulfill({json:{articles:isBrief?[...sources,discovered]:sources,fetchedAt:new Date().toISOString(),stats:{}}});
   });
   await page.route('**/api/article-photo-fast**',route=>{photoRequests.push(route.request().url());return route.fulfill({body:png,contentType:'image/png',headers:{'X-Thumbnail-Status':'feed'}});});
-  await page.route('**/version.json**',route=>route.fulfill({json:{version:'98',codeRelease:'98.51'}}));
+  await page.route('**/version.json**',route=>route.fulfill({json:{version:'98',codeRelease:'98.52'}}));
   await page.goto(process.env.AI_BASE_URL||'http://127.0.0.1:4173/?nativePreview=1',{waitUntil:'domcontentloaded'});
   await page.waitForFunction(()=>document.querySelectorAll('[data-stable-home-feed] img.image-ready-v98').length>=8);
   const homeBefore=await page.locator('[data-stable-home-feed] .article-card').evaluateAll(cards=>cards.map(card=>({id:card.dataset.article,src:card.querySelector('img').src})));
@@ -103,10 +103,12 @@ try {
   assert.equal(await keywordsSection.locator('#blocked-keyword-input').getAttribute('placeholder'),'À éviter');
   await openSection('[data-setting-toggle="autoRefresh"]');
   await openSection('[data-check-update]');
-  assert.equal(await page.locator('.app-version-badge').evaluate(node=>getComputedStyle(node).color),'rgb(255, 255, 255)');
+  assert.equal(await page.locator('.app-version-badge').count(),0,'redundant v98 tile removed');
+  const versionLayout=await page.locator('.app-version-row').evaluate(row=>{const parent=row.parentElement.getBoundingClientRect();return [...row.querySelectorAll('strong,div>span')].map(node=>{const r=node.getBoundingClientRect();return {align:getComputedStyle(node).textAlign,centerOffset:r.x+r.width/2-parent.x-parent.width/2,text:node.textContent};});});
+  assert.equal(versionLayout.length,2);assert.ok(versionLayout.every(line=>line.align==='center'&&Math.abs(line.centerOffset)<1),JSON.stringify(versionLayout));
   if(native) assert.equal(await page.locator('.ai-field-v9840:has([data-ai-key])>strong').textContent(),'Ta clé Groq');
   const actions=await page.locator('.settings-page-v9185').evaluate(root=>{
-    const selectors=['[data-source-follow]','[data-source-block]','[data-add-source]','.opml-button-v9186','[data-add-watch-rule]','.ai-account-v9840>a.secondary-btn','[data-ai-save-key]','[data-ai-disconnect]','[data-ai-generate]','[data-ai-open-brief]','[data-check-update]'];
+    const selectors=['[data-source-follow]','[data-source-block]','[data-add-source]','.opml-button-v9186','[data-add-watch-rule]','.ai-account-v9840>a.secondary-btn','[data-ai-save-key]','[data-ai-disconnect]','[data-ai-generate]','[data-ai-open-brief]','[data-check-update]','[data-reset-accent]','[data-reset-header-heights]'];
     return selectors.flatMap(selector=>{const node=root.querySelector(selector);if(!node)return[];
       const style=getComputedStyle(node),rect=node.getBoundingClientRect(),parent=node.parentElement.getBoundingClientRect();
       return [{selector,color:style.color,background:style.backgroundColor,width:rect.width,parentWidth:parent.width,height:rect.height,padding:style.padding,disabled:!!node.disabled,centerOffset:rect.x+rect.width/2-parent.x-parent.width/2}];
@@ -116,7 +118,7 @@ try {
     assert.equal(action.color,'rgb(255, 255, 255)',JSON.stringify(action));
     assert.equal(action.background,action.selector==='[data-source-block]'?'rgb(167, 68, 80)':'rgb(116, 97, 232)',JSON.stringify(action));
     if(!action.selector.startsWith('[data-source-')){assert.ok(action.width<action.parentWidth,JSON.stringify(action));assert.ok(action.height>=44);}
-    if(action.selector==='.opml-button-v9186') assert.ok(Math.abs(action.centerOffset)<=1,JSON.stringify(action));
+    if(action.selector==='.opml-button-v9186'||action.selector.startsWith('[data-reset-')) assert.ok(Math.abs(action.centerOffset)<=1,JSON.stringify(action));
   }
   await openSection('[data-accent]');
   const actionColors=[];
@@ -124,13 +126,22 @@ try {
     await page.locator('[data-accent]').evaluate((input,value)=>{input.value=value;input.dispatchEvent(new Event('input',{bubbles:true}));},color);
     const checked=await page.evaluate(()=>{
       const root=document.documentElement,ink=getComputedStyle(root).getPropertyValue('--app-accent-ink').trim(),button=document.querySelector('[data-add-source]'),danger=document.querySelector('[data-source-block]');
-      return {ink,color:getComputedStyle(button).color,background:getComputedStyle(button).backgroundColor,danger:getComputedStyle(danger).color};
+      return {ink,color:getComputedStyle(button).color,background:getComputedStyle(button).backgroundColor,danger:getComputedStyle(danger).color,resets:[...document.querySelectorAll('[data-reset-accent],[data-reset-header-heights]')].map(node=>({color:getComputedStyle(node).color,background:getComputedStyle(node).backgroundColor}))};
     });
     assert.equal(checked.color,checked.ink==='#ffffff'?'rgb(255, 255, 255)':'rgb(0, 0, 0)');assert.equal(checked.danger,'rgb(255, 255, 255)');
+    assert.equal(checked.resets.length,2);assert.ok(checked.resets.every(button=>button.color===checked.color&&button.background===checked.background));
     actionColors.push({color,...checked});
   }
   await page.locator('[data-reset-accent]').click();
-  for(const [name,selector] of [['sources','[data-source-follow]'],['ajouter-source','[data-add-source]'],['curseurs','[data-ui-range="textSize"]'],['essentiel','[data-brief-essential]'],['veille','[data-add-watch-rule]'],['ia','[data-ai-prompt]'],['fonctionnement','[data-setting-toggle="autoRefresh"]'],['version','[data-check-update]']]){
+  assert.equal(await page.locator('[data-accent]').inputValue(),'#7461e8','color restore still works');
+  const headerKeys=['homeHeaderHeight','settingsHeaderHeight','briefHeaderHeight'];
+  const heightsBefore=await page.evaluate(keys=>keys.map(key=>document.querySelector('[data-ui-range="'+key+'"]').value),headerKeys);
+  for(const key of headerKeys) await page.locator('[data-ui-range="'+key+'"]').evaluate(input=>{input.value='210';input.dispatchEvent(new Event('input',{bubbles:true}));});
+  await page.locator('[data-reset-header-heights]').click();
+  assert.deepEqual(await page.evaluate(keys=>keys.map(key=>document.querySelector('[data-ui-range="'+key+'"]').value),headerKeys),heightsBefore,'all three header heights restored');
+  await page.waitForFunction(()=>!document.querySelector('#toast').classList.contains('show'));
+  await page.waitForTimeout(250); // Let the normal toast fade finish before visual evidence.
+  for(const [name,selector] of [['sources','[data-source-follow]'],['ajouter-source','[data-add-source]'],['curseurs','[data-ui-range="textSize"]'],['affichage','[data-reset-accent]'],['essentiel','[data-brief-essential]'],['veille','[data-add-watch-rule]'],['ia','[data-ai-prompt]'],['fonctionnement','[data-setting-toggle="autoRefresh"]'],['version','[data-check-update]']]){
     await page.locator('.settings-accordion-v9185').filter({has:page.locator(selector).first()}).screenshot({path:output+'/reglages-'+name+'.png'});
   }
   const switches=await page.locator('.function-settings-v9186 .switch').evaluateAll(nodes=>nodes.map(node=>{
@@ -143,7 +154,7 @@ try {
   await page.locator('[data-setting-toggle="autoRefresh"]').click();
   await page.evaluate(()=>window.scrollTo(0,0));
   await page.screenshot({path:output+'/reglages-actions.png',fullPage:true});
-  settingsLayout={languageHeaders,actions,actionColors,switches};
+  settingsLayout={languageHeaders,actions,actionColors,switches,versionLayout,restoredHeaderHeights:heightsBefore};
   if(!native){
     assert.equal(await page.locator('[data-ai-key]').count(),0);assert.match(await page.locator('[data-ai-account]').textContent(),/APK Android/);
     assert.equal(generations,0);assert.equal(discoveryRequests,0);
@@ -187,7 +198,7 @@ try {
         borders:[...root.querySelectorAll('.ai-result-v9840')].slice(1).map(node=>({width:getComputedStyle(node).borderTopWidth,color:getComputedStyle(node).borderTopColor})),overflow:document.documentElement.scrollWidth>innerWidth};
     });
     assert.equal(layout.footers,0);assert.equal(layout.preferencesCount,0);assert.ok(Math.abs(layout.headerGap-layout.contentGap)<1,JSON.stringify(layout));assert.equal(layout.headerGap,14);
-    assert.ok(layout.headings.length===3&&layout.headings.every(value=>value.align==='center'&&Number(value.weight)>=700&&value.beforePreview&&value.font>value.bodyFont));
+    assert.ok(layout.headings.length===3&&layout.headings.every(value=>value.align==='center'&&Number(value.weight)>=700&&value.beforePreview&&value.font/value.bodyFont>=1.28));
     assert.ok(await page.locator('.ai-summary-paragraph-v9847').evaluateAll(nodes=>nodes.every(node=>{const clone=node.cloneNode(true);clone.querySelector('strong')?.remove();return /^[\p{Lu}]/u.test(clone.textContent.trim());})),'each category paragraph starts with a capital');
     assert.ok(await page.locator('.ai-card-summary-v9840 p').evaluateAll(nodes=>nodes.every(node=>/^[\p{Lu}]/u.test(node.textContent.trim()))),'card prose starts with capitals');
     assert.ok(layout.dates.length===3&&layout.dates.every(value=>value.inHeader&&value.toRight&&/\d{2}\/\d{2}\/\d{4}/.test(value.text)));
