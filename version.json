@@ -1,6 +1,6 @@
 {
   "version": "98",
-  "codeRelease": "98.42",
+  "codeRelease": "98.43",
   "release": "2026-10-02",
-  "label": "v98.42 : Retour Android et reprise DNS avant envoi"
+  "label": "v98.43 : Flux IA validé et erreurs de génération précises"
 }

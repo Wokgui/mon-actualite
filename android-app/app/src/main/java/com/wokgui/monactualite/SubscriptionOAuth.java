@@ -67,18 +67,23 @@ final class SubscriptionOAuth {
     static JSONObject completedResponse(Reader input) throws Exception {
         BufferedReader reader = new BufferedReader(input);
         StringBuilder data = new StringBuilder();
-        int bytes = 0;
+        int[] bytes = {0};
         String line;
-        while ((line = reader.readLine()) != null) {
-            bytes += line.length();
-            if (bytes > 2000000) throw new IOException("Réponse IA trop longue.");
-            if (!line.isEmpty()) { if (line.startsWith("data:")) data.append(line.substring(5).trim()); continue; }
+        while ((line = streamLine(reader, bytes)) != null) {
+            if (!line.isEmpty()) {
+                if (line.startsWith("data:")) {
+                    if (data.length() > 0) data.append('\n');
+                    String field = line.substring(5);
+                    data.append(field.startsWith(" ") ? field.substring(1) : field);
+                }
+                continue;
+            }
             if (data.length() == 0) continue;
             String eventText = data.toString(); data.setLength(0);
             if ("[DONE]".equals(eventText)) break;
             JSONObject event = new JSONObject(eventText);
             String type = event.optString("type");
-            if (type.equals("response.failed") || type.equals("response.incomplete") || type.equals("error")) throw new IOException("La génération n’a pas abouti. Vérifie les limites de ton abonnement dans ChatGPT.");
+            if (type.equals("response.failed") || type.equals("response.incomplete") || type.equals("error")) throw new IOException(SubscriptionResponse.failureText(event));
             if (!type.equals("response.completed")) continue;
             JSONObject response = event.getJSONObject("response");
             if (!"completed".equals(response.optString("status"))) throw new IOException("Génération incomplète.");
@@ -95,5 +100,20 @@ final class SubscriptionOAuth {
             return new JSONObject(text);
         }
         throw new IOException("Génération interrompue : le résultat précédent est conservé.");
+    }
+    private static String streamLine(BufferedReader reader, int[] count) throws IOException {
+        StringBuilder line = new StringBuilder(); int value;
+        while ((value = reader.read()) != -1) {
+            if (++count[0] > 2000000) throw new IOException("Réponse IA trop longue.");
+            if (value == '\n') return line.toString();
+            if (value == '\r') {
+                reader.mark(1); int next = reader.read();
+                if (next == '\n') { if (++count[0] > 2000000) throw new IOException("Réponse IA trop longue."); }
+                else if (next != -1) reader.reset();
+                return line.toString();
+            }
+            line.append((char)value);
+        }
+        return line.length() == 0 ? null : line.toString();
     }
 }

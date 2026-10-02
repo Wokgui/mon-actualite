@@ -36,7 +36,7 @@ try {
       else if (request.action === 'models') data = [{ slug: 'fixture-model', name: 'Modèle de test' }];
       else if (request.action === 'disconnect') data = account = { profiles: [], activeId: '', connected: false, planEnabled: false, email: '' };
       else if (request.action === 'generate') {
-        if (window.__AI_FAILURE) error = 'Limite d’utilisation atteinte. Consulte ChatGPT.';
+        if (window.__AI_FAILURE) error = window.__AI_FAILURE;
         else data = { summary: 'Synthèse des actualités transmises.', model: request.model || 'fixture-model', generatedAt: new Date().toISOString(), cards: request.articles.slice(0, 3).map((article, index) => ({ sourceId: article.id, title: 'Analyse IA ' + (index + 1), summary: 'Résumé factuel ' + (index + 1), image: 'https://evil.test/invented.png', url: 'javascript:alert(1)' })).concat([{ sourceId: 'invented', title: 'Faux article', summary: 'À refuser' }]) };
       }
       setTimeout(() => window.MonActualiteAI.onmessage?.({ data: JSON.stringify({ id: request.id, ok: !error, data, error }) }), request.action === 'connect' ? 300 : request.action === 'generate' ? 100 : 15);
@@ -47,7 +47,7 @@ try {
   page.on('dialog', dialog => dialog.accept());
   await page.route('**/api/news**', route => route.fulfill({ json: { articles: sources, fetchedAt: new Date().toISOString(), stats: {} } }));
   await page.route('**/api/article-photo-fast**', route => { photoRequests.push(route.request().url()); return route.fulfill({ contentType: 'image/png', headers: { 'X-Thumbnail-Status': 'feed' }, body: png }); });
-  await page.route('**/version.json**', route => route.fulfill({ json: { version: '98', codeRelease: '98.42' } }));
+  await page.route('**/version.json**', route => route.fulfill({ json: { version: '98', codeRelease: '98.43' } }));
   await page.goto(process.env.AI_BASE_URL || 'http://127.0.0.1:4173/?nativePreview=1', { waitUntil: 'domcontentloaded' });
   await page.waitForFunction(() => document.querySelectorAll('[data-stable-home-feed] img.image-ready-v98').length >= 8);
   let homePhotos = await page.locator('[data-stable-home-feed] .article-card').evaluateAll(cards => Object.fromEntries(cards.map(card => [card.dataset.article, card.querySelector('img').src])));
@@ -114,14 +114,26 @@ try {
     assert.equal(new Set(photoRequests).size, photoRequests.length, 'one photo request per article across views');
     await page.screenshot({ path: output + '/brief-ia.png', fullPage: true });
     const previous = await page.locator('.ai-results-v9840').textContent();
-    await page.evaluate(() => { window.__AI_FAILURE = true; });
     await page.locator('.bottom-nav [data-view="settings"]').click();
-    await page.locator('[data-ai-generate]').click();
-    await page.waitForSelector('.ai-error-v9840');
-    await page.locator('[data-ai-open-brief]').click();
-    assert.equal(await page.locator('.ai-results-v9840').textContent(), previous, 'failure never overwrites a complete result');
+    for (const message of [
+      'Le service a renvoyé une page Web, pas un résultat IA. HTTP 200 · format text/html · contenu HTML · réf req_fixture',
+      'Génération interrompue : le résultat précédent est conservé. HTTP 200 · format text/event-stream · contenu SSE',
+      'Limite d’utilisation atteinte. Consulte ton utilisation ChatGPT. Code : subscription_sharing_usage_limit_exceeded. HTTP 429 · format application/json · contenu JSON'
+    ]) {
+      await page.evaluate(message => { window.__AI_FAILURE = message; }, message);
+      const requestsBefore = await page.evaluate(() => window.__AI_REQUESTS.filter(request => request.action === 'generate').length);
+      await page.locator('[data-ai-generate]').click();
+      await page.waitForFunction(expected => document.querySelector('.ai-error-v9840')?.textContent.includes(expected), message);
+      assert.equal(await page.locator('[data-ai-model]').count(), 1, 'response failure keeps the account connected');
+      assert.equal(await page.locator('[data-ai-prompt]').inputValue(), custom, 'response failure retains the prompt');
+      assert.equal(await page.evaluate(() => window.__AI_REQUESTS.filter(request => request.action === 'generate').length), requestsBefore + 1, 'one generation per explicit click; no silent retry');
+      if (message.includes('text/html')) await page.screenshot({ path: output + '/erreur-format-ia.png', fullPage: true });
+      await page.locator('[data-ai-open-brief]').click();
+      assert.equal(await page.locator('.ai-results-v9840').textContent(), previous, 'failure never overwrites a complete result');
+      await page.locator('.bottom-nav [data-view="settings"]').click();
+    }
     const invalid = await page.evaluate(async () => {
-      const module = await import('./services/brief-ai.js?v=98.42');
+      const module = await import('./services/brief-ai.js?v=98.43');
       try { module.normalizeAIResult({ cards: [{ sourceId: 'bad', title: 'X', summary: 'X' }] }, [{ id: 'bad', url: 'javascript:alert(1)' }]); return false; } catch { return true; }
     });
     assert.equal(invalid, true, 'malformed persisted URLs rejected');

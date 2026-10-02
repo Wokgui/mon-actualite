@@ -1,6 +1,6 @@
 import { importOpmlPreview, fetchLiveNews } from './services/source-connectors.js?v=98.26';
-import { photoSnapshot, photoArticleKey } from './services/article-photos.js?v=98.42';
-import { AI_PROVIDERS, briefAI, aiProvider, nativeAIAvailable, setAISettings, onAIChange, refreshAIAccount, aiAccountAction, loadAIModels, generateAIBrief } from './services/brief-ai.js?v=98.42';
+import { photoSnapshot, photoArticleKey } from './services/article-photos.js?v=98.43';
+import { AI_PROVIDERS, briefAI, aiProvider, nativeAIAvailable, setAISettings, onAIChange, refreshAIAccount, aiAccountAction, loadAIModels, generateAIBrief } from './services/brief-ai.js?v=98.43';
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const app = $('#app');
@@ -1908,7 +1908,7 @@ if ('serviceWorker' in navigator && location.protocol.startsWith('http') && !nav
     serviceWorkerRefreshing = true;
     window.location.reload();
   });
-  navigator.serviceWorker.register('./sw-v98.js?v=98.42', { updateViaCache: 'none' }).then(registration => {
+  navigator.serviceWorker.register('./sw-v98.js?v=98.43', { updateViaCache: 'none' }).then(registration => {
     if (registration.waiting) registration.waiting.postMessage('SKIP_WAITING');
     registration.addEventListener('updatefound', () => {
       const installing = registration.installing;
