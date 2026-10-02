@@ -24,7 +24,7 @@ import android.webkit.WebResourceResponse;
 import androidx.webkit.WebViewAssetLoader;
 
 public class MainActivity extends Activity {
-    private static final String APP_URL = "https://mon-actualite.vercel.app/assets/index.html?native=98.47";
+    private static final String APP_URL = "https://mon-actualite.vercel.app/assets/index.html?native=98.48";
     private static final String APP_HOST = "mon-actualite.vercel.app";
 
     private FrameLayout root;
@@ -106,7 +106,7 @@ public class MainActivity extends Activity {
         settings.setMediaPlaybackRequiresUserGesture(false);
         settings.setSupportMultipleWindows(true);
         settings.setJavaScriptCanOpenWindowsAutomatically(true);
-        settings.setUserAgentString(settings.getUserAgentString() + " MonActualiteAndroid/98.47");
+        settings.setUserAgentString(settings.getUserAgentString() + " MonActualiteAndroid/98.48");
 
         assetLoader = new WebViewAssetLoader.Builder()
             .setDomain(APP_HOST)

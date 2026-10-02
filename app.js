@@ -1,7 +1,7 @@
-import { importOpmlPreview, fetchLiveNews, fetchBriefCandidates } from './services/source-connectors.js?v=98.47';
-import { photoSnapshot, photoArticleKey } from './services/article-photos.js?v=98.47';
-import { briefAI, setAISettings, onAIChange, initializeBrief, maybeGenerateBrief, generateBrief, saveGroqKey, disconnectGroq } from './services/brief-groq.js?v=98.47';
-import { newestBriefCards, briefSummaryParagraphs, briefDateLabel } from './services/brief-presentation.js?v=98.47';
+import { importOpmlPreview, fetchLiveNews, fetchBriefCandidates } from './services/source-connectors.js?v=98.48';
+import { photoSnapshot, photoArticleKey } from './services/article-photos.js?v=98.48';
+import { briefAI, setAISettings, onAIChange, initializeBrief, maybeGenerateBrief, generateBrief, saveGroqKey, disconnectGroq } from './services/brief-groq.js?v=98.48';
+import { newestBriefCards, briefSummaryParagraphs, briefArticleBlocks, briefDateLabel } from './services/brief-presentation.js?v=98.48';
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const app = $('#app');
@@ -764,7 +764,7 @@ function renderBrief() {
       return `<section class="brief-history-day-v9138 journal-section"><div class="brief-history-date-v9138">${escapeHtml(dayLabel(picks[0].article.publishedAt))}</div><div class="feed stable-owned-list">${picks.map(({ article }, index) => compactArticleRow(article, dayIndex * essentialCount + index)).join('')}</div></section>`;
     }).filter(Boolean).join('');
   const watchCount = watchNewCount();
-  return `<main class="page">${topbar(ui('brief'), false)}
+  return `<main class="page ${state.briefMode === 'ai' ? 'ai-brief-page-v9848' : ''}">${topbar(ui('brief'), false)}
     <div class="brief-mode-tabs"><button class="brief-mode-tab ${state.briefMode === 'essential' ? 'active' : ''}" data-brief-mode="essential">${escapeHtml(ui('essential'))}</button><button class="brief-mode-tab watch-tab-v9184 ${state.briefMode === 'watches' ? 'active' : ''}" data-brief-mode="watches">${escapeHtml(ui('watch'))}${watchCount ? `<span class="watch-new-badge-v9184">${watchCount > 9 ? '9+' : watchCount}</span>` : ''}</button><button class="brief-mode-tab ${state.briefMode === 'ai' ? 'active' : ''}" data-brief-mode="ai">IA</button></div>
     <div class="runtime-brief-content" data-stable-brief-content>${state.briefMode === 'essential' ? essential : state.briefMode === 'ai' ? renderAIBrief() : renderWatchesFinal()}</div>
   </main>${nav('brief')}`;
@@ -957,9 +957,10 @@ function renderAIBrief() {
   const result = briefAI.result;
   const summary = result ? briefSummaryParagraphs(result.summary).map(paragraph => `<p class="ai-summary-paragraph-v9847">${paragraph.topic ? `<strong class="ai-summary-topic-v9847">${escapeHtml(paragraph.topic)}</strong>` : ''}${aiSummaryLinks(result, paragraph.text)}</p>`).join('') : '';
   return `<section class="ai-brief-v9840">
-    ${aiStatusMarkup({ notices: false })}${result ? `<section class="ai-news-summary-v9840"><h3>Synthèse de tes sujets</h3>${result.partialSources ? '<p class="muted-note">Recherche ciblée indisponible lors de cette synthèse : articles déjà présents dans l’appli uniquement.</p>' : ''}<div class="ai-summary-text-v9847">${summary}</div><footer class="ai-summary-footer-v9847"><time datetime="${escapeHtml(result.generatedAt || '')}">${escapeHtml(briefDateLabel(result.generatedAt))}</time>${result.cards.length ? '<a href="#ai-articles-v9847">Voir les articles sources</a>' : ''}</footer></section><div id="ai-articles-v9847" class="feed stable-owned-list ai-results-v9840">${newestBriefCards(result.cards).map((card, index) => {
+    ${aiStatusMarkup({ notices: false })}${result ? `<section class="ai-news-summary-v9840">${result.partialSources ? '<p class="muted-note">Recherche ciblée indisponible lors de cette synthèse : articles déjà présents dans l’appli uniquement.</p>' : ''}<div class="ai-summary-text-v9847">${summary}</div></section><div id="ai-articles-v9847" class="feed stable-owned-list ai-results-v9840">${newestBriefCards(result.cards).map((card, index) => {
       rememberRenderedArticle(card.article);
-      return `<section class="ai-result-v9840"><article class="article-card runtime-row" data-article="${escapeHtml(card.article.id)}" tabindex="0" aria-label="Ouvrir l’article source : ${escapeHtml(card.title)}">${articleVisual(card.article, index)}<div class="article-body"><h2>${escapeHtml(card.title)}</h2><div class="meta"><span class="article-category-badge">IA</span><span class="ai-source-name-v9840">${escapeHtml(card.article.source)}</span></div></div></article><p class="ai-card-summary-v9840">${escapeHtml(card.summary)}</p><footer class="ai-article-footer-v9847">${briefDateLabel(card.article.publishedAt) ? `<time datetime="${escapeHtml(card.article.publishedAt)}">${escapeHtml(briefDateLabel(card.article.publishedAt))}</time>` : ''}<a class="ai-source-v9840" href="${escapeHtml(card.article.url)}" target="_blank" rel="noopener noreferrer">Lire la source originale</a></footer></section>`;
+      const paragraphs = briefArticleBlocks(card.summary).map(block => block.type === 'heading' ? `<h3 class="ai-card-topic-v9848">${escapeHtml(block.text)}</h3>` : `<p>${escapeHtml(block.text)}</p>`).join('');
+      return `<section class="ai-result-v9840"><article class="article-card runtime-row" data-article="${escapeHtml(card.article.id)}" tabindex="0" aria-label="Ouvrir l’article source : ${escapeHtml(card.title)}">${articleVisual(card.article, index)}<div class="article-body"><h2>${escapeHtml(card.title)}</h2><div class="meta"><span class="article-category-badge">IA</span><span class="ai-source-meta-v9848"><span class="ai-source-name-v9840">${escapeHtml(card.article.source)}</span>${briefDateLabel(card.article.publishedAt) ? `<time class="ai-publication-v9848" datetime="${escapeHtml(card.article.publishedAt)}">${escapeHtml(briefDateLabel(card.article.publishedAt))}</time>` : ''}</span></div></div></article>${paragraphs ? `<div class="ai-card-summary-v9840">${paragraphs}</div>` : ''}</section>`;
     }).join('')}</div>` : '<p class="ai-empty-v9840">Ta synthèse et les articles IA apparaîtront ici automatiquement. Enregistre une fois ta clé gratuite Groq dans Réglages → IA.</p>'}</section>`;
 }
 
@@ -1918,7 +1919,7 @@ if ('serviceWorker' in navigator && location.protocol.startsWith('http') && !nav
     serviceWorkerRefreshing = true;
     window.location.reload();
   });
-  navigator.serviceWorker.register('./sw-v98.js?v=98.47', { updateViaCache: 'none' }).then(registration => {
+  navigator.serviceWorker.register('./sw-v98.js?v=98.48', { updateViaCache: 'none' }).then(registration => {
     if (registration.waiting) registration.waiting.postMessage('SKIP_WAITING');
     registration.addEventListener('updatefound', () => {
       const installing = registration.installing;

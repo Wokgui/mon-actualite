@@ -8,6 +8,12 @@ Brief → IA affiche une synthèse justifiée avec un titre centré et des parag
 
 Les cartes sont triées par date de publication décroissante lors de la normalisation et du rendu, y compris pour les anciens caches, sans mutation des sources ou des photos. Les résultats invalides ou sans date valide restent à la fin. Le prompt système demande désormais un paragraphe court par sujet séparé par deux sauts de ligne. Les anciens résultats sont lus sans réécriture de leur texte; leurs sauts de ligne existants sont respectés. Aucun appel Groq supplémentaire n’est lancé pour remettre en forme un cache.
 
+## Présentation 98.48
+
+Brief → IA retire le titre de synthèse et les pieds de carte. L’introduction reste justifiée, y compris lorsqu’elle contient un deux-points. Les espacements bandeau → onglets et onglets → synthèse utilisent la même valeur de 14 px. Les cartes sont resserrées, sans supprimer la protection contre le bandeau de navigation fixe.
+
+La date et l’heure de publication sont à droite de la source dans l’en-tête de chaque article. Les titres intermédiaires des cartes sont centrés et gras. Un formateur pur nettoie aussi les anciens résultats : les libellés Utilité et Statut disparaissent mais leur contenu reste; le bloc Source et sa continuation sont retirés puisque la provenance et l’accès à l’article existent dans l’en-tête. Le cache, le prompt personnel, la clé et les verrous de photos sont inchangés. Les futures générations reçoivent également cette consigne de présentation. Le test mobile mesure les espacements, les dates en en-tête, le nettoyage des anciens blocs et l’absence des pieds de carte, en plus des contrôles précédents.
+
 ## Activation unique dans l’APK
 
 Créer un compte sur https://console.groq.com/keys, rester sur Free sans activer de facturation, créer une clé, puis l’enregistrer dans Réglages → IA. Ne jamais transmettre la clé dans une conversation. Le compte et les limites Groq sont indépendants de l’abonnement ChatGPT. L’app ne crée aucun compte et ne souscrit aucune offre payante.
