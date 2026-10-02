@@ -63,7 +63,12 @@ final class SubscriptionAiBridge {
         this.activity = activity;
         file = new AtomicFile(new File(activity.getNoBackupFilesDir(), "subscription-ai-v1.enc"));
         // If a vault cannot be decrypted, fail closed. Never silently overwrite it.
-        try { vault = readVault(); } catch (Exception ignored) { vault = null; }
+        try {
+            vault = readVault();
+            String savedHost = vault.getString("hostId");
+            String validHost = SubscriptionOAuth.hostId(savedHost);
+            if (!savedHost.equals(validHost)) { vault.put("hostId", validHost); saveVault(); }
+        } catch (Exception ignored) { vault = null; }
         if (!WebViewFeature.isFeatureSupported(WebViewFeature.WEB_MESSAGE_LISTENER)) return;
         WebViewCompat.addWebMessageListener(webView, "MonActualiteAI", Collections.singleton(ORIGIN),
             (view, message, sourceOrigin, isMainFrame, reply) -> {
@@ -155,7 +160,7 @@ final class SubscriptionAiBridge {
             Map<String, String> fields = new HashMap<>();
             fields.put("client_id", previousClient.isEmpty() ? "dynamic_agent_client" : previousClient);
             if (previousClient.isEmpty()) fields.put("agent_name_hint", "Mon Actualité");
-            fields.put("ext_agent_host_id", vault.getString("hostId"));
+            fields.put("ext_agent_host_id", SubscriptionOAuth.hostId(vault.getString("hostId")));
             if (!email.isEmpty()) fields.put("login_hint", email);
             fields.put("response_type", "code"); fields.put("redirect_uri", redirect);
             fields.put("scope", SubscriptionOAuth.SCOPES); fields.put("resource", SubscriptionOAuth.RESOURCE);
@@ -350,7 +355,7 @@ final class SubscriptionAiBridge {
     }
     private JSONObject readVault() throws Exception {
         if (!file.getBaseFile().exists()) {
-            JSONObject initial = new JSONObject().put("hostId", UUID.randomUUID().toString()).put("profiles", new JSONArray()).put("activeId", "");
+            JSONObject initial = new JSONObject().put("hostId", SubscriptionOAuth.hostId(UUID.randomUUID().toString())).put("profiles", new JSONArray()).put("activeId", "");
             vault = initial; saveVault(); return initial;
         }
         JSONObject envelope = new JSONObject(new String(file.readFully(), StandardCharsets.UTF_8));

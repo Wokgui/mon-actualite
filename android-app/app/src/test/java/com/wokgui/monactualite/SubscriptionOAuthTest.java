@@ -15,6 +15,9 @@ import java.util.Arrays;
 import static org.junit.Assert.*;
 
 public class SubscriptionOAuthTest {
+    @Test public void migratesBareHostUuidWithoutChangingIt() throws Exception { assertEquals("urn:uuid:3b539c06-5860-4450-a848-c1f876184c02", SubscriptionOAuth.hostId("3b539c06-5860-4450-a848-c1f876184c02")); }
+    @Test public void hostMigrationIsIdempotent() throws Exception { String value = "urn:uuid:3b539c06-5860-4450-a848-c1f876184c02"; assertEquals(value, SubscriptionOAuth.hostId(SubscriptionOAuth.hostId(value))); }
+    @Test public void rejectsInvalidHostIds() { for (String invalid : new String[]{"", "user@example.test", "urn:uuid:wrong", "3b539c06-5860-1450-a848-c1f876184c02"}) assertThrows(Exception.class, () -> SubscriptionOAuth.hostId(invalid)); }
     private KeyPair pair;
     private JSONObject jwks, claims;
     @Before public void prepare() throws Exception {

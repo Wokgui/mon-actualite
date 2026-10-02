@@ -1,4 +1,12 @@
-# Brief IA — contrat de connexion par abonnement (98.40)
+# Brief IA — contrat de connexion par abonnement (98.41)
+
+## Correction 98.41
+
+La réponse visible sur le téléphone refusait ext_agent_host_id. La version 98.40 envoyait un UUID nu; le format UUID accepté par OpenAI est une URI urn:uuid:<UUIDv4>. La mise à jour migre atomiquement la représentation de l’identifiant enregistré, sans générer un autre UUID ni effacer les comptes ou les réglages. Les nouvelles installations utilisent directement le format URI. Trois tests JVM couvrent la migration, son idempotence et le rejet des formats invalides.
+
+Les libellés du service, de la gestion de l’abonnement et du prompt sont centrés. Les espaces sélecteur/paragraphe et paragraphe/actions sont mesurés égaux. Brief → IA ne contient plus de contrôles : uniquement le message d’attente, ou le résumé et les cartes obtenues. La génération et la configuration restent dans Réglages → IA.
+
+La sonde anonyme du fournisseur réel est bloquée par une protection anti-robot HTTP 403 sur l’environnement de test, tant avec l’ancien format qu’avec le format corrigé. Ce blocage distinct n’est pas présenté comme une connexion réussie; la validation de bout en bout doit être faite volontairement par l’utilisateur sur son téléphone.
 
 ## Disponible et limites explicites
 

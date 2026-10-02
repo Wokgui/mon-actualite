@@ -19,6 +19,12 @@ final class SubscriptionOAuth {
     static final String RESOURCE = "https://api.openai.com/v1";
     static final String PLAN_SCOPE = "chatgpt.tokens.use.direct";
     static final String SCOPES = "openid profile email offline_access resource.invoke " + PLAN_SCOPE;
+    static String hostId(String saved) throws Exception {
+        String uuid = saved.startsWith("urn:uuid:") ? saved.substring(9) : saved;
+        if (!uuid.matches("(?i)[0-9a-f]{8}-[0-9a-f]{4}-4[0-9a-f]{3}-[89ab][0-9a-f]{3}-[0-9a-f]{12}")) throw new Exception("Identifiant de l’installation invalide.");
+        // Preserve the existing UUID; migrate its representation, not its identity.
+        return saved.startsWith("urn:uuid:") ? saved : "urn:uuid:" + uuid;
+    }
     static byte[] decode(String text) { return Base64.getUrlDecoder().decode(text); }
     static String encode(byte[] bytes) { return Base64.getUrlEncoder().withoutPadding().encodeToString(bytes); }
     static boolean equal(String a, String b) {

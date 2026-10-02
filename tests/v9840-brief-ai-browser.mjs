@@ -43,7 +43,7 @@ try {
   page.on('dialog', dialog => dialog.accept());
   await page.route('**/api/news**', route => route.fulfill({ json: { articles: sources, fetchedAt: new Date().toISOString(), stats: {} } }));
   await page.route('**/api/article-photo-fast**', route => { photoRequests.push(route.request().url()); return route.fulfill({ contentType: 'image/png', headers: { 'X-Thumbnail-Status': 'feed' }, body: png }); });
-  await page.route('**/version.json**', route => route.fulfill({ json: { version: '98', codeRelease: '98.40' } }));
+  await page.route('**/version.json**', route => route.fulfill({ json: { version: '98', codeRelease: '98.41' } }));
   await page.goto(process.env.AI_BASE_URL || 'http://127.0.0.1:4173/?nativePreview=1', { waitUntil: 'domcontentloaded' });
   await page.waitForFunction(() => document.querySelectorAll('[data-stable-home-feed] img.image-ready-v98').length >= 8);
   let homePhotos = await page.locator('[data-stable-home-feed] .article-card').evaluateAll(cards => Object.fromEntries(cards.map(card => [card.dataset.article, card.querySelector('img').src])));
@@ -70,14 +70,26 @@ try {
   const custom = 'Résume uniquement la science et explique les conséquences.';
   await page.locator('[data-ai-prompt]').fill(custom);
   assert.equal(await page.locator('[data-ai-prompt]').inputValue(), custom, 'typing retains focus and all text');
+  const alignment = await page.evaluate(() => {
+    const account = document.querySelector('[data-ai-account]');
+    const field = account.querySelector('.ai-provider-field-v9841');
+    const note = account.querySelector('.ai-connection-note-v9841');
+    const action = account.querySelector('.ai-actions-v9840') || account.querySelector('a.secondary-btn');
+    const r = node => node.getBoundingClientRect();
+    return { service: getComputedStyle(field.querySelector('strong')).textAlign, prompt: getComputedStyle(document.querySelector('.ai-prompt-field-v9841 strong')).textAlign, usage: getComputedStyle(account.querySelector('.ai-usage-v9840')).textAlign, above: r(note).top - r(field).bottom, below: r(action).top - r(note).bottom };
+  });
+  assert.deepEqual([alignment.service, alignment.prompt, alignment.usage], ['center','center','center']);
+  assert.ok(Math.abs(alignment.above - alignment.below) <= .75, 'selector/note and note/action gaps must be equal: ' + JSON.stringify(alignment));
   await page.screenshot({ path: output + '/reglages-ia.png', fullPage: true });
   if (nativeFixtures) {
     await page.locator('[data-ai-connect]').click();
     await page.waitForSelector('[data-ai-model]');
     await page.locator('[data-ai-model]').selectOption('fixture-model');
+    await page.locator('[data-ai-generate]').click();
+    await page.waitForFunction(() => !document.querySelector('[data-ai-generate]')?.disabled);
     await page.locator('[data-ai-open-brief]').click();
     assert.equal(await page.locator('.brief-mode-tab').count(), 3);
-    await page.locator('[data-ai-generate]').click();
+    assert.equal(await page.locator('.ai-brief-v9840 button,.ai-brief-v9840 select,.ai-brief-v9840 [data-ai-account]').count(), 0, 'Brief IA contains results only');
     await page.waitForSelector('.ai-result-v9840');
     assert.equal(await page.locator('.ai-result-v9840').count(), 3, 'invented source is discarded');
     await page.waitForFunction(() => document.querySelectorAll('.ai-result-v9840 img.image-ready-v98').length === 3);
@@ -88,11 +100,13 @@ try {
     await page.screenshot({ path: output + '/brief-ia.png', fullPage: true });
     const previous = await page.locator('.ai-results-v9840').textContent();
     await page.evaluate(() => { window.__AI_FAILURE = true; });
+    await page.locator('.bottom-nav [data-view="settings"]').click();
     await page.locator('[data-ai-generate]').click();
     await page.waitForSelector('.ai-error-v9840');
+    await page.locator('[data-ai-open-brief]').click();
     assert.equal(await page.locator('.ai-results-v9840').textContent(), previous, 'failure never overwrites a complete result');
     const invalid = await page.evaluate(async () => {
-      const module = await import('./services/brief-ai.js?v=98.40');
+      const module = await import('./services/brief-ai.js?v=98.41');
       try { module.normalizeAIResult({ cards: [{ sourceId: 'bad', title: 'X', summary: 'X' }] }, [{ id: 'bad', url: 'javascript:alert(1)' }]); return false; } catch { return true; }
     });
     assert.equal(invalid, true, 'malformed persisted URLs rejected');
@@ -107,8 +121,12 @@ try {
   } else {
     assert.equal(await page.locator('[data-ai-connect]').count(), 0);
     assert.match(await page.locator('[data-ai-account]').textContent(), /nécessite l’application Android/);
-    await page.locator('[data-ai-open-brief]').click();
     assert.equal(await page.locator('[data-ai-generate]').isDisabled(), true);
+    await page.locator('[data-ai-open-brief]').click();
+    assert.equal(await page.locator('.ai-brief-v9840 button,.ai-brief-v9840 select,.ai-brief-v9840 h2,.ai-brief-v9840 [data-ai-account]').count(), 0);
+    assert.equal(await page.locator('.ai-brief-v9840>p').count(), 1);
+    assert.match(await page.locator('.ai-empty-v9840').textContent(), /Ton résumé et tes articles IA apparaîtront ici/);
+    await page.screenshot({ path: output + '/brief-ia-vide.png' });
   }
   assert.deepEqual(errors, []);
   const verification = { pass: true, fixture: nativeFixtures ? 'native protocol simulated; no real account login' : 'web without native bridge', apkAssets: !!assets, providers: 6, photos: photoRequests.length, errors };
