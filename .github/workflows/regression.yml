@@ -23,6 +23,7 @@ jobs:
           node tests/v89-static-check.mjs
           node tests/v9846-groq.mjs
           node tests/v9847-brief-presentation.mjs
+          node tests/v9853-brief-readiness.mjs
           node tests/v98-locale-backend.mjs
           node tests/v9831-photo-selection.mjs
           node tests/v9836-publisher-photo-connectors.mjs
@@ -56,6 +57,7 @@ jobs:
             sleep 0.2
           done
           node tests/v9193-current-ui-browser.mjs
+          node tests/v9853-brief-ready-text-browser.mjs test-results/brief-ready-text
           node tests/v98-settings-images-browser.mjs test-results/v98
           node tests/v9831-photos-browser.mjs test-results/photos-v9831
           HEADER_BASE_URL=http://127.0.0.1:4173/?nativePreview=1 node tests/v9832-header-background-browser.mjs test-results/header-background

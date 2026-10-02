@@ -1,5 +1,11 @@
 # Brief IA automatique — Groq (98.46)
 
+## Présentation et ouverture 98.53
+
+Le rendu initial de L’essentiel contient uniquement un message de chargement sous les onglets, sans cartes ni images dans le DOM. Une seule préparation de données par langue complète ce rendu en une fois; les anciens observateurs de visibilité et l’interception des clics de navigation sont retirés. Une réponse complète d’une ou deux journées est utilisable, sans attente infinie de trois journées. Le délai réseau est limité à douze secondes avec repli sur le catalogue disponible. L’historique dédié ne remplace plus le catalogue d’Accueil pendant la lecture.
+
+Accueil, L’essentiel, Veille et les textes des synthèses IA utilisent la même taille calculée : 11,5 px × réglage du texte × réglage des titres. Le minimum reste celui d’Accueil, soit 11,5 px à texte 100 et titres 100 (8,05 px si les titres sont aussi réduits à 70). Les domaines IA restent volontairement plus grands, centrés et gras. Les tests vérifient une requête d’historique, zéro image et zéro carte pendant l’attente, la réponse partielle en jours, l’erreur et le cache de repli, les quatre tailles au minimum et maximum, leur persistance après rechargement et l’absence de débordement à 320 px.
+
 ## Présentation 98.47
 
 Réglages → IA utilise partout la taille de « Service d’intelligence artificielle », tout en respectant le réglage de taille de l’interface. Les intitulés de service et de clé sont centrés et le prompt est justifié.

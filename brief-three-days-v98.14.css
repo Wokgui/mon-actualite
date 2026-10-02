@@ -1,3 +1,0 @@
-/* Le premier rendu de L’essentiel n’apparaît qu’une fois trois journées constituées. */
-[data-stable-brief-content].brief-waiting-three-days{min-height:55vh;visibility:hidden;position:relative}
-[data-stable-brief-content].brief-waiting-three-days::after{content:'Chargement de L’essentiel…';visibility:visible;position:absolute;inset:0;display:flex;align-items:center;justify-content:center;font-size:calc(13px * var(--interface-text-scale));color:#77748a}

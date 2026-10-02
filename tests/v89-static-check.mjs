@@ -25,7 +25,7 @@ for (const ref of new Set(refs)) {
 if (!process.exitCode) ok('all local index assets exist');
 
 const scripts = [...index.matchAll(/<script[^>]+src="([^"]+)"/g)].map(match => match[1]);
-const runtimeFiles = new Set(['startup-stability-v98.15.js', 'release-watch.js', 'article-access-v91.48.js', 'startup-news-prefetch-v91.83.js', 'app.js', 'image-pipeline.js', 'nav-solid-hardfix-v91.89.js', 'ui-settings-fix-v98.11.js', 'brief-three-days-v98.14.js', 'brief-prefetch-v98.15.js']);
+const runtimeFiles = new Set(['startup-stability-v98.15.js', 'release-watch.js', 'article-access-v91.48.js', 'startup-news-prefetch-v91.83.js', 'app.js', 'image-pipeline.js', 'nav-solid-hardfix-v91.89.js', 'ui-settings-fix-v98.11.js']);
 for (const src of scripts) if (!runtimeFiles.has(src.split('?')[0])) fail(`unexpected runtime owner: ${src}`);
 if (scripts.length !== runtimeFiles.size) fail('runtime must contain exactly the current approved modules without duplicates');
 else ok(`current runtime allowlist: ${scripts.length} scripts, no duplicate photo owner`);

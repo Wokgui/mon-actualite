@@ -42,7 +42,7 @@ try {
     return route.fulfill({json:{articles:isBrief?[...sources,discovered]:sources,fetchedAt:new Date().toISOString(),stats:{}}});
   });
   await page.route('**/api/article-photo-fast**',route=>{photoRequests.push(route.request().url());return route.fulfill({body:png,contentType:'image/png',headers:{'X-Thumbnail-Status':'feed'}});});
-  await page.route('**/version.json**',route=>route.fulfill({json:{version:'98',codeRelease:'98.52'}}));
+  await page.route('**/version.json**',route=>route.fulfill({json:{version:'98',codeRelease:'98.53'}}));
   await page.goto(process.env.AI_BASE_URL||'http://127.0.0.1:4173/?nativePreview=1',{waitUntil:'domcontentloaded'});
   await page.waitForFunction(()=>document.querySelectorAll('[data-stable-home-feed] img.image-ready-v98').length>=8);
   const homeBefore=await page.locator('[data-stable-home-feed] .article-card').evaluateAll(cards=>cards.map(card=>({id:card.dataset.article,src:card.querySelector('img').src})));

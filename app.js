@@ -1,7 +1,8 @@
-import { importOpmlPreview, fetchLiveNews, fetchBriefCandidates } from './services/source-connectors.js?v=98.52';
-import { photoSnapshot, photoArticleKey } from './services/article-photos.js?v=98.52';
-import { briefAI, setAISettings, onAIChange, initializeBrief, maybeGenerateBrief, generateBrief, saveGroqKey, disconnectGroq } from './services/brief-groq.js?v=98.52';
-import { newestBriefCards, briefSummaryParagraphs, briefArticleBlocks, briefDateLabel } from './services/brief-presentation.js?v=98.52';
+import { importOpmlPreview, fetchLiveNews, fetchBriefCandidates } from './services/source-connectors.js?v=98.53';
+import { photoSnapshot, photoArticleKey } from './services/article-photos.js?v=98.53';
+import { briefAI, setAISettings, onAIChange, initializeBrief, maybeGenerateBrief, generateBrief, saveGroqKey, disconnectGroq } from './services/brief-groq.js?v=98.53';
+import { newestBriefCards, briefSummaryParagraphs, briefArticleBlocks, briefDateLabel } from './services/brief-presentation.js?v=98.53';
+import { hasBriefHistory, prepareBriefHistory } from './brief-prefetch-v98.15.js?v=98.53';
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const app = $('#app');
@@ -197,6 +198,8 @@ const state = {
   articles: Array.isArray(cache.articles) ? cache.articles : [],
   lastSync: cache.fetchedAt || null,
   syncStatus: 'idle', syncError: '', stats: cache.stats || null,
+  essentialStatus: hasBriefHistory(Array.isArray(cache.articles) ? cache.articles : []) ? 'ready' : 'loading',
+  essentialArticles: Array.isArray(cache.articles) ? cache.articles : [],
   newsPeriod: 'today', customFrom: todayOffset(-7), customTo: todayOffset(0),
   sheet: false, savedOnly: false, opmlName: 'Aucun fichier importé',
   settings: {
@@ -418,10 +421,10 @@ function isVideoOnlyArticle(article = {}) {
   return explicitVideo || videoHost || sourceVideo || (videoTitle && (videoPath || summary.length < 220));
 }
 
-function visibleArticles() {
+function visibleArticles(articles = state.articles) {
   const blockedTerms = (state.blockedTerms || []).map(normalizeTopic).filter(term => term.length >= 2);
   const blockedSources = state.blockedSources || new Set();
-  return state.articles
+  return articles
     .filter(article => article && typeof article === 'object')
     .filter(article => isInArticleHistory(article.publishedAt || article.date))
     .filter(article => !isVideoOnlyArticle(article))
@@ -723,7 +726,8 @@ function renderBrief() {
   };
   const allowedEssential = new Set(state.settings.briefEssentialCategories);
   const essentialCount = state.settings.essentialCount;
-  const ranked = visibleArticles().filter(article => !allowedEssential.size || allowedEssential.has(article.category)).map(article => {
+  const essentialArticles = [...new Map([...state.essentialArticles, ...state.articles].filter(article => article && typeof article === 'object').map(article => [article.url || article.id, article])).values()];
+  const ranked = (state.essentialStatus === 'ready' ? visibleArticles(essentialArticles) : []).filter(article => !allowedEssential.size || allowedEssential.has(article.category)).map(article => {
     const text = `${article.title || ''} ${article.summary || ''}`;
     const age = Math.max(0, (Date.now() - Date.parse(article.publishedAt || 0)) / 3600000);
     const category = globalCategories.has(article.category) ? 55 : -35;
@@ -766,9 +770,11 @@ function renderBrief() {
   const watchCount = watchNewCount();
   const watches = state.briefMode === 'watches' ? renderWatchesFinal() : '';
   const hasContent = state.briefMode === 'ai' ? Boolean(briefAI.result) : Boolean(watches);
+  const essentialLoading = state.briefMode === 'essential' && state.essentialStatus !== 'ready';
+  const essentialContent = essentialLoading ? '<p class="brief-loading-message-v9853" role="status">Chargement de L’essentiel…</p>' : essential || '<p class="brief-loading-message-v9853">Aucun article disponible pour les domaines choisis.</p>';
   return `<main class="page ${state.briefMode !== 'essential' ? 'brief-preferences-page-v9849' : ''} ${state.briefMode === 'ai' ? 'ai-brief-page-v9848' : ''}">${topbar(ui('brief'), false)}
     <div class="brief-mode-tabs"><button class="brief-mode-tab ${state.briefMode === 'essential' ? 'active' : ''}" data-brief-mode="essential">${escapeHtml(ui('essential'))}</button><button class="brief-mode-tab watch-tab-v9184 ${state.briefMode === 'watches' ? 'active' : ''}" data-brief-mode="watches">${escapeHtml(ui('watch'))}${watchCount ? `<span class="watch-new-badge-v9184">${watchCount > 9 ? '9+' : watchCount}</span>` : ''}</button><button class="brief-mode-tab ${state.briefMode === 'ai' ? 'active' : ''}" data-brief-mode="ai">IA</button></div>
-    <div class="runtime-brief-content" data-stable-brief-content>${state.briefMode !== 'essential' && !hasContent ? '<p class="brief-preferences-note-v9849">Réglez vos préférences dans l’onglet Réglages</p>' : ''}${state.briefMode === 'essential' ? essential : state.briefMode === 'ai' ? renderAIBrief() : watches}</div>
+    <div class="runtime-brief-content" data-stable-brief-content aria-busy="${essentialLoading}">${state.briefMode !== 'essential' && !hasContent ? '<p class="brief-preferences-note-v9849">Réglez vos préférences dans l’onglet Réglages</p>' : ''}${state.briefMode === 'essential' ? essentialContent : state.briefMode === 'ai' ? renderAIBrief() : watches}</div>
   </main>${nav('brief')}`;
 }
 
@@ -1480,6 +1486,9 @@ function selectLanguage(code) {
   state.settings.language = code;
   state.settings.enabledLanguages = [...new Set([...state.settings.enabledLanguages, code])];
   state.articles = [];
+  state.essentialArticles = [];
+  state.essentialStatus = 'loading';
+  void prepareEssential();
   state.lastSync = null;
   state.stats = null;
   state.homeOrder = [];
@@ -1922,7 +1931,7 @@ if ('serviceWorker' in navigator && location.protocol.startsWith('http') && !nav
     serviceWorkerRefreshing = true;
     window.location.reload();
   });
-  navigator.serviceWorker.register('./sw-v98.js?v=98.52', { updateViaCache: 'none' }).then(registration => {
+  navigator.serviceWorker.register('./sw-v98.js?v=98.53', { updateViaCache: 'none' }).then(registration => {
     if (registration.waiting) registration.waiting.postMessage('SKIP_WAITING');
     registration.addEventListener('updatefound', () => {
       const installing = registration.installing;
@@ -2031,6 +2040,19 @@ function allowedBriefArticle(article) {
   const text = normalizeTopic([article.title, article.summary, article.source, article.category].join(' '));
   return !(state.blockedTerms || []).some(term => normalizeTopic(term).length >= 2 && text.includes(normalizeTopic(term)));
 }
+// Preparation does not mutate Home's catalogue or intercept navigation clicks.
+let essentialRequest = 0;
+async function prepareEssential() {
+  if (state.essentialStatus === 'ready') return;
+  const request = ++essentialRequest;
+  const language = state.settings.language;
+  const result = await prepareBriefHistory({language, fallback:state.articles.slice()});
+  if (request !== essentialRequest || language !== state.settings.language) return;
+  state.essentialArticles = result.error && state.articles.length ? state.articles.slice() : result.articles;
+  state.essentialStatus = 'ready';
+  if (state.view === 'brief' && state.briefMode === 'essential') render({scrollTop:window.scrollY});
+}
+void prepareEssential();
 bootLatestNews().finally(() => initializeBrief({ getArticles: visibleArticles, filter: allowedBriefArticle, discover: keywords => {
   if (!state.settings.webSearch) return Promise.reject(Error('Recherche Web désactivée.'));
   const locale = LANGUAGE_PRESETS[state.settings.language] || LANGUAGE_PRESETS.fr;
