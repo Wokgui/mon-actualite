@@ -1,0 +1,229 @@
+/* v91.55 — mise en page approuvée : entêtes, Brief/Veille et Personnaliser */
+
+/* Mon actualité : bloc date + titre centré et plus aéré. */
+body.home-view-v9155 .hero-header {
+  position: relative !important;
+  width: 100% !important;
+  padding: 14px 50px 17px !important;
+  text-align: center !important;
+}
+
+body.home-view-v9155 .hero-header .eyebrow,
+body.home-view-v9155 .hero-header h1 {
+  width: 100% !important;
+  text-align: center !important;
+}
+
+body.home-view-v9155 .hero-header .eyebrow {
+  margin: 0 0 8px !important;
+}
+
+body.home-view-v9155 .hero-header h1 {
+  margin: 0 !important;
+}
+
+body.home-view-v9155 .hero-header p {
+  display: none !important;
+}
+
+/* Même bouton Réinitialiser, plus lisible, placé dans l'entête courant. */
+.global-reset-v9154 {
+  width: 38px !important;
+  height: 38px !important;
+  border-radius: 13px !important;
+  font-size: 26px !important;
+  line-height: 38px !important;
+}
+
+body.home-view-v9155 .hero-header > .global-reset-v9154 {
+  position: absolute !important;
+  z-index: 4 !important;
+  top: 50% !important;
+  right: 0 !important;
+  left: auto !important;
+  transform: translateY(-50%) !important;
+}
+
+/* Mon actualité : titres seuls, réellement centrés verticalement face aux photos. */
+body.home-view-v9155 [data-stable-home-feed] .article-body {
+  justify-content: center !important;
+  padding-top: 12px !important;
+  padding-bottom: 12px !important;
+}
+
+body.home-view-v9155 [data-stable-home-feed] .card-top,
+body.home-view-v9155 [data-stable-home-feed] .summary,
+body.home-view-v9155 [data-stable-home-feed] .meta {
+  display: none !important;
+}
+
+body.home-view-v9155 [data-stable-home-feed] .article-card h2 {
+  margin: 0 !important;
+}
+
+/* Brief / Veille : une seule ligne compacte, parfaitement centrée, avec reset à droite. */
+.brief-controls-row-v9155 {
+  display: grid !important;
+  grid-template-columns: 38px minmax(0, 228px) 38px !important;
+  align-items: center !important;
+  justify-content: center !important;
+  column-gap: 9px !important;
+  width: 100% !important;
+  margin: 7px auto 14px !important;
+}
+
+.brief-controls-row-v9155 .brief-mode-tabs {
+  grid-column: 2 !important;
+  width: 228px !important;
+  margin: 0 !important;
+  justify-self: center !important;
+  min-height: 38px !important;
+  padding: 3px !important;
+  border-radius: 15px !important;
+}
+
+.brief-controls-row-v9155 .brief-mode-tab {
+  min-height: 36px !important;
+  padding: 7px 11px !important;
+  border-radius: 12px !important;
+  font-size: 12.5px !important;
+}
+
+.brief-controls-row-v9155 > .global-reset-v9154 {
+  position: static !important;
+  grid-column: 3 !important;
+  justify-self: center !important;
+  transform: none !important;
+  margin: 0 !important;
+}
+
+/* Espacement vertical identique au flux Mon actualité. */
+body.brief-view-v9155 .runtime-brief-content .feed {
+  gap: 13px !important;
+}
+
+body.brief-view-v9155 .runtime-row {
+  margin: 0 !important;
+}
+
+/* Dans Veille : pas de bandeau Aujourd'hui ni de bascule Toute l'actualité. */
+body.brief-watch-active-v9155 .watch-day-v9138:first-of-type > h3,
+body.brief-watch-active-v9155 .watch-all-band-v9138,
+body.brief-watch-active-v9155 .watch-all-feed-v9138 {
+  display: none !important;
+}
+
+body.brief-watch-active-v9155 .watch-day-v9138:first-of-type {
+  padding-top: 0 !important;
+  margin-top: 0 !important;
+}
+
+/* Personnaliser : éviter le flash de la feuille modale avant son habillage JS. */
+.sheet-backdrop:has(.personalization-sheet) {
+  z-index: 15 !important;
+  inset: 0 !important;
+  align-items: stretch !important;
+  justify-content: center !important;
+  padding: 0 !important;
+  background: #f7f5fc !important;
+  backdrop-filter: none !important;
+}
+
+.sheet-backdrop:has(.personalization-sheet) .personalization-sheet {
+  width: min(100%, 480px) !important;
+  height: 100dvh !important;
+  max-height: none !important;
+  margin: 0 auto !important;
+  overflow-y: auto !important;
+  padding: max(12px, env(safe-area-inset-top)) 18px calc(var(--nav-height) + 38px + env(safe-area-inset-bottom)) !important;
+  border-radius: 0 !important;
+  background: #f7f5fc !important;
+  box-shadow: none !important;
+}
+
+body.personalize-page-v9155 .personalize-head-v9155 {
+  margin-top: 12px !important;
+  margin-bottom: 20px !important;
+}
+
+body.personalize-page-v9155 .personalize-head-v9155 h2 {
+  text-align: center !important;
+}
+
+body.personalize-page-v9155 .personalization-sheet > .global-reset-v9154 {
+  position: absolute !important;
+  z-index: 4 !important;
+  top: max(12px, env(safe-area-inset-top)) !important;
+  right: 16px !important;
+  left: auto !important;
+  transform: none !important;
+}
+
+/* Réglages avancés devient une vraie tuile d'entrée. */
+body.personalize-page-v9155 .personalize-settings-v9155 {
+  position: relative !important;
+  min-height: 62px !important;
+  margin: 0 0 22px !important;
+  padding: 0 46px 0 56px !important;
+  justify-content: flex-start !important;
+  border: 1px solid rgba(116, 97, 232, .12) !important;
+  border-radius: 19px !important;
+  background: linear-gradient(145deg, rgba(235,230,255,.96), rgba(247,244,255,.98)) !important;
+  color: #4f4567 !important;
+  box-shadow: 0 8px 24px rgba(78, 62, 134, .08) !important;
+  font-size: 13px !important;
+  font-weight: 800 !important;
+  text-align: left !important;
+}
+
+body.personalize-page-v9155 .personalize-settings-v9155::before {
+  content: '☷' !important;
+  position: absolute !important;
+  left: 17px !important;
+  top: 50% !important;
+  transform: translateY(-50%) !important;
+  width: 28px !important;
+  height: 28px !important;
+  display: grid !important;
+  place-items: center !important;
+  border-radius: 10px !important;
+  background: rgba(116, 97, 232, .12) !important;
+  color: #6652da !important;
+  font-size: 18px !important;
+}
+
+body.personalize-page-v9155 .personalize-settings-v9155::after {
+  content: '›' !important;
+  position: absolute !important;
+  right: 18px !important;
+  top: 50% !important;
+  transform: translateY(-52%) !important;
+  color: #6652da !important;
+  font-size: 25px !important;
+  font-weight: 500 !important;
+}
+
+body.personalize-page-v9155 .personalize-section > p {
+  margin-top: 6px !important;
+  margin-bottom: 13px !important;
+  text-align: center !important;
+  color: #817a90 !important;
+  font-size: 11.5px !important;
+  font-weight: 650 !important;
+}
+
+@media (max-width: 380px) {
+  .brief-controls-row-v9155 {
+    grid-template-columns: 36px minmax(0, 208px) 36px !important;
+    column-gap: 7px !important;
+  }
+
+  .brief-controls-row-v9155 .brief-mode-tabs {
+    width: 208px !important;
+  }
+
+  body.home-view-v9155 .hero-header {
+    padding-left: 46px !important;
+    padding-right: 46px !important;
+  }
+}

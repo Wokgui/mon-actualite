@@ -1,0 +1,204 @@
+/* v91.84 — passe de stabilité : navigation native, sources, veille, images, lecteur. */
+
+/* Accueil : titre centré, aucune justification sous le titre. */
+.hero-header{
+  text-align:center!important;
+  align-items:center!important;
+}
+.hero-header>p{display:none!important}
+.hero-header h1,.hero-header .eyebrow{text-align:center!important}
+
+/* Barre basse native, toujours présente et intégrée au bord inférieur. */
+.bottom-nav.stable-bottom-nav-v9184{
+  position:fixed!important;
+  left:0!important;
+  right:0!important;
+  bottom:0!important;
+  z-index:10040!important;
+  width:100%!important;
+  height:calc(72px + env(safe-area-inset-bottom))!important;
+  margin:0!important;
+  padding:0 0 env(safe-area-inset-bottom)!important;
+  display:grid!important;
+  grid-template-columns:repeat(3,minmax(0,1fr))!important;
+  align-items:stretch!important;
+  background:#fff!important;
+  border-top:1px solid #e5e1ea!important;
+  box-shadow:0 -3px 16px rgba(46,36,70,.06)!important;
+  transform:none!important;
+  border-radius:0!important;
+}
+.bottom-nav.stable-bottom-nav-v9184 .nav-item{
+  position:relative!important;
+  width:100%!important;
+  height:72px!important;
+  margin:0!important;
+  padding:8px 4px 7px!important;
+  display:flex!important;
+  flex-direction:column!important;
+  align-items:center!important;
+  justify-content:center!important;
+  gap:5px!important;
+  border:0!important;
+  border-radius:0!important;
+  background:#fff!important;
+  color:#96919f!important;
+  box-shadow:none!important;
+  transform:none!important;
+  font:750 11.5px/1 Inter,system-ui,sans-serif!important;
+}
+.bottom-nav.stable-bottom-nav-v9184 .nav-item.active{color:#6753d8!important}
+.bottom-nav.stable-bottom-nav-v9184 .nav-item svg{
+  width:22px!important;height:22px!important;margin:0!important;
+  stroke:currentColor!important;fill:none!important;stroke-width:1.9!important
+}
+.bottom-nav.stable-bottom-nav-v9184 .nav-item span{display:block!important}
+.nav-watch-dot-v9184{
+  position:absolute!important;top:6px!important;left:calc(50% + 10px)!important;
+  min-width:17px!important;height:17px!important;padding:0 4px!important;
+  display:grid!important;place-items:center!important;border-radius:999px!important;
+  background:#e34d68!important;color:#fff!important;font:800 9px/1 Inter,system-ui,sans-serif!important;
+  font-style:normal!important;border:2px solid #fff!important;box-sizing:border-box!important
+}
+#app .page{padding-bottom:calc(92px + env(safe-area-inset-bottom))!important}
+
+/* Désactive les anciennes transformations de navigation. */
+.golden-bottom-nav-v9169{display:none!important}
+.top-reset-icon-v9138,.global-reset-v9154{display:none!important}
+
+/* Centres d'intérêt : tuiles centrées dans leur section. */
+.centered-interest-grid-v9184{
+  display:flex!important;
+  flex-wrap:wrap!important;
+  justify-content:center!important;
+  align-items:center!important;
+  gap:10px!important
+}
+.centered-interest-grid-v9184 .interest{
+  flex:0 0 auto!important;
+  min-width:104px!important;
+  text-align:center!important
+}
+
+/* Sources. */
+.source-directory-v9184{
+  display:grid!important;
+  gap:10px!important;
+  margin-top:14px!important
+}
+.source-directory-row-v9184{
+  padding:13px 14px!important;
+  border:1px solid #e8e4ed!important;
+  border-radius:14px!important;
+  background:#fff!important
+}
+.source-directory-row-v9184.is-blocked{opacity:.62!important}
+.source-directory-main-v9184{
+  display:flex!important;align-items:center!important;justify-content:space-between!important;
+  gap:12px!important
+}
+.source-directory-main-v9184>div:first-child{min-width:0!important}
+.source-directory-main-v9184 strong{
+  display:block!important;color:#2b2630!important;font-size:14px!important;line-height:1.25!important
+}
+.source-directory-main-v9184 span{
+  display:block!important;margin-top:4px!important;color:#8b8491!important;font-size:11px!important;
+  overflow:hidden!important;text-overflow:ellipsis!important;white-space:nowrap!important
+}
+.source-actions-v9184{display:flex!important;gap:6px!important;flex:0 0 auto!important}
+.source-actions-v9184 button{
+  border:1px solid #ded9e7!important;border-radius:999px!important;background:#f9f8fb!important;
+  color:#665f6e!important;padding:7px 9px!important;font-size:11px!important;font-weight:800!important
+}
+.source-actions-v9184 button.active{background:#eeeafd!important;color:#654ed7!important;border-color:#d5cdf7!important}
+.source-actions-v9184 button.danger.active{background:#fff0f2!important;color:#c43e57!important;border-color:#f1c8d0!important}
+.source-feeds-v9184{margin-top:10px!important;color:#777080!important}
+.source-feeds-v9184 summary{cursor:pointer!important;font-size:11px!important;font-weight:800!important}
+.source-feeds-v9184>div{
+  margin-top:8px!important;padding-left:10px!important;border-left:2px solid #ece8f1!important
+}
+.source-feeds-v9184 span{display:block!important;font-size:11px!important;font-weight:750!important}
+.source-feeds-v9184 small{
+  display:block!important;margin-top:2px!important;color:#9992a0!important;font-size:10px!important;
+  overflow-wrap:anywhere!important
+}
+.domain-form-v9184{margin-top:16px!important}
+.domain-list-v9184,.watch-rules-v9184{display:grid!important;gap:8px!important;margin-top:10px!important}
+.domain-list-v9184>div,.watch-rule-v9184{
+  display:flex!important;align-items:center!important;justify-content:space-between!important;gap:10px!important;
+  padding:10px 12px!important;border-radius:12px!important;background:#f7f5fa!important
+}
+.domain-list-v9184 button,.watch-rule-v9184 button{
+  width:30px!important;height:30px!important;border:0!important;border-radius:9px!important;background:#fff!important;
+  color:#8b8491!important;font-size:18px!important
+}
+.watch-rule-v9184 strong{display:block!important;font-size:13px!important}
+.watch-rule-v9184 span{display:block!important;margin-top:3px!important;color:#938c99!important;font-size:11px!important}
+.settings-subtitle-v9184{margin:18px 0 8px!important;font-size:13px!important}
+.blocked-keywords-v9184 .keyword-chip{background:#fff0f2!important;color:#b94459!important}
+
+/* Brief / veille. */
+.watch-tab-v9184{position:relative!important}
+.watch-new-badge-v9184{
+  display:inline-grid!important;place-items:center!important;min-width:18px!important;height:18px!important;
+  margin-left:6px!important;padding:0 5px!important;border-radius:999px!important;background:#e34d68!important;color:#fff!important;
+  font-size:9px!important;font-weight:850!important
+}
+
+/* Les articles lus restent lisibles : plus d'écran à moitié effacé. */
+.article-card.read-passed-v9138{
+  opacity:.74!important;
+  filter:saturate(.78)!important
+}
+.article-card.read-passed-v9138 h2{color:#6f6974!important}
+
+/* Images : aucun effet appliqué à la carte entière, aucun clignotement. */
+.article-card.v42-image-pending,
+.article-card.v42-image-loaded,
+.article-card.v42-image-failed{
+  background-image:none!important
+}
+.article-card .article-image{
+  transition:none!important;
+  animation:none!important;
+  opacity:1!important;
+  visibility:visible!important;
+  background:#efedf2!important
+}
+.article-card .article-image.image-pending-v9184{
+  background:#efedf2!important
+}
+.article-card .article-image.image-ready-v9184{
+  background:#efedf2!important
+}
+.article-card .article-image.image-failed-v9184{
+  background:#efedf2!important
+}
+
+/* Lecteur : sortie toujours accessible, spinner borné et page non bloquante. */
+.quick-summary-backdrop{overflow:auto!important}
+.quick-summary-head{
+  min-height:58px!important;
+  justify-content:flex-start!important
+}
+.quick-summary-close,[data-quick-close]{
+  display:grid!important;
+  visibility:visible!important;
+  pointer-events:auto!important;
+  place-items:center!important;
+  width:42px!important;height:42px!important;
+  border:0!important;border-radius:14px!important;
+  background:#f3f0f7!important;color:#3f3945!important;
+  font-size:34px!important;font-weight:400!important;line-height:1!important
+}
+.quick-reader-loading-v9183{min-height:110px!important}
+.quick-reader-empty{
+  padding:16px!important;border-radius:14px!important;background:#f8f6fa!important;
+  color:#77707e!important;line-height:1.5!important
+}
+
+@media(max-width:520px){
+  .source-directory-main-v9184{align-items:flex-start!important;flex-direction:column!important}
+  .source-actions-v9184{width:100%!important}
+  .source-actions-v9184 button{flex:1!important}
+}

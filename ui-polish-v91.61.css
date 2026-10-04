@@ -1,0 +1,111 @@
+/* v91.61 — option 2 du bandeau bas : reset moyen + réglages intégré dans l'encoche */
+
+/* Aucun bouton Réinitialiser flottant ne doit rester visible. */
+#app > .global-reset-v9154,
+#app > .top-reset-icon-v9138,
+#app main > .top-reset-icon-v9138,
+.global-reset-v9154.reset-draggable-v9157,
+.top-reset-icon-v9138:not(.reset-nav-v9160) {
+  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+/* Bandeau : composition de l'option 2, plus compacte que la grosse variante. */
+.bottom-nav {
+  overflow: visible !important;
+}
+
+.bottom-nav .reset-nav-v9160 {
+  position: relative !important;
+  z-index: 15 !important;
+  width: 70px !important;
+  height: 70px !important;
+  min-width: 70px !important;
+  min-height: 70px !important;
+  margin: -16px auto 0 !important;
+  padding: 0 !important;
+  transform: translateY(-13px) !important;
+  border: 0 !important;
+  border-radius: 50% !important;
+  background: linear-gradient(145deg,#7864eb,#6550d8) !important;
+  color: #fff !important;
+  box-shadow: 0 10px 24px rgba(89,70,190,.25) !important;
+}
+
+.bottom-nav .reset-nav-glyph-v9160 {
+  display: block !important;
+  font-size: 36px !important;
+  line-height: 1 !important;
+  font-weight: 650 !important;
+  transform: translateY(-1px) !important;
+}
+
+/* Réglages forme la petite languette sous le cercle, sans effet de bouton flottant séparé. */
+.bottom-nav .nav-gear-v9160 {
+  position: absolute !important;
+  left: 50% !important;
+  top: 48px !important;
+  z-index: 14 !important;
+  width: 32px !important;
+  height: 31px !important;
+  min-width: 32px !important;
+  min-height: 31px !important;
+  margin: 0 !important;
+  padding: 4px 0 0 !important;
+  transform: translateX(-50%) !important;
+  display: grid !important;
+  place-items: center !important;
+  border: 1px solid rgba(111,96,176,.10) !important;
+  border-top-color: rgba(111,96,176,.05) !important;
+  border-radius: 0 0 10px 10px !important;
+  background: rgba(251,250,255,.99) !important;
+  color: #8b8599 !important;
+  box-shadow: 0 4px 9px rgba(72,58,125,.08) !important;
+  -webkit-tap-highlight-color: transparent !important;
+  touch-action: manipulation !important;
+}
+
+.bottom-nav .nav-gear-v9160::before {
+  content: '' !important;
+  position: absolute !important;
+  left: 50% !important;
+  top: -9px !important;
+  z-index: -1 !important;
+  width: 32px !important;
+  height: 14px !important;
+  transform: translateX(-50%) !important;
+  background: rgba(251,250,255,.99) !important;
+}
+
+.bottom-nav .nav-gear-v9160 svg {
+  width: 16px !important;
+  height: 16px !important;
+  display: block !important;
+}
+
+.bottom-nav .nav-gear-v9160:active {
+  transform: translateX(-50%) scale(.94) !important;
+  color: #6755d5 !important;
+  background: #f2effd !important;
+}
+
+/* Ni reset ni roue dentée dans une fiche/résumé d'article. */
+body.quick-summary-open .bottom-nav .reset-nav-v9160,
+body.quick-summary-open .bottom-nav .nav-gear-v9160,
+body:has(.detail-page) .bottom-nav .reset-nav-v9160,
+body:has(.detail-page) .bottom-nav .nav-gear-v9160 {
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+@media (max-width: 380px) {
+  .bottom-nav .reset-nav-v9160 {
+    width: 66px !important;
+    height: 66px !important;
+    min-width: 66px !important;
+    min-height: 66px !important;
+  }
+  .bottom-nav .reset-nav-glyph-v9160 { font-size: 34px !important; }
+  .bottom-nav .nav-gear-v9160 { top: 47px !important; }
+}
