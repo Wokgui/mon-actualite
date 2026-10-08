@@ -89,10 +89,10 @@ jobs:
           set -euo pipefail
           TAG="v98-98.10"
           APK="mon-actualite-v98-98.10.apk"
-          NOTES="Mon Actualite 98.65 (Android 98.0.65, code 143). Appui long sur les articles, suivi des sources avec coche, Brief au centre, articles lus grises et masques a la prochaine ouverture, historique de veille conserve, badges Veille et IA, filtre payant reversible et dates masquables avec titres plus longs, resumes par article IA retablis sans encadre general, menu colore et badges alignes. Demarrage sans seconde icone isolee."
+          NOTES="Mon Actualite 98.66 (Android 98.0.66, code 144). Appui long sur les articles, suivi des sources avec coche, Brief au centre, articles lus grises et masques a la prochaine ouverture, historique de veille conserve, badges Veille et IA, filtre payant reversible et dates masquables avec titres plus longs, resumes par article IA retablis sans encadre general, menu colore et badges alignes. Demarrage sans seconde icone isolee."
           if gh release view "$TAG" >/dev/null 2>&1; then
             gh release upload "$TAG" "$APK" --clobber
-            gh release edit "$TAG" --title "Mon Actualité v98 / 98.65" --notes "$NOTES"
+            gh release edit "$TAG" --title "Mon Actualité v98 / 98.66" --notes "$NOTES"
           else
-            gh release create "$TAG" "$APK" --title "Mon Actualité v98 / 98.65" --notes "$NOTES"
+            gh release create "$TAG" "$APK" --title "Mon Actualité v98 / 98.66" --notes "$NOTES"
           fi

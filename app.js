@@ -1,8 +1,8 @@
-import { importOpmlPreview, fetchLiveNews, fetchBriefCandidates } from './services/source-connectors.js?v=98.65';
-import { photoSnapshot, photoArticleKey } from './services/article-photos.js?v=98.65';
-import { briefAI, setAISettings, onAIChange, initializeBrief, maybeGenerateBrief, generateBrief, saveGroqKey, disconnectGroq } from './services/brief-groq.js?v=98.65';
-import { newestBriefCards, briefSummaryParagraphs, briefArticleBlocks, briefDateLabel } from './services/brief-presentation.js?v=98.65';
-import { hasBriefHistory, prepareBriefHistory } from './brief-prefetch-v98.15.js?v=98.65';
+import { importOpmlPreview, fetchLiveNews, fetchBriefCandidates } from './services/source-connectors.js?v=98.66';
+import { photoSnapshot, photoArticleKey } from './services/article-photos.js?v=98.66';
+import { briefAI, setAISettings, onAIChange, initializeBrief, maybeGenerateBrief, generateBrief, saveGroqKey, disconnectGroq } from './services/brief-groq.js?v=98.66';
+import { newestBriefCards, briefSummaryParagraphs, briefArticleBlocks, briefDateLabel } from './services/brief-presentation.js?v=98.66';
+import { hasBriefHistory, prepareBriefHistory } from './brief-prefetch-v98.15.js?v=98.66';
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const app = $('#app');
@@ -294,6 +294,7 @@ let settingsOpenAccordions = new Set();
 const iconPaths = {
   home: '<path d="m3 11 9-8 9 8"/><path d="M5 10v10h14V10"/><path d="M9 20v-6h6v6"/>',
   brief: '<path d="M6 3h12v18H6z"/><path d="M9 8h6M9 12h6M9 16h4"/>',
+  minus: '<path d="M5 12h14"/>',
   plus: '<path d="M12 5v14M5 12h14"/>',
   calendar: '<path d="M5 4h14a2 2 0 0 1 2 2v14H3V6a2 2 0 0 1 2-2Z"/><path d="M8 2v4M16 2v4M3 9h18"/>',
   settings: '<path d="M12 15.5a3.5 3.5 0 1 0 0-7 3.5 3.5 0 0 0 0 7Z"/><path d="M19.4 15a1.7 1.7 0 0 0 .34 1.88l.06.06-2.83 2.83-.06-.06a1.7 1.7 0 0 0-1.88-.34 1.7 1.7 0 0 0-1.03 1.56V21h-4v-.08A1.7 1.7 0 0 0 8.94 19.4a1.7 1.7 0 0 0-1.88.34l-.06.06-2.83-2.83.06-.06A1.7 1.7 0 0 0 4.57 15 1.7 1.7 0 0 0 3 14H3v-4h.08A1.7 1.7 0 0 0 4.6 8.94a1.7 1.7 0 0 0-.34-1.88L4.2 7l2.83-2.83.06.06A1.7 1.7 0 0 0 9 4.57 1.7 1.7 0 0 0 10 3V3h4v.08a1.7 1.7 0 0 0 1.06 1.52 1.7 1.7 0 0 0 1.88-.34L17 4.2 19.8 7l-.06.06a1.7 1.7 0 0 0-.34 1.88A1.7 1.7 0 0 0 21 10h.08v4H21a1.7 1.7 0 0 0-1.6 1Z"/>',
@@ -1017,12 +1018,12 @@ function renderSettings() {
         <div class="form-stack compact-source-form-v9186">
           <input id="source-name" class="text-input" type="text" maxlength="100" placeholder="Nom de la source">
           <input id="source-url" class="text-input" type="url" maxlength="600" placeholder="Adresse RSS / Atom">
-          <div class="source-form-actions-v9865"><button class="secondary-btn" data-add-source>${icon('plus')} Ajouter</button><button class="secondary-btn" data-add-blocked-source>Bloquer</button></div>
+          <div class="source-form-actions-v9865"><button class="secondary-btn" data-add-source>${icon('plus')} Ajouter</button><button class="secondary-btn" data-add-blocked-source>${icon('minus')} Bloquer</button></div>
           <label class="secondary-btn opml-button-v9186" for="opml-input">Importer un fichier OPML</label><input id="opml-input" class="file-input" type="file" accept=".opml,.xml">
         </div>
+        <section class="source-group-v9866"><h3>Sources ajoutées</h3>${sourceRows()}</section>
+        <section class="source-group-v9866"><h3>Sources bloquées</h3>${blockedSourceChips() || '<p class="muted-note">Aucune source bloquée.</p>'}</section>
       `)}
-      ${accordion('Sources ajoutées', sourceRows())}
-      ${accordion('Sources bloquées', blockedSourceChips() || '<p class="muted-note">Aucune source bloquée.</p>')}
 
       ${accordion(ui('keywords'), `
         <div class="inline-form"><input id="keyword-input" class="text-input" type="text" maxlength="70" placeholder="À surveiller"><button class="small-primary-btn" data-add-keyword>Ajouter</button></div>${keywordChips()}
@@ -2029,7 +2030,7 @@ if ('serviceWorker' in navigator && location.protocol.startsWith('http') && !nav
     serviceWorkerRefreshing = true;
     toast('Mise à jour prête pour la prochaine ouverture');
   });
-  navigator.serviceWorker.register('./sw-v98.js?v=98.65', { updateViaCache: 'none' }).then(registration => {
+  navigator.serviceWorker.register('./sw-v98.js?v=98.66', { updateViaCache: 'none' }).then(registration => {
     if (registration.waiting) registration.waiting.postMessage('SKIP_WAITING');
     registration.addEventListener('updatefound', () => {
       const installing = registration.installing;
