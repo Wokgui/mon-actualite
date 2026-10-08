@@ -1,8 +1,8 @@
-import { importOpmlPreview, fetchLiveNews, fetchBriefCandidates } from './services/source-connectors.js?v=98.55';
-import { photoSnapshot, photoArticleKey } from './services/article-photos.js?v=98.55';
-import { briefAI, setAISettings, onAIChange, initializeBrief, maybeGenerateBrief, generateBrief, saveGroqKey, disconnectGroq } from './services/brief-groq.js?v=98.55';
-import { newestBriefCards, briefSummaryParagraphs, briefDateLabel } from './services/brief-presentation.js?v=98.55';
-import { hasBriefHistory, prepareBriefHistory } from './brief-prefetch-v98.15.js?v=98.55';
+import { importOpmlPreview, fetchLiveNews, fetchBriefCandidates } from './services/source-connectors.js?v=98.57';
+import { photoSnapshot, photoArticleKey } from './services/article-photos.js?v=98.57';
+import { briefAI, setAISettings, onAIChange, initializeBrief, maybeGenerateBrief, generateBrief, saveGroqKey, disconnectGroq } from './services/brief-groq.js?v=98.57';
+import { newestBriefCards, briefSummaryParagraphs, briefArticleBlocks, briefDateLabel } from './services/brief-presentation.js?v=98.57';
+import { hasBriefHistory, prepareBriefHistory } from './brief-prefetch-v98.15.js?v=98.57';
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const app = $('#app');
@@ -864,7 +864,7 @@ function sourceRows() {
 function sourceDirectoryMarkup() {
   const items = sourceDirectory();
   if (!items.length) return '<p class="muted-note">Aucune source détectée pour le moment.</p>';
-  return `<input class="text-input" type="search" data-source-search placeholder="Rechercher une source" aria-label="Rechercher une source"><div class="source-directory-v9186">${items.map(item => {
+  return `<div class="followed-sources-v9856"><strong class="settings-field-title">Sources suivies</strong>${state.followedSources.size ? `<div class="keyword-list">${[...state.followedSources].map(key => `<span class="keyword-chip">✓ ${escapeHtml(items.find(item => item.key === key)?.name || key)}</span>`).join('')}</div>` : '<p class="muted-note">Aucune source suivie.</p>'}</div><input class="text-input" type="search" data-source-search placeholder="Rechercher une source" aria-label="Rechercher une source"><div class="source-directory-v9186">${items.map(item => {
     const followed = state.followedSources.has(item.key);
     const blocked = state.blockedSources.has(item.key);
     const feeds = [...item.feeds.entries()];
@@ -898,7 +898,7 @@ function interestEditorMarkup() {
 }
 
 function keywordChips() {
-  return state.keywords.length ? `<div class="keyword-list">${state.keywords.map((keyword, index) => `<span class="keyword-chip">${escapeHtml(keyword)}<button data-keyword-delete="${index}" aria-label="Supprimer ${escapeHtml(keyword)}">×</button></span>`).join('')}</div>` : '<p class="muted-note">Aucun mot-clé suivi.</p>';
+  return state.keywords.length ? `<div class="keyword-list watched-keywords-v9857">${state.keywords.map((keyword, index) => `<span class="keyword-chip">${escapeHtml(keyword)}<button data-keyword-delete="${index}" aria-label="Supprimer ${escapeHtml(keyword)}">×</button></span>`).join('')}</div>` : '<p class="muted-note">Aucun mot-clé suivi.</p>';
 }
 
 function blockedKeywordChips() {
@@ -976,11 +976,13 @@ function aiSummaryLinks(result, text = result.summary) {
 }
 function renderAIBrief() {
   const result = briefAI.result;
-  const summary = result ? briefSummaryParagraphs(result.summary).map(paragraph => `<p class="ai-summary-paragraph-v9847">${paragraph.topic ? `<strong class="ai-summary-topic-v9847">${escapeHtml(paragraph.topic)}</strong>` : ''}${aiSummaryLinks(result, paragraph.text)}</p>`).join('') : '';
   return `<section class="ai-brief-v9840">
-    ${aiStatusMarkup({ notices: false })}${result ? `<section class="ai-news-summary-v9840">${result.partialSources ? '<p class="muted-note">Recherche ciblée indisponible lors de cette synthèse : articles déjà présents dans l’appli uniquement.</p>' : ''}<div class="ai-summary-text-v9847">${summary}</div></section><div id="ai-articles-v9847" class="feed stable-owned-list ai-results-v9840">${newestBriefCards(result.cards).filter(card => visibleArticles([card.article]).length).map((card, index) => {
+    ${aiStatusMarkup({ notices: false })}${result ? `<div id="ai-articles-v9847" class="feed stable-owned-list ai-results-v9840">${newestBriefCards(result.cards).filter(card => visibleArticles([card.article]).length).map((card, index) => {
       rememberRenderedArticle(card.article);
-      return `<section class="ai-result-v9840"><article class="article-card runtime-row" data-article="${escapeHtml(card.article.id)}" tabindex="0" aria-label="Ouvrir l’article source : ${escapeHtml(displayTitle(card.article))}">${articleVisual(card.article, index)}<div class="article-body"><h2>${escapeHtml(displayTitle(card.article))}</h2><div class="meta"><span class="article-category-badge">IA</span><span class="ai-source-meta-v9848"><span class="ai-source-name-v9840">${escapeHtml(card.article.source)}</span>${briefDateLabel(card.article.publishedAt) ? `<time class="ai-publication-v9848 article-age" datetime="${escapeHtml(card.article.publishedAt)}">${escapeHtml(briefDateLabel(card.article.publishedAt))}</time>` : ''}</span></div></div></article></section>`;
+      const blocks = briefArticleBlocks(card.summary || '');
+      if (blocks[0]?.type === 'heading') blocks.shift();
+      const paragraphs = blocks.map(block => block.type === 'heading' ? `<h3 class="ai-card-topic-v9848">${escapeHtml(block.text)}</h3>` : `<p>${escapeHtml(block.text)}</p>`).join('');
+      return `<section class="ai-result-v9840"><article class="article-card runtime-row" data-article="${escapeHtml(card.article.id)}" tabindex="0" aria-label="Ouvrir l’article source : ${escapeHtml(displayTitle(card.article))}">${articleVisual(card.article, index)}<div class="article-body"><h2>${escapeHtml(displayTitle(card.article))}</h2><div class="meta"><span class="article-category-badge">IA</span><span class="ai-source-meta-v9848"><span class="ai-source-name-v9840">${escapeHtml(card.article.source)}</span>${briefDateLabel(card.article.publishedAt) ? `<time class="ai-publication-v9848 article-age" datetime="${escapeHtml(card.article.publishedAt)}">${escapeHtml(briefDateLabel(card.article.publishedAt))}</time>` : ''}</span></div></div></article>${paragraphs ? `<div class="ai-card-summary-v9840">${paragraphs}</div>` : ''}</section>`;
     }).join('')}</div>` : ''}</section>`;
 }
 
@@ -1006,7 +1008,7 @@ function renderSettings() {
         </div>
         ${sourceRows()}
         <div class="inline-form manual-block-source-v9186"><input id="blocked-source-input" class="text-input" type="text" maxlength="100" placeholder="Nom d’une source à bloquer"><button class="small-primary-btn danger-action-v9186" data-add-blocked-source>Bloquer</button></div>
-        ${blockedSourceChips()}
+        <strong class="settings-field-title">Sources bloquées</strong>${blockedSourceChips()}
         <label class="secondary-btn opml-button-v9186" for="opml-input">Importer un fichier OPML</label><input id="opml-input" class="file-input" type="file" accept=".opml,.xml">
       `)}
 
@@ -1679,6 +1681,7 @@ app.addEventListener('click', async event => {
     }
     row?.classList.remove('is-blocked');
     persist();
+    render({ scrollTop: window.scrollY });
     syncNews({ silent: true });
     return;
   }
@@ -1932,7 +1935,13 @@ function cancelArticlePress() { clearTimeout(articlePressTimer); articlePressTim
 function openArticleMenu(article) {
   app.querySelector('.article-menu-backdrop')?.remove();
   const backdrop = document.createElement('div'); backdrop.className = 'article-menu-backdrop';
-  backdrop.innerHTML = `<section class="article-menu" role="dialog" aria-modal="true" aria-label="Préférences de l’article"><button data-article-menu-close aria-label="Fermer">×</button><h2>${escapeHtml(displayTitle(article))}</h2>${[['more','Plus comme ça'],['less','Moins comme ça'],['follow','Suivre cette source'],['block','Ne plus voir cette source']].map(([action,label]) => `<button data-article-action="${action}" data-id="${escapeHtml(article.id)}">${label}</button>`).join('')}</section>`;
+  const symbols = {
+    more: '<path d="M7 10v10H4V10h3Zm0 0 5-7c2 0 2 2 1 6h5a2 2 0 0 1 2 2l-2 8a2 2 0 0 1-2 1H7"/>',
+    less: '<path d="M7 14V4H4v10h3Zm0 0 5 7c2 0 2-2 1-6h5a2 2 0 0 0 2-2l-2-8a2 2 0 0 0-2-1H7"/>',
+    follow: '<rect x="3" y="4" width="14" height="16" rx="3"/><path d="M7 8h6M7 12h3M16 13v8M12 17h8"/>',
+    block: '<circle cx="12" cy="12" r="9"/><path d="m6 6 12 12"/>'
+  };
+  backdrop.innerHTML = `<section class="article-menu" role="dialog" aria-modal="true" aria-label="Préférences de l’article"><header class="article-menu-heading"><h2>${escapeHtml(displayTitle(article))}</h2><button data-article-menu-close aria-label="Fermer">×</button></header><p class="article-menu-source">${escapeHtml(article.source || article.feedTitle || 'Source inconnue')}</p><div class="article-menu-actions">${[['more','Plus comme ça'],['less','Moins comme ça'],['follow','Suivre cette source'],['block','Ne plus voir cette source']].map(([action,label]) => `<button data-article-action="${action}" data-id="${escapeHtml(article.id)}"><span class="article-menu-icon article-menu-icon--${action}"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.8" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">${symbols[action]}</svg></span><span>${label}</span></button>`).join('')}</div></section>`;
   app.appendChild(backdrop); backdrop.querySelector('[data-article-action]')?.focus({preventScroll:true});
 }
 app.addEventListener('pointerdown', event => {
@@ -2009,7 +2018,7 @@ if ('serviceWorker' in navigator && location.protocol.startsWith('http') && !nav
     serviceWorkerRefreshing = true;
     toast('Mise à jour prête pour la prochaine ouverture');
   });
-  navigator.serviceWorker.register('./sw-v98.js?v=98.55', { updateViaCache: 'none' }).then(registration => {
+  navigator.serviceWorker.register('./sw-v98.js?v=98.57', { updateViaCache: 'none' }).then(registration => {
     if (registration.waiting) registration.waiting.postMessage('SKIP_WAITING');
     registration.addEventListener('updatefound', () => {
       const installing = registration.installing;

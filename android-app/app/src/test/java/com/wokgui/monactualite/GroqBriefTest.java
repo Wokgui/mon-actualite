@@ -21,10 +21,7 @@ public class GroqBriefTest {
         assertFalse(body.toString().contains("SECRET")); assertFalse(body.toString().contains("evil.test"));
         assertEquals(2200,body.getInt("max_completion_tokens"));
         assertTrue(body.getJSONArray("messages").getJSONObject(0).getString("content").contains("un paragraphe court par sujet"));
-        JSONObject cardSchema = body.getJSONObject("response_format").getJSONObject("json_schema").getJSONObject("schema").getJSONObject("properties").getJSONObject("cards").getJSONObject("items");
-        assertEquals(1, cardSchema.getJSONArray("required").length());
-        assertFalse(cardSchema.getJSONObject("properties").has("summary"));
-        assertFalse(cardSchema.getJSONObject("properties").has("title"));
+        assertTrue(body.getJSONArray("messages").getJSONObject(0).getString("content").contains("sans les libellés Utilité, Statut ou Source"));
         assertTrue(body.getJSONArray("messages").getJSONObject(0).getString("content").contains("Pour chaque catégorie demandée"));
         assertTrue(body.getJSONArray("messages").getJSONObject(0).getString("content").contains("chaque phrase commence par une majuscule"));
     }
@@ -45,7 +42,7 @@ public class GroqBriefTest {
         try { GroqBrief.request(value); fail(); } catch(Exception expected) {}
     }
     @Test public void acceptsCompleteSummaryAndRejectsTruncatedSseOrUnknownSources() throws Exception {
-        String good = "{\"summary\":\"Résumé\",\"cards\":[{\"sourceId\":\"A1\"}]}";
+        String good = "{\"summary\":\"Résumé\",\"cards\":[{\"sourceId\":\"A1\",\"title\":\"Titre\",\"summary\":\"Faits\"}]}";
         assertEquals("Résumé",GroqBrief.result(response("stop",good),input().getJSONArray("articles")).getString("summary"));
         for(String finish : new String[]{"length","content_filter",""}) { try { GroqBrief.result(response(finish,good),input().getJSONArray("articles")); fail(); } catch(Exception expected) {} }
         try { GroqBrief.result(response("stop","data: [DONE]"),input().getJSONArray("articles")); fail(); } catch(Exception expected) {}

@@ -185,24 +185,24 @@ try {
     const cache=await page.evaluate(()=>JSON.parse(localStorage.getItem('news-brief-ai-results-v1')));
     const expected=cache.cards.slice().sort((a,b)=>Date.parse(b.article.publishedAt)-Date.parse(a.article.publishedAt)).map(card=>card.article.id);
     assert.deepEqual(await page.locator('.ai-result-v9840 article').evaluateAll(nodes=>nodes.map(node=>node.dataset.article)),expected);
-    assert.equal(await page.locator('.ai-summary-paragraph-v9847').count(),4);
+    assert.equal(await page.locator('.ai-news-summary-v9840').count(),0);
     assert.equal(await page.locator('.ai-news-summary-v9840 h3').count(),0);
-    assert.equal(await page.locator('.ai-summary-paragraph-v9847').first().evaluate(node=>getComputedStyle(node).textAlign),'justify');
+    assert.equal(await page.locator('.ai-card-summary-v9840 p').first().evaluate(node=>getComputedStyle(node).textAlign),'justify');
     assert.ok(!(await page.locator('.ai-brief-v9840').textContent()).includes('Synthèse actualisée'));
     assert.ok(!(await page.locator('.ai-brief-v9840').textContent()).includes('Dernière synthèse conservée'));
     const layout=await page.locator('.ai-brief-v9840').evaluate(root=>{
       const rect=selector=>document.querySelector(selector).getBoundingClientRect();
-      const header=rect('.ai-brief-page-v9848>.page-masthead-v9186'),tabs=rect('.brief-mode-tabs'),summary=rect('.ai-news-summary-v9840');
+      const header=rect('.ai-brief-page-v9848>.page-masthead-v9186'),tabs=rect('.brief-mode-tabs'),summary=rect('.ai-result-v9840');
       return {headerGap:tabs.top-header.bottom,contentGap:summary.top-tabs.bottom,preferencesCount:document.querySelectorAll('.brief-preferences-note-v9849').length,footers:root.querySelectorAll('footer').length,
-        summaryToArticles:root.querySelector('.ai-result-v9840 .article-card').getBoundingClientRect().top-summary.bottom,
+        summaryToArticles:root.querySelector('.ai-result-v9840 .article-card').getBoundingClientRect().top-summary.top,
         headings:[...root.querySelectorAll('.ai-result-v9840 h2')].map(node=>({text:node.textContent,weight:getComputedStyle(node).fontWeight})),
         dates:[...root.querySelectorAll('.ai-publication-v9848')].map(node=>({inHeader:!!node.closest('.article-card'),toRight:node.getBoundingClientRect().left>=node.previousElementSibling.getBoundingClientRect().right,text:node.textContent})),
         bodies:[...root.querySelectorAll('.ai-card-summary-v9840')].map(node=>node.textContent),
         borders:[...root.querySelectorAll('.ai-result-v9840')].slice(1).map(node=>({width:getComputedStyle(node).borderTopWidth,color:getComputedStyle(node).borderTopColor})),overflow:document.documentElement.scrollWidth>innerWidth};
     });
     assert.equal(layout.footers,0);assert.equal(layout.preferencesCount,0);assert.ok(Math.abs(layout.headerGap-layout.contentGap)<1,JSON.stringify(layout));assert.equal(layout.headerGap,14);
-    assert.ok(Math.abs(layout.summaryToArticles-16)<.1,JSON.stringify(layout));
-    assert.equal(await page.locator('.ai-card-title-v9849').count(),0);assert.equal(await page.locator('.ai-card-summary-v9840').count(),0);
+    assert.ok(Math.abs(layout.summaryToArticles)<.1,JSON.stringify(layout));
+    assert.equal(await page.locator('.ai-card-title-v9849').count(),0);assert.equal(await page.locator('.ai-card-summary-v9840').count(),3);
     assert.ok(layout.headings.length===3&&layout.headings.every(value=>value.text.length>10&&Number(value.weight)>=600));
     assert.ok(await page.locator('.ai-summary-paragraph-v9847').evaluateAll(nodes=>nodes.every(node=>{const clone=node.cloneNode(true);clone.querySelector('strong')?.remove();return /^[\p{Lu}]/u.test(clone.textContent.trim());})),'each category paragraph starts with a capital');
     assert.ok(await page.locator('.ai-card-summary-v9840 p').evaluateAll(nodes=>nodes.every(node=>/^[\p{Lu}]/u.test(node.textContent.trim()))),'card prose starts with capitals');
@@ -213,7 +213,7 @@ try {
     assert.ok(layout.borders.every(border=>border.width==='2px'&&border.color==='rgb(17, 17, 17)'));assert.equal(layout.overflow,false);
     briefLayout=layout;
     await page.evaluate(()=>window.scrollTo(0,document.documentElement.scrollHeight));
-    const bottomGap=await page.evaluate(()=>document.querySelector('.bottom-nav').getBoundingClientRect().top-document.querySelector('.ai-result-v9840:last-child .article-card').getBoundingClientRect().bottom);
+    const bottomGap=await page.evaluate(()=>document.querySelector('.bottom-nav').getBoundingClientRect().top-document.querySelector('.ai-result-v9840:last-child .ai-card-summary-v9840>:last-child').getBoundingClientRect().bottom);
     assert.ok(bottomGap>=8&&bottomGap<=20,'last article stays above the navigation without excess space: '+bottomGap);
     briefLayout.bottomGap=bottomGap;
     await page.setViewportSize({width:320,height:915});
@@ -275,8 +275,8 @@ try {
   if(native){
     const prior=await page.evaluate(()=>localStorage.getItem('news-brief-ai-results-v1'));
     await page.evaluate(()=>{const key='news-brief-ai-results-v1',value=JSON.parse(localStorage.getItem(key));localStorage.setItem(key,JSON.stringify({...value,cards:[]}));const config=JSON.parse(localStorage.getItem('news-brief-ai-settings-v1'));localStorage.setItem('news-brief-ai-settings-v1',JSON.stringify({...config,autoAtOpen:false}));});
-    await page.reload({waitUntil:'domcontentloaded'});await page.locator('[data-brief-mode="ai"]').click();await page.waitForSelector('.ai-news-summary-v9840');
-    assert.equal(await page.locator('.ai-result-v9840').count(),0);assert.equal(await page.locator('.brief-preferences-note-v9849').count(),0,'summary without cards is still content');
+    await page.reload({waitUntil:'domcontentloaded'});await page.locator('[data-brief-mode="ai"]').click();await page.waitForSelector('.ai-brief-v9840',{state:'attached'});
+    assert.equal(await page.locator('.ai-result-v9840').count(),0);assert.equal(await page.locator('.brief-preferences-note-v9849').count(),0,'weekly summary is hidden even when no cards are selected');
     await page.evaluate(()=>localStorage.removeItem('news-brief-ai-results-v1'));await page.reload({waitUntil:'domcontentloaded'});
     await page.waitForSelector('.brief-preferences-note-v9849');assert.equal(await page.locator('.ai-news-summary-v9840').count(),0);
     await page.evaluate(value=>localStorage.setItem('news-brief-ai-results-v1',value),prior);await page.reload({waitUntil:'domcontentloaded'});await page.waitForSelector('.ai-result-v9840');
