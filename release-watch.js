@@ -165,8 +165,8 @@
   // Release watcher. This file is part of v91.38, so it must identify itself as
   // v91.38. Using nativeFetch here prevents later fetch shims from falsifying
   // the value returned by /version.json.
-  const PAGE_RELEASE = '98.54';
-  const RELEASE_DATE = '1 octobre 2026';
+  const PAGE_RELEASE = '98.55';
+  const RELEASE_DATE = '8 octobre 2026';
   const VERSION_PATH = '/version.json';
   const IS_NATIVE_ANDROID = /MonActualiteAndroid\//.test(navigator.userAgent) || location.pathname.startsWith('/assets/') || new URLSearchParams(location.search).get('nativePreview') === '1';
   const CHECK_COOLDOWN_MS = 45_000;

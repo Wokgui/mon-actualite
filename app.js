@@ -1,14 +1,14 @@
-import { importOpmlPreview, fetchLiveNews, fetchBriefCandidates } from './services/source-connectors.js?v=98.54';
-import { photoSnapshot, photoArticleKey } from './services/article-photos.js?v=98.54';
-import { briefAI, setAISettings, onAIChange, initializeBrief, maybeGenerateBrief, generateBrief, saveGroqKey, disconnectGroq } from './services/brief-groq.js?v=98.54';
-import { newestBriefCards, briefSummaryParagraphs, briefArticleBlocks, briefDateLabel } from './services/brief-presentation.js?v=98.54';
-import { hasBriefHistory, prepareBriefHistory } from './brief-prefetch-v98.15.js?v=98.54';
+import { importOpmlPreview, fetchLiveNews, fetchBriefCandidates } from './services/source-connectors.js?v=98.55';
+import { photoSnapshot, photoArticleKey } from './services/article-photos.js?v=98.55';
+import { briefAI, setAISettings, onAIChange, initializeBrief, maybeGenerateBrief, generateBrief, saveGroqKey, disconnectGroq } from './services/brief-groq.js?v=98.55';
+import { newestBriefCards, briefSummaryParagraphs, briefDateLabel } from './services/brief-presentation.js?v=98.55';
+import { hasBriefHistory, prepareBriefHistory } from './brief-prefetch-v98.15.js?v=98.55';
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const app = $('#app');
 const toastEl = $('#toast');
 const APP_VERSION = '98';
-const APP_RELEASE = '1 octobre 2026';
+const APP_RELEASE = '8 octobre 2026';
 const IS_NATIVE_ANDROID = /MonActualiteAndroid\//.test(navigator.userAgent) || location.pathname.startsWith('/assets/') || new URLSearchParams(location.search).get('nativePreview') === '1';
 const savedSessionView = sessionStorage.getItem('news-active-view-v9204');
 const INITIAL_VIEW = ['home', 'settings', 'brief'].includes(savedSessionView) ? savedSessionView : 'home';
@@ -147,6 +147,8 @@ const defaultSettings = {
   briefHeaderHeight: 116,
   showBadges: true,
   showAge: true,
+  showPaid: true,
+  hideReadAtOpen: true,
   accent: DEFAULT_ACCENT
 };
 
@@ -194,6 +196,7 @@ const state = {
   followedSources: new Set(safeJson('news-followed-sources-v1', [])),
   blockedSources: new Set(safeJson('news-blocked-sources-v1', [])),
   watchRules: safeJson('news-watch-rules-v1', []),
+  aiLastSeen: Number(localStorage.getItem('news-ai-last-seen-v1') || 0),
   watchLastSeen: Number(localStorage.getItem('news-watch-last-seen-v1') || 0),
   articles: Array.isArray(cache.articles) ? cache.articles : [],
   lastSync: cache.fetchedAt || null,
@@ -428,6 +431,7 @@ function visibleArticles(articles = state.articles) {
     .filter(article => article && typeof article === 'object')
     .filter(article => isInArticleHistory(article.publishedAt || article.date))
     .filter(article => !isVideoOnlyArticle(article))
+    .filter(article => state.settings.showPaid || !window.NewsArticleAccess?.isPaid(article))
     .filter(article => {
       if (state.feedback[article.id] === 'not') return false;
       if (blockedSources.has(sourceIdentity(article))) return false;
@@ -464,8 +468,9 @@ function diversifyBySource(articles) {
   return result;
 }
 
+const readAtLaunch = new Set(safeJson('news-grey-after-scroll-v9138-v1', []).map(String));
 function stableHomeArticles() {
-  const ordered = visibleArticles();
+  const ordered = visibleArticles().filter(article => state.savedOnly || !state.settings.hideReadAtOpen || !(readAtLaunch.has(String(article.id)) || readAtLaunch.has(articleReadKey(article))));
   const days = new Map();
   for (const article of ordered) {
     const key = dayKey(article.publishedAt || article.date || '');
@@ -477,12 +482,16 @@ function stableHomeArticles() {
   const overflow = [];
   [...days.values()].forEach((items, dayIndex) => {
     const quota = dayIndex === 0 ? 24 : dayIndex === 1 ? 16 : 8;
+    items.sort((a,b) => preferenceWeight(b) - preferenceWeight(a));
     prioritized.push(...items.slice(0, quota));
     overflow.push(...items.slice(quota));
   });
   return [...prioritized, ...overflow];
 }
 
+function preferenceWeight(article) {
+  return Number(state.topicPreferences[normalizeTopic(article.category)] || 0) + (state.followedSources.has(sourceIdentity(article)) ? 2 : 0);
+}
 function reconcileHomeOrder() {
   const ordered = stableHomeArticles();
   state.homeOrder = ordered.map(article => String(article.id));
@@ -490,13 +499,14 @@ function reconcileHomeOrder() {
 }
 
 function nav(active = state.view) {
-  const watchCount = watchNewCount();
+  const watchCount = watchNewCount() + aiNewCount();
   return `<nav class="bottom-nav stable-bottom-nav-v9184" aria-label="${escapeHtml(ui('brief'))}">
     <button class="nav-item ${active === 'home' ? 'active' : ''}" data-view="home" aria-label="${escapeHtml(ui('home'))}">${navSolidIcon('home')}<span>${escapeHtml(ui('home'))}</span></button>
-    <button class="nav-item ${active === 'settings' ? 'active' : ''}" data-view="settings" aria-label="${escapeHtml(ui('settings'))}">${navSolidIcon('settings')}<span>${escapeHtml(ui('settings'))}</span></button>
     <button class="nav-item ${active === 'brief' ? 'active' : ''}" data-view="brief" aria-label="${escapeHtml(ui('brief'))}">${navSolidIcon('brief')}<span>${escapeHtml(ui('brief'))}</span>${watchCount ? `<i class="nav-watch-dot-v9184">${watchCount > 9 ? '9+' : watchCount}</i>` : ''}</button>
+    <button class="nav-item ${active === 'settings' ? 'active' : ''}" data-view="settings" aria-label="${escapeHtml(ui('settings'))}">${navSolidIcon('settings')}<span>${escapeHtml(ui('settings'))}</span></button>
   </nav>`;
 }
+
 
 function articleCard(article, index = 0) {
   rememberRenderedArticle(article);
@@ -645,6 +655,9 @@ function watchedArticles() {
   return visibleArticles().filter(article => rules.some(rule => watchRuleMatches(article, rule)));
 }
 
+function aiNewCount() {
+  return Date.parse(briefAI.result?.generatedAt || '') > state.aiLastSeen ? newestBriefCards(briefAI.result?.cards).filter(card => visibleArticles([card.article]).length).length : 0;
+}
 function watchNewCount() {
   const since = Number(state.watchLastSeen || 0);
   return watchedArticles().filter(article => (Date.parse(article.publishedAt || 0) || 0) > since).length;
@@ -696,7 +709,7 @@ function compactArticleRow(article, index = 0) {
 
 function renderWatchesFinal() {
   const rules = effectiveWatchRules();
-  const recent = visibleArticles().slice(0, 600);
+  const recent = visibleArticles();
   const order = [];
   const days = new Map();
   for (const article of recent) {
@@ -773,7 +786,7 @@ function renderBrief() {
   const essentialLoading = state.briefMode === 'essential' && state.essentialStatus !== 'ready';
   const essentialContent = essentialLoading ? '<p class="brief-loading-message-v9853" role="status">Chargement de L’essentiel…</p>' : essential || '<p class="brief-loading-message-v9853">Aucun article disponible pour les domaines choisis.</p>';
   return `<main class="page ${state.briefMode !== 'essential' ? 'brief-preferences-page-v9849' : ''} ${state.briefMode === 'ai' ? 'ai-brief-page-v9848' : ''}">${topbar(ui('brief'), false)}
-    <div class="brief-mode-tabs"><button class="brief-mode-tab ${state.briefMode === 'essential' ? 'active' : ''}" data-brief-mode="essential">${escapeHtml(ui('essential'))}</button><button class="brief-mode-tab watch-tab-v9184 ${state.briefMode === 'watches' ? 'active' : ''}" data-brief-mode="watches">${escapeHtml(ui('watch'))}${watchCount ? `<span class="watch-new-badge-v9184">${watchCount > 9 ? '9+' : watchCount}</span>` : ''}</button><button class="brief-mode-tab ${state.briefMode === 'ai' ? 'active' : ''}" data-brief-mode="ai">IA</button></div>
+    <div class="brief-mode-tabs"><button class="brief-mode-tab ${state.briefMode === 'essential' ? 'active' : ''}" data-brief-mode="essential">${escapeHtml(ui('essential'))}</button><button class="brief-mode-tab watch-tab-v9184 ${state.briefMode === 'watches' ? 'active' : ''}" data-brief-mode="watches">${escapeHtml(ui('watch'))}${watchCount ? `<span class="watch-new-badge-v9184">${watchCount > 9 ? '9+' : watchCount}</span>` : ''}</button><button class="brief-mode-tab ${state.briefMode === 'ai' ? 'active' : ''}" data-brief-mode="ai">IA${aiNewCount() ? `<span class="watch-new-badge-v9184">${aiNewCount() > 9 ? '9+' : aiNewCount()}</span>` : ''}</button></div>
     <div class="runtime-brief-content" data-stable-brief-content aria-busy="${essentialLoading}">${state.briefMode !== 'essential' && !hasContent ? '<p class="brief-preferences-note-v9849">Réglez vos préférences dans l’onglet Réglages</p>' : ''}${state.briefMode === 'essential' ? essentialContent : state.briefMode === 'ai' ? renderAIBrief() : watches}</div>
   </main>${nav('brief')}`;
 }
@@ -851,7 +864,7 @@ function sourceRows() {
 function sourceDirectoryMarkup() {
   const items = sourceDirectory();
   if (!items.length) return '<p class="muted-note">Aucune source détectée pour le moment.</p>';
-  return `<div class="source-directory-v9186">${items.map(item => {
+  return `<input class="text-input" type="search" data-source-search placeholder="Rechercher une source" aria-label="Rechercher une source"><div class="source-directory-v9186">${items.map(item => {
     const followed = state.followedSources.has(item.key);
     const blocked = state.blockedSources.has(item.key);
     const feeds = [...item.feeds.entries()];
@@ -859,7 +872,7 @@ function sourceDirectoryMarkup() {
       <div class="source-line-v9186">
         <strong>${escapeHtml(item.name)}</strong>
         <div class="source-actions-v9186">
-          <button type="button" class="${followed ? 'active' : ''}" data-source-follow="${escapeHtml(item.key)}">${escapeHtml(ui(followed ? 'followed' : 'follow'))}</button>
+          <button type="button" class="${followed ? 'active' : ''}" data-source-follow="${escapeHtml(item.key)}" aria-pressed="${followed}">${followed ? '✓ ' : ''}${escapeHtml(ui(followed ? 'followed' : 'follow'))}</button>
           <button type="button" class="${blocked ? 'danger active' : 'danger'}" data-source-block="${escapeHtml(item.key)}">${escapeHtml(ui(blocked ? 'unblock' : 'block'))}</button>
         </div>
       </div>
@@ -929,7 +942,7 @@ function openLanguageCatalog() {
 }
 
 function displaySettingsMarkup() {
-  return `<label class="preference-check"><input type="checkbox" data-display-setting="showBadges" ${state.settings.showBadges ? 'checked' : ''}><span>${escapeHtml(ui('showBadges'))}</span></label><label class="preference-check"><input type="checkbox" data-display-setting="showAge" ${state.settings.showAge ? 'checked' : ''}><span>${escapeHtml(ui('showAge'))}</span></label><label class="preference-color"><strong>${escapeHtml(ui('dominantColor'))}</strong><input type="color" value="${state.settings.accent}" data-accent aria-label="${escapeHtml(ui('dominantColor'))}"></label><button type="button" class="secondary-btn" data-reset-accent>${escapeHtml(ui('restoreColor'))}</button>`;
+  return `<label class="preference-check"><input type="checkbox" data-display-setting="showBadges" ${state.settings.showBadges ? 'checked' : ''}><span>${escapeHtml(ui('showBadges'))}</span></label><label class="preference-check"><input type="checkbox" data-display-setting="showAge" ${state.settings.showAge ? 'checked' : ''}><span>${escapeHtml(ui('showAge'))}</span></label><label class="preference-check"><input type="checkbox" data-display-setting="showPaid" ${state.settings.showPaid ? 'checked' : ''}><span>Afficher les articles détectés comme payants</span></label><label class="preference-check"><input type="checkbox" data-display-setting="hideReadAtOpen" ${state.settings.hideReadAtOpen ? 'checked' : ''}><span>Masquer dans Accueil les articles déjà vus à la prochaine ouverture</span></label><label class="preference-color"><strong>${escapeHtml(ui('dominantColor'))}</strong><input type="color" value="${state.settings.accent}" data-accent aria-label="${escapeHtml(ui('dominantColor'))}"></label><button type="button" class="secondary-btn" data-reset-accent>${escapeHtml(ui('restoreColor'))}</button>`;
 }
 
 function essentialSettingsMarkup() {
@@ -965,12 +978,9 @@ function renderAIBrief() {
   const result = briefAI.result;
   const summary = result ? briefSummaryParagraphs(result.summary).map(paragraph => `<p class="ai-summary-paragraph-v9847">${paragraph.topic ? `<strong class="ai-summary-topic-v9847">${escapeHtml(paragraph.topic)}</strong>` : ''}${aiSummaryLinks(result, paragraph.text)}</p>`).join('') : '';
   return `<section class="ai-brief-v9840">
-    ${aiStatusMarkup({ notices: false })}${result ? `<section class="ai-news-summary-v9840">${result.partialSources ? '<p class="muted-note">Recherche ciblée indisponible lors de cette synthèse : articles déjà présents dans l’appli uniquement.</p>' : ''}<div class="ai-summary-text-v9847">${summary}</div></section><div id="ai-articles-v9847" class="feed stable-owned-list ai-results-v9840">${newestBriefCards(result.cards).map((card, index) => {
+    ${aiStatusMarkup({ notices: false })}${result ? `<section class="ai-news-summary-v9840">${result.partialSources ? '<p class="muted-note">Recherche ciblée indisponible lors de cette synthèse : articles déjà présents dans l’appli uniquement.</p>' : ''}<div class="ai-summary-text-v9847">${summary}</div></section><div id="ai-articles-v9847" class="feed stable-owned-list ai-results-v9840">${newestBriefCards(result.cards).filter(card => visibleArticles([card.article]).length).map((card, index) => {
       rememberRenderedArticle(card.article);
-      const blocks = briefArticleBlocks(card.summary);
-      const title = blocks[0]?.type === 'heading' ? blocks.shift().text : card.title;
-      const paragraphs = blocks.map(block => block.type === 'heading' ? `<h3 class="ai-card-topic-v9848">${escapeHtml(block.text)}</h3>` : `<p>${escapeHtml(block.text)}</p>`).join('');
-      return `<section class="ai-result-v9840"><h3 class="ai-card-title-v9849">${escapeHtml(title)}</h3><article class="article-card runtime-row" data-article="${escapeHtml(card.article.id)}" tabindex="0" aria-label="Ouvrir l’article source : ${escapeHtml(displayTitle(card.article))}">${articleVisual(card.article, index)}<div class="article-body"><h2>${escapeHtml(displayTitle(card.article))}</h2><div class="meta"><span class="article-category-badge">IA</span><span class="ai-source-meta-v9848"><span class="ai-source-name-v9840">${escapeHtml(card.article.source)}</span>${briefDateLabel(card.article.publishedAt) ? `<time class="ai-publication-v9848" datetime="${escapeHtml(card.article.publishedAt)}">${escapeHtml(briefDateLabel(card.article.publishedAt))}</time>` : ''}</span></div></div></article>${paragraphs ? `<div class="ai-card-summary-v9840">${paragraphs}</div>` : ''}</section>`;
+      return `<section class="ai-result-v9840"><article class="article-card runtime-row" data-article="${escapeHtml(card.article.id)}" tabindex="0" aria-label="Ouvrir l’article source : ${escapeHtml(displayTitle(card.article))}">${articleVisual(card.article, index)}<div class="article-body"><h2>${escapeHtml(displayTitle(card.article))}</h2><div class="meta"><span class="article-category-badge">IA</span><span class="ai-source-meta-v9848"><span class="ai-source-name-v9840">${escapeHtml(card.article.source)}</span>${briefDateLabel(card.article.publishedAt) ? `<time class="ai-publication-v9848 article-age" datetime="${escapeHtml(card.article.publishedAt)}">${escapeHtml(briefDateLabel(card.article.publishedAt))}</time>` : ''}</span></div></div></article></section>`;
     }).join('')}</div>` : ''}</section>`;
 }
 
@@ -1187,6 +1197,7 @@ function patchHomeFeedPreservingCards() {
 }
 
 function refreshAfterNewsChange() {
+  refreshNoveltyBadges();
   reconcileHomeOrder();
   const overlay = document.getElementById('startup-stability-v9815');
   if (['home', 'brief'].includes(state.view) && app.querySelector('[data-article]') && (!overlay || overlay.classList.contains('leaving'))) {
@@ -1209,6 +1220,7 @@ function refreshAfterNewsChange() {
 }
 
 function navigate(view, additions = {}) {
+  if (view === 'brief') { if (state.briefMode === 'ai') state.aiLastSeen = Date.now(); if (state.briefMode === 'watches') state.watchLastSeen = Date.now(); persist(); }
   if (view !== state.view) state.previous.push({ view: state.view, category: state.category, articleId: state.articleId, categoryTab: state.categoryTab, scrollTop: window.scrollY });
   Object.assign(state, { view, sheet: false, ...additions });
   render({ resetScroll: true });
@@ -1245,10 +1257,21 @@ function persist() {
   localStorage.setItem('news-followed-sources-v1', JSON.stringify([...state.followedSources]));
   localStorage.setItem('news-blocked-sources-v1', JSON.stringify([...state.blockedSources]));
   localStorage.setItem('news-watch-rules-v1', JSON.stringify(state.watchRules));
+  localStorage.setItem('news-ai-last-seen-v1', String(state.aiLastSeen || 0));
   localStorage.setItem('news-watch-last-seen-v1', String(state.watchLastSeen || 0));
   localStorage.removeItem('news-ui-v96');
 }
 
+function mergeArticleHistory(incoming, previous) {
+  const items = new Map();
+  for (const article of [...previous, ...incoming]) {
+    if (article && isInArticleHistory(article.publishedAt || article.date)) items.set(articleReadKey(article), article);
+  }
+  return [...items.values()].sort((a,b) => Date.parse(b.publishedAt || b.date) - Date.parse(a.publishedAt || a.date)).slice(0, 5000);
+}
+function articleReadKey(article) {
+  try { const url = new URL(article.url); url.hash = ''; for (const key of [...url.searchParams.keys()]) if (/^utm_|^(fbclid|gclid)$/.test(key)) url.searchParams.delete(key); return url.href; } catch { return String(article.id); }
+}
 function persistCache() {
   localStorage.setItem('news-live-cache', JSON.stringify({ articles: state.articles, fetchedAt: state.lastSync, stats: state.stats }));
   localStorage.setItem('news-cache-language-v98', state.settings.language);
@@ -1262,7 +1285,7 @@ function applyDownloadedNews(payload) {
   if (!payload || !Array.isArray(payload.articles)) return false;
   const nextArticles = payload.articles;
   const changed = catalogueSignature(nextArticles) !== catalogueSignature(state.articles);
-  state.articles = nextArticles;
+  state.articles = mergeArticleHistory(nextArticles, state.articles);
   state.lastSync = payload.fetchedAt || new Date().toISOString();
   state.stats = payload.stats || null;
   state.syncStatus = 'idle';
@@ -1303,7 +1326,7 @@ async function fetchHistoryCoverage({ force = false, topic = '', days = historyW
       country: locale.country
   });
   if (Array.isArray(history?.articles) && history.articles.length) {
-    state.articles = history.articles;
+    state.articles = mergeArticleHistory(history.articles, state.articles);
     state.lastSync = history.fetchedAt || state.lastSync || new Date().toISOString();
     state.stats = { ...(state.stats || {}), ...(history.stats || {}), historyWindowDays: days };
     persistCache();
@@ -1348,7 +1371,7 @@ async function syncNews({ silent = false } = {}) {
       });
       const nextArticles = Array.isArray(result.articles) ? result.articles : [];
       const previousSignature = catalogueSignature(state.articles);
-      state.articles = nextArticles;
+      state.articles = mergeArticleHistory(nextArticles, state.articles);
       state.lastSync = result.fetchedAt || new Date().toISOString();
       state.stats = result.stats || null;
       state.syncStatus = 'idle';
@@ -1501,6 +1524,24 @@ function selectLanguage(code) {
 }
 
 app.addEventListener('click', async event => {
+  if (event.target.closest('[data-article]') && Date.now() < articlePressBlockedUntil) { event.preventDefault(); event.stopPropagation(); return; }
+  if (event.target.closest('[data-article-menu-close]') || event.target.classList.contains('article-menu-backdrop')) { app.querySelector('.article-menu-backdrop')?.remove(); return; }
+  const action = event.target.closest('[data-article-action]');
+  if (action) {
+    const selected = articleById(action.dataset.id);
+    if (!selected) return;
+    const kind = action.dataset.articleAction;
+    if (kind === 'more' || kind === 'less') {
+      state.feedback[selected.id] = kind;
+      const key = normalizeTopic(selected.category);
+      state.topicPreferences[key] = Number(state.topicPreferences[key] || 0) + (kind === 'more' ? 1 : -1);
+    } else {
+      const key = sourceIdentity(selected);
+      if (kind === 'follow') { state.followedSources.add(key); state.blockedSources.delete(key); }
+      else { state.followedSources.delete(key); state.blockedSources.add(key); }
+    }
+    persist(); app.querySelector('.article-menu-backdrop')?.remove(); render({ scrollTop: window.scrollY }); toast('Préférence enregistrée'); return;
+  }
   const languageInstall = event.target.closest('[data-language-install]');
   if (languageInstall) {
     const code = languageInstall.dataset.languageInstall;
@@ -1524,6 +1565,7 @@ app.addEventListener('click', async event => {
     event.preventDefault();
     state.briefMode = ['watches', 'ai'].includes(briefMode.dataset.briefMode) ? briefMode.dataset.briefMode : 'essential';
     if (state.briefMode === 'watches') { state.watchLastSeen = Date.now(); persist(); }
+    if (state.briefMode === 'ai') { state.aiLastSeen = Date.now(); persist(); }
     render({ scrollTop: 0 });
     return;
   }
@@ -1575,6 +1617,7 @@ app.addEventListener('click', async event => {
     event.stopPropagation();
     const selected = articleById(article.dataset.article || '');
     const url = String(selected?.url || '').trim();
+    markArticleRead(selected, article);
     if (url) window.open(url, '_blank', 'noopener,noreferrer');
     return;
   }
@@ -1628,7 +1671,8 @@ app.addEventListener('click', async event => {
     following ? state.followedSources.add(key) : state.followedSources.delete(key);
     state.blockedSources.delete(key);
     sourceFollow.classList.toggle('active', following);
-    sourceFollow.textContent = ui(following ? 'followed' : 'follow');
+    sourceFollow.textContent = (following ? '✓ ' : '') + ui(following ? 'followed' : 'follow');
+    sourceFollow.setAttribute('aria-pressed', String(following));
     if (blockButton) {
       blockButton.classList.remove('active');
       blockButton.textContent = 'Bloquer';
@@ -1746,6 +1790,11 @@ function updateRangeSetting(target) {
 }
 
 app.addEventListener('input', event => {
+  if (event.target.matches('[data-source-search]')) {
+    const query = normalizeTopic(event.target.value);
+    for (const row of app.querySelectorAll('.source-directory-row-v9186')) row.hidden = !normalizeTopic(row.querySelector('strong')?.textContent).includes(query);
+    return;
+  }
   if (event.target.matches('[data-ai-prompt]')) {
     setAISettings({ prompt: event.target.value }, { announce: false });
     return;
@@ -1768,6 +1817,7 @@ app.addEventListener('change', async event => {
     state.settings[event.target.dataset.displaySetting] = event.target.checked;
     applyAppearanceSettings();
     persist();
+    if (['showPaid', 'hideReadAtOpen'].includes(event.target.dataset.displaySetting)) render({ scrollTop: window.scrollY });
     return;
   }
   if (event.target.id === 'opml-input' && event.target.files[0]) {
@@ -1796,6 +1846,7 @@ app.addEventListener('toggle', event => {
 
 app.addEventListener('keydown', event => {
   if ((event.key === 'Enter' || event.key === ' ') && event.target.matches('[data-article]')) event.target.click();
+  if (event.isComposing || event.keyCode === 229) return;
   if (event.key === 'Enter' && event.target.id === 'keyword-input') {
     if (state.sheet) addWatchTopicFromSheet(); else addKeyword();
   }
@@ -1817,12 +1868,14 @@ let navLongPressStartX = 0;
 let navLongPressStartY = 0;
 
 function resetReadStateFromNav(view) {
+  const hadHiddenArticles = readAtLaunch.size > 0;
   greyArticleIds.clear();
+  readAtLaunch.clear();
   localStorage.setItem('news-grey-after-scroll-v9138-v1', '[]');
   document.querySelectorAll('.article-card.read-passed-v9138').forEach(card => card.classList.remove('read-passed-v9138'));
   navLongPressBlockClickUntil = Date.now() + 900;
   navLongPressBlockedView = view;
-  if (state.view !== view) {
+  if (state.view !== view || (view === 'home' && hadHiddenArticles)) {
     state.view = view;
     state.sheet = false;
     state.savedOnly = false;
@@ -1868,6 +1921,31 @@ app.addEventListener('contextmenu', event => {
   if (event.target.closest('.bottom-nav .nav-item[data-view="home"], .bottom-nav .nav-item[data-view="brief"]')) event.preventDefault();
 });
 
+function markArticleRead(article, card) {
+  if (!article) return;
+  greyArticleIds.add(String(article.id)); greyArticleIds.add(articleReadKey(article));
+  localStorage.setItem('news-grey-after-scroll-v9138-v1', JSON.stringify([...greyArticleIds]));
+  card?.classList.add('read-passed-v9138');
+}
+let articlePressTimer = 0, articlePressStart = null, articlePressBlockedUntil = 0;
+function cancelArticlePress() { clearTimeout(articlePressTimer); articlePressTimer = 0; articlePressStart = null; }
+function openArticleMenu(article) {
+  app.querySelector('.article-menu-backdrop')?.remove();
+  const backdrop = document.createElement('div'); backdrop.className = 'article-menu-backdrop';
+  backdrop.innerHTML = `<section class="article-menu" role="dialog" aria-modal="true" aria-label="Préférences de l’article"><button data-article-menu-close aria-label="Fermer">×</button><h2>${escapeHtml(displayTitle(article))}</h2>${[['more','Plus comme ça'],['less','Moins comme ça'],['follow','Suivre cette source'],['block','Ne plus voir cette source']].map(([action,label]) => `<button data-article-action="${action}" data-id="${escapeHtml(article.id)}">${label}</button>`).join('')}</section>`;
+  app.appendChild(backdrop); backdrop.querySelector('[data-article-action]')?.focus({preventScroll:true});
+}
+app.addEventListener('pointerdown', event => {
+  if (event.button !== 0 || event.target.closest('button,a,input')) return;
+  const card = event.target.closest('[data-article]'); if (!card) return;
+  articlePressBlockedUntil = 0;
+  cancelArticlePress(); articlePressStart = {x:event.clientX,y:event.clientY};
+  articlePressTimer = setTimeout(() => { const article = articleById(card.dataset.article); cancelArticlePress(); if (article) { articlePressBlockedUntil = Date.now()+1000; openArticleMenu(article); } }, 600);
+});
+app.addEventListener('pointermove', event => { if (articlePressStart && Math.hypot(event.clientX-articlePressStart.x,event.clientY-articlePressStart.y)>12) cancelArticlePress(); }, {passive:true});
+app.addEventListener('pointerup',cancelArticlePress); app.addEventListener('pointercancel',cancelArticlePress);
+window.addEventListener('scroll',cancelArticlePress,{passive:true});
+app.addEventListener('contextmenu', event => { const card=event.target.closest('[data-article]'); if(card) {event.preventDefault(); cancelArticlePress(); articlePressBlockedUntil=Date.now()+1000; const article=articleById(card.dataset.article); if(article) openArticleMenu(article);} });
 const observedGreyCards = new WeakSet();
 let scrollingDown = false;
 let lastScrollY = window.scrollY;
@@ -1880,7 +1958,7 @@ const greyObserver = new IntersectionObserver(entries => entries.forEach(entry =
 function bindStableCards() {
   document.querySelectorAll('.stable-owned-list .article-card[data-article]').forEach(card => {
     if (!observedGreyCards.has(card)) { observedGreyCards.add(card); greyObserver.observe(card); }
-    card.classList.toggle('read-passed-v9138', greyArticleIds.has(String(card.dataset.article || '')));
+    card.classList.toggle('read-passed-v9138', (greyArticleIds.has(String(card.dataset.article || '')) || greyArticleIds.has(articleReadKey(articleById(card.dataset.article) || {}))));
   });
 }
 
@@ -1891,7 +1969,7 @@ function markPassedCards() {
     const rect = card.getBoundingClientRect();
     if (rect.top < 0 && rect.bottom <= Math.max(20, innerHeight * .05)) {
       const id = String(card.dataset.article || '');
-      if (id) { greyArticleIds.add(id); card.classList.add('read-passed-v9138'); changed = true; }
+      if (id) { greyArticleIds.add(id); const article = articleById(id); if (article) greyArticleIds.add(articleReadKey(article)); card.classList.add('read-passed-v9138'); changed = true; }
     }
   });
   if (changed) localStorage.setItem('news-grey-after-scroll-v9138-v1', JSON.stringify([...greyArticleIds].slice(-1600)));
@@ -1929,9 +2007,9 @@ if ('serviceWorker' in navigator && location.protocol.startsWith('http') && !nav
   navigator.serviceWorker.addEventListener('controllerchange', () => {
     if (serviceWorkerRefreshing) return;
     serviceWorkerRefreshing = true;
-    window.location.reload();
+    toast('Mise à jour prête pour la prochaine ouverture');
   });
-  navigator.serviceWorker.register('./sw-v98.js?v=98.54', { updateViaCache: 'none' }).then(registration => {
+  navigator.serviceWorker.register('./sw-v98.js?v=98.55', { updateViaCache: 'none' }).then(registration => {
     if (registration.waiting) registration.waiting.postMessage('SKIP_WAITING');
     registration.addEventListener('updatefound', () => {
       const installing = registration.installing;
@@ -1971,7 +2049,7 @@ function launchCacheIsFresh(articles = [], fetchedAt = '') {
 
 function applyStartupNews(payload) {
   if (!payload || !Array.isArray(payload.articles) || !payload.articles.length) return false;
-  state.articles = payload.articles;
+  state.articles = mergeArticleHistory(payload.articles, state.articles);
   state.lastSync = payload.fetchedAt || new Date().toISOString();
   state.stats = payload.stats || null;
   state.syncStatus = 'idle';
@@ -2028,13 +2106,25 @@ async function bootLatestNews() {
 }
 
 onAIChange(() => {
+  if (state.view === 'brief' && state.briefMode === 'ai' && briefAI.result) { state.aiLastSeen = Date.now(); persist(); }
+  refreshNoveltyBadges();
   // Generation progress must not rebuild Home or interrupt an edited prompt/key.
-  if (state.view === 'settings' && document.activeElement?.matches('[data-ai-prompt],[data-ai-key]')) {
+  if (state.view === 'settings' && document.activeElement?.matches('input,textarea')) {
     const status = app.querySelector('[data-ai-state]');
     if (status) status.outerHTML = aiStatusMarkup();
     for (const button of app.querySelectorAll('[data-ai-generate],[data-ai-save-key]')) button.disabled = !!briefAI.busy || (button.hasAttribute('data-ai-generate') && !briefAI.configured);
   } else if (state.view === 'settings' || (state.view === 'brief' && state.briefMode === 'ai')) render({ scrollTop: window.scrollY });
 });
+function refreshNoveltyBadges() {
+  const replace = (selector, count, className) => {
+    const button = app.querySelector(selector); if (!button) return;
+    button.querySelector('.' + className)?.remove();
+    if (count) { const badge = document.createElement('span'); badge.className = className; badge.textContent = count > 9 ? '9+' : String(count); button.appendChild(badge); }
+  };
+  replace('.bottom-nav [data-view="brief"]', watchNewCount() + aiNewCount(), 'nav-watch-dot-v9184');
+  replace('[data-brief-mode="watches"]', watchNewCount(), 'watch-new-badge-v9184');
+  replace('[data-brief-mode="ai"]', aiNewCount(), 'watch-new-badge-v9184');
+}
 function allowedBriefArticle(article) {
   if (!article || state.feedback[article.id] === 'not' || isVideoOnlyArticle(article) || state.blockedSources.has(sourceIdentity(article))) return false;
   const text = normalizeTopic([article.title, article.summary, article.source, article.category].join(' '));

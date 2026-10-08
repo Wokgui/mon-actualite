@@ -1,0 +1,48 @@
+import assert from 'node:assert/strict';
+import {readFile,writeFile,mkdir} from 'node:fs/promises';
+let pw;try{pw=await import('playwright')}catch{pw=await import('file:///C:/Users/Wokgui/.cache/codex-runtimes/codex-primary-runtime/dependencies/node/node_modules/playwright/index.mjs')}
+const output=process.argv[2]||'test-results/reader-preferences';await mkdir(output,{recursive:true});
+const articles=Array.from({length:8},(_,i)=>({id:'reader-'+i,url:'https://example.test/article/'+i,title:'Une découverte scientifique vérifiée numéro '+i,source:i===1?'Le Monde':'Science test',category:'Science',summary:'Un résultat scientifique expliqué dans cet article.',publishedAt:new Date(Date.now()-i*86400000).toISOString()}));
+const png=await readFile(new URL('../assets/science-energie.png',import.meta.url));
+const browser=await pw.chromium.launch({headless:true,...(process.platform==='win32'?{executablePath:'C:/Program Files/Google/Chrome/Application/chrome.exe'}:{})});
+const errors=[],checks=[];
+try{
+const context=await browser.newContext({viewport:{width:412,height:915},isMobile:true,hasTouch:true,serviceWorkers:'block'});
+await context.addInitScript(({articles})=>{
+ window.open=(url)=>{window.__openedArticle=url;return null;};
+ if(localStorage.getItem('fixture-ready'))return;localStorage.setItem('fixture-ready','1');
+ localStorage.setItem('news-cache-language-v98','fr');localStorage.setItem('news-live-cache',JSON.stringify({articles,fetchedAt:new Date().toISOString()}));
+ localStorage.setItem('news-watch-rules-v1',JSON.stringify([{query:'découverte',enabled:true}]));
+ localStorage.setItem('news-settings',JSON.stringify({textSize:100,briefEssentialCategories:['Science'],showPaid:true}));
+ localStorage.setItem('news-brief-ai-settings-v1',JSON.stringify({autoAtOpen:false,prompt:'Science'}));
+ localStorage.setItem('news-brief-ai-results-v1',JSON.stringify({provider:'groq',generatedAt:new Date().toISOString(),summary:'Science : Les nouvelles découvertes sont expliquées.',cards:articles.slice(0,3).map(article=>({article,title:'Nouveauté',summary:'Science\nUne découverte utile et vérifiée.'})),sources:articles}));
+},{articles});
+const page=await context.newPage();page.on('pageerror',e=>{errors.push(e.message);console.error('PAGE ERROR',e.message);});
+await page.route('**/api/news**',r=>r.fulfill({json:{articles:articles.slice(0,2),fetchedAt:new Date().toISOString()}}));
+await page.route('**/api/article-photo-fast**',r=>r.fulfill({body:png,contentType:'image/png',headers:{'X-Thumbnail-Status':'publisher-metadata'}}));
+await page.route('**/version.json**',r=>r.fulfill({json:{version:'98',codeRelease:'98.55'}}));
+await page.goto('http://127.0.0.1:4173/?nativePreview=1');await page.waitForFunction(()=>!document.getElementById('startup-stability-v9815'));await page.waitForTimeout(500);
+assert.deepEqual(await page.locator('.bottom-nav [data-view]').evaluateAll(ns=>ns.map(n=>n.dataset.view)),['home','brief','settings']);assert.ok(await page.locator('.bottom-nav [data-view="brief"]').evaluate(n=>n.getBoundingClientRect().x) < await page.locator('.bottom-nav [data-view="settings"]').evaluate(n=>n.getBoundingClientRect().x));checks.push('navigation');
+assert.equal(await page.locator('[data-stable-home-feed] [data-article]').count(),8);checks.push('history survives partial sync');
+assert.ok(await page.locator('.nav-watch-dot-v9184').count());
+const card=page.locator('[data-stable-home-feed] [data-article]').filter({hasText:/ 0/});const clickedId=await card.getAttribute('data-article');const box=await card.boundingBox();
+await page.mouse.move(box.x+10,box.y+20);await page.mouse.down();await page.waitForTimeout(650);await page.mouse.up();
+await page.waitForSelector('.article-menu');assert.equal(await page.locator('[data-article-action]').count(),4);checks.push('long press');
+await page.locator('[data-article-action="more"]').click();assert.equal(await page.evaluate(()=>Object.values(JSON.parse(localStorage.getItem('news-feedback')))[0]),'more');
+await page.locator('.bottom-nav [data-view="settings"]').click();
+const section=page.locator('.settings-accordion-v9185').filter({has:page.locator('[data-display-setting="showPaid"]')});await section.locator('summary').click();
+await page.locator('[data-display-setting="showPaid"]').uncheck();await page.locator('.bottom-nav [data-view="home"]').click();assert.equal(await page.locator('[data-stable-home-feed] [data-article]').filter({hasText:/ 1/}).count(),0);
+await page.locator('.bottom-nav [data-view="settings"]').click();await page.locator('[data-display-setting="showPaid"]').check();await page.locator('.bottom-nav [data-view="home"]').click();assert.equal(await page.locator('[data-stable-home-feed] [data-article]').filter({hasText:/ 1/}).count(),1);checks.push('paid toggle both ways');
+await page.locator('[data-stable-home-feed] [data-article]').filter({hasText:/ 0/}).click();assert.equal(await page.evaluate(()=>window.__openedArticle),'https://example.test/article/0');assert.ok(await page.locator('[data-stable-home-feed] [data-article]').filter({hasText:/ 0/}).evaluate(n=>n.classList.contains('read-passed-v9138')));checks.push('click greys card');
+await page.reload();await page.waitForFunction(()=>!document.getElementById('startup-stability-v9815'));assert.equal(await page.locator('[data-stable-home-feed] [data-article]').filter({hasText:/ 0/}).count(),0);checks.push('read hidden on reopen');
+const homeBox=await page.locator('.bottom-nav [data-view="home"]').boundingBox();await page.mouse.move(homeBox.x+homeBox.width/2,homeBox.y+homeBox.height/2);await page.mouse.down();await page.waitForTimeout(650);await page.mouse.up();assert.equal(await page.locator('[data-stable-home-feed] [data-article]').count(),8);checks.push('reset restores hidden articles');
+await page.locator('.bottom-nav [data-view="brief"]').click();assert.ok(await page.locator('[data-brief-mode="ai"] .watch-new-badge-v9184').count());
+await page.locator('[data-brief-mode="ai"]').click();assert.equal(await page.locator('.ai-card-title-v9849').count(),0);assert.equal(await page.locator('.ai-card-summary-v9840').count(),0);assert.ok((await page.locator('.ai-result-v9840 h2').first().textContent()).includes('découverte'));assert.equal(await page.locator('[data-brief-mode="ai"] .watch-new-badge-v9184').count(),0);checks.push('AI titles and read badge');await page.screenshot({path:output+'/ia.png'});
+await page.locator('[data-brief-mode="watches"]').click();assert.equal(await page.locator('.watch-day-v9138').count(),8);assert.equal(await page.locator('.nav-watch-dot-v9184').count(),0);checks.push('watch history and badges');
+await page.locator('.bottom-nav [data-view="settings"]').click();if(!await section.evaluate(n=>n.open))await section.locator('summary').click();await page.locator('[data-display-setting="showBadges"]').uncheck();await page.locator('[data-display-setting="showAge"]').uncheck();
+const keywordSection=page.locator('.settings-accordion-v9185').filter({has:page.locator('#keyword-input')});await keywordSection.locator('summary').click();await page.locator('#keyword-input').fill('énergie nucléaire');await page.waitForTimeout(500);assert.equal(await page.locator('#keyword-input').inputValue(),'énergie nucléaire');await page.locator('[data-add-keyword]').click();assert.ok((await page.evaluate(()=>JSON.parse(localStorage.getItem('news-keywords')))).includes('énergie nucléaire'));checks.push('accented keyword');
+const directory=page.locator('.settings-accordion-v9185').filter({has:page.locator('.source-directory-v9186')});if(!await directory.evaluate(n=>n.open))await directory.locator('summary').click();await page.locator('[data-source-follow="science test"]').click();assert.match(await page.locator('[data-source-follow="science test"]').textContent(),/✓/);checks.push('follow check');await page.screenshot({path:output+'/sources.png'});
+await page.locator('.bottom-nav [data-view="home"]').click();assert.equal(await page.locator('.source-dot').first().evaluate(n=>getComputedStyle(n).display),'none');assert.equal(await page.locator('.article-age').first().evaluate(n=>getComputedStyle(n).display),'none');await page.screenshot({path:output+'/home.png'});
+await page.setViewportSize({width:320,height:915});assert.equal(await page.evaluate(()=>document.documentElement.scrollWidth>innerWidth),false);checks.push('320px layout');
+assert.deepEqual(errors,[]);await writeFile(output+'/report.json',JSON.stringify({checks,errors},null,2));console.log(JSON.stringify({checks,errors}));
+}finally{await browser.close()}

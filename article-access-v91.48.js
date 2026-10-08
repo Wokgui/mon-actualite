@@ -318,14 +318,6 @@
     const response = await upstreamFetch(input, init);
     if (!sameOrigin || !response.ok) return response;
 
-    if (url.pathname === '/api/news') {
-      try {
-        const data = await response.clone().json();
-        const filtered = filterNewsPayload(data);
-        return filtered.removed ? cloneJsonResponse(response, filtered.payload) : response;
-      } catch { return response; }
-    }
-
     if (method === 'POST' && SUMMARY_PATHS.has(url.pathname)) {
       try {
         const data = await response.clone().json();
@@ -421,7 +413,7 @@
     observer.observe(document.body, { childList: true, subtree: true, characterData: true });
   }
 
-  filterCachedNews();
+  window.NewsArticleAccess = { isPaid: article => sourceLooksPaid(article) || explicitPaywall(article) || isHidden(article) || article.paywalled === true || article.isPaid === true };
 
   if (document.readyState === 'loading') document.addEventListener('DOMContentLoaded', startSummaryFormatting, { once: true });
   else startSummaryFormatting();

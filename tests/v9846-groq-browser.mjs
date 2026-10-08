@@ -42,7 +42,7 @@ try {
     return route.fulfill({json:{articles:isBrief?[...sources,discovered]:sources,fetchedAt:new Date().toISOString(),stats:{}}});
   });
   await page.route('**/api/article-photo-fast**',route=>{photoRequests.push(route.request().url());return route.fulfill({body:png,contentType:'image/png',headers:{'X-Thumbnail-Status':'feed'}});});
-  await page.route('**/version.json**',route=>route.fulfill({json:{version:'98',codeRelease:'98.54'}}));
+  await page.route('**/version.json**',route=>route.fulfill({json:{version:'98',codeRelease:'98.55'}}));
   await page.goto(process.env.AI_BASE_URL||'http://127.0.0.1:4173/?nativePreview=1',{waitUntil:'domcontentloaded'});
   await page.waitForFunction(()=>document.querySelectorAll('[data-stable-home-feed] img.image-ready-v98').length>=8);
   const homeBefore=await page.locator('[data-stable-home-feed] .article-card').evaluateAll(cards=>cards.map(card=>({id:card.dataset.article,src:card.querySelector('img').src})));
@@ -194,15 +194,16 @@ try {
       const rect=selector=>document.querySelector(selector).getBoundingClientRect();
       const header=rect('.ai-brief-page-v9848>.page-masthead-v9186'),tabs=rect('.brief-mode-tabs'),summary=rect('.ai-news-summary-v9840');
       return {headerGap:tabs.top-header.bottom,contentGap:summary.top-tabs.bottom,preferencesCount:document.querySelectorAll('.brief-preferences-note-v9849').length,footers:root.querySelectorAll('footer').length,
-        summaryToDomain:root.querySelector('.ai-card-title-v9849').getBoundingClientRect().top-summary.bottom,domainToArticles:[...root.querySelectorAll('.ai-card-title-v9849')].map(node=>node.nextElementSibling.getBoundingClientRect().top-node.getBoundingClientRect().bottom),
-        headings:[...root.querySelectorAll('.ai-card-title-v9849')].map(node=>({align:getComputedStyle(node).textAlign,weight:getComputedStyle(node).fontWeight,font:parseFloat(getComputedStyle(node).fontSize),bodyFont:parseFloat(getComputedStyle(node.parentElement.querySelector('.ai-card-summary-v9840')).fontSize),beforePreview:node.getBoundingClientRect().bottom<=node.nextElementSibling.getBoundingClientRect().top})),
+        summaryToArticles:root.querySelector('.ai-result-v9840 .article-card').getBoundingClientRect().top-summary.bottom,
+        headings:[...root.querySelectorAll('.ai-result-v9840 h2')].map(node=>({text:node.textContent,weight:getComputedStyle(node).fontWeight})),
         dates:[...root.querySelectorAll('.ai-publication-v9848')].map(node=>({inHeader:!!node.closest('.article-card'),toRight:node.getBoundingClientRect().left>=node.previousElementSibling.getBoundingClientRect().right,text:node.textContent})),
         bodies:[...root.querySelectorAll('.ai-card-summary-v9840')].map(node=>node.textContent),
         borders:[...root.querySelectorAll('.ai-result-v9840')].slice(1).map(node=>({width:getComputedStyle(node).borderTopWidth,color:getComputedStyle(node).borderTopColor})),overflow:document.documentElement.scrollWidth>innerWidth};
     });
     assert.equal(layout.footers,0);assert.equal(layout.preferencesCount,0);assert.ok(Math.abs(layout.headerGap-layout.contentGap)<1,JSON.stringify(layout));assert.equal(layout.headerGap,14);
-    assert.ok(Math.abs(layout.summaryToDomain-16)<.1,JSON.stringify(layout));assert.ok(layout.domainToArticles.every(gap=>Math.abs(gap-16)<.1),JSON.stringify(layout));
-    assert.ok(layout.headings.length===3&&layout.headings.every(value=>value.align==='center'&&Number(value.weight)>=700&&value.beforePreview&&value.font/value.bodyFont>=1.28));
+    assert.ok(Math.abs(layout.summaryToArticles-16)<.1,JSON.stringify(layout));
+    assert.equal(await page.locator('.ai-card-title-v9849').count(),0);assert.equal(await page.locator('.ai-card-summary-v9840').count(),0);
+    assert.ok(layout.headings.length===3&&layout.headings.every(value=>value.text.length>10&&Number(value.weight)>=600));
     assert.ok(await page.locator('.ai-summary-paragraph-v9847').evaluateAll(nodes=>nodes.every(node=>{const clone=node.cloneNode(true);clone.querySelector('strong')?.remove();return /^[\p{Lu}]/u.test(clone.textContent.trim());})),'each category paragraph starts with a capital');
     assert.ok(await page.locator('.ai-card-summary-v9840 p').evaluateAll(nodes=>nodes.every(node=>/^[\p{Lu}]/u.test(node.textContent.trim()))),'card prose starts with capitals');
     assert.ok(layout.dates.length===3&&layout.dates.every(value=>value.inHeader&&value.toRight&&/\d{2}\/\d{2}\/\d{4}/.test(value.text)));
@@ -212,7 +213,7 @@ try {
     assert.ok(layout.borders.every(border=>border.width==='2px'&&border.color==='rgb(17, 17, 17)'));assert.equal(layout.overflow,false);
     briefLayout=layout;
     await page.evaluate(()=>window.scrollTo(0,document.documentElement.scrollHeight));
-    const bottomGap=await page.evaluate(()=>document.querySelector('.bottom-nav').getBoundingClientRect().top-document.querySelector('.ai-result-v9840:last-child .ai-card-summary-v9840>:last-child').getBoundingClientRect().bottom);
+    const bottomGap=await page.evaluate(()=>document.querySelector('.bottom-nav').getBoundingClientRect().top-document.querySelector('.ai-result-v9840:last-child .article-card').getBoundingClientRect().bottom);
     assert.ok(bottomGap>=8&&bottomGap<=20,'last article stays above the navigation without excess space: '+bottomGap);
     briefLayout.bottomGap=bottomGap;
     await page.setViewportSize({width:320,height:915});
@@ -264,7 +265,7 @@ try {
   await page.locator('#watch-query-input').fill('VR');await page.locator('[data-add-watch-rule]').click();
   await page.locator('.bottom-nav [data-view="brief"]').click();await page.locator('[data-brief-mode="watches"]').click();
   assert.ok(await page.locator('.watch-filtered-feed-v9138 .article-card').count()>0);assert.equal(await page.locator('.brief-preferences-note-v9849').count(),0);
-  const watchLayout=await page.evaluate(()=>{const r=s=>document.querySelector(s).getBoundingClientRect(),header=r('.page-masthead-v9186'),tabs=r('.brief-mode-tabs'),content=r('.watch-day-v9138');return {headerGap:tabs.top-header.bottom,contentGap:content.top-tabs.bottom};});
+  const watchLayout=await page.evaluate(()=>{const r=s=>document.querySelector(s).getBoundingClientRect(),header=r('.page-masthead-v9186'),tabs=r('.brief-mode-tabs'),content=r('.watches-by-day-v9138');return {headerGap:tabs.top-header.bottom,contentGap:content.top-tabs.bottom};});
   assert.equal(watchLayout.headerGap,14);assert.ok(Math.abs(watchLayout.contentGap-watchLayout.headerGap)<1,JSON.stringify(watchLayout));
   await page.screenshot({path:output+'/brief-veille-remplie.png',fullPage:true});
   await settings();await openSection('[data-add-watch-rule]');await page.locator('[data-watch-rule-delete]').first().click();

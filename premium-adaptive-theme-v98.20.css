@@ -149,3 +149,24 @@ html[data-custom-home-header="1"] .hero-header .eyebrow{padding-top:6px!importan
  height:13px!important;min-height:13px!important;font-size:10.5px!important;line-height:13px!important;font-weight:760!important;
  color:rgba(255,255,255,.92)!important;opacity:1!important;text-shadow:none!important;
 }
+/* Reading preferences shared by every article list. */
+html[data-show-badges="0"] #app .article-card .meta .source-dot,html[data-show-badges="0"] #app .article-card .meta .badge-age-dot{display:none!important}
+html[data-show-age="0"] #app .article-card .meta .article-age{display:none!important}
+html[data-show-age="0"] #app :is([data-stable-home-feed],[data-stable-brief-content]) .article-card h2{-webkit-line-clamp:4!important}
+#app :is([data-stable-home-feed],[data-stable-brief-content]) .article-card h2{font-weight:650!important;line-height:1.4!important;overflow-wrap:anywhere}
+#app .source-directory-row-v9186{padding:6px 0!important;border-radius:0!important;border-bottom:1px solid #eceaf1!important}
+#app .source-line-v9186{display:flex;align-items:center;justify-content:space-between;gap:8px}
+#app .source-line-v9186>strong{min-width:0;overflow-wrap:anywhere}
+#app .source-actions-v9186{display:flex!important;gap:4px!important;flex-shrink:0}
+#app .source-actions-v9186 button{width:auto!important;min-width:60px!important;min-height:36px!important;padding:4px 7px!important;font-size:11px!important}
+#app .blocked-sources-v9186 .keyword-chip{padding:3px 8px!important;min-height:30px!important;max-width:100%;overflow-wrap:anywhere}
+.article-menu-backdrop{position:fixed;inset:0;z-index:200000;background:#17192766;display:flex;align-items:flex-end}
+.article-menu{width:100%;box-sizing:border-box;padding:20px 20px max(20px,env(safe-area-inset-bottom));border-radius:20px 20px 0 0;background:#fff;display:grid;gap:8px;max-height:85vh;overflow:auto}
+.article-menu h2{font-size:17px;line-height:1.45;padding:0;margin:0 0 8px;color:#171927}
+.article-menu button{min-height:44px;border:0;border-radius:10px;text-align:left;padding:10px 14px;background:#f2f0fa;color:#292238;font:inherit}
+.article-menu [data-article-menu-close]{justify-self:end;min-width:44px;text-align:center}
+#app .bottom-nav>[data-view="home"]{order:1!important}
+#app .bottom-nav>[data-view="brief"]{order:2!important}
+#app .bottom-nav>[data-view="settings"]{order:3!important}
+#app .source-directory-row-v9186[hidden]{display:none!important}
+#app .article-card{-webkit-user-select:none;user-select:none;-webkit-touch-callout:none}

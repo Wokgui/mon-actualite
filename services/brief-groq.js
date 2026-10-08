@@ -1,5 +1,5 @@
 // One owner for automatic Brief generation. Credentials never enter JS storage.
-import { newestBriefCards } from './brief-presentation.js?v=98.54';
+import { newestBriefCards } from './brief-presentation.js?v=98.55';
 export const DEFAULT_AI_PROMPT = 'Fais une synthèse en français des nouveautés importantes des sept derniers jours concernant les innovations pratiques ou théoriques dans tous les domaines, les découvertes scientifiques, la réalité virtuelle et mixte, et les voitures. Privilégie les véritables nouveautés plutôt que les promotions ou les rumeurs. Explique ce qui est nouveau, à quoi cela pourrait servir et si c’est disponible, expérimental ou théorique. Commence par une synthèse courte, puis présente les sujets intéressants avec leurs sources. Regroupe les doublons et signale les incertitudes. N’invente aucune information.';
 const CONFIG = 'news-brief-ai-settings-v1', RESULT = 'news-brief-ai-results-v1', ATTEMPT = 'news-brief-groq-attempt-v1';
 export const INTERVAL_MS = 12 * 3600000, ERROR_BACKOFF_MS = 3600000;
@@ -12,7 +12,7 @@ function restoreResult(value) {
   const source = article => {
     try { const url = new URL(article?.url); return ['https:', 'http:'].includes(url.protocol) && !url.username && !url.password && typeof article.title === 'string' ? article : null; } catch { return null; }
   };
-  return { ...value, summary: clean(value.summary,16000), cards: value.cards.slice(0,8).filter(card => card && typeof card.title === 'string' && typeof card.summary === 'string' && source(card.article)), sources: (Array.isArray(value.sources) ? value.sources : []).filter(source).slice(0,24) };
+  return { ...value, summary: clean(value.summary,16000), cards: value.cards.slice(0,8).filter(card => card && typeof card.title === 'string' && source(card.article)), sources: (Array.isArray(value.sources) ? value.sources : []).filter(source).slice(0,24) };
 }
 const oldDefault = 'Résume les actualités importantes en français. Présente les faits, leurs conséquences et ce qui est nouveau. Regroupe les articles qui parlent du même événement et indique les sources. Ne complète pas les informations absentes des sources.';
 export const briefAI = {
@@ -84,9 +84,9 @@ export function normalizeAIResult(payload, articles) {
   const seen = new Set(), byId = new Map(articles.map((article,index) => ['A' + (index + 1), article]));
   const cards = payload.cards.slice(0, 8).flatMap(card => {
     const article = byId.get(card?.sourceId);
-    if (!article || seen.has(article.url) || !clean(card.title, 240) || !clean(card.summary, 2500)) return [];
+    if (!article || seen.has(article.url)) return [];
     seen.add(article.url);
-    return [{ sourceId: article.id, title: clean(card.title, 240), summary: clean(card.summary, 2500), article }];
+    return [{ sourceId: article.id, title: article.title, summary: '', article }];
   });
   if (payload.cards.length && !cards.length) throw Error('Les sources du résultat ne correspondent pas aux articles fournis.');
   const summary = clean(payload.summary, 16000).replace(/\[([^\]\n]{1,240})\]\((A\d+)\)/g, (match, title, id) => byId.has(id) ? `[${title}](${byId.get(id).url})` : title);

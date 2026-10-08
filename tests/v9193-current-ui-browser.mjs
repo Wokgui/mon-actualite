@@ -34,6 +34,7 @@ const fixtureKey = `${article.url}|${article.title.normalize('NFD').replace(/[\u
 article.id = `a-${fixtureHash(fixtureKey, 2166136261)}${fixtureHash(fixtureKey, 0x9e3779b1)}`;
 
 await context.addInitScript(payload => {
+  localStorage.setItem('news-settings', JSON.stringify({ hideReadAtOpen: false }));
   localStorage.setItem('news-live-cache', JSON.stringify({
     articles: [payload],
     fetchedAt: new Date().toISOString(),
