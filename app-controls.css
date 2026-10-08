@@ -149,7 +149,7 @@ html[data-show-badges="0"][data-show-age="0"] #app .article-card h2{margin-botto
 #app .brief-preferences-note-v9849{margin:0 0 12px;padding:0;color:#000;text-align:center;font-size:calc(13px * var(--interface-text-scale));line-height:1.5;overflow-wrap:anywhere}
 #app .ai-brief-v9840>[data-ai-state]:empty{display:none}
 #app .ai-news-summary-v9840{margin:0;padding:18px 20px;border:1px solid color-mix(in srgb,var(--app-accent) 12%,#ececf2);border-radius:20px;box-shadow:0 5px 20px rgba(26,24,44,.035)}
-#app .ai-summary-text-v9847 p,#app .ai-card-summary-v9840 p{text-align:justify;text-align-last:left;hyphens:auto;overflow-wrap:anywhere;line-height:1.75}
+#app .ai-summary-text-v9847 p,#app .ai-card-summary-v9840 p{text-align:justify;text-align-last:left;hyphens:none;overflow-wrap:anywhere;line-height:1.75}
 #app .ai-summary-text-v9847 p{white-space:normal;margin:0 0 16px}
 #app .ai-summary-text-v9847 p:last-child{margin-bottom:0}
 #app .ai-summary-text-v9847 strong{color:var(--ink);font-weight:750}

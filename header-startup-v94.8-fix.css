@@ -13,8 +13,6 @@
 [data-stable-home-feed] .article-card .meta{display:flex!important;align-items:center!important;gap:7px!important;margin:0!important;padding:0!important;color:#7A8295!important;font-size:12px!important;line-height:1.2!important;white-space:nowrap!important}
 [data-stable-home-feed] .article-card .meta .source,[data-stable-home-feed] .article-card .meta .dot{display:none!important}
 [data-stable-home-feed] .article-card .meta .category-link{order:-1!important;display:inline-flex!important;align-items:center!important;justify-content:center!important;padding:4px 10px!important;border:0!important;border-radius:999px!important;background:#F0EDFF!important;color:#5B4BD8!important;font:700 12px/1 system-ui,sans-serif!important;text-decoration:none!important}
-/* Le libellé temporel reste immédiatement après le badge catégorie. */
-[data-stable-home-feed] .article-card .meta > span:not(.source)::before{content:'•';display:inline-block;margin-right:7px;color:#858CA0}
 
 .settings-page-v9185 details > summary,.settings-page-v9185 .settings-accordion-v9185 > summary,.settings-accordions-v9185 details > summary{font-size:19px!important}
 .settings-page-v9185 > h1,.settings-page-v9185 .settings-title,.brief-page h1,.brief-page .brief-title{font-size:32px!important;transform:translateY(-8px)!important}
