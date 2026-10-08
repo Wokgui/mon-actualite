@@ -204,3 +204,7 @@ html[data-show-age="0"] #app :is([data-stable-home-feed],[data-stable-brief-cont
 #app .bottom-nav.stable-bottom-nav-v9184 button.nav-item:focus{width:100%!important;height:100%!important;min-height:0!important;max-height:none!important;block-size:100%!important;min-block-size:0!important;max-block-size:none!important;margin:0!important;border-radius:0!important;box-shadow:none!important}
 #app .bottom-nav.stable-bottom-nav-v9184 button.nav-item.active{background:rgba(255,255,255,.18)!important}
 #app .bottom-nav.stable-bottom-nav-v9184{padding:0!important;gap:0!important}
+#app :is(.watched-keywords-v9857,.blocked-keywords-v9184){align-items:center!important}
+#app .settings-accordion-content-v9185 :is(.watched-keywords-v9857,.blocked-keywords-v9184) .keyword-chip{height:auto!important;min-height:0!important;max-width:100%;box-sizing:border-box;padding:4px 8px!important;line-height:1.4;overflow-wrap:anywhere;align-self:center}
+#app :is(.watched-keywords-v9857,.blocked-keywords-v9184) .keyword-chip button{flex:0 0 19px}
+#app .followed-sources-v9856 .keyword-list{justify-content:center;align-items:center}

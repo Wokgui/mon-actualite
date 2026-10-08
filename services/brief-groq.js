@@ -1,5 +1,5 @@
 // One owner for automatic Brief generation. Credentials never enter JS storage.
-import { newestBriefCards } from './brief-presentation.js?v=98.58';
+import { newestBriefCards } from './brief-presentation.js?v=98.59';
 export const DEFAULT_AI_PROMPT = 'Fais une synthèse en français des nouveautés importantes des sept derniers jours concernant les innovations pratiques ou théoriques dans tous les domaines, les découvertes scientifiques, la réalité virtuelle et mixte, et les voitures. Privilégie les véritables nouveautés plutôt que les promotions ou les rumeurs. Explique ce qui est nouveau, à quoi cela pourrait servir et si c’est disponible, expérimental ou théorique. Commence par une synthèse courte, puis présente les sujets intéressants avec leurs sources. Regroupe les doublons et signale les incertitudes. N’invente aucune information.';
 const CONFIG = 'news-brief-ai-settings-v1', RESULT = 'news-brief-ai-results-v1', ATTEMPT = 'news-brief-groq-attempt-v1';
 export const INTERVAL_MS = 12 * 3600000, ERROR_BACKOFF_MS = 3600000;
