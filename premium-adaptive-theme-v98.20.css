@@ -185,7 +185,7 @@ html[data-show-age="0"] #app :is([data-stable-home-feed],[data-stable-brief-cont
 .article-menu .article-menu-heading [data-article-menu-close]{width:44px;height:44px;padding:0;display:grid;place-items:center;font-size:26px;background:#f0eef7;color:#655d7c}
 .article-menu-source{margin:0 0 12px;color:#777087;font-size:13px;overflow-wrap:anywhere}
 .article-menu-actions{display:grid;grid-template-columns:minmax(0,1fr);width:max-content;max-width:100%;justify-self:center;gap:10px}
-.article-menu .article-menu-actions button{display:grid;grid-template-columns:32px minmax(0,160px);align-items:center;justify-content:center;gap:12px;width:100%;min-height:68px;padding:10px 18px;box-sizing:border-box;text-align:left;font-size:14px;font-weight:600;border:1px solid #e8e3f2;border-radius:14px;background:#faf9fd}
+.article-menu .article-menu-actions button{display:grid;grid-template-columns:32px minmax(0,130px);align-items:center;justify-content:center;gap:12px;width:100%;min-height:68px;padding:10px 18px;box-sizing:border-box;text-align:left;font-size:14px;font-weight:600;border:1px solid #e8e3f2;border-radius:14px;background:#faf9fd}
 .article-menu-actions button>span:last-child{white-space:normal;overflow-wrap:anywhere;line-height:1.4}
 .article-menu-icon{display:grid;place-items:center;flex:0 0 32px;width:32px;height:32px;border-radius:10px}
 .article-menu-icon svg{width:22px;height:22px}
