@@ -1,8 +1,8 @@
-import { importOpmlPreview, fetchLiveNews, fetchBriefCandidates } from './services/source-connectors.js?v=98.57';
-import { photoSnapshot, photoArticleKey } from './services/article-photos.js?v=98.57';
-import { briefAI, setAISettings, onAIChange, initializeBrief, maybeGenerateBrief, generateBrief, saveGroqKey, disconnectGroq } from './services/brief-groq.js?v=98.57';
-import { newestBriefCards, briefSummaryParagraphs, briefArticleBlocks, briefDateLabel } from './services/brief-presentation.js?v=98.57';
-import { hasBriefHistory, prepareBriefHistory } from './brief-prefetch-v98.15.js?v=98.57';
+import { importOpmlPreview, fetchLiveNews, fetchBriefCandidates } from './services/source-connectors.js?v=98.58';
+import { photoSnapshot, photoArticleKey } from './services/article-photos.js?v=98.58';
+import { briefAI, setAISettings, onAIChange, initializeBrief, maybeGenerateBrief, generateBrief, saveGroqKey, disconnectGroq } from './services/brief-groq.js?v=98.58';
+import { newestBriefCards, briefSummaryParagraphs, briefArticleBlocks, briefDateLabel } from './services/brief-presentation.js?v=98.58';
+import { hasBriefHistory, prepareBriefHistory } from './brief-prefetch-v98.15.js?v=98.58';
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const app = $('#app');
@@ -2018,7 +2018,7 @@ if ('serviceWorker' in navigator && location.protocol.startsWith('http') && !nav
     serviceWorkerRefreshing = true;
     toast('Mise à jour prête pour la prochaine ouverture');
   });
-  navigator.serviceWorker.register('./sw-v98.js?v=98.57', { updateViaCache: 'none' }).then(registration => {
+  navigator.serviceWorker.register('./sw-v98.js?v=98.58', { updateViaCache: 'none' }).then(registration => {
     if (registration.waiting) registration.waiting.postMessage('SKIP_WAITING');
     registration.addEventListener('updatefound', () => {
       const installing = registration.installing;
