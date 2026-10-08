@@ -1,6 +1,6 @@
 {
   "version": "98",
-  "codeRelease": "98.60",
+  "codeRelease": "98.61",
   "release": "2026-10-08",
-  "label": "v98.60 : suppression du point, coupures sans tiret et menu abaissé"
+  "label": "v98.61 : taille des articles de 0 à 100, ancien 100 = nouveau 50"
 }

@@ -1,8 +1,8 @@
-import { importOpmlPreview, fetchLiveNews, fetchBriefCandidates } from './services/source-connectors.js?v=98.60';
-import { photoSnapshot, photoArticleKey } from './services/article-photos.js?v=98.60';
-import { briefAI, setAISettings, onAIChange, initializeBrief, maybeGenerateBrief, generateBrief, saveGroqKey, disconnectGroq } from './services/brief-groq.js?v=98.60';
-import { newestBriefCards, briefSummaryParagraphs, briefArticleBlocks, briefDateLabel } from './services/brief-presentation.js?v=98.60';
-import { hasBriefHistory, prepareBriefHistory } from './brief-prefetch-v98.15.js?v=98.60';
+import { importOpmlPreview, fetchLiveNews, fetchBriefCandidates } from './services/source-connectors.js?v=98.61';
+import { photoSnapshot, photoArticleKey } from './services/article-photos.js?v=98.61';
+import { briefAI, setAISettings, onAIChange, initializeBrief, maybeGenerateBrief, generateBrief, saveGroqKey, disconnectGroq } from './services/brief-groq.js?v=98.61';
+import { newestBriefCards, briefSummaryParagraphs, briefArticleBlocks, briefDateLabel } from './services/brief-presentation.js?v=98.61';
+import { hasBriefHistory, prepareBriefHistory } from './brief-prefetch-v98.15.js?v=98.61';
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const app = $('#app');
@@ -137,7 +137,8 @@ const defaultSettings = {
   essentialCount: 5,
   language: 'fr',
   enabledLanguages: ['fr'],
-  textSize: 115,
+  textSize: 60,
+  articleTextScaleVersion: 2,
   interfaceTextSize: 100,
   density: 62,
   homeHeaderSpacing: 20,
@@ -215,7 +216,10 @@ const state = {
     essentialCount: Math.round(boundedNumber(savedSettings.essentialCount, 5, 3, 12)),
     language: selectedLanguage,
     enabledLanguages: [...new Set(['fr', ...(Array.isArray(savedSettings.enabledLanguages) ? savedSettings.enabledLanguages : []), selectedLanguage])].filter(code => LANGUAGE_PRESETS[code]),
-    textSize: boundedNumber(savedSettings.textSize, 115, 100, 175),
+    textSize: savedSettings.articleTextScaleVersion === 2
+      ? boundedNumber(savedSettings.textSize, 60, 0, 100)
+      : (boundedNumber(savedSettings.textSize, 115, 100, 175) - 100) / 1.5 + 50,
+    articleTextScaleVersion: 2,
     interfaceTextSize: boundedNumber(savedSettings.interfaceTextSize, 100, 85, 150),
     density: boundedNumber(savedSettings.density, 62, 0, 100),
     homeHeaderSpacing: boundedNumber(savedSettings.homeHeaderSpacing ?? 20, 20, 4, 40),
@@ -232,14 +236,16 @@ const state = {
 function applyAppearanceSettings() {
   const root = document.documentElement;
   const { accent, textSize, interfaceTextSize, titleSize, density, showBadges, showAge, language } = state.settings;
+  const articleScale = textSize <= 50 ? .5 + textSize / 100 : 1 + (textSize - 50) * .015;
+  const effectiveTextSize = articleScale * 100;
   const rowGap = Math.round(20 - density * .18);
-  const photoWidth = Math.round(112 + (textSize - 100) * (36 / 75));
+  const photoWidth = Math.round(112 + (effectiveTextSize - 100) * (36 / 75));
   const photoHeight = Math.round(photoWidth * 75 / 112);
   root.style.setProperty('--app-accent', accent);
   root.style.setProperty('--app-accent-ink', accentForeground(accent));
   root.style.setProperty('--ui-accent', accent);
   root.style.setProperty('--ui-active', accent);
-  root.style.setProperty('--article-text-scale', String(textSize / 100));
+  root.style.setProperty('--article-text-scale', String(articleScale));
   root.style.setProperty('--interface-text-scale', String(interfaceTextSize / 100));
   root.style.setProperty('--interface-space-scale', String(interfaceTextSize / 100));
   root.style.setProperty('--app-title-scale', String(titleSize / 100));
@@ -915,7 +921,7 @@ function watchRulesMarkup() {
 }
 
 function rangeSetting(label, key, min, max, left, right) {
-  const value = state.settings[key] ?? (key === 'homeHeaderHeight' ? 129 : min);
+  const value = key === 'textSize' ? Math.round(state.settings[key]) : state.settings[key] ?? (key === 'homeHeaderHeight' ? 129 : min);
   return `<label class="preference-range"><strong>${escapeHtml(label)}</strong><input type="range" min="${min}" max="${max}" value="${value}" data-ui-range="${key}"><span><i>${escapeHtml(left)}</i><output data-ui-output="${key}">${value}</output><i>${escapeHtml(right)}</i></span></label>`;
 }
 
@@ -992,7 +998,7 @@ function renderSettings() {
     <div class="settings-accordions-v9185">
       ${accordion(ui('language'), languageSettingsMarkup())}
 
-      ${accordion(ui('textDensity'), `${rangeSetting(ui('articleText'), 'textSize', 100, 175, ui('small'), ui('large'))}${rangeSetting(ui('interfaceText'), 'interfaceTextSize', 85, 150, ui('small'), ui('large'))}${rangeSetting(ui('density'), 'density', 0, 100, ui('lowDensity'), ui('highDensity'))}${rangeSetting(ui('homeHeaderSpacing'), 'homeHeaderSpacing', 4, 40, '4 px', '40 px')}${rangeSetting(ui('titleSize'), 'titleSize', 70, 140, ui('smallTitle'), ui('largeTitle'))}${rangeSetting(ui('homeHeaderHeight'), 'homeHeaderHeight', 104, 260, '104 px', '260 px')}${rangeSetting(ui('settingsHeaderHeight'), 'settingsHeaderHeight', 72, 260, '72 px', '260 px')}${rangeSetting(ui('briefHeaderHeight'), 'briefHeaderHeight', 72, 260, '72 px', '260 px')}<button type="button" class="secondary-btn" data-reset-header-heights>${escapeHtml(ui('restoreHeaderHeights'))}</button>`)}
+      ${accordion(ui('textDensity'), `${rangeSetting(ui('articleText'), 'textSize', 0, 100, ui('small'), ui('large'))}${rangeSetting(ui('interfaceText'), 'interfaceTextSize', 85, 150, ui('small'), ui('large'))}${rangeSetting(ui('density'), 'density', 0, 100, ui('lowDensity'), ui('highDensity'))}${rangeSetting(ui('homeHeaderSpacing'), 'homeHeaderSpacing', 4, 40, '4 px', '40 px')}${rangeSetting(ui('titleSize'), 'titleSize', 70, 140, ui('smallTitle'), ui('largeTitle'))}${rangeSetting(ui('homeHeaderHeight'), 'homeHeaderHeight', 104, 260, '104 px', '260 px')}${rangeSetting(ui('settingsHeaderHeight'), 'settingsHeaderHeight', 72, 260, '72 px', '260 px')}${rangeSetting(ui('briefHeaderHeight'), 'briefHeaderHeight', 72, 260, '72 px', '260 px')}<button type="button" class="secondary-btn" data-reset-header-heights>${escapeHtml(ui('restoreHeaderHeights'))}</button>`)}
 
       ${accordion(ui('display'), displaySettingsMarkup())}
 
@@ -2018,7 +2024,7 @@ if ('serviceWorker' in navigator && location.protocol.startsWith('http') && !nav
     serviceWorkerRefreshing = true;
     toast('Mise à jour prête pour la prochaine ouverture');
   });
-  navigator.serviceWorker.register('./sw-v98.js?v=98.60', { updateViaCache: 'none' }).then(registration => {
+  navigator.serviceWorker.register('./sw-v98.js?v=98.61', { updateViaCache: 'none' }).then(registration => {
     if (registration.waiting) registration.waiting.postMessage('SKIP_WAITING');
     registration.addEventListener('updatefound', () => {
       const installing = registration.installing;
