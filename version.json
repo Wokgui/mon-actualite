@@ -1,6 +1,6 @@
 {
   "version": "98",
-  "codeRelease": "98.61",
+  "codeRelease": "98.62",
   "release": "2026-10-08",
-  "label": "v98.61 : taille des articles de 0 à 100, ancien 100 = nouveau 50"
+  "label": "v98.62 : sources, mots-clés, alignement du Brief et sélection IA élargie"
 }

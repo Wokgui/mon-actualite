@@ -1,14 +1,14 @@
-const CORE_CACHE = 'mon-actualite-v98-61-core-r1';
+const CORE_CACHE = 'mon-actualite-v98-62-core-r1';
 const THUMB_CACHE = 'mon-actualite-thumbnails-v11';
 const PHOTO_BODY_CACHE = 'mon-actualite-photo-bodies-v1';
 const PHOTO_TTL_MS = 7 * 86400000;
 const thumbnailInflight = new Map();
-const ASSETS = ['./', './index.html', './version.json', './assets/article-image-unavailable-v98.39.png', './styles.css?v=53', './app-controls.css?v=98.61', './loading-and-text-v98.12.css?v=98.61',
-  './app.js?v=98.61', './image-pipeline.js?v=98.61', './services/article-photos.js?v=98.61', './services/brief-groq.js?v=98.61', './services/brief-presentation.js?v=98.61',
-  './services/article-visuals.js?v=98.61', './services/source-connectors.js?v=98.61', './manifest.webmanifest?v=98.10',
-  './startup-stability-v98.15.js?v=98.17', './release-watch.js?v=98.61', './premium-adaptive-theme-v98.20.css?v=98.61', './article-access-v91.48.js?v=91.88',
+const ASSETS = ['./', './index.html', './version.json', './assets/article-image-unavailable-v98.39.png', './styles.css?v=53', './app-controls.css?v=98.62', './loading-and-text-v98.12.css?v=98.62',
+  './app.js?v=98.62', './image-pipeline.js?v=98.62', './services/article-photos.js?v=98.62', './services/brief-groq.js?v=98.62', './services/brief-presentation.js?v=98.62',
+  './services/article-visuals.js?v=98.62', './services/source-connectors.js?v=98.62', './manifest.webmanifest?v=98.10',
+  './startup-stability-v98.15.js?v=98.17', './release-watch.js?v=98.62', './premium-adaptive-theme-v98.20.css?v=98.62', './article-access-v91.48.js?v=91.88',
   './startup-news-prefetch-v91.83.js?v=98.26', './nav-solid-hardfix-v91.89.js?v=98.10',
-  './ui-settings-fix-v98.11.js?v=98.12', './brief-prefetch-v98.15.js?v=98.61'];
+  './ui-settings-fix-v98.11.js?v=98.12', './brief-prefetch-v98.15.js?v=98.62'];
 
 self.addEventListener('install', event => event.waitUntil((async () => {
   const cache = await caches.open(CORE_CACHE);

@@ -1,5 +1,5 @@
 // One owner for automatic Brief generation. Credentials never enter JS storage.
-import { newestBriefCards } from './brief-presentation.js?v=98.61';
+import { newestBriefCards } from './brief-presentation.js?v=98.62';
 export const DEFAULT_AI_PROMPT = 'Fais une synthèse en français des nouveautés importantes des sept derniers jours concernant les innovations pratiques ou théoriques dans tous les domaines, les découvertes scientifiques, la réalité virtuelle et mixte, et les voitures. Privilégie les véritables nouveautés plutôt que les promotions ou les rumeurs. Explique ce qui est nouveau, à quoi cela pourrait servir et si c’est disponible, expérimental ou théorique. Commence par une synthèse courte, puis présente les sujets intéressants avec leurs sources. Regroupe les doublons et signale les incertitudes. N’invente aucune information.';
 const CONFIG = 'news-brief-ai-settings-v1', RESULT = 'news-brief-ai-results-v1', ATTEMPT = 'news-brief-groq-attempt-v1';
 export const INTERVAL_MS = 12 * 3600000, ERROR_BACKOFF_MS = 3600000;
@@ -12,7 +12,7 @@ function restoreResult(value) {
   const source = article => {
     try { const url = new URL(article?.url); return ['https:', 'http:'].includes(url.protocol) && !url.username && !url.password && typeof article.title === 'string' ? article : null; } catch { return null; }
   };
-  return { ...value, summary: clean(value.summary,16000), cards: value.cards.slice(0,8).filter(card => card && typeof card.title === 'string' && source(card.article)), sources: (Array.isArray(value.sources) ? value.sources : []).filter(source).slice(0,24) };
+  return { ...value, summary: clean(value.summary,16000), cards: value.cards.filter(card => card && typeof card.title === 'string' && source(card.article)), sources: (Array.isArray(value.sources) ? value.sources : []).filter(source).slice(0,72) };
 }
 const oldDefault = 'Résume les actualités importantes en français. Présente les faits, leurs conséquences et ce qui est nouveau. Regroupe les articles qui parlent du même événement et indique les sources. Ne complète pas les informations absentes des sources.';
 export const briefAI = {
@@ -69,8 +69,8 @@ export function selectBriefArticles(articles, prompt, now = Date.now()) {
     buckets.get(category).push(article);
   }
   const selected = [];
-  while (selected.length < 24 && [...buckets.values()].some(bucket => bucket.length)) {
-    for (const bucket of buckets.values()) if (bucket.length && selected.length < 24) {
+  while (selected.length < 72 && [...buckets.values()].some(bucket => bucket.length)) {
+    for (const bucket of buckets.values()) if (bucket.length && selected.length < 72) {
       const article = bucket.shift();
       selected.push({ id: String(article.id || article.url), url: article.url, title: clean(article.title, 220),
         summary: clean(article.summary, 300), source: clean(article.source, 80), category: clean(article.category, 70),
@@ -79,10 +79,19 @@ export function selectBriefArticles(articles, prompt, now = Date.now()) {
   }
   return selected;
 }
+export function mergeBriefCards(current, previous, now = Date.now()) {
+  const byUrl = new Map();
+  for (const card of [...(current || []), ...(previous || [])]) {
+    const time = Date.parse(card?.article?.publishedAt || '');
+    if (!Number.isFinite(time) || time < now - 7 * 86400000 || time > now + 3600000 || !card.article.url || byUrl.has(card.article.url)) continue;
+    byUrl.set(card.article.url, card);
+  }
+  return newestBriefCards([...byUrl.values()]);
+}
 export function normalizeAIResult(payload, articles) {
   if (!payload || typeof payload.summary !== 'string' || !Array.isArray(payload.cards) || !payload.summary.trim()) throw Error('Réponse IA inexploitable. La dernière synthèse est conservée.');
   const seen = new Set(), byId = new Map(articles.map((article,index) => ['A' + (index + 1), article]));
-  const cards = payload.cards.slice(0, 8).flatMap(card => {
+  const cards = payload.cards.slice(0, 24).flatMap(card => {
     const article = byId.get(card?.sourceId);
     if (!article || seen.has(article.url)) return [];
     seen.add(article.url);
@@ -168,11 +177,12 @@ export function generateBrief({ force = false } = {}) {
       if (!articles.length) throw Error('Aucun article récent exploitable. Actualise les nouvelles puis réessaie.');
       briefAI.busy = 'Rédaction de ta synthèse…'; notify();
       const wireArticles = articles.map((article,index) => ({ sourceId: 'A' + (index + 1), title: article.title, summary: article.summary, source: article.source, category: article.category, publishedAt: article.publishedAt }));
-      while (wireArticles.length > 1 && new TextEncoder().encode(JSON.stringify({ prompt, articles: wireArticles })).length > 17500) { wireArticles.pop(); articles.pop(); }
-      if (new TextEncoder().encode(JSON.stringify({ prompt, articles: wireArticles })).length > 17500) throw Error('Prompt trop volumineux. Raccourcis-le avant de réessayer.');
+      while (wireArticles.length > 1 && new TextEncoder().encode(JSON.stringify({ prompt, articles: wireArticles })).length > 42000) { wireArticles.pop(); articles.pop(); }
+      if (new TextEncoder().encode(JSON.stringify({ prompt, articles: wireArticles })).length > 42000) throw Error('Prompt trop volumineux. Raccourcis-le avant de réessayer.');
       const data = await bridge('generate', { prompt, articles: wireArticles, force });
       if (expected !== revision || !briefAI.configured || data.credentialVersion !== keyVersion) throw Error('Le prompt ou la connexion a changé. Le résultat précédent est conservé.');
       const result = { ...normalizeAIResult(data.result, articles), prompt, credentialVersion: keyVersion, model: data.model, partialSources: discoveryFailed };
+      if (briefAI.result?.prompt === prompt) result.cards = mergeBriefCards(result.cards, briefAI.result.cards);
       localStorage.setItem(RESULT, JSON.stringify(result));
       briefAI.result = result; briefAI.notice = discoveryFailed ? 'Synthèse actualisée avec les articles déjà disponibles : la recherche ciblée était indisponible.' : 'Synthèse actualisée.';
       return result;

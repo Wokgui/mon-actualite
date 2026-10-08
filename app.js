@@ -1,8 +1,8 @@
-import { importOpmlPreview, fetchLiveNews, fetchBriefCandidates } from './services/source-connectors.js?v=98.61';
-import { photoSnapshot, photoArticleKey } from './services/article-photos.js?v=98.61';
-import { briefAI, setAISettings, onAIChange, initializeBrief, maybeGenerateBrief, generateBrief, saveGroqKey, disconnectGroq } from './services/brief-groq.js?v=98.61';
-import { newestBriefCards, briefSummaryParagraphs, briefArticleBlocks, briefDateLabel } from './services/brief-presentation.js?v=98.61';
-import { hasBriefHistory, prepareBriefHistory } from './brief-prefetch-v98.15.js?v=98.61';
+import { importOpmlPreview, fetchLiveNews, fetchBriefCandidates } from './services/source-connectors.js?v=98.62';
+import { photoSnapshot, photoArticleKey } from './services/article-photos.js?v=98.62';
+import { briefAI, setAISettings, onAIChange, initializeBrief, maybeGenerateBrief, generateBrief, saveGroqKey, disconnectGroq } from './services/brief-groq.js?v=98.62';
+import { newestBriefCards, briefSummaryParagraphs, briefArticleBlocks, briefDateLabel } from './services/brief-presentation.js?v=98.62';
+import { hasBriefHistory, prepareBriefHistory } from './brief-prefetch-v98.15.js?v=98.62';
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const app = $('#app');
@@ -46,7 +46,7 @@ const LANGUAGE_PRESETS = {
 const UI_TEXT = {
   fr: {
     home: 'Accueil', settings: 'Réglages', brief: 'Brief', essential: 'L’essentiel', watch: 'Veille', editWatch: 'Régler la veille',
-    language: 'Langue', textDensity: 'Taille et densité du texte', display: 'Affichage', generalNews: 'Actualité générale', baseSources: 'Sources d’information de base', addBlockSource: 'Ajouter / bloquer une source', keywords: 'Mots-clés', operation: 'Fonctionnement', version: 'Version',
+    language: 'Langue', textDensity: 'Taille et densité du texte', display: 'Affichage', generalNews: 'Actualité générale', baseSources: 'Sources d’information', addBlockSource: 'Ajouter / bloquer une source', keywords: 'Mots-clés', operation: 'Fonctionnement', version: 'Version',
     articleText: 'Taille du texte des articles', interfaceText: 'Taille du texte de l’interface', density: 'Densité entre les articles', titleSize: 'Taille du titre', small: 'Petit', large: 'Grand', lowDensity: 'Peu dense', highDensity: 'Très dense', smallTitle: 'Petit titre', largeTitle: 'Gros titre',
     showBadges: 'Afficher les badges', showAge: 'Afficher depuis combien de temps l’article est sorti', dominantColor: 'Couleur dominante', homeHeaderSpacing: 'Espacement date / trait / titre', homeHeaderHeight: 'Hauteur du bandeau — Accueil', settingsHeaderHeight: 'Hauteur du bandeau — Réglages', briefHeaderHeight: 'Hauteur du bandeau — Brief', restoreHeaderHeights: 'Restaurer les hauteurs par défaut', headerHeightsRestored: 'Hauteurs par défaut restaurées', restoreColor: 'Restaurer la couleur par défaut', colorRestored: 'Couleur par défaut restaurée', articleCount: 'Nombre d’articles', coveredDomains: 'Domaines couverts',
     chooseLanguages: 'Choisir des langues', sourcesCountry: 'Les sources proposées par défaut suivent le pays correspondant : {country}.', availableLanguages: 'Langues disponibles', catalogHelp: 'Téléchargez une langue puis utilisez ses sources d’information.', selected: 'Sélectionnée', use: 'Utiliser', download: 'Télécharger', close: 'Fermer',
@@ -662,7 +662,7 @@ function watchedArticles() {
 }
 
 function aiNewCount() {
-  return Date.parse(briefAI.result?.generatedAt || '') > state.aiLastSeen ? newestBriefCards(briefAI.result?.cards).filter(card => visibleArticles([card.article]).length).length : 0;
+  return Date.parse(briefAI.result?.generatedAt || '') > state.aiLastSeen ? visibleAICards(briefAI.result).length : 0;
 }
 function watchNewCount() {
   const since = Number(state.watchLastSeen || 0);
@@ -870,7 +870,7 @@ function sourceRows() {
 function sourceDirectoryMarkup() {
   const items = sourceDirectory();
   if (!items.length) return '<p class="muted-note">Aucune source détectée pour le moment.</p>';
-  return `<div class="followed-sources-v9856"><strong class="settings-field-title">Sources suivies</strong>${state.followedSources.size ? `<div class="keyword-list">${[...state.followedSources].map(key => `<span class="keyword-chip">✓ ${escapeHtml(items.find(item => item.key === key)?.name || key)}</span>`).join('')}</div>` : '<p class="muted-note">Aucune source suivie.</p>'}</div><input class="text-input" type="search" data-source-search placeholder="Rechercher une source" aria-label="Rechercher une source"><div class="source-directory-v9186">${items.map(item => {
+  return `<input class="text-input" type="search" data-source-search placeholder="Rechercher une source" aria-label="Rechercher une source"><div class="source-directory-v9186">${items.map(item => {
     const followed = state.followedSources.has(item.key);
     const blocked = state.blockedSources.has(item.key);
     const feeds = [...item.feeds.entries()];
@@ -980,10 +980,17 @@ function aiSummaryLinks(result, text = result.summary) {
   }
   return output + escapeHtml(text.slice(cursor));
 }
+function visibleAICards(result) {
+  return newestBriefCards(result?.cards).filter(card => {
+    const article = card.article;
+    return visibleArticles([article]).length && Date.parse(article.publishedAt) >= Date.now() - 7 * 86400000
+      && (!state.settings.hideReadAtOpen || !(readAtLaunch.has(String(article.id)) || readAtLaunch.has(articleReadKey(article))));
+  });
+}
 function renderAIBrief() {
   const result = briefAI.result;
   return `<section class="ai-brief-v9840">
-    ${aiStatusMarkup({ notices: false })}${result ? `<div id="ai-articles-v9847" class="feed stable-owned-list ai-results-v9840">${newestBriefCards(result.cards).filter(card => visibleArticles([card.article]).length).map((card, index) => {
+    ${aiStatusMarkup({ notices: false })}${result ? `<div id="ai-articles-v9847" class="feed stable-owned-list ai-results-v9840">${visibleAICards(result).map((card, index) => {
       rememberRenderedArticle(card.article);
       const blocks = briefArticleBlocks(card.summary || '');
       if (blocks[0]?.type === 'heading') blocks.shift();
@@ -2024,7 +2031,7 @@ if ('serviceWorker' in navigator && location.protocol.startsWith('http') && !nav
     serviceWorkerRefreshing = true;
     toast('Mise à jour prête pour la prochaine ouverture');
   });
-  navigator.serviceWorker.register('./sw-v98.js?v=98.61', { updateViaCache: 'none' }).then(registration => {
+  navigator.serviceWorker.register('./sw-v98.js?v=98.62', { updateViaCache: 'none' }).then(registration => {
     if (registration.waiting) registration.waiting.postMessage('SKIP_WAITING');
     registration.addEventListener('updatefound', () => {
       const installing = registration.installing;

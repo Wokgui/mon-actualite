@@ -19,7 +19,7 @@ public class GroqBriefTest {
         assertEquals("openai/gpt-oss-120b",body.getString("model")); assertFalse(body.getBoolean("stream"));
         assertTrue(body.getJSONObject("response_format").getJSONObject("json_schema").getBoolean("strict"));
         assertFalse(body.toString().contains("SECRET")); assertFalse(body.toString().contains("evil.test"));
-        assertEquals(2200,body.getInt("max_completion_tokens"));
+        assertEquals(6000,body.getInt("max_completion_tokens"));
         assertTrue(body.getJSONArray("messages").getJSONObject(0).getString("content").contains("un paragraphe court par sujet"));
         assertTrue(body.getJSONArray("messages").getJSONObject(0).getString("content").contains("sans les libellés Utilité, Statut ou Source"));
         assertTrue(body.getJSONArray("messages").getJSONObject(0).getString("content").contains("Pour chaque catégorie demandée"));
@@ -32,7 +32,7 @@ public class GroqBriefTest {
     @Test public void rejectsBlankPromptAndTooManySources() throws Exception {
         try { GroqBrief.request(input().put("prompt"," ")); fail(); } catch(Exception expected) {}
         JSONObject value = input(); JSONArray articles = value.getJSONArray("articles");
-        for(int i=0;i<24;i++) articles.put(articles.getJSONObject(0));
+        for(int i=0;i<72;i++) articles.put(articles.getJSONObject(0));
         try { GroqBrief.request(value); fail(); } catch(Exception expected) {}
     }
     @Test public void rejectsSourceIdentifiersAndOversizedRequest() throws Exception {

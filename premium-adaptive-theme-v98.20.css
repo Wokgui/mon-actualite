@@ -208,3 +208,14 @@ html[data-show-age="0"] #app :is([data-stable-home-feed],[data-stable-brief-cont
 #app .settings-accordion-content-v9185 :is(.watched-keywords-v9857,.blocked-keywords-v9184) .keyword-chip{height:auto!important;min-height:0!important;max-width:100%;box-sizing:border-box;padding:4px 8px!important;line-height:1.4;overflow-wrap:anywhere;align-self:center}
 #app :is(.watched-keywords-v9857,.blocked-keywords-v9184) .keyword-chip button{flex:0 0 19px}
 #app .followed-sources-v9856 .keyword-list{justify-content:center;align-items:center}
+
+/* Compact keywords: reset the generic 42px settings button inside each chip. */
+#app .settings-accordion-content-v9185 :is(.watched-keywords-v9857,.blocked-keywords-v9184) .keyword-chip{padding:3px 8px!important;line-height:1.3!important}
+#app .settings-accordion-content-v9185 :is(.watched-keywords-v9857,.blocked-keywords-v9184) .keyword-chip button{width:19px!important;height:19px!important;min-height:0!important;padding:0!important;line-height:1!important;align-self:center}
+#app .settings-accordion-content-v9185 [data-source-search]{display:block;width:100%;box-sizing:border-box;margin:14px 0!important}
+/* Same date row and article start in Essential and Watches. */
+#app .page:has(.brief-mode-tabs)>.brief-mode-tabs{margin-top:0!important;margin-bottom:14px!important}
+#app .page:has(.brief-mode-tabs)>.runtime-brief-content{margin:0!important;padding-top:0!important}
+#app .runtime-brief-content :is(.brief-history-day-v9138,.watch-day-v9138){margin-top:22px!important;padding-top:0!important}
+#app .runtime-brief-content :is(.brief-history-day-v9138,.watch-day-v9138):first-child{margin-top:0!important}
+#app .runtime-brief-content :is(.brief-history-date-v9138,.watch-day-v9138>h3){display:block!important;margin:0 0 10px!important;padding:0!important;line-height:1.5!important;font-size:calc(13px * var(--interface-text-scale))!important;font-weight:900!important}
