@@ -1,8 +1,8 @@
-import { importOpmlPreview, fetchLiveNews, fetchBriefCandidates } from './services/source-connectors.js?v=98.64';
-import { photoSnapshot, photoArticleKey } from './services/article-photos.js?v=98.64';
-import { briefAI, setAISettings, onAIChange, initializeBrief, maybeGenerateBrief, generateBrief, saveGroqKey, disconnectGroq } from './services/brief-groq.js?v=98.64';
-import { newestBriefCards, briefSummaryParagraphs, briefArticleBlocks, briefDateLabel } from './services/brief-presentation.js?v=98.64';
-import { hasBriefHistory, prepareBriefHistory } from './brief-prefetch-v98.15.js?v=98.64';
+import { importOpmlPreview, fetchLiveNews, fetchBriefCandidates } from './services/source-connectors.js?v=98.65';
+import { photoSnapshot, photoArticleKey } from './services/article-photos.js?v=98.65';
+import { briefAI, setAISettings, onAIChange, initializeBrief, maybeGenerateBrief, generateBrief, saveGroqKey, disconnectGroq } from './services/brief-groq.js?v=98.65';
+import { newestBriefCards, briefSummaryParagraphs, briefArticleBlocks, briefDateLabel } from './services/brief-presentation.js?v=98.65';
+import { hasBriefHistory, prepareBriefHistory } from './brief-prefetch-v98.15.js?v=98.65';
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const app = $('#app');
@@ -1015,15 +1015,14 @@ function renderSettings() {
 
       ${accordion(ui('addBlockSource'), `
         <div class="form-stack compact-source-form-v9186">
-          <input id="source-name" class="text-input" type="text" maxlength="80" placeholder="Nom de la source (optionnel)">
+          <input id="source-name" class="text-input" type="text" maxlength="100" placeholder="Nom de la source">
           <input id="source-url" class="text-input" type="url" maxlength="600" placeholder="Adresse RSS / Atom">
-          <button class="secondary-btn" data-add-source>${icon('plus')} Ajouter le flux</button>
+          <div class="source-form-actions-v9865"><button class="secondary-btn" data-add-source>${icon('plus')} Ajouter</button><button class="secondary-btn" data-add-blocked-source>Bloquer</button></div>
           <label class="secondary-btn opml-button-v9186" for="opml-input">Importer un fichier OPML</label><input id="opml-input" class="file-input" type="file" accept=".opml,.xml">
         </div>
-        ${sourceRows()}
-        <div class="inline-form manual-block-source-v9186"><input id="blocked-source-input" class="text-input" type="text" maxlength="100" placeholder="Nom d’une source à bloquer"><button class="small-primary-btn danger-action-v9186" data-add-blocked-source>Bloquer</button></div>
-        ${blockedSourceChips()}
       `)}
+      ${accordion('Sources ajoutées', sourceRows())}
+      ${accordion('Sources bloquées', blockedSourceChips() || '<p class="muted-note">Aucune source bloquée.</p>')}
 
       ${accordion(ui('keywords'), `
         <div class="inline-form"><input id="keyword-input" class="text-input" type="text" maxlength="70" placeholder="À surveiller"><button class="small-primary-btn" data-add-keyword>Ajouter</button></div>${keywordChips()}
@@ -1471,7 +1470,7 @@ function addWatchTopicFromSheet() {
 }
 
 function addBlockedSourceManual() {
-  const raw = $('#blocked-source-input')?.value.trim();
+  const raw = $('#source-name')?.value.trim();
   const key = normalizeTopic(raw || '');
   if (!key) return toast('Indiquez une source');
   state.blockedSources.add(key);
@@ -1868,7 +1867,6 @@ app.addEventListener('keydown', event => {
   }
   if (event.key === 'Enter' && event.target.id === 'blocked-keyword-input') addBlockedKeyword();
   if (event.key === 'Enter' && event.target.id === 'domain-input') addDomain();
-  if (event.key === 'Enter' && event.target.id === 'blocked-source-input') addBlockedSourceManual();
   if (event.key === 'Enter' && event.target.id === 'interest-input') addInterestManual();
   if (event.key === 'Enter' && event.target.id === 'watch-query-input') addWatchRule();
   if (event.key === 'Enter' && event.target.id === 'source-url') addSource();
@@ -2031,7 +2029,7 @@ if ('serviceWorker' in navigator && location.protocol.startsWith('http') && !nav
     serviceWorkerRefreshing = true;
     toast('Mise à jour prête pour la prochaine ouverture');
   });
-  navigator.serviceWorker.register('./sw-v98.js?v=98.64', { updateViaCache: 'none' }).then(registration => {
+  navigator.serviceWorker.register('./sw-v98.js?v=98.65', { updateViaCache: 'none' }).then(registration => {
     if (registration.waiting) registration.waiting.postMessage('SKIP_WAITING');
     registration.addEventListener('updatefound', () => {
       const installing = registration.installing;

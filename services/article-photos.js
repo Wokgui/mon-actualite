@@ -1,4 +1,4 @@
-import { preparedVisualUrl, articleVisualUrl, sourceTileUrl, photoArticleKey, canonicalPhotoUrl } from './article-visuals.js?v=98.64';
+import { preparedVisualUrl, articleVisualUrl, sourceTileUrl, photoArticleKey, canonicalPhotoUrl } from './article-visuals.js?v=98.65';
 export { photoArticleKey };
 
 // Renderer and loader share this exact module. URL identity survives id/title
@@ -40,7 +40,7 @@ export function photoRecord(article = {}) {
     if (!allowed(url)) return '';
     const request = new URL(url, location.href);
     request.searchParams.set('clientRecovery', '1');
-    request.searchParams.set('v', '98.64');
+    request.searchParams.set('v', '98.65');
     return request.href;
   };
   const candidates = [...new Set([recent ? remembered.requestUrl : '', preparedVisualUrl(article), articleVisualUrl(article)].map(upgrade).filter(Boolean))];
