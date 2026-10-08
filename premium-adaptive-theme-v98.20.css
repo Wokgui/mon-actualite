@@ -219,3 +219,15 @@ html[data-show-age="0"] #app :is([data-stable-home-feed],[data-stable-brief-cont
 #app .runtime-brief-content :is(.brief-history-day-v9138,.watch-day-v9138){margin-top:22px!important;padding-top:0!important}
 #app .runtime-brief-content :is(.brief-history-day-v9138,.watch-day-v9138):first-child{margin-top:0!important}
 #app .runtime-brief-content :is(.brief-history-date-v9138,.watch-day-v9138>h3){display:block!important;margin:0 0 10px!important;padding:0!important;line-height:1.5!important;font-size:calc(13px * var(--interface-text-scale))!important;font-weight:900!important}
+
+/* Same compact proportion for source chips and added feeds. */
+#app .settings-accordion-content-v9185 .blocked-sources-v9186{justify-content:center;align-items:center}
+#app .settings-accordion-content-v9185 .blocked-sources-v9186 .keyword-chip{height:auto!important;min-height:0!important;max-width:100%;box-sizing:border-box;padding:3px 8px!important;line-height:1.3!important;align-self:center}
+#app .settings-accordion-content-v9185 .blocked-sources-v9186 .keyword-chip button{width:19px!important;height:19px!important;min-height:0!important;padding:0!important;line-height:1!important;flex:0 0 19px}
+#app .settings-accordion-content-v9185 .source-setting{padding:3px 8px!important;grid-template-columns:18px minmax(0,1fr) 24px!important}
+#app .settings-accordion-content-v9185 .source-setting>div{min-width:0}
+#app .settings-accordion-content-v9185 .source-setting .mini-icon-btn{width:24px!important;height:24px!important;min-height:0!important;padding:0!important}
+#app .settings-accordion-content-v9185 .source-setting .source-state{width:13px!important;height:13px!important;min-height:0!important;padding:0!important}
+#app .settings-accordion-content-v9185 .manual-block-source-v9186{display:flex!important;flex-direction:column;align-items:stretch;gap:10px!important;margin:14px 0}
+#app .settings-accordion-content-v9185 :is(#source-name,#blocked-source-input){width:100%!important;min-width:0!important;box-sizing:border-box;height:42px!important;min-height:42px!important;padding:8px 12px!important}
+#app .manual-block-source-v9186 [data-add-blocked-source]{align-self:center;width:fit-content!important;min-height:36px!important;padding:7px 16px!important}

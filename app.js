@@ -1,8 +1,8 @@
-import { importOpmlPreview, fetchLiveNews, fetchBriefCandidates } from './services/source-connectors.js?v=98.62';
-import { photoSnapshot, photoArticleKey } from './services/article-photos.js?v=98.62';
-import { briefAI, setAISettings, onAIChange, initializeBrief, maybeGenerateBrief, generateBrief, saveGroqKey, disconnectGroq } from './services/brief-groq.js?v=98.62';
-import { newestBriefCards, briefSummaryParagraphs, briefArticleBlocks, briefDateLabel } from './services/brief-presentation.js?v=98.62';
-import { hasBriefHistory, prepareBriefHistory } from './brief-prefetch-v98.15.js?v=98.62';
+import { importOpmlPreview, fetchLiveNews, fetchBriefCandidates } from './services/source-connectors.js?v=98.63';
+import { photoSnapshot, photoArticleKey } from './services/article-photos.js?v=98.63';
+import { briefAI, setAISettings, onAIChange, initializeBrief, maybeGenerateBrief, generateBrief, saveGroqKey, disconnectGroq } from './services/brief-groq.js?v=98.63';
+import { newestBriefCards, briefSummaryParagraphs, briefArticleBlocks, briefDateLabel } from './services/brief-presentation.js?v=98.63';
+import { hasBriefHistory, prepareBriefHistory } from './brief-prefetch-v98.15.js?v=98.63';
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const app = $('#app');
@@ -1021,7 +1021,7 @@ function renderSettings() {
         </div>
         ${sourceRows()}
         <div class="inline-form manual-block-source-v9186"><input id="blocked-source-input" class="text-input" type="text" maxlength="100" placeholder="Nom d’une source à bloquer"><button class="small-primary-btn danger-action-v9186" data-add-blocked-source>Bloquer</button></div>
-        <strong class="settings-field-title">Sources bloquées</strong>${blockedSourceChips()}
+        ${blockedSourceChips()}
         <label class="secondary-btn opml-button-v9186" for="opml-input">Importer un fichier OPML</label><input id="opml-input" class="file-input" type="file" accept=".opml,.xml">
       `)}
 
@@ -2031,7 +2031,7 @@ if ('serviceWorker' in navigator && location.protocol.startsWith('http') && !nav
     serviceWorkerRefreshing = true;
     toast('Mise à jour prête pour la prochaine ouverture');
   });
-  navigator.serviceWorker.register('./sw-v98.js?v=98.62', { updateViaCache: 'none' }).then(registration => {
+  navigator.serviceWorker.register('./sw-v98.js?v=98.63', { updateViaCache: 'none' }).then(registration => {
     if (registration.waiting) registration.waiting.postMessage('SKIP_WAITING');
     registration.addEventListener('updatefound', () => {
       const installing = registration.installing;
