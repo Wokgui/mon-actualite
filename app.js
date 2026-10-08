@@ -1,8 +1,8 @@
-import { importOpmlPreview, fetchLiveNews, fetchBriefCandidates } from './services/source-connectors.js?v=98.63';
-import { photoSnapshot, photoArticleKey } from './services/article-photos.js?v=98.63';
-import { briefAI, setAISettings, onAIChange, initializeBrief, maybeGenerateBrief, generateBrief, saveGroqKey, disconnectGroq } from './services/brief-groq.js?v=98.63';
-import { newestBriefCards, briefSummaryParagraphs, briefArticleBlocks, briefDateLabel } from './services/brief-presentation.js?v=98.63';
-import { hasBriefHistory, prepareBriefHistory } from './brief-prefetch-v98.15.js?v=98.63';
+import { importOpmlPreview, fetchLiveNews, fetchBriefCandidates } from './services/source-connectors.js?v=98.64';
+import { photoSnapshot, photoArticleKey } from './services/article-photos.js?v=98.64';
+import { briefAI, setAISettings, onAIChange, initializeBrief, maybeGenerateBrief, generateBrief, saveGroqKey, disconnectGroq } from './services/brief-groq.js?v=98.64';
+import { newestBriefCards, briefSummaryParagraphs, briefArticleBlocks, briefDateLabel } from './services/brief-presentation.js?v=98.64';
+import { hasBriefHistory, prepareBriefHistory } from './brief-prefetch-v98.15.js?v=98.64';
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const app = $('#app');
@@ -508,7 +508,7 @@ function nav(active = state.view) {
   const watchCount = watchNewCount() + aiNewCount();
   return `<nav class="bottom-nav stable-bottom-nav-v9184" aria-label="${escapeHtml(ui('brief'))}">
     <button class="nav-item ${active === 'home' ? 'active' : ''}" data-view="home" aria-label="${escapeHtml(ui('home'))}">${navSolidIcon('home')}<span>${escapeHtml(ui('home'))}</span></button>
-    <button class="nav-item ${active === 'brief' ? 'active' : ''}" data-view="brief" aria-label="${escapeHtml(ui('brief'))}">${navSolidIcon('brief')}<span>${escapeHtml(ui('brief'))}</span>${watchCount ? `<i class="nav-watch-dot-v9184">${watchCount > 9 ? '9+' : watchCount}</i>` : ''}</button>
+    <button class="nav-item ${active === 'brief' ? 'active' : ''}" data-view="brief" aria-label="${escapeHtml(ui('brief'))}"><div class="nav-brief-icon-anchor">${navSolidIcon('brief')}${watchCount ? `<i class="nav-watch-dot-v9184">${watchCount > 9 ? '9+' : watchCount}</i>` : ''}</div><span>${escapeHtml(ui('brief'))}</span></button>
     <button class="nav-item ${active === 'settings' ? 'active' : ''}" data-view="settings" aria-label="${escapeHtml(ui('settings'))}">${navSolidIcon('settings')}<span>${escapeHtml(ui('settings'))}</span></button>
   </nav>`;
 }
@@ -1018,11 +1018,11 @@ function renderSettings() {
           <input id="source-name" class="text-input" type="text" maxlength="80" placeholder="Nom de la source (optionnel)">
           <input id="source-url" class="text-input" type="url" maxlength="600" placeholder="Adresse RSS / Atom">
           <button class="secondary-btn" data-add-source>${icon('plus')} Ajouter le flux</button>
+          <label class="secondary-btn opml-button-v9186" for="opml-input">Importer un fichier OPML</label><input id="opml-input" class="file-input" type="file" accept=".opml,.xml">
         </div>
         ${sourceRows()}
         <div class="inline-form manual-block-source-v9186"><input id="blocked-source-input" class="text-input" type="text" maxlength="100" placeholder="Nom d’une source à bloquer"><button class="small-primary-btn danger-action-v9186" data-add-blocked-source>Bloquer</button></div>
         ${blockedSourceChips()}
-        <label class="secondary-btn opml-button-v9186" for="opml-input">Importer un fichier OPML</label><input id="opml-input" class="file-input" type="file" accept=".opml,.xml">
       `)}
 
       ${accordion(ui('keywords'), `
@@ -2031,7 +2031,7 @@ if ('serviceWorker' in navigator && location.protocol.startsWith('http') && !nav
     serviceWorkerRefreshing = true;
     toast('Mise à jour prête pour la prochaine ouverture');
   });
-  navigator.serviceWorker.register('./sw-v98.js?v=98.63', { updateViaCache: 'none' }).then(registration => {
+  navigator.serviceWorker.register('./sw-v98.js?v=98.64', { updateViaCache: 'none' }).then(registration => {
     if (registration.waiting) registration.waiting.postMessage('SKIP_WAITING');
     registration.addEventListener('updatefound', () => {
       const installing = registration.installing;
@@ -2141,7 +2141,7 @@ function refreshNoveltyBadges() {
   const replace = (selector, count, className) => {
     const button = app.querySelector(selector); if (!button) return;
     button.querySelector('.' + className)?.remove();
-    if (count) { const badge = document.createElement('span'); badge.className = className; badge.textContent = count > 9 ? '9+' : String(count); button.appendChild(badge); }
+    if (count) { const badge = document.createElement('span'); badge.className = className; badge.textContent = count > 9 ? '9+' : String(count); (button.querySelector('.nav-brief-icon-anchor') || button).appendChild(badge); }
   };
   replace('.bottom-nav [data-view="brief"]', watchNewCount() + aiNewCount(), 'nav-watch-dot-v9184');
   replace('[data-brief-mode="watches"]', watchNewCount(), 'watch-new-badge-v9184');

@@ -1,6 +1,6 @@
 {
   "version": "98",
-  "codeRelease": "98.63",
+  "codeRelease": "98.64",
   "release": "2026-10-08",
-  "label": "v98.63 : sources ajoutées et bloquées compactes, formulaire de blocage aligné"
+  "label": "v98.64 : OPML sous ajout du flux, icône Brief centrée avec badge à droite"
 }

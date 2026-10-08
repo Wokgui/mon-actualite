@@ -231,3 +231,11 @@ html[data-show-age="0"] #app :is([data-stable-home-feed],[data-stable-brief-cont
 #app .settings-accordion-content-v9185 .manual-block-source-v9186{display:flex!important;flex-direction:column;align-items:stretch;gap:10px!important;margin:14px 0}
 #app .settings-accordion-content-v9185 :is(#source-name,#blocked-source-input){width:100%!important;min-width:0!important;box-sizing:border-box;height:42px!important;min-height:42px!important;padding:8px 12px!important}
 #app .manual-block-source-v9186 [data-add-blocked-source]{align-self:center;width:fit-content!important;min-height:36px!important;padding:7px 16px!important}
+
+#app .settings-accordion-content-v9185 .manual-block-source-v9186{border-top:0!important;padding-top:0!important}
+#app .compact-source-form-v9186 .opml-button-v9186{margin-top:0!important}
+/* Keep Brief's icon centered; its count sits outside the icon's layout box. */
+#app .bottom-nav.stable-bottom-nav-v9184 .nav-item[data-view="brief"]{grid-template-columns:auto!important;column-gap:0!important}
+#app .bottom-nav.stable-bottom-nav-v9184 .nav-brief-icon-anchor{position:relative;grid-column:1!important;grid-row:1!important;justify-self:center;align-self:center;display:flex;align-items:center;justify-content:center;width:21px;height:21px}
+#app .bottom-nav.stable-bottom-nav-v9184 .nav-item[data-view="brief"]>span{grid-column:1!important}
+#app .bottom-nav.stable-bottom-nav-v9184 .nav-brief-icon-anchor .nav-watch-dot-v9184{position:absolute!important;left:calc(100% + 7px)!important;right:auto!important;top:50%!important;transform:translateY(-50%)!important;translate:none!important;grid-column:auto!important;grid-row:auto!important}
