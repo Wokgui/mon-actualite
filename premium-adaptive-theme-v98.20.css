@@ -245,3 +245,18 @@ html[data-show-age="0"] #app :is([data-stable-home-feed],[data-stable-brief-cont
 
 #app .source-group-v9866{margin-top:18px;text-align:center}
 #app .source-group-v9866>h3{margin:0 0 10px;font-size:calc(13px * var(--interface-text-scale));font-weight:700;text-align:center}
+
+/* Active watches are a compact plain list. */
+#app .settings-accordion-content-v9185 .watch-rules-v9184{display:grid!important;gap:3px!important;margin:12px 0 0!important;padding:0!important;list-style:none}
+#app .settings-accordion-content-v9185 .watch-rule-v9184{padding:3px 0!important;gap:8px!important;border:0!important;border-radius:0!important;background:transparent!important;min-height:0!important}
+#app .settings-accordion-content-v9185 .watch-rule-v9184>div{min-width:0;text-align:left;overflow-wrap:anywhere}
+#app .settings-accordion-content-v9185 .watch-rule-v9184 strong{font-size:calc(12px * var(--interface-text-scale))!important;font-weight:600;line-height:1.4}
+#app .settings-accordion-content-v9185 .watch-rule-v9184 span{margin:0!important;line-height:1.4;font-size:calc(11px * var(--interface-text-scale))!important}
+#app .settings-accordion-content-v9185 .watch-rule-v9184 button{width:22px!important;height:22px!important;min-height:0!important;padding:0!important;background:transparent!important;border:0!important;flex:0 0 22px;line-height:1!important}
+#app .preference-history-actions-v9867{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:10px;width:286px;max-width:100%;margin:20px auto 0}
+#app .settings-accordion-content-v9185 .preference-history-actions-v9867 button{display:flex;align-items:center;justify-content:center;gap:8px;border:0;border-radius:14px;min-height:44px!important;padding:9px 12px!important;color:#fff;font-weight:700;box-shadow:0 3px 8px rgba(45,35,80,.12)}
+#app .preference-history-actions-v9867 [data-preference-undo]{background:linear-gradient(135deg,#c75478,#b44d35)}
+#app .preference-history-actions-v9867 [data-preference-redo]{background:linear-gradient(135deg,#1877b8,#158269)}
+#app .preference-history-actions-v9867 button svg{width:19px;height:19px;flex:0 0 19px}
+#app .preference-history-actions-v9867 button:disabled{opacity:.4;box-shadow:none;cursor:default}
+#app .preference-history-actions-v9867 button:focus-visible{outline:2px solid var(--app-accent);outline-offset:3px}

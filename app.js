@@ -1,8 +1,9 @@
-import { importOpmlPreview, fetchLiveNews, fetchBriefCandidates } from './services/source-connectors.js?v=98.66';
-import { photoSnapshot, photoArticleKey } from './services/article-photos.js?v=98.66';
-import { briefAI, setAISettings, onAIChange, initializeBrief, maybeGenerateBrief, generateBrief, saveGroqKey, disconnectGroq } from './services/brief-groq.js?v=98.66';
-import { newestBriefCards, briefSummaryParagraphs, briefArticleBlocks, briefDateLabel } from './services/brief-presentation.js?v=98.66';
-import { hasBriefHistory, prepareBriefHistory } from './brief-prefetch-v98.15.js?v=98.66';
+import { createPreferenceHistory } from './services/preference-history.js?v=98.67';
+import { importOpmlPreview, fetchLiveNews, fetchBriefCandidates } from './services/source-connectors.js?v=98.67';
+import { photoSnapshot, photoArticleKey } from './services/article-photos.js?v=98.67';
+import { briefAI, setAISettings, onAIChange, initializeBrief, maybeGenerateBrief, generateBrief, saveGroqKey, disconnectGroq } from './services/brief-groq.js?v=98.67';
+import { newestBriefCards, briefSummaryParagraphs, briefArticleBlocks, briefDateLabel } from './services/brief-presentation.js?v=98.67';
+import { hasBriefHistory, prepareBriefHistory } from './brief-prefetch-v98.15.js?v=98.67';
 
 const $ = (selector, root = document) => root.querySelector(selector);
 const app = $('#app');
@@ -291,7 +292,11 @@ let syncPromise = null;
 let toastTimer;
 let settingsOpenAccordions = new Set();
 
+const preferenceHistory = createPreferenceHistory(preferenceSnapshot(), localStorage);
+let restoringPreferences = false;
 const iconPaths = {
+  undo: '<path d="M3 10h6M3 10V4"/><path d="M3 10a8 8 0 1 1 2 9"/>',
+  redo: '<path d="M21 10h-6M21 10V4"/><path d="M21 10a8 8 0 1 0-2 9"/>',
   home: '<path d="m3 11 9-8 9 8"/><path d="M5 10v10h14V10"/><path d="M9 20v-6h6v6"/>',
   brief: '<path d="M6 3h12v18H6z"/><path d="M9 8h6M9 12h6M9 16h4"/>',
   minus: '<path d="M5 12h14"/>',
@@ -918,7 +923,7 @@ function domainRows() {
 
 function watchRulesMarkup() {
   const rules = activeWatchRules();
-  return rules.length ? `<div class="watch-rules-v9184">${rules.map((rule,index) => `<div class="watch-rule-v9184"><div><strong>${escapeHtml(rule.query)}</strong>${rule.exclude ? `<span>Évite : ${escapeHtml(rule.exclude)}</span>` : ''}</div><button type="button" data-watch-rule-delete="${index}" aria-label="Supprimer cette veille">×</button></div>`).join('')}</div>` : '<p class="muted-note">Aucune règle de veille.</p>';
+  return rules.length ? `<ul class="watch-rules-v9184">${rules.map((rule,index) => `<li class="watch-rule-v9184"><div><strong>${escapeHtml(rule.query)}</strong>${rule.exclude ? `<span>Évite : ${escapeHtml(rule.exclude)}</span>` : ''}</div><button type="button" data-watch-rule-delete="${index}" aria-label="Supprimer cette veille">×</button></li>`).join('')}</ul>` : '<p class="muted-note">Aucune règle de veille.</p>';
 }
 
 function rangeSetting(label, key, min, max, left, right) {
@@ -1039,7 +1044,7 @@ function renderSettings() {
 
       ${accordion(ui('operation'), `<div class="function-settings-v9186">${settingRow(ui('automaticRefresh'), ui('automaticDesc'), 'autoRefresh')}${settingRow(ui('webSearch'), ui('webSearchDesc'), 'webSearch')}</div>`)}
 
-      ${accordion(ui('version'), `<div class="app-version-row"><div><strong>Mon actualité · ${escapeHtml(ui('version').toLowerCase())} ${APP_VERSION}</strong><span>${escapeHtml(ui('publication', { date: APP_RELEASE }))}</span></div></div><button class="secondary-btn compact-btn version-update-v9186" data-check-update>${icon('refresh')} ${escapeHtml(ui('checkUpdate'))}</button>`)}
+      ${accordion(ui('version'), `<div class="app-version-row"><div><strong>Mon actualité · ${escapeHtml(ui('version').toLowerCase())} ${APP_VERSION}</strong><span>${escapeHtml(ui('publication', { date: APP_RELEASE }))}</span></div></div><button class="secondary-btn compact-btn version-update-v9186" data-check-update>${icon('refresh')} ${escapeHtml(ui('checkUpdate'))}</button><div class="preference-history-actions-v9867"><button type="button" data-preference-undo ${preferenceHistory.canUndo ? '' : 'disabled'}>${icon('undo')} Annuler</button><button type="button" data-preference-redo ${preferenceHistory.canRedo ? '' : 'disabled'}>${icon('redo')} Rétablir</button></div>`)}
     </div>
   </main>${nav('settings')}`;
 }
@@ -1260,7 +1265,33 @@ function toast(message) {
   toastTimer = setTimeout(() => toastEl.classList.remove('show'), 2200);
 }
 
-function persist() {
+function preferenceSnapshot() {
+  return JSON.parse(JSON.stringify({ settings: state.settings, sources: state.sources, keywords: state.keywords,
+    domains: state.domains, blockedTerms: state.blockedTerms, followedSources: [...state.followedSources],
+    blockedSources: [...state.blockedSources], watchRules: state.watchRules, feedback: state.feedback,
+    topicPreferences: state.topicPreferences, saved: [...state.saved], ai: { prompt: briefAI.prompt, autoAtOpen: briefAI.autoAtOpen } }));
+}
+function refreshHistoryButtons() {
+  const undo = app.querySelector('[data-preference-undo]'), redo = app.querySelector('[data-preference-redo]');
+  if (undo) undo.disabled = !preferenceHistory.canUndo;
+  if (redo) redo.disabled = !preferenceHistory.canRedo;
+}
+function restorePreferenceAction(direction) {
+  const snapshot = preferenceHistory[direction](); if (!snapshot) return;
+  const before = JSON.stringify([state.settings.language, state.settings.webSearch, state.sources]);
+  restoringPreferences = true;
+  try {
+    for (const key of ['settings','sources','keywords','domains','blockedTerms','watchRules','feedback','topicPreferences']) state[key] = snapshot[key];
+    for (const key of ['followedSources','blockedSources','saved']) state[key] = new Set(snapshot[key]);
+    setAISettings(snapshot.ai, { announce: false });
+    persist(); applyAppearanceSettings(); reconcileHomeOrder({ reset: true }); render({ scrollTop: window.scrollY });
+    toast(direction === 'undo' ? 'Modification annulée' : 'Modification rétablie');
+    if (before !== JSON.stringify([state.settings.language, state.settings.webSearch, state.sources])) {
+      state.essentialStatus = 'loading'; void prepareEssential(); void syncNews({ silent: true });
+    }
+  } finally { restoringPreferences = false; }
+}
+function persist({ historyGroup = null } = {}) {
   localStorage.setItem('news-saved', JSON.stringify([...state.saved]));
   localStorage.setItem('news-feedback', JSON.stringify(state.feedback));
   localStorage.setItem('news-topic-preferences-v1', JSON.stringify(state.topicPreferences));
@@ -1275,6 +1306,8 @@ function persist() {
   localStorage.setItem('news-ai-last-seen-v1', String(state.aiLastSeen || 0));
   localStorage.setItem('news-watch-last-seen-v1', String(state.watchLastSeen || 0));
   localStorage.removeItem('news-ui-v96');
+  if (!restoringPreferences) preferenceHistory.record(preferenceSnapshot(), historyGroup);
+  refreshHistoryButtons();
 }
 
 function mergeArticleHistory(incoming, previous) {
@@ -1539,6 +1572,8 @@ function selectLanguage(code) {
 }
 
 app.addEventListener('click', async event => {
+  if (event.target.closest('[data-preference-undo]')) { restorePreferenceAction('undo'); return; }
+  if (event.target.closest('[data-preference-redo]')) { restorePreferenceAction('redo'); return; }
   if (event.target.closest('[data-article]') && Date.now() < articlePressBlockedUntil) { event.preventDefault(); event.stopPropagation(); return; }
   if (event.target.closest('[data-article-menu-close]') || event.target.classList.contains('article-menu-backdrop')) { app.querySelector('.article-menu-backdrop')?.remove(); return; }
   const action = event.target.closest('[data-article-action]');
@@ -1801,7 +1836,7 @@ function updateRangeSetting(target) {
   const output = app.querySelector(`[data-ui-output="${key}"]`);
   if (output) output.value = String(state.settings[key]);
   applyAppearanceSettings();
-  persist();
+  persist({ historyGroup: 'range:' + key });
   return true;
 }
 
@@ -1812,20 +1847,21 @@ app.addEventListener('input', event => {
     return;
   }
   if (event.target.matches('[data-ai-prompt]')) {
-    setAISettings({ prompt: event.target.value }, { announce: false });
+    if (setAISettings({ prompt: event.target.value }, { announce: false })) persist({ historyGroup: 'ai-prompt' });
     return;
   }
   if (updateRangeSetting(event.target)) return;
   if (event.target.matches('[data-accent]')) {
     state.settings.accent = event.target.value;
     applyAppearanceSettings();
-    persist();
+    persist({ historyGroup: 'accent' });
   }
 });
 
 app.addEventListener('change', async event => {
-  if (event.target.matches('[data-ai-auto]')) { setAISettings({ autoAtOpen: event.target.checked }); void maybeGenerateBrief(); return; }
-  if (updateRangeSetting(event.target)) return;
+  if (event.target.matches('[data-ui-range],[data-accent],[data-ai-prompt]')) preferenceHistory.finishGroup();
+  if (event.target.matches('[data-ai-auto]')) { setAISettings({ autoAtOpen: event.target.checked }, { announce: false }); persist(); render({scrollTop:window.scrollY}); void maybeGenerateBrief(); return; }
+  if (updateRangeSetting(event.target)) { preferenceHistory.finishGroup(); return; }
   if (event.target.matches('[data-date]')) { state[event.target.dataset.date === 'from' ? 'customFrom' : 'customTo'] = event.target.value; render(); }
   if (event.target.matches('[data-setting-select]')) { state.settings[event.target.dataset.settingSelect] = event.target.value; persist(); toast('Réglage enregistré'); }
   if (event.target.matches('[data-language]')) { selectLanguage(event.target.value); return; }
@@ -2030,7 +2066,7 @@ if ('serviceWorker' in navigator && location.protocol.startsWith('http') && !nav
     serviceWorkerRefreshing = true;
     toast('Mise à jour prête pour la prochaine ouverture');
   });
-  navigator.serviceWorker.register('./sw-v98.js?v=98.66', { updateViaCache: 'none' }).then(registration => {
+  navigator.serviceWorker.register('./sw-v98.js?v=98.67', { updateViaCache: 'none' }).then(registration => {
     if (registration.waiting) registration.waiting.postMessage('SKIP_WAITING');
     registration.addEventListener('updatefound', () => {
       const installing = registration.installing;

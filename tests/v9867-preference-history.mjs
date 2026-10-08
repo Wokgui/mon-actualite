@@ -1,0 +1,12 @@
+import assert from 'node:assert/strict';
+import {createPreferenceHistory} from '../services/preference-history.js';
+const saved=new Map(),storage={getItem:k=>saved.get(k),setItem:(k,v)=>saved.set(k,v)};
+const snap=n=>({settings:{textSize:n},keywords:['mot'+n]});
+const h=createPreferenceHistory(snap(0),storage,50);assert.equal(h.canUndo,false);
+h.record(snap(1));h.record(snap(2));assert.deepEqual(h.undo(),snap(1));assert.deepEqual(h.undo(),snap(0));assert.equal(h.undo(),null);assert.deepEqual(h.redo(),snap(1));
+h.record(snap(3));assert.equal(h.canRedo,false);h.record(snap(4),'slider');h.record(snap(5),'slider');h.finishGroup();assert.deepEqual(h.undo(),snap(3));assert.deepEqual(h.redo(),snap(5));
+const restored=createPreferenceHistory(snap(5),storage);assert.deepEqual(restored.undo(),snap(3));
+const mismatch=createPreferenceHistory(snap(99),storage);assert.equal(mismatch.canUndo,false);
+const capped=createPreferenceHistory(snap(0),{getItem:()=>null,setItem(){}},50);for(let n=1;n<=70;n++)capped.record(snap(n));let count=0;while(capped.undo())count++;assert.equal(count,50);
+const fullDisk=createPreferenceHistory(snap(0),{getItem:()=>null,setItem(){throw Error('full')}});fullDisk.record(snap(1));assert.deepEqual(fullDisk.undo(),snap(0));
+console.log('PASS multi-step undo/redo, coalesced gestures, reload, divergence, 50-step cap and full storage');
