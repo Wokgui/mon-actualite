@@ -24,7 +24,7 @@ import android.webkit.WebResourceResponse;
 import androidx.webkit.WebViewAssetLoader;
 
 public class MainActivity extends Activity {
-    private static final String APP_URL = "https://mon-actualite.vercel.app/assets/index.html?native=98.67";
+    private static final String APP_URL = "https://mon-actualite.vercel.app/assets/index.html?native=98.68";
     private static final String APP_HOST = "mon-actualite.vercel.app";
 
     private FrameLayout root;
