@@ -1,0 +1,98 @@
+name: Android APK release
+
+on:
+  push:
+    branches:
+      - main
+  workflow_dispatch:
+
+permissions:
+  contents: write
+  actions: read
+
+jobs:
+  build-release:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: '17'
+
+      - uses: gradle/actions/setup-gradle@v4
+        with:
+          gradle-version: '8.7'
+
+      - name: Ensure Android SDK 35
+        shell: bash
+        run: |
+          set -euo pipefail
+          SDK_ROOT="${ANDROID_SDK_ROOT:-${ANDROID_HOME:-/usr/local/lib/android/sdk}}"
+          SDKMANAGER="$(find "$SDK_ROOT/cmdline-tools" -type f -name sdkmanager | sort -V | tail -n 1)"
+          test -x "$SDKMANAGER"
+          yes | "$SDKMANAGER" --licenses >/dev/null || true
+          "$SDKMANAGER" "platforms;android-35" "build-tools;35.0.0"
+
+      - name: Restore or create stable install key
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          mkdir -p "$HOME/.android"
+          artifact_id="$(gh api "repos/$GITHUB_REPOSITORY/actions/artifacts?name=mon-actualite-debug-keystore&per_page=1" --jq '.artifacts[0].id // empty')"
+          if [ -n "$artifact_id" ]; then
+            gh api "repos/$GITHUB_REPOSITORY/actions/artifacts/$artifact_id/zip" > /tmp/signing-key.zip
+            unzip -o /tmp/signing-key.zip -d "$HOME/.android"
+          fi
+          if [ ! -f "$HOME/.android/debug.keystore" ]; then
+            keytool -genkeypair -v -keystore "$HOME/.android/debug.keystore" -storepass android -alias androiddebugkey -keypass android -dname "CN=Mon Actualite,O=Wokgui,C=FR" -keyalg RSA -keysize 2048 -validity 10000
+          fi
+
+      - name: Build APK
+        working-directory: android-app
+        env:
+          MON_ACTUALITE_KEYSTORE: /home/runner/.android/debug.keystore
+        run: gradle :app:testDebugUnitTest :app:assembleDebug --no-daemon
+
+      - name: Prepare APK
+        shell: bash
+        run: |
+          set -euo pipefail
+          cp android-app/app/build/outputs/apk/debug/app-debug.apk mon-actualite-v98-98.10.apk
+
+      - name: Upload APK artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: mon-actualite-v98-98.10-apk
+          path: mon-actualite-v98-98.10.apk
+          retention-days: 30
+          if-no-files-found: error
+
+      - name: Preserve install key for future updates
+        uses: actions/upload-artifact@v4
+        with:
+          name: mon-actualite-debug-keystore
+          path: ~/.android/debug.keystore
+          retention-days: 90
+          if-no-files-found: error
+
+      - name: Publish GitHub Release
+        env:
+          GH_TOKEN: ${{ github.token }}
+        shell: bash
+        run: |
+          set -euo pipefail
+          TAG="v98-98.10"
+          APK="mon-actualite-v98-98.10.apk"
+          NOTES="Mon Actualité 98.54 (Android 98.0.54, code 132). Espace publication/bouton de mise à jour réduit de moitié (31 vers 15,5 px). Espacement entre domaines IA et articles doublé (8 vers 16 px); même écart de 16 px entre la synthèse générale et le premier domaine. Chargement cohérent de L’essentiel, tailles de texte communes, clé Groq, prompt et photos stables conservés. Le lien APK historique est conservé."
+          if gh release view "$TAG" >/dev/null 2>&1; then
+            gh release upload "$TAG" "$APK" --clobber
+            gh release edit "$TAG" --title "Mon Actualité v98 / 98.54" --notes "$NOTES"
+          else
+            gh release create "$TAG" "$APK" --title "Mon Actualité v98 / 98.54" --notes "$NOTES"
+          fi
