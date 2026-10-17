@@ -1,0 +1,84 @@
+.detail-page .feedback-grid {
+  align-items: stretch !important;
+}
+
+.detail-page .runtime-feedback-card {
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 7px !important;
+  min-height: 92px !important;
+  padding: 10px 8px !important;
+  text-align: center !important;
+}
+
+.detail-page .runtime-feedback-card .feedback-symbol {
+  margin: 0 auto !important;
+}
+
+.detail-page .runtime-feedback-card .feedback-copy {
+  width: 100% !important;
+  text-align: center !important;
+}
+
+.detail-page .runtime-feedback-card .feedback-copy strong,
+.detail-page .runtime-feedback-card .feedback-copy small {
+  text-align: center !important;
+}
+
+.detail-page .runtime-feedback-card .feedback-copy strong {
+  margin: 0 0 3px !important;
+}
+
+.detail-page .runtime-summary p,
+.runtime-category-summary p,
+[data-runtime-category-summary] {
+  white-space: pre-line !important;
+}
+
+.runtime-followed-list {
+  display: grid;
+  gap: 8px;
+  margin-top: 10px;
+}
+
+.runtime-followed-item {
+  display: grid;
+  grid-template-columns: minmax(0,1fr) 34px;
+  align-items: center;
+  gap: 10px;
+  min-height: 48px;
+  padding: 8px 8px 8px 12px;
+  border: 1px solid #e7e2ee;
+  border-radius: 13px;
+  background: #fff;
+}
+
+.runtime-followed-item span {
+  min-width: 0;
+  font-size: 11.5px;
+  line-height: 1.3;
+  font-weight: 650;
+}
+
+.runtime-followed-item button {
+  width: 34px;
+  height: 34px;
+  display: grid;
+  place-items: center;
+  border: 0;
+  border-radius: 10px;
+  background: #f2eef8;
+  color: #675a78;
+  font-size: 20px;
+  line-height: 1;
+}
+
+@media (max-width: 380px) {
+  .detail-page .runtime-feedback-card {
+    min-height: 88px !important;
+    padding-left: 6px !important;
+    padding-right: 6px !important;
+  }
+}
