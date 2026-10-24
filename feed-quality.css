@@ -1,0 +1,111 @@
+.block-manager {
+  margin-top: 18px;
+  padding-top: 16px;
+  border-top: 1px solid #ece7f2;
+}
+.block-manager h3 {
+  margin: 0 0 5px;
+  color: #2f2b35;
+  font-size: 15px;
+  line-height: 1.25;
+}
+.block-manager p {
+  margin: 0 0 11px;
+  color: #8b8493;
+  font-size: 11px;
+  line-height: 1.4;
+}
+.block-form {
+  display: grid;
+  grid-template-columns: minmax(0,1fr) auto;
+  gap: 8px;
+}
+.block-form input {
+  min-width: 0;
+  height: 42px;
+  padding: 0 12px;
+  border: 1px solid #ded8e8;
+  border-radius: 12px;
+  outline: none;
+  background: #fff;
+  color: #302d35;
+  font: inherit;
+  font-size: 12px;
+}
+.block-form input:focus {
+  border-color: #a996ec;
+  box-shadow: 0 0 0 3px rgba(117,88,220,.08);
+}
+.block-form button {
+  min-height: 42px;
+  padding: 0 13px;
+  border: 0;
+  border-radius: 12px;
+  background: #6f58dc;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 800;
+}
+.block-chips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 7px;
+  margin-top: 10px;
+}
+.block-chip {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  min-height: 29px;
+  padding: 0 5px 0 10px;
+  border: 1px solid #e0d9f4;
+  border-radius: 999px;
+  background: #f5f1ff;
+  color: #5c4c93;
+  font-size: 10.5px;
+  font-weight: 750;
+}
+.block-chip button {
+  display: grid;
+  place-items: center;
+  width: 21px;
+  height: 21px;
+  padding: 0;
+  border: 0;
+  border-radius: 50%;
+  background: #e8e1fa;
+  color: #74679d;
+  font-size: 15px;
+  line-height: 1;
+}
+.block-empty {
+  color: #9c96a3;
+  font-size: 10.5px;
+}
+.quick-summary-sheet .block-manager.compact {
+  margin-top: 14px;
+  padding-top: 13px;
+}
+.quick-summary-sheet .block-manager.compact::before {
+  content: 'Ne plus afficher un thème ou un mot';
+  display: block;
+  margin-bottom: 8px;
+  color: #62576e;
+  font-size: 11px;
+  font-weight: 800;
+}
+.quick-summary-sheet .block-manager.compact .block-chips {
+  max-height: 70px;
+  overflow-y: auto;
+}
+.settings-block-section .block-manager {
+  margin-top: 0;
+  padding-top: 0;
+  border-top: 0;
+}
+@media (max-width: 380px) {
+  .block-form { grid-template-columns: 1fr; }
+  .block-form button { width: 100%; }
+  .quick-summary-sheet .block-form { grid-template-columns: minmax(0,1fr) auto; }
+  .quick-summary-sheet .block-form button { width: auto; }
+}
