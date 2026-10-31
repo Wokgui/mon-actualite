@@ -1,0 +1,78 @@
+name: Regression checks
+
+on:
+  push:
+  pull_request:
+
+jobs:
+  static-regression:
+    runs-on: ubuntu-latest
+    timeout-minutes: 8
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: JavaScript syntax
+        shell: bash
+        run: |
+          set -euo pipefail
+          while IFS= read -r -d '' file; do node --check "$file"; done < <(find . -type f -name '*.js' -not -path './node_modules/*' -print0)
+      - name: Static regression suites
+        run: |
+          node tests/v89-static-check.mjs
+          node tests/v9846-groq.mjs
+          node tests/v9847-brief-presentation.mjs
+          node tests/v9853-brief-readiness.mjs
+          node tests/v98-locale-backend.mjs
+          node tests/v9831-photo-selection.mjs
+          node tests/v9836-publisher-photo-connectors.mjs
+          node tests/v9831-photo-cache-worker.mjs
+          node tests/v9135-final-image-prewarm.mjs
+          node tests/v9136-live-title-thumbnail.mjs
+
+  mobile-browser:
+    needs: static-regression
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: '22'
+      - name: Install Playwright Chromium
+        run: |
+          npm init -y >/dev/null 2>&1
+          npm install --no-save playwright@1.55.0
+          npx playwright install --with-deps chromium
+      - name: Android and PWA browser regression
+        shell: bash
+        run: |
+          set -euo pipefail
+          python3 -m http.server 4173 --bind 127.0.0.1 >/tmp/mon-actualite-http.log 2>&1 &
+          SERVER_PID=$!
+          trap 'kill $SERVER_PID 2>/dev/null || true' EXIT
+          for i in {1..30}; do
+            if curl -fsS http://127.0.0.1:4173/ >/dev/null; then break; fi
+            sleep 0.2
+          done
+          node tests/v9193-current-ui-browser.mjs
+          node tests/v9853-brief-ready-text-browser.mjs test-results/brief-ready-text
+          node tests/v98-settings-images-browser.mjs test-results/v98
+          node tests/v9831-photos-browser.mjs test-results/photos-v9831
+          HEADER_BASE_URL=http://127.0.0.1:4173/?nativePreview=1 node tests/v9832-header-background-browser.mjs test-results/header-background
+          node tests/v9834-adaptive-controls-browser.mjs test-results/adaptive-controls
+          node tests/v9834-header-heights-browser.mjs test-results/header-heights
+          node tests/v9835-header-spacing-browser.mjs test-results/header-spacing
+          node tests/v9836-optical-header-browser.mjs test-results/optical-header
+          node tests/v9836-startup-browser.mjs test-results/startup-v9836
+          node tests/v9837-client-photo-recovery-browser.mjs test-results/client-photo-recovery
+          node tests/v9839-failure-replacement-browser.mjs test-results/replacement-v9839
+          node tests/v9846-groq-browser.mjs test-results/groq-native
+          GROQ_NATIVE_FIXTURE=0 node tests/v9846-groq-browser.mjs test-results/groq-web
+      - name: Photo metrics and screenshots
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: photo-regression-evidence
+          path: test-results/

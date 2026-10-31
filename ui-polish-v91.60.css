@@ -1,0 +1,138 @@
+/* v91.60 — roue dentée sous Réinitialiser + transitions Brief/Veille plus nettes */
+
+/* L'ancien reset flottant reste supprimé. */
+.global-reset-v9154,
+.top-reset-icon-v9138 {
+  display: none !important;
+}
+
+/* Bouton central Réinitialiser sur les vues d'articles. */
+.bottom-nav {
+  overflow: visible !important;
+}
+
+.bottom-nav .reset-nav-v9160 {
+  display: grid !important;
+  place-items: center !important;
+  width: 58px !important;
+  height: 58px !important;
+  min-width: 58px !important;
+  min-height: 58px !important;
+  margin: -18px auto 0 !important;
+  padding: 0 !important;
+  border-radius: 50% !important;
+  background: linear-gradient(145deg, #7561e8, #6551d8) !important;
+  color: #fff !important;
+  box-shadow: 0 9px 22px rgba(89,70,190,.24) !important;
+}
+
+.bottom-nav .reset-nav-glyph-v9160 {
+  display: block !important;
+  font-size: 31px !important;
+  line-height: 1 !important;
+  font-weight: 700 !important;
+  transform: translateY(-1px) !important;
+}
+
+/* Petite roue dentée centrée juste sous le rond Réinitialiser. */
+.bottom-nav .nav-gear-v9160 {
+  position: absolute !important;
+  left: 50% !important;
+  top: 42px !important;
+  z-index: 12 !important;
+  width: 27px !important;
+  height: 27px !important;
+  min-width: 27px !important;
+  min-height: 27px !important;
+  display: grid !important;
+  place-items: center !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  transform: translateX(-50%) !important;
+  border: 1px solid rgba(103,83,216,.14) !important;
+  border-radius: 9px !important;
+  background: rgba(247,245,252,.98) !important;
+  color: #6755d5 !important;
+  box-shadow: 0 4px 11px rgba(74,59,131,.10) !important;
+  -webkit-tap-highlight-color: transparent !important;
+  touch-action: manipulation !important;
+}
+
+.bottom-nav .nav-gear-v9160 svg {
+  width: 15px !important;
+  height: 15px !important;
+  display: block !important;
+}
+
+.bottom-nav .nav-gear-v9160:active {
+  transform: translateX(-50%) scale(.94) !important;
+  background: #f0ecff !important;
+}
+
+body.quick-summary-open .bottom-nav .reset-nav-v9160,
+body.quick-summary-open .bottom-nav .nav-gear-v9160 {
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+/* Brief / Veille : pas de fondu tardif des images, dimensions stables immédiatement. */
+body.brief-view-v9156 [data-stable-brief-content] .article-image {
+  transition: none !important;
+  opacity: 1 !important;
+  background-color: #efeff3 !important;
+}
+
+body.brief-view-v9156 [data-stable-brief-content] .article-card,
+body.brief-view-v9156 [data-stable-brief-content] .runtime-row {
+  contain: layout paint !important;
+}
+
+/* Le retour visuel des onglets est immédiat dès l'appui. */
+.brief-mode-tab,
+.bottom-nav [data-view="brief"] {
+  touch-action: manipulation !important;
+  -webkit-tap-highlight-color: transparent !important;
+}
+
+.brief-mode-tab:active,
+.bottom-nav [data-view="brief"]:active {
+  transform: scale(.985) !important;
+}
+
+/* Conserve l'aération validée de l'en-tête Mon actualité. */
+body.home-spacing-v9159 .hero-header {
+  padding-top: 22px !important;
+  padding-bottom: 25px !important;
+}
+
+body.home-spacing-v9159 .hero-header .eyebrow {
+  margin-bottom: 13px !important;
+}
+
+/* Réglages intégrés dans Personnaliser : contenu directement visible à l'ouverture de l'accordéon. */
+body.personalize-page-v9157 .personalize-advanced-page-v9159 {
+  width: 100% !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  background: transparent !important;
+}
+
+body.personalize-page-v9157 .personalize-advanced-page-v9159 .settings-section,
+body.personalize-page-v9157 .personalize-advanced-page-v9159 .maintenance-v84 {
+  margin: 0 !important;
+  padding: 15px 2px 17px !important;
+  border: 0 !important;
+  border-bottom: 1px solid rgba(89,75,133,.09) !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+body.personalize-page-v9157 .personalize-advanced-page-v9159 .settings-section > p,
+body.personalize-page-v9157 .personalize-advanced-page-v9159 .maintenance-v84 > p,
+body.personalize-page-v9157 .personalize-advanced-page-v9159 .setting-label span,
+body.personalize-page-v9157 .personalize-blocked-footer-v9159 > p {
+  text-align: justify !important;
+  text-justify: inter-word !important;
+  line-height: 1.48 !important;
+}
