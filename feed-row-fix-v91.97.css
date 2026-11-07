@@ -1,0 +1,76 @@
+/* v91.99 — alignement géométrique exact photo / titre. */
+[data-stable-home-feed] .article-card,
+[data-stable-brief-content] .article-card.runtime-row{
+  display:grid!important;
+  grid-template-columns:minmax(0,1fr) 112px!important;
+  grid-template-areas:"body image"!important;
+  grid-template-rows:75px!important;
+  align-items:center!important;
+  min-height:75px!important;
+}
+
+[data-stable-home-feed] .article-card .article-image,
+[data-stable-brief-content] .article-card.runtime-row .article-image{
+  grid-area:image!important;
+  width:112px!important;
+  height:75px!important;
+  min-height:75px!important;
+  max-height:75px!important;
+  align-self:center!important;
+  justify-self:end!important;
+  margin:0!important;
+  object-fit:cover!important;
+}
+
+[data-stable-home-feed] .article-card .article-body,
+[data-stable-brief-content] .article-card.runtime-row .article-body{
+  grid-area:body!important;
+  display:flex!important;
+  flex-direction:column!important;
+  justify-content:center!important;
+  align-self:center!important;
+  height:75px!important;
+  min-height:75px!important;
+  max-height:75px!important;
+  padding:0!important;
+  margin:0!important;
+  box-sizing:border-box!important;
+}
+
+[data-stable-home-feed] .article-card .meta,
+[data-stable-brief-content] .article-card.runtime-row .meta{
+  display:none!important;
+  margin:0!important;
+  padding:0!important;
+}
+
+[data-stable-home-feed] .article-card h2,
+[data-stable-brief-content] .article-card.runtime-row h2{
+  margin:0!important;
+  padding:0!important;
+}
+
+
+/* v92.00 — aucun séparateur entre les articles, sur toutes les vues. */
+.article-card,
+.feed > .article-card,
+.stable-owned-list > .article-card,
+.runtime-brief-content .article-card,
+.watch-filtered-feed-v9138 .article-card,
+.watch-all-feed-v9138 .article-card{
+  border:0!important;
+  border-top:0!important;
+  border-right:0!important;
+  border-bottom:0!important;
+  border-left:0!important;
+  box-shadow:none!important;
+}
+.article-card::before,
+.article-card::after{
+  content:none!important;
+  display:none!important;
+}
+.feed > .article-card + .article-card,
+.stable-owned-list > .article-card + .article-card{
+  border-top:0!important;
+}

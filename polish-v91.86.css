@@ -1,0 +1,338 @@
+/* v91.86 — réglages resserrés et mastheads unifiés. */
+
+/* Accueil : date et titre plus soignés. */
+.hero-header{
+  position:relative!important;
+  margin:0 -18px 24px!important;
+  padding:30px 20px 24px!important;
+  border-bottom:1px solid #e4dfeb!important;
+  background:linear-gradient(180deg,#faf9fd 0%,#f7f5fc 100%)!important;
+  text-align:center!important;
+}
+.hero-header .eyebrow{
+  display:inline-flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  min-height:28px!important;
+  margin:0 0 11px!important;
+  padding:0 12px!important;
+  border:1px solid #ded7f5!important;
+  border-radius:999px!important;
+  background:#f0ecfd!important;
+  color:#6953d4!important;
+  font-size:12px!important;
+  line-height:1!important;
+  font-weight:850!important;
+  letter-spacing:.045em!important;
+  text-transform:none!important;
+}
+.hero-header h1{
+  margin:0!important;
+  color:#211c28!important;
+  font-size:38px!important;
+  line-height:1.04!important;
+  font-weight:880!important;
+  letter-spacing:-.045em!important;
+}
+
+/* En-têtes Réglages / Brief / autres pages : intégrés au fond. */
+.page-masthead-v9186{
+  min-height:auto!important;
+  margin:0 -18px 14px!important;
+  padding:26px 18px 19px!important;
+  border-bottom:1px solid #e4dfeb!important;
+  background:linear-gradient(180deg,#faf9fd 0%,#f7f5fc 100%)!important;
+  box-shadow:none!important;
+}
+.page-masthead-v9186 h1{
+  margin:0!important;
+  color:#211c28!important;
+  text-align:center!important;
+  font-size:27px!important;
+  line-height:1.08!important;
+  font-weight:860!important;
+  letter-spacing:-.035em!important;
+}
+.page-masthead-v9186>span:first-child,
+.page-masthead-v9186>span:last-child{
+  width:40px!important;
+}
+.page-masthead-v9186 .icon-btn{
+  background:transparent!important;
+  box-shadow:none!important;
+}
+
+/* Bandeau inférieur plus fini, totalement intégré. */
+.bottom-nav.stable-bottom-nav-v9184{
+  height:calc(70px + env(safe-area-inset-bottom))!important;
+  background:linear-gradient(180deg,#fff 0%,#faf9fc 100%)!important;
+  border-top:1px solid #ddd8e6!important;
+  box-shadow:0 -5px 20px rgba(52,42,78,.07)!important;
+}
+.bottom-nav.stable-bottom-nav-v9184 .nav-item{
+  height:70px!important;
+  padding:8px 4px 6px!important;
+  background:transparent!important;
+  color:#918b98!important;
+}
+.bottom-nav.stable-bottom-nav-v9184 .nav-item.active{
+  position:relative!important;
+  color:#654fd5!important;
+  background:linear-gradient(180deg,rgba(238,234,253,.62),rgba(255,255,255,0))!important;
+}
+.bottom-nav.stable-bottom-nav-v9184 .nav-item.active::before{
+  content:""!important;
+  display:block!important;
+  position:absolute!important;
+  top:0!important;
+  left:27%!important;
+  right:27%!important;
+  height:3px!important;
+  border-radius:0 0 4px 4px!important;
+  background:#6b54dc!important;
+}
+.bottom-nav.stable-bottom-nav-v9184 .nav-item.active::after{content:none!important;display:none!important}
+.bottom-nav.stable-bottom-nav-v9184 .nav-item svg{width:21px!important;height:21px!important}
+.bottom-nav.stable-bottom-nav-v9184 .nav-item span{font-size:11px!important}
+
+/* Sources : nom + Suivre/Bloquer sur une seule ligne, sans méta ni séparateurs. */
+.source-directory-v9186{
+  display:grid!important;
+  gap:3px!important;
+  margin:0!important;
+}
+.source-directory-row-v9186{
+  margin:0!important;
+  padding:5px 0!important;
+  border:0!important;
+  border-radius:0!important;
+  background:transparent!important;
+  box-shadow:none!important;
+}
+.source-directory-row-v9186.is-blocked{opacity:.58!important}
+.source-line-v9186{
+  display:grid!important;
+  grid-template-columns:minmax(0,1fr) auto!important;
+  align-items:center!important;
+  gap:8px!important;
+}
+.source-line-v9186>strong{
+  min-width:0!important;
+  overflow:hidden!important;
+  text-overflow:ellipsis!important;
+  white-space:nowrap!important;
+  color:#302a34!important;
+  font-size:13.5px!important;
+  line-height:1.25!important;
+  font-weight:780!important;
+}
+.source-actions-v9186{
+  display:flex!important;
+  align-items:center!important;
+  gap:5px!important;
+  white-space:nowrap!important;
+}
+.source-actions-v9186 button{
+  min-height:29px!important;
+  padding:0 8px!important;
+  border:1px solid #ddd8e6!important;
+  border-radius:999px!important;
+  background:transparent!important;
+  color:#746d7b!important;
+  font-size:10.5px!important;
+  font-weight:800!important;
+}
+.source-actions-v9186 button.active{
+  border-color:#d4ccf2!important;
+  background:#f0ecfd!important;
+  color:#654fd2!important;
+}
+.source-actions-v9186 button.danger.active{
+  border-color:#efc7cf!important;
+  background:#fff1f3!important;
+  color:#bb4057!important;
+}
+.source-feeds-v9186{
+  margin:2px 0 0!important;
+  padding-left:0!important;
+  color:#8d8693!important;
+  font-size:10.5px!important;
+}
+.source-feeds-v9186 summary{
+  display:inline-block!important;
+  cursor:pointer!important;
+  list-style:none!important;
+  font-weight:700!important;
+}
+.source-feeds-v9186 summary::-webkit-details-marker{display:none!important}
+.source-feeds-v9186>div{
+  margin-top:3px!important;
+  padding-left:10px!important;
+  font-size:10px!important;
+}
+
+/* Ajouter / bloquer une source : aucun ancien domaine, aucun bloc superflu. */
+.compact-source-form-v9186{
+  margin-bottom:10px!important;
+}
+.manual-block-source-v9186{
+  margin-top:12px!important;
+  padding-top:12px!important;
+  border-top:1px solid #e4dfe8!important;
+}
+.blocked-sources-v9186{
+  justify-content:center!important;
+  margin-top:8px!important;
+}
+.opml-button-v9186{
+  width:max-content!important;
+  max-width:100%!important;
+  min-height:40px!important;
+  margin-top:14px!important;
+  padding:0 15px!important;
+  display:flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  border-radius:12px!important;
+}
+.danger-action-v9186{
+  background:#fff1f3!important;
+  color:#b83e56!important;
+  border-color:#efcad1!important;
+}
+
+/* Centres d'intérêt éditables librement. */
+.interest-editor-v9186{
+  max-width:600px!important;
+  margin:0 auto!important;
+}
+.interest-add-v9186{
+  margin-bottom:14px!important;
+}
+.current-interests-v9186{
+  margin-top:0!important;
+}
+.removable-interest-v9186{
+  display:inline-flex!important;
+  align-items:center!important;
+  gap:7px!important;
+}
+.removable-interest-v9186 span{
+  font-size:16px!important;
+  line-height:1!important;
+  opacity:.7!important;
+}
+.interest-suggestions-v9186{
+  display:flex!important;
+  flex-wrap:wrap!important;
+  justify-content:center!important;
+  gap:7px!important;
+  margin-top:12px!important;
+}
+.interest-suggestions-v9186 button{
+  border:0!important;
+  background:transparent!important;
+  color:#7467b8!important;
+  font-size:11px!important;
+  font-weight:750!important;
+}
+
+/* Accordéons : encore un peu plus directs. */
+.settings-accordions-v9185{
+  margin-top:0!important;
+}
+.settings-accordion-v9185>summary{
+  min-height:55px!important;
+  padding-top:17px!important;
+  padding-bottom:15px!important;
+}
+.settings-accordion-content-v9185{
+  padding-bottom:18px!important;
+}
+
+/* Fonctionnement : libellés à gauche, switch à droite. */
+.function-settings-v9186{
+  max-width:560px!important;
+  margin:0 auto!important;
+}
+.function-settings-v9186 .setting-row{
+  display:grid!important;
+  grid-template-columns:minmax(0,1fr) auto!important;
+  align-items:center!important;
+  gap:12px!important;
+  text-align:left!important;
+}
+.function-settings-v9186 .setting-label{
+  text-align:left!important;
+}
+.function-settings-v9186 .setting-label strong,
+.function-settings-v9186 .setting-label span{
+  display:block!important;
+  margin-left:0!important;
+  margin-right:0!important;
+  text-align:left!important;
+  text-align-last:left!important;
+}
+.function-settings-v9186 .setting-label strong{font-size:13.5px!important}
+.function-settings-v9186 .setting-label span{
+  margin-top:3px!important;
+  font-size:11px!important;
+  line-height:1.35!important;
+}
+
+/* Version : bouton correctement dimensionné. */
+.version-update-v9186{
+  width:auto!important;
+  min-width:190px!important;
+  max-width:100%!important;
+  min-height:42px!important;
+  margin:15px auto 0!important;
+  padding:0 16px!important;
+  display:flex!important;
+  align-items:center!important;
+  justify-content:center!important;
+  gap:8px!important;
+  border-radius:12px!important;
+}
+.settings-accordion-content-v9185 .app-version-row{
+  max-width:560px!important;
+  margin:0 auto!important;
+}
+
+/* Brief mieux intégré à son en-tête. */
+.brief-mode-tabs{
+  margin:0 auto 18px!important;
+  max-width:420px!important;
+  padding:4px!important;
+  border:1px solid #e0dbe7!important;
+  border-radius:14px!important;
+  background:#efecf5!important;
+}
+.brief-mode-tab{
+  min-height:40px!important;
+  border-radius:10px!important;
+}
+.brief-mode-tab.active{
+  background:#fff!important;
+  box-shadow:0 2px 8px rgba(53,42,80,.07)!important;
+}
+.journal-section .brief-day-v9138{
+  margin-top:2px!important;
+}
+.journal-section .brief-section-title{
+  margin-top:5px!important;
+}
+
+/* Réglages et Brief collent visuellement au haut de page. */
+.settings-page-v9185,
+.page:has(.brief-mode-tabs){
+  padding-top:0!important;
+}
+
+@media(max-width:420px){
+  .hero-header{padding-top:25px!important}
+  .hero-header h1{font-size:35px!important}
+  .source-line-v9186{grid-template-columns:minmax(0,1fr) auto!important}
+  .source-actions-v9186{gap:3px!important}
+  .source-actions-v9186 button{padding:0 6px!important;font-size:10px!important}
+}

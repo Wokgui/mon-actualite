@@ -1,0 +1,213 @@
+/* v91.65 geometry, served through v91.64 URL — detached reset + recessed settings pocket */
+
+#app > .global-reset-v9154,
+#app > .top-reset-icon-v9138,
+#app main > .top-reset-icon-v9138,
+.global-reset-v9154.reset-draggable-v9157,
+.top-reset-icon-v9138:not(.reset-nav-v9160) {
+  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+.bottom-nav {
+  --bar-bg-v9165: rgba(255,255,255,.975);
+  --page-bg-v9165: #f7f5fc;
+  position: fixed !important;
+  overflow: visible !important;
+  height: 76px !important;
+  grid-template-columns: minmax(0,1fr) 72px minmax(0,1fr) !important;
+  align-items: center !important;
+  column-gap: 0 !important;
+  padding: 7px 10px !important;
+  padding-left: 10px !important;
+  padding-right: 10px !important;
+  border: 1px solid rgba(224,219,238,.90) !important;
+  border-radius: 27px !important;
+  background: var(--bar-bg-v9165) !important;
+  box-shadow: 0 13px 32px rgba(68,55,111,.13) !important;
+  backdrop-filter: blur(18px) !important;
+  -webkit-backdrop-filter: blur(18px) !important;
+}
+
+.bottom-nav::before {
+  content: none !important;
+  display: none !important;
+}
+
+/* Recessed settings enclave: part of the bar, not a floating tile. */
+.bottom-nav::after {
+  content: '' !important;
+  display: block !important;
+  position: absolute !important;
+  left: 50% !important;
+  top: 42px !important;
+  z-index: 4 !important;
+  width: 48px !important;
+  height: 34px !important;
+  transform: translateX(-50%) !important;
+  border: 1px solid rgba(114,99,174,.10) !important;
+  border-top: 0 !important;
+  border-radius: 0 0 16px 16px !important;
+  background: #f1eef8 !important;
+  box-shadow: inset 0 2px 6px rgba(81,68,126,.075) !important;
+  pointer-events: none !important;
+}
+
+.bottom-nav > .nav-item:not(.plus):not(.reset-nav-v9160) {
+  position: relative !important;
+  z-index: 2 !important;
+  width: 100% !important;
+  height: 60px !important;
+  min-height: 60px !important;
+  margin: 0 !important;
+  padding: 7px 4px 5px !important;
+  transform: none !important;
+  border: 0 !important;
+  border-radius: 18px !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.bottom-nav > .nav-item:not(.plus):not(.reset-nav-v9160).active {
+  background: rgba(243,240,252,.82) !important;
+  color: #6550d8 !important;
+}
+
+.bottom-nav > [data-view="home"] { order: 1 !important; }
+.bottom-nav > .reset-nav-v9160,
+.bottom-nav > [data-view="sheet"] { order: 2 !important; }
+.bottom-nav > [data-view="brief"] { order: 3 !important; }
+
+/* Detached reset: page-colour halo makes the circle clearly float above the bar. */
+.bottom-nav .reset-nav-v9160 {
+  position: relative !important;
+  z-index: 8 !important;
+  justify-self: center !important;
+  align-self: center !important;
+  display: grid !important;
+  place-items: center !important;
+  width: 58px !important;
+  height: 58px !important;
+  min-width: 58px !important;
+  min-height: 58px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  transform: translateY(-27px) !important;
+  border: 0 !important;
+  border-radius: 50% !important;
+  background: linear-gradient(145deg,#7864eb,#6550d8) !important;
+  color: #fff !important;
+  box-shadow: 0 0 0 6px var(--page-bg-v9165), 0 9px 21px rgba(89,70,190,.25) !important;
+}
+
+.bottom-nav .reset-nav-v9160:active {
+  transform: translateY(-27px) scale(.96) !important;
+}
+
+.bottom-nav .reset-nav-glyph-v9160 {
+  display: block !important;
+  font-size: 31px !important;
+  line-height: 1 !important;
+  font-weight: 650 !important;
+  transform: translateY(-1px) !important;
+}
+
+/* Gear has no tile of its own: it lives inside the recessed enclave. */
+.bottom-nav .nav-gear-v9160 {
+  position: absolute !important;
+  left: 50% !important;
+  top: 49px !important;
+  z-index: 9 !important;
+  display: grid !important;
+  place-items: center !important;
+  width: 34px !important;
+  height: 23px !important;
+  min-width: 34px !important;
+  min-height: 23px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  transform: translateX(-50%) !important;
+  border: 0 !important;
+  border-radius: 8px !important;
+  background: transparent !important;
+  color: #726b82 !important;
+  box-shadow: none !important;
+  touch-action: manipulation !important;
+  -webkit-tap-highlight-color: transparent !important;
+}
+
+.bottom-nav .nav-gear-v9160::before {
+  content: none !important;
+  display: none !important;
+}
+
+.bottom-nav .nav-gear-v9160 svg {
+  display: block !important;
+  width: 15px !important;
+  height: 15px !important;
+}
+
+.bottom-nav .nav-gear-v9160:active {
+  transform: translateX(-50%) scale(.94) !important;
+  color: #6550d8 !important;
+}
+
+body.settings-open-v9162 .personalize-close,
+body.settings-open-v9162 .bottom-nav > [data-view="sheet"],
+body.settings-open-v9162 .bottom-nav .reset-nav-v9160,
+body.settings-open-v9162 .bottom-nav .nav-gear-v9160 {
+  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+body.settings-open-v9162 .bottom-nav {
+  grid-template-columns: 1fr 1fr !important;
+  column-gap: 8px !important;
+}
+
+body.settings-open-v9162 .bottom-nav::after {
+  content: none !important;
+  display: none !important;
+}
+
+body.settings-open-v9162 .bottom-nav > .nav-item:not([data-view="sheet"]) {
+  width: 100% !important;
+  height: 60px !important;
+  transform: none !important;
+}
+
+body.quick-summary-open .bottom-nav .reset-nav-v9160,
+body.quick-summary-open .bottom-nav .nav-gear-v9160,
+body:has(.detail-page) .bottom-nav .reset-nav-v9160,
+body:has(.detail-page) .bottom-nav .nav-gear-v9160 {
+  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+body.quick-summary-open .bottom-nav::after,
+body:has(.detail-page) .bottom-nav::after {
+  content: none !important;
+  display: none !important;
+}
+
+@media (max-width: 380px) {
+  .bottom-nav {
+    grid-template-columns: minmax(0,1fr) 68px minmax(0,1fr) !important;
+    padding-left: 8px !important;
+    padding-right: 8px !important;
+  }
+  .bottom-nav .reset-nav-v9160 {
+    width: 56px !important;
+    height: 56px !important;
+    min-width: 56px !important;
+    min-height: 56px !important;
+    transform: translateY(-26px) !important;
+    box-shadow: 0 0 0 5px var(--page-bg-v9165), 0 8px 19px rgba(89,70,190,.24) !important;
+  }
+  .bottom-nav .reset-nav-v9160:active { transform: translateY(-26px) scale(.96) !important; }
+  .bottom-nav .reset-nav-glyph-v9160 { font-size: 30px !important; }
+  .bottom-nav::after { width: 46px !important; }
+}
