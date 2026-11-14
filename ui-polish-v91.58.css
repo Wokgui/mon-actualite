@@ -1,0 +1,158 @@
+/* v91.58 — réglages fondus + sections déplacées dans Personnaliser */
+
+/* Réglages avancés : plus de grosses cartes. */
+body.advanced-settings-v9158 .advanced-settings-page-v9158 {
+  padding-top: 8px !important;
+}
+
+body.advanced-settings-v9158 .advanced-settings-page-v9158 .settings-section,
+body.advanced-settings-v9158 .advanced-settings-page-v9158 .settings-flat-v9158 {
+  margin: 0 !important;
+  padding: 15px 2px 18px !important;
+  border: 0 !important;
+  border-bottom: 1px solid rgba(89, 75, 133, .09) !important;
+  border-radius: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+body.advanced-settings-v9158 .advanced-settings-page-v9158 .settings-section:last-of-type {
+  border-bottom: 0 !important;
+}
+
+body.advanced-settings-v9158 .advanced-settings-page-v9158 .settings-section > h2,
+body.advanced-settings-v9158 .advanced-settings-page-v9158 .settings-section .setting-label > strong,
+body.advanced-settings-v9158 .advanced-settings-page-v9158 .app-version-section h2 {
+  text-align: center !important;
+}
+
+body.advanced-settings-v9158 .advanced-settings-page-v9158 .settings-section > h2 {
+  width: 100% !important;
+  margin: 0 0 9px !important;
+}
+
+body.advanced-settings-v9158 .advanced-settings-page-v9158 .settings-section > p,
+body.advanced-settings-v9158 .advanced-settings-page-v9158 .settings-help,
+body.advanced-settings-v9158 .advanced-settings-page-v9158 .muted-note {
+  text-align: justify !important;
+  text-justify: inter-word !important;
+  line-height: 1.48 !important;
+}
+
+body.advanced-settings-v9158 .advanced-settings-page-v9158 .install-section,
+body.advanced-settings-v9158 .advanced-settings-page-v9158 .app-version-section {
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+/* Personnaliser : les contenus globaux sont rangés dans Accueil. */
+body.personalize-page-v9157 .personalize-inline-section-v9158 {
+  margin: 0 !important;
+  padding: 15px 2px 16px !important;
+  border: 0 !important;
+  border-top: 1px solid rgba(103, 83, 216, .08) !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+body.personalize-page-v9157 .personalize-inline-section-v9158:first-child {
+  border-top: 0 !important;
+}
+
+body.personalize-page-v9157 .personalize-inline-section-v9158 > h4 {
+  width: 100% !important;
+  margin: 0 0 9px !important;
+  color: #51486a !important;
+  text-align: center !important;
+  font-size: 13.5px !important;
+  font-weight: 800 !important;
+}
+
+body.personalize-page-v9157 .personalize-inline-section-v9158 > p {
+  margin: 0 0 12px !important;
+  color: #80788f !important;
+  text-align: justify !important;
+  text-justify: inter-word !important;
+  font-size: 11.5px !important;
+  line-height: 1.45 !important;
+}
+
+body.personalize-page-v9157 .personalize-source-form-v9158,
+body.personalize-page-v9157 .personalize-block-form-v9158 {
+  margin-top: 8px !important;
+}
+
+body.personalize-page-v9157 .personalize-source-list-v9158 {
+  margin-top: 12px !important;
+}
+
+body.personalize-page-v9157 .personalize-source-list-v9158 .source-setting {
+  background: rgba(255,255,255,.36) !important;
+  border-radius: 13px !important;
+}
+
+body.personalize-page-v9157 .personalize-opml-v9158 {
+  display: flex !important;
+  justify-content: center !important;
+  margin-top: 12px !important;
+}
+
+body.personalize-page-v9157 .personalize-opml-v9158 .secondary-btn {
+  width: 100% !important;
+  justify-content: center !important;
+}
+
+body.personalize-page-v9157 .personalize-setting-row-v9158 {
+  margin-top: 12px !important;
+  padding: 12px 0 0 !important;
+  border-top: 1px solid rgba(103,83,216,.07) !important;
+}
+
+body.personalize-page-v9157 .personalize-setting-row-v9158 .setting-label strong,
+body.personalize-page-v9157 .personalize-setting-row-v9158 .setting-label span {
+  text-align: left !important;
+}
+
+body.personalize-page-v9157 .personalize-block-list-v9158 {
+  display: flex !important;
+  flex-wrap: wrap !important;
+  gap: 7px !important;
+  margin-top: 12px !important;
+}
+
+body.personalize-page-v9157 .personalize-block-list-v9158 > span {
+  display: inline-flex !important;
+  align-items: center !important;
+  gap: 6px !important;
+  padding: 7px 8px 7px 10px !important;
+  border-radius: 999px !important;
+  background: rgba(103,83,216,.09) !important;
+  color: #51486a !important;
+  font-size: 11.5px !important;
+  font-weight: 750 !important;
+}
+
+body.personalize-page-v9157 .personalize-block-list-v9158 button {
+  width: 20px !important;
+  height: 20px !important;
+  display: grid !important;
+  place-items: center !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 50% !important;
+  background: rgba(103,83,216,.11) !important;
+  color: #5b49c8 !important;
+  font-size: 14px !important;
+}
+
+/* Les quatre tuiles principales restent compactes et leurs titres bien centrés. */
+body.personalize-page-v9157 .personalize-accordion-head-v9157 h3 {
+  text-align: center !important;
+}
+
+/* Le contenu de Réglages avancés ne recrée pas une grosse tuile interne. */
+body.personalize-page-v9157 .personalize-settings-launch-v9157 {
+  background: transparent !important;
+  box-shadow: none !important;
+  border: 1px solid rgba(103,83,216,.12) !important;
+}

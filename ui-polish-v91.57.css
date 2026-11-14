@@ -1,0 +1,170 @@
+/* v91.57 — accordéons Personnaliser + bouton Réinitialiser déplaçable par vue */
+
+/* Réinitialiser n'existe visuellement que sur Mon actualité, Brief et Veille. */
+.global-reset-v9154 {
+  display: none !important;
+}
+
+body.reset-visible-v9157 .global-reset-v9154.reset-draggable-v9157 {
+  display: grid !important;
+  place-items: center !important;
+  position: fixed !important;
+  z-index: 10070 !important;
+  left: var(--reset-left-v9157, 12px) !important;
+  top: var(--reset-top-v9157, 12px) !important;
+  right: auto !important;
+  bottom: auto !important;
+  transform: none !important;
+  width: 40px !important;
+  height: 40px !important;
+  padding: 0 !important;
+  margin: 0 !important;
+  border: 0 !important;
+  border-radius: 14px !important;
+  background: rgba(247,245,252,.94) !important;
+  color: #6753d8 !important;
+  box-shadow: 0 5px 16px rgba(72,56,118,.10) !important;
+  font-size: 27px !important;
+  font-weight: 800 !important;
+  line-height: 40px !important;
+  touch-action: none !important;
+  cursor: grab !important;
+  user-select: none !important;
+  -webkit-user-select: none !important;
+  backdrop-filter: blur(9px) !important;
+}
+
+body.reset-visible-v9157 .global-reset-v9154.reset-draggable-v9157.dragging-v9157 {
+  cursor: grabbing !important;
+  box-shadow: 0 7px 22px rgba(72,56,118,.18) !important;
+  scale: 1.04 !important;
+}
+
+/* Les onglets Brief / Veille restent centrés, indépendamment du bouton déplaçable. */
+body.brief-view-v9157 .brief-mode-tabs {
+  width: 228px !important;
+  min-height: 38px !important;
+  margin: 7px auto 14px !important;
+  padding: 3px !important;
+  border-radius: 15px !important;
+}
+
+body.brief-view-v9157 .brief-mode-tab {
+  min-height: 36px !important;
+  padding: 7px 11px !important;
+  border-radius: 12px !important;
+  font-size: 12.5px !important;
+}
+
+/* Personnaliser : tout est rangé dans quatre tuiles accordéon homogènes. */
+body.personalize-page-v9157 .personalization-sheet {
+  padding-top: max(14px, env(safe-area-inset-top)) !important;
+}
+
+body.personalize-page-v9157 .personalize-head-v9157 {
+  margin: 15px 0 20px !important;
+  text-align: center !important;
+}
+
+body.personalize-page-v9157 .personalize-head-v9157 h2 {
+  margin: 0 !important;
+  text-align: center !important;
+}
+
+body.personalize-page-v9157 .personalize-accordion-v9157 {
+  margin: 0 0 13px !important;
+  padding: 0 !important;
+  overflow: hidden !important;
+  border: 1px solid rgba(116,97,232,.12) !important;
+  border-radius: 19px !important;
+  background: linear-gradient(145deg, rgba(235,230,255,.96), rgba(247,244,255,.98)) !important;
+  box-shadow: 0 8px 24px rgba(78,62,134,.075) !important;
+}
+
+body.personalize-page-v9157 .personalize-accordion-head-v9157 {
+  position: relative !important;
+  width: 100% !important;
+  min-height: 66px !important;
+  display: flex !important;
+  flex-direction: column !important;
+  align-items: center !important;
+  justify-content: center !important;
+  gap: 4px !important;
+  padding: 12px 48px !important;
+  border: 0 !important;
+  background: transparent !important;
+  color: #4f4567 !important;
+  text-align: center !important;
+  cursor: pointer !important;
+}
+
+body.personalize-page-v9157 .personalize-accordion-head-v9157 h3 {
+  margin: 0 !important;
+  width: 100% !important;
+  text-align: center !important;
+  font-size: 15px !important;
+  line-height: 1.2 !important;
+  font-weight: 800 !important;
+}
+
+body.personalize-page-v9157 .personalize-accordion-head-v9157 p {
+  margin: 0 !important;
+  width: 100% !important;
+  text-align: center !important;
+  color: #817a90 !important;
+  font-size: 11px !important;
+  line-height: 1.25 !important;
+  font-weight: 650 !important;
+}
+
+body.personalize-page-v9157 .personalize-accordion-head-v9157::after {
+  content: '›' !important;
+  position: absolute !important;
+  top: 50% !important;
+  right: 18px !important;
+  transform: translateY(-52%) !important;
+  color: #6652da !important;
+  font-size: 25px !important;
+  font-weight: 500 !important;
+  transition: transform .18s ease !important;
+}
+
+body.personalize-page-v9157 .personalize-accordion-v9157.open-v9157 .personalize-accordion-head-v9157::after {
+  transform: translateY(-52%) rotate(90deg) !important;
+}
+
+body.personalize-page-v9157 .personalize-accordion-body-v9157 {
+  padding: 5px 14px 16px !important;
+  border-top: 1px solid rgba(116,97,232,.08) !important;
+  background: rgba(255,255,255,.42) !important;
+}
+
+body.personalize-page-v9157 .personalize-accordion-body-v9157[hidden] {
+  display: none !important;
+}
+
+body.personalize-page-v9157 .personalize-settings-launch-v9157 {
+  width: 100% !important;
+  min-height: 46px !important;
+  margin: 8px 0 0 !important;
+  border-radius: 14px !important;
+  justify-content: center !important;
+  text-align: center !important;
+}
+
+/* L'ancien aspect autonome de Réglages avancés ne doit plus ressortir hors de son accordéon. */
+body.personalize-page-v9157 .personalize-settings-v9156,
+body.personalize-page-v9157 .personalize-settings-v9155 {
+  box-shadow: none !important;
+}
+
+@media (max-width: 380px) {
+  body.brief-view-v9157 .brief-mode-tabs {
+    width: 208px !important;
+  }
+
+  body.personalize-page-v9157 .personalize-accordion-head-v9157 {
+    padding-left: 42px !important;
+    padding-right: 42px !important;
+  }
+}
