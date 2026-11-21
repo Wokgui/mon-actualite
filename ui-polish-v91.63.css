@@ -1,0 +1,217 @@
+/* v91.63 — final authoritative bottom bar geometry, loaded after structural stability */
+
+/* Never show any legacy reset control outside the bottom navigation. */
+#app > .global-reset-v9154,
+#app > .top-reset-icon-v9138,
+#app main > .top-reset-icon-v9138,
+.global-reset-v9154.reset-draggable-v9157,
+.top-reset-icon-v9138:not(.reset-nav-v9160) {
+  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+/* Final bar: one continuous surface, no separate side tiles. */
+.bottom-nav {
+  --bar-bg-v9163: rgba(255,255,255,.975);
+  position: fixed !important;
+  overflow: visible !important;
+  height: 78px !important;
+  grid-template-columns: minmax(0,1fr) 82px minmax(0,1fr) !important;
+  align-items: center !important;
+  column-gap: 0 !important;
+  padding: 7px 10px !important;
+  padding-left: 10px !important;
+  padding-right: 10px !important;
+  border: 1px solid rgba(224,219,238,.90) !important;
+  border-radius: 28px !important;
+  background: var(--bar-bg-v9163) !important;
+  box-shadow: 0 13px 32px rgba(68,55,111,.13) !important;
+  backdrop-filter: blur(18px) !important;
+  -webkit-backdrop-filter: blur(18px) !important;
+}
+
+/* Smooth central cradle that belongs to the same bar. */
+.bottom-nav::before {
+  content: '' !important;
+  display: block !important;
+  position: absolute !important;
+  left: 50% !important;
+  top: -20px !important;
+  z-index: 0 !important;
+  width: 82px !important;
+  height: 76px !important;
+  transform: translateX(-50%) !important;
+  border: 1px solid rgba(224,219,238,.88) !important;
+  border-bottom: 0 !important;
+  border-radius: 43px 43px 16px 16px !important;
+  background: var(--bar-bg-v9163) !important;
+  box-shadow: 0 -4px 12px rgba(72,58,125,.035) !important;
+  pointer-events: none !important;
+}
+
+/* Home and Brief stay flat inside the common bar, as in the approved mock-up. */
+.bottom-nav > .nav-item:not(.plus):not(.reset-nav-v9160) {
+  position: relative !important;
+  z-index: 2 !important;
+  width: 100% !important;
+  height: 62px !important;
+  min-height: 62px !important;
+  margin: 0 !important;
+  padding: 8px 4px 5px !important;
+  transform: none !important;
+  border: 0 !important;
+  border-radius: 18px !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.bottom-nav > .nav-item:not(.plus):not(.reset-nav-v9160).active {
+  background: transparent !important;
+  color: #6550d8 !important;
+}
+
+.bottom-nav > [data-view="home"] { order: 1 !important; }
+.bottom-nav > .reset-nav-v9160,
+.bottom-nav > [data-view="sheet"] { order: 2 !important; }
+.bottom-nav > [data-view="brief"] { order: 3 !important; }
+
+/* Reset circle: medium size, visually seated in the center cradle. */
+.bottom-nav .reset-nav-v9160 {
+  position: relative !important;
+  z-index: 6 !important;
+  justify-self: center !important;
+  align-self: center !important;
+  display: grid !important;
+  place-items: center !important;
+  width: 62px !important;
+  height: 62px !important;
+  min-width: 62px !important;
+  min-height: 62px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  transform: translateY(-18px) !important;
+  border: 0 !important;
+  border-radius: 50% !important;
+  background: linear-gradient(145deg,#7864eb,#6550d8) !important;
+  color: #fff !important;
+  box-shadow: 0 8px 20px rgba(89,70,190,.24) !important;
+}
+
+.bottom-nav .reset-nav-v9160:active {
+  transform: translateY(-18px) scale(.96) !important;
+}
+
+.bottom-nav .reset-nav-glyph-v9160 {
+  display: block !important;
+  font-size: 32px !important;
+  line-height: 1 !important;
+  font-weight: 650 !important;
+  transform: translateY(-1px) !important;
+}
+
+/* Settings is the small attached tab below the circle, not a floating control. */
+.bottom-nav .nav-gear-v9160 {
+  position: absolute !important;
+  left: 50% !important;
+  top: 47px !important;
+  z-index: 7 !important;
+  display: grid !important;
+  place-items: center !important;
+  width: 34px !important;
+  height: 30px !important;
+  min-width: 34px !important;
+  min-height: 30px !important;
+  margin: 0 !important;
+  padding: 2px 0 0 !important;
+  transform: translateX(-50%) !important;
+  border: 1px solid rgba(113,98,177,.12) !important;
+  border-top-color: rgba(113,98,177,.07) !important;
+  border-radius: 0 0 10px 10px !important;
+  background: var(--bar-bg-v9163) !important;
+  color: #736b85 !important;
+  box-shadow: 0 4px 9px rgba(72,58,125,.07) !important;
+  touch-action: manipulation !important;
+  -webkit-tap-highlight-color: transparent !important;
+}
+
+.bottom-nav .nav-gear-v9160::before {
+  content: '' !important;
+  position: absolute !important;
+  left: 50% !important;
+  top: -8px !important;
+  width: 34px !important;
+  height: 10px !important;
+  transform: translateX(-50%) !important;
+  background: var(--bar-bg-v9163) !important;
+  pointer-events: none !important;
+}
+
+.bottom-nav .nav-gear-v9160 svg {
+  width: 16px !important;
+  height: 16px !important;
+}
+
+.bottom-nav .nav-gear-v9160:active {
+  transform: translateX(-50%) scale(.94) !important;
+  color: #6550d8 !important;
+  background: #f4f1fd !important;
+}
+
+/* Settings/Personalize: bottom bar contains only Home and Brief. */
+body.settings-open-v9162 .personalize-close,
+body.settings-open-v9162 .bottom-nav > [data-view="sheet"],
+body.settings-open-v9162 .bottom-nav .reset-nav-v9160,
+body.settings-open-v9162 .bottom-nav .nav-gear-v9160 {
+  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+body.settings-open-v9162 .bottom-nav {
+  grid-template-columns: 1fr 1fr !important;
+  column-gap: 8px !important;
+  padding-left: 10px !important;
+  padding-right: 10px !important;
+}
+
+body.settings-open-v9162 .bottom-nav::before {
+  content: none !important;
+  display: none !important;
+}
+
+body.settings-open-v9162 .bottom-nav > .nav-item:not([data-view="sheet"]) {
+  width: 100% !important;
+  height: 62px !important;
+  transform: none !important;
+  background: transparent !important;
+}
+
+/* Article detail/quick summary: no reset or settings center controls. */
+body.quick-summary-open .bottom-nav .reset-nav-v9160,
+body.quick-summary-open .bottom-nav .nav-gear-v9160,
+body:has(.detail-page) .bottom-nav .reset-nav-v9160,
+body:has(.detail-page) .bottom-nav .nav-gear-v9160 {
+  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+@media (max-width: 380px) {
+  .bottom-nav {
+    grid-template-columns: minmax(0,1fr) 78px minmax(0,1fr) !important;
+    padding-left: 8px !important;
+    padding-right: 8px !important;
+  }
+  .bottom-nav::before { width: 78px !important; }
+  .bottom-nav .reset-nav-v9160 {
+    width: 58px !important;
+    height: 58px !important;
+    min-width: 58px !important;
+    min-height: 58px !important;
+    transform: translateY(-17px) !important;
+  }
+  .bottom-nav .reset-nav-v9160:active { transform: translateY(-17px) scale(.96) !important; }
+  .bottom-nav .reset-nav-glyph-v9160 { font-size: 30px !important; }
+  .bottom-nav .nav-gear-v9160 { top: 46px !important; }
+}

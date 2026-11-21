@@ -1,0 +1,175 @@
+/* v91.82 — flux strictement récent, chargement explicite, photos progressives, lecteur intégré. */
+
+.fresh-loading-v9182{
+  min-height:100dvh;
+  padding:calc(72px + env(safe-area-inset-top)) 22px calc(40px + env(safe-area-inset-bottom));
+  box-sizing:border-box;
+  background:#f7f5fc;
+  color:#241f2b;
+  text-align:center;
+}
+.fresh-loading-v9182__brand{
+  margin-bottom:28px;
+  color:#715bd8;
+  font:800 13px/1.2 Inter,system-ui,sans-serif;
+  letter-spacing:.06em;
+  text-transform:uppercase;
+}
+.fresh-loading-v9182__spinner{
+  width:34px;height:34px;margin:0 auto 22px;border:3px solid #ddd7ee;border-top-color:#6d58d9;border-radius:50%;
+  animation:fresh-spin-v9182 .8s linear infinite;
+}
+@keyframes fresh-spin-v9182{to{transform:rotate(360deg)}}
+.fresh-loading-v9182 h1{margin:0;color:#211d29;font:800 26px/1.12 Inter,system-ui,sans-serif;letter-spacing:-.025em}
+.fresh-loading-v9182 p{margin:10px auto 28px;max-width:360px;color:#85808c;font:500 14px/1.45 Inter,system-ui,sans-serif}
+.fresh-loading-v9182__rows{width:min(100%,520px);margin:0 auto;text-align:left}
+.fresh-loading-v9182__row{
+  display:grid;grid-template-columns:minmax(0,1fr) 112px;gap:14px;align-items:center;height:88px;border-bottom:1px solid #ebe7f1;
+  opacity:0;animation:fresh-row-v9182 .24s ease forwards;animation-delay:calc(var(--i) * 70ms)
+}
+.fresh-loading-v9182__row div{
+  height:44px;border-radius:8px;background:linear-gradient(90deg,#e8e4ef 0,#f4f1f7 48%,#e8e4ef 100%);background-size:220% 100%;
+  animation:fresh-shimmer-v9182 1.15s linear infinite
+}
+.fresh-loading-v9182__row span{
+  display:block;width:112px;height:75px;border-radius:5px;background:#e9e6ed
+}
+@keyframes fresh-row-v9182{to{opacity:1}}
+@keyframes fresh-shimmer-v9182{to{background-position:-220% 0}}
+
+/* Les cartes gardent toujours leur emplacement image : aucun trou visuel. */
+.article-card{
+  min-height:75px!important;
+}
+.article-card .article-image,
+.article-card .article-placeholder{
+  width:112px!important;height:75px!important;min-height:75px!important;background-color:#efedf2!important;
+}
+.article-card.v42-image-pending .article-image{
+  background-image:linear-gradient(110deg,#ece9f0 8%,#f6f4f8 28%,#ece9f0 48%)!important;
+  background-size:220% 100%!important;
+  animation:fresh-photo-v9182 1.05s linear infinite!important;
+}
+.article-card.v42-image-loaded .article-image{
+  animation:none!important;background-image:none!important
+}
+@keyframes fresh-photo-v9182{to{background-position:-220% 0}}
+.article-card.v42-image-failed .article-image{
+  animation:none!important;background:#efedf2!important
+}
+
+/* Plus de bouton de réinitialisation/rafraîchissement au centre. */
+.golden-bottom-nav-v9169 .golden-bottom-nav-v9169__reset,
+.top-reset-icon-v9138,
+.global-reset-v9154{
+  display:none!important;visibility:hidden!important;pointer-events:none!important
+}
+.golden-bottom-nav-v9169__center{
+  display:grid!important;place-items:center!important;width:96px!important;height:74px!important
+}
+.golden-bottom-nav-v9169 .golden-bottom-nav-v9169__gear{
+  position:static!important;left:auto!important;top:auto!important;
+  width:46px!important;height:46px!important;min-width:46px!important;min-height:46px!important;
+  margin:0!important;transform:none!important;border-radius:14px!important;
+  border:1px solid #e3deeb!important;background:#fff!important;color:#6753d8!important;box-shadow:none!important
+}
+.golden-bottom-nav-v9169 .golden-bottom-nav-v9169__gear:active{transform:scale(.96)!important}
+.golden-bottom-nav-v9169 .golden-bottom-nav-v9169__gear svg{width:21px!important;height:21px!important}
+
+/* Lecteur intégré. */
+.quick-reader-body{
+  margin:0 0 26px!important;padding:0!important;color:#302a35!important;
+  font:400 17px/1.72 Georgia,"Times New Roman",serif!important
+}
+.quick-reader-content-label{
+  margin:0 0 16px!important;color:#847d8b!important;font:800 11px/1.2 Inter,system-ui,sans-serif!important;
+  letter-spacing:.055em!important;text-transform:uppercase!important
+}
+.quick-reader-body p{
+  margin:0 0 1.05em!important;padding:0!important
+}
+.quick-reader-body p:first-of-type{
+  font-size:18px!important;line-height:1.68!important
+}
+.quick-reader-body.is-excerpt{
+  padding:18px!important;border:1px solid #e9e5ee!important;border-radius:16px!important;background:#faf9fc!important;
+  font-family:Inter,system-ui,sans-serif!important;font-size:15.5px!important;line-height:1.6!important
+}
+.quick-source-link{
+  min-height:46px!important;margin:26px 0 8px!important;border:1px solid #e2ddec!important;background:#fff!important;color:#6651cf!important;
+  box-shadow:none!important;font-size:13px!important
+}
+.quick-reader-free-note{display:none!important}
+
+@media(max-width:380px){
+  .fresh-loading-v9182__row{grid-template-columns:minmax(0,1fr) 106px}
+  .fresh-loading-v9182__row span,.article-card .article-image,.article-card .article-placeholder{width:106px!important}
+}
+
+
+/* v91.83 — Réglages devient une vraie destination de la barre basse. */
+.golden-bottom-nav-v9169__center{
+  width:96px!important;
+  height:74px!important;
+  display:block!important;
+  pointer-events:auto!important;
+}
+.golden-bottom-nav-v9169__center::before{display:none!important}
+.golden-bottom-nav-v9169 .golden-bottom-nav-v9169__gear{
+  position:relative!important;
+  inset:auto!important;
+  width:100%!important;
+  height:74px!important;
+  min-width:0!important;
+  min-height:0!important;
+  margin:0!important;
+  padding:8px 4px 7px!important;
+  display:flex!important;
+  flex-direction:column!important;
+  align-items:center!important;
+  justify-content:center!important;
+  gap:5px!important;
+  border:0!important;
+  border-radius:0!important;
+  background:#fff!important;
+  color:#96919f!important;
+  box-shadow:none!important;
+  transform:none!important;
+  font:750 11.5px/1 Inter,ui-sans-serif,system-ui,sans-serif!important;
+}
+.golden-bottom-nav-v9169 .golden-bottom-nav-v9169__gear:active{
+  transform:scale(.98)!important;
+  color:#6753d8!important;
+}
+.golden-bottom-nav-v9169 .golden-bottom-nav-v9169__gear svg{
+  width:22px!important;
+  height:22px!important;
+  stroke-width:1.9!important;
+}
+.golden-bottom-nav-v9169 .golden-bottom-nav-v9169__gear span{
+  display:block!important;
+  margin:0!important;
+  padding:0!important;
+}
+
+/* Chargement discret du texte public dans le lecteur. */
+.quick-reader-loading-v9183{
+  min-height:150px;
+  display:flex;
+  align-items:center;
+  justify-content:center;
+  gap:10px;
+  color:#817a88;
+  font:650 13px/1.3 Inter,system-ui,sans-serif;
+}
+.quick-reader-loading-v9183__spinner{
+  width:18px;
+  height:18px;
+  border:2px solid #e1ddec;
+  border-top-color:#6d58d9;
+  border-radius:50%;
+  animation:fresh-spin-v9182 .72s linear infinite;
+}
+.quick-reader-body.is-full-public{
+  margin-top:0!important;
+}

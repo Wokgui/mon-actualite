@@ -1,0 +1,306 @@
+/* v91.54 — navigation Brief stable et interface remontée */
+.quick-summary-text[data-summary-state="ready"]::before {
+  content: none !important;
+  display: none !important;
+}
+
+.verification-note-v83 {
+  display: none !important;
+}
+
+.quick-feedback-help {
+  display: none !important;
+}
+
+.quick-feedback-grid.quick-feedback-secondary {
+  margin-top: 20px !important;
+}
+
+.quick-feedback-secondary .quick-feedback-symbol {
+  flex-basis: 40px !important;
+  width: 40px !important;
+  height: 40px !important;
+  border-radius: 13px !important;
+  font-size: 24px !important;
+}
+
+.center-topic-word-v9150 {
+  display: block !important;
+  width: 100% !important;
+  text-align: center !important;
+}
+
+/* Réinitialiser est désormais disponible en haut à droite sur tous les écrans. */
+.top-reset-icon-v9138:not(.global-reset-v9154) {
+  display: none !important;
+}
+
+.global-reset-v9154 {
+  position: fixed !important;
+  z-index: 10060 !important;
+  top: max(6px, env(safe-area-inset-top)) !important;
+  left: auto !important;
+  right: max(10px, calc((100vw - 480px) / 2 + 10px)) !important;
+  transform: none !important;
+  width: 34px !important;
+  height: 34px !important;
+  padding: 0 !important;
+  border: 0 !important;
+  border-radius: 12px !important;
+  background: rgba(247, 245, 252, .88) !important;
+  color: #6d55d8 !important;
+  box-shadow: none !important;
+  font-size: 23px !important;
+  font-weight: 800 !important;
+  line-height: 34px !important;
+  backdrop-filter: blur(8px) !important;
+}
+
+/* L'ensemble remonte légèrement maintenant que Réinitialiser n'occupe plus le centre. */
+.page {
+  padding-top: max(8px, env(safe-area-inset-top)) !important;
+}
+
+.hero-header {
+  padding-top: 7px !important;
+}
+
+/* Suppression du petit trait horizontal au-dessus de Mon actualité. */
+.hero-mark {
+  display: none !important;
+}
+
+/* Quand un écran a déjà une action à droite, elle se décale pour laisser Réinitialiser libre. */
+.page > .topbar > :last-child:not(h1) {
+  transform: translateX(-42px);
+}
+
+/* Les deux seuls onglets de la page : Brief et Veille. */
+.brief-mode-tabs {
+  display: grid !important;
+  grid-template-columns: 1fr 1fr !important;
+  gap: 4px !important;
+  width: min(100%, 330px) !important;
+  margin: 8px auto 18px !important;
+  padding: 4px !important;
+  border-radius: 17px !important;
+  background: #eae6f3 !important;
+}
+
+.brief-mode-tab {
+  min-height: 44px !important;
+  padding: 10px 14px !important;
+  border: 0 !important;
+  border-radius: 14px !important;
+  background: transparent !important;
+  color: #817b8d !important;
+  font-size: 13px !important;
+  font-weight: 800 !important;
+}
+
+.brief-mode-tab.active {
+  background: #fff !important;
+  color: #5a46cf !important;
+  box-shadow: 0 4px 14px rgba(76, 61, 114, .08) !important;
+}
+
+.watch-edit-button-v9138,
+.watches-head-v9138 {
+  display: none !important;
+}
+
+/* Suppression de la mention « Brief du jour ». */
+body.brief-view-v9153 .page > .topbar,
+body.brief-view-v9154 .page > .topbar {
+  display: none !important;
+}
+
+body.brief-view-v9150 .runtime-brief-content,
+body.brief-view-v9151 .runtime-brief-content,
+body.brief-view-v9152 .runtime-brief-content,
+body.brief-view-v9153 .runtime-brief-content,
+body.brief-view-v9154 .runtime-brief-content {
+  margin-top: 0 !important;
+  padding-top: 0 !important;
+}
+
+body.brief-view-v9150 .journal-section,
+body.brief-view-v9151 .journal-section,
+body.brief-view-v9152 .journal-section,
+body.brief-view-v9153 .journal-section,
+body.brief-view-v9154 .journal-section {
+  margin-top: 0 !important;
+  padding-top: 0 !important;
+}
+
+body.brief-view-v9153 .brief-day-v9138,
+body.brief-view-v9153 .journal-section .brief-section-title,
+body.brief-view-v9154 .brief-day-v9138,
+body.brief-view-v9154 .journal-section .brief-section-title {
+  display: none !important;
+}
+
+/* Suppression des heures/jours relatifs des cartes. */
+.article-card .meta > span:not(.source) {
+  display: none !important;
+}
+
+.article-card .meta > .source + .dot {
+  display: none !important;
+}
+
+/* Titres centrés verticalement face à la photo dans les deux onglets. */
+body.brief-view-v9153 .runtime-row .article-body,
+body.brief-view-v9154 .runtime-row .article-body {
+  justify-content: center !important;
+  padding-top: 12px !important;
+  padding-bottom: 12px !important;
+}
+
+body.brief-view-v9153 .runtime-row .article-body h2,
+body.brief-view-v9154 .runtime-row .article-body h2 {
+  margin-top: 0 !important;
+  margin-bottom: 0 !important;
+}
+
+body.brief-view-v9153 .runtime-row .meta,
+body.brief-view-v9154 .runtime-row .meta {
+  display: none !important;
+}
+
+/* Annule les ajouts visuels de la proposition précédente. */
+body.brief-view-v9153 .brief-major-v9152,
+body.brief-view-v9154 .brief-major-v9152 {
+  border: 0 !important;
+  background: transparent !important;
+  box-shadow: none !important;
+}
+
+.brief-integrated-watches-v9152,
+.brief-watch-separator-v9152 {
+  display: none !important;
+}
+
+/* Bouton + seul, centré verticalement dans le bandeau. */
+.bottom-nav [data-view="sheet"] > span,
+.bottom-nav .nav-item.plus::after,
+.bottom-nav [data-view="sheet"]::after {
+  display: none !important;
+  content: none !important;
+}
+
+.bottom-nav .nav-item.plus,
+.bottom-nav [data-view="sheet"] {
+  transform: none !important;
+  align-self: center !important;
+  justify-self: center !important;
+}
+
+/* Personnaliser reste une page plein écran. */
+.sheet-backdrop.personalize-tab-v9151,
+.sheet-backdrop.personalize-tab-v9152,
+.sheet-backdrop.personalize-tab-v9154 {
+  z-index: 15 !important;
+  inset: 0 !important;
+  align-items: stretch !important;
+  justify-content: center !important;
+  padding: 0 !important;
+  background: #f7f5fc !important;
+  backdrop-filter: none !important;
+}
+
+.sheet-backdrop.personalize-tab-v9151 .personalization-sheet,
+.sheet-backdrop.personalize-tab-v9152 .personalization-sheet,
+.sheet-backdrop.personalize-tab-v9154 .personalization-sheet {
+  width: min(100%, 480px) !important;
+  height: 100dvh !important;
+  max-height: none !important;
+  margin: 0 auto !important;
+  overflow-y: auto !important;
+  padding: max(8px, env(safe-area-inset-top)) 18px calc(var(--nav-height) + 34px + env(safe-area-inset-bottom)) !important;
+  border-radius: 0 !important;
+  background: #f7f5fc !important;
+  box-shadow: none !important;
+}
+
+.sheet-backdrop.personalize-tab-v9151 .sheet-handle,
+.sheet-backdrop.personalize-tab-v9151 .personalize-close,
+.sheet-backdrop.personalize-tab-v9152 .sheet-handle,
+.sheet-backdrop.personalize-tab-v9152 .personalize-close,
+.sheet-backdrop.personalize-tab-v9154 .sheet-handle,
+.sheet-backdrop.personalize-tab-v9154 .personalize-close {
+  display: none !important;
+}
+
+body.personalize-page-v9151 .bottom-nav,
+body.personalize-page-v9152 .bottom-nav,
+body.personalize-page-v9154 .bottom-nav {
+  z-index: 20 !important;
+}
+
+body.personalize-page-v9151 .bottom-nav [data-view="sheet"],
+body.personalize-page-v9152 .bottom-nav [data-view="sheet"],
+body.personalize-page-v9154 .bottom-nav [data-view="sheet"] {
+  color: #fff !important;
+  background: linear-gradient(145deg,#8c78f2,#6652da) !important;
+}
+
+.personalize-head-v9151,
+.personalize-head-v9152,
+.personalize-head-v9154 {
+  display: block !important;
+  margin: 6px 0 14px !important;
+  text-align: center !important;
+}
+
+body.personalize-page-v9152 .personalize-head-v9152,
+body.personalize-page-v9154 .personalize-head-v9154 {
+  margin-top: 6px !important;
+}
+
+.personalize-head-v9151 > div,
+.personalize-head-v9152 > div,
+.personalize-head-v9154 > div {
+  width: 100% !important;
+}
+
+.personalize-head-v9151 span,
+.personalize-head-v9152 span,
+.personalize-head-v9154 span {
+  display: none !important;
+}
+
+.personalize-head-v9151 h2,
+.personalize-head-v9152 h2,
+.personalize-head-v9154 h2 {
+  width: 100% !important;
+  margin: 0 !important;
+  text-align: center !important;
+  font-size: 21px !important;
+}
+
+.sheet-backdrop.personalize-tab-v9151 .personalize-settings,
+.sheet-backdrop.personalize-tab-v9152 .personalize-settings,
+.sheet-backdrop.personalize-tab-v9154 .personalize-settings {
+  width: 100% !important;
+  margin: 0 0 18px !important;
+}
+
+.personalize-brief-section-v9151 > h3,
+.personalize-home-section-v9152 > h3 {
+  text-align: center !important;
+}
+
+@media (max-width: 380px) {
+  .brief-mode-tabs {
+    width: min(100%, 300px) !important;
+    margin-top: 7px !important;
+  }
+
+  .sheet-backdrop.personalize-tab-v9151 .personalization-sheet,
+  .sheet-backdrop.personalize-tab-v9152 .personalization-sheet,
+  .sheet-backdrop.personalize-tab-v9154 .personalization-sheet {
+    padding-left: 14px !important;
+    padding-right: 14px !important;
+  }
+}

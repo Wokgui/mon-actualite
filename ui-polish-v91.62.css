@@ -1,0 +1,194 @@
+/* v91.62 — bandeau bas unifié, reset mieux ancré et réglages intégrés */
+
+/* Les anciens reset flottants restent neutralisés quoi qu'il arrive. */
+#app > .global-reset-v9154,
+#app > .top-reset-icon-v9138,
+#app main > .top-reset-icon-v9138,
+.global-reset-v9154.reset-draggable-v9157,
+.top-reset-icon-v9138:not(.reset-nav-v9160) {
+  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+/* Bandeau unique : trois zones réellement équilibrées. */
+.bottom-nav {
+  --nav-bg-v9162: rgba(255,255,255,.97);
+  --nav-soft-v9162: rgba(243,240,252,.82);
+  overflow: visible !important;
+  height: 76px !important;
+  grid-template-columns: minmax(0,1fr) 86px minmax(0,1fr) !important;
+  align-items: center !important;
+  padding: 7px 8px !important;
+  border: 1px solid rgba(224,219,238,.9) !important;
+  border-radius: 27px !important;
+  background: var(--nav-bg-v9162) !important;
+  box-shadow: 0 12px 30px rgba(68,55,111,.12) !important;
+  backdrop-filter: blur(18px) !important;
+}
+
+/* Petit socle central : il fait visuellement partie du bandeau. */
+.bottom-nav::before {
+  content: '' !important;
+  position: absolute !important;
+  left: 50% !important;
+  top: -19px !important;
+  z-index: 0 !important;
+  width: 86px !important;
+  height: 88px !important;
+  transform: translateX(-50%) !important;
+  border: 1px solid rgba(224,219,238,.86) !important;
+  border-bottom: 0 !important;
+  border-radius: 44px 44px 17px 17px !important;
+  background: var(--nav-bg-v9162) !important;
+  box-shadow: 0 -5px 15px rgba(72,58,125,.035) !important;
+  pointer-events: none !important;
+}
+
+/* Accueil / Brief : zones latérales discrètes et symétriques. */
+.bottom-nav > .nav-item:not(.plus):not(.reset-nav-v9160) {
+  position: relative !important;
+  z-index: 2 !important;
+  width: 100% !important;
+  max-width: none !important;
+  height: 60px !important;
+  min-height: 60px !important;
+  margin: 0 !important;
+  padding: 7px 4px 5px !important;
+  transform: none !important;
+  border-radius: 20px !important;
+  background: transparent !important;
+}
+
+.bottom-nav > .nav-item:not(.plus):not(.reset-nav-v9160).active {
+  background: var(--nav-soft-v9162) !important;
+}
+
+/* Rond Réinitialiser : moins gros, moins haut, ancré dans le socle central. */
+.bottom-nav .reset-nav-v9160 {
+  position: relative !important;
+  z-index: 5 !important;
+  justify-self: center !important;
+  align-self: center !important;
+  display: grid !important;
+  place-items: center !important;
+  width: 62px !important;
+  height: 62px !important;
+  min-width: 62px !important;
+  min-height: 62px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  transform: translateY(-17px) !important;
+  border: 0 !important;
+  border-radius: 50% !important;
+  background: linear-gradient(145deg,#7864eb,#6550d8) !important;
+  color: #fff !important;
+  box-shadow: 0 8px 19px rgba(89,70,190,.23) !important;
+}
+
+.bottom-nav .reset-nav-v9160:active {
+  transform: translateY(-17px) scale(.96) !important;
+}
+
+.bottom-nav .reset-nav-glyph-v9160 {
+  display: block !important;
+  font-size: 32px !important;
+  line-height: 1 !important;
+  font-weight: 650 !important;
+  transform: translateY(-1px) !important;
+}
+
+/* Réglages est dans le socle, sous le rond : pas de mini-bouton flottant. */
+.bottom-nav .nav-gear-v9160 {
+  position: absolute !important;
+  left: 50% !important;
+  top: 46px !important;
+  z-index: 6 !important;
+  display: grid !important;
+  place-items: center !important;
+  width: 38px !important;
+  height: 25px !important;
+  min-width: 38px !important;
+  min-height: 25px !important;
+  margin: 0 !important;
+  padding: 0 !important;
+  transform: translateX(-50%) !important;
+  border: 0 !important;
+  border-radius: 9px !important;
+  background: transparent !important;
+  color: #756d89 !important;
+  box-shadow: none !important;
+  touch-action: manipulation !important;
+  -webkit-tap-highlight-color: transparent !important;
+}
+
+.bottom-nav .nav-gear-v9160::before {
+  content: none !important;
+}
+
+.bottom-nav .nav-gear-v9160 svg {
+  display: block !important;
+  width: 17px !important;
+  height: 17px !important;
+}
+
+.bottom-nav .nav-gear-v9160:active {
+  transform: translateX(-50%) scale(.92) !important;
+  background: rgba(116,97,232,.08) !important;
+  color: #6550d8 !important;
+}
+
+/* Dans Personnaliser/Réglages : seulement Accueil et Brief en bas.
+   Plus de rond central, plus de roue, plus de +, plus de croix en haut. */
+body.settings-open-v9162 .personalize-close,
+body.settings-open-v9162 .bottom-nav > [data-view="sheet"],
+body.settings-open-v9162 .bottom-nav .reset-nav-v9160,
+body.settings-open-v9162 .bottom-nav .nav-gear-v9160 {
+  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+body.settings-open-v9162 .bottom-nav {
+  grid-template-columns: 1fr 1fr !important;
+  column-gap: 10px !important;
+}
+
+body.settings-open-v9162 .bottom-nav::before {
+  content: none !important;
+  display: none !important;
+}
+
+body.settings-open-v9162 .bottom-nav > .nav-item:not([data-view="sheet"]) {
+  width: 100% !important;
+  height: 60px !important;
+  transform: none !important;
+  border-radius: 20px !important;
+}
+
+/* Ni les commandes centrales ni les anciens resets dans une fiche/résumé. */
+body.quick-summary-open .bottom-nav .reset-nav-v9160,
+body.quick-summary-open .bottom-nav .nav-gear-v9160,
+body:has(.detail-page) .bottom-nav .reset-nav-v9160,
+body:has(.detail-page) .bottom-nav .nav-gear-v9160 {
+  display: none !important;
+  visibility: hidden !important;
+  pointer-events: none !important;
+}
+
+@media (max-width: 380px) {
+  .bottom-nav {
+    grid-template-columns: minmax(0,1fr) 80px minmax(0,1fr) !important;
+  }
+  .bottom-nav::before { width: 80px !important; }
+  .bottom-nav .reset-nav-v9160 {
+    width: 58px !important;
+    height: 58px !important;
+    min-width: 58px !important;
+    min-height: 58px !important;
+    transform: translateY(-16px) !important;
+  }
+  .bottom-nav .reset-nav-v9160:active { transform: translateY(-16px) scale(.96) !important; }
+  .bottom-nav .reset-nav-glyph-v9160 { font-size: 30px !important; }
+  .bottom-nav .nav-gear-v9160 { top: 45px !important; }
+}

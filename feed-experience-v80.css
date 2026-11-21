@@ -1,0 +1,108 @@
+.new-info-banner-v80 {
+  position: fixed;
+  z-index: 35;
+  left: 50%;
+  bottom: calc(var(--nav-height, 82px) + max(20px, env(safe-area-inset-bottom)));
+  transform: translateX(-50%);
+  width: min(calc(100% - 34px), 430px);
+  min-height: 52px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  padding: 10px 13px 10px 15px;
+  border: 1px solid rgba(102, 80, 210, .30);
+  border-radius: 17px;
+  background: rgba(255,255,255,.97);
+  color: #33275e;
+  box-shadow: 0 13px 34px rgba(65, 48, 126, .22);
+  backdrop-filter: blur(14px);
+  cursor: pointer;
+  animation: v80-banner-in .18s ease-out;
+}
+
+.new-info-banner-v80 strong {
+  display: block;
+  font-size: 12.5px;
+  line-height: 1.2;
+  font-weight: 830;
+}
+
+.new-info-banner-v80 span {
+  flex: 0 0 auto;
+  padding: 7px 9px;
+  border-radius: 10px;
+  background: #eee9ff;
+  color: #5a43c6;
+  font-size: 10px;
+  line-height: 1;
+  font-weight: 800;
+}
+
+@keyframes v80-banner-in {
+  from { opacity: 0; transform: translate(-50%, 7px); }
+  to { opacity: 1; transform: translate(-50%, 0); }
+}
+
+.brief-diff-v80 {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 0 0 12px;
+  padding: 13px 14px;
+  border: 1px solid #e5dff5;
+  border-radius: 16px;
+  background: linear-gradient(145deg, #fbf9ff, #f3effd);
+  color: #4f4860;
+}
+
+.brief-diff-v80 > div { min-width: 0; }
+.brief-diff-v80 strong {
+  display: block;
+  font-size: 12px;
+  line-height: 1.25;
+  font-weight: 820;
+  color: #4d3c9b;
+}
+.brief-diff-v80 small {
+  display: block;
+  margin-top: 3px;
+  color: #81798f;
+  font-size: 10px;
+  line-height: 1.35;
+}
+.brief-diff-v80 button {
+  flex: 0 0 auto;
+  min-height: 34px;
+  padding: 7px 9px;
+  border: 1px solid #d9d0f4;
+  border-radius: 10px;
+  background: #fff;
+  color: #6550c8;
+  font-size: 9.5px;
+  font-weight: 800;
+  cursor: pointer;
+}
+
+.brief-point[hidden] { display: none !important; }
+
+.multi-source-note-v80 {
+  width: fit-content;
+  margin: 7px 0 2px;
+  padding: 4px 7px;
+  border-radius: 8px;
+  background: #eeebfa;
+  color: #5f50a5;
+  font-size: 9.5px;
+  line-height: 1.2;
+  font-weight: 760;
+}
+
+@media (max-width: 380px) {
+  .new-info-banner-v80 { width: calc(100% - 24px); bottom: calc(var(--nav-height, 82px) + 16px + env(safe-area-inset-bottom)); }
+  .new-info-banner-v80 strong { font-size: 12px; }
+  .new-info-banner-v80 span { font-size: 9.5px; }
+  .brief-diff-v80 { align-items: flex-start; flex-direction: column; }
+  .brief-diff-v80 button { width: 100%; }
+}

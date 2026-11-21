@@ -1,0 +1,66 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 512 512">
+  <defs>
+    <linearGradient id="bg" x1="54" y1="38" x2="466" y2="466" gradientUnits="userSpaceOnUse">
+      <stop offset="0" stop-color="#FFD35B"/>
+      <stop offset=".28" stop-color="#FF8F73"/>
+      <stop offset=".55" stop-color="#FF55B8"/>
+      <stop offset=".78" stop-color="#A04CFF"/>
+      <stop offset="1" stop-color="#2DBDFF"/>
+    </linearGradient>
+    <radialGradient id="ocean" cx="38%" cy="28%" r="78%">
+      <stop stop-color="#7EF2FF"/>
+      <stop offset=".5" stop-color="#33B8FF"/>
+      <stop offset="1" stop-color="#5752F0"/>
+    </radialGradient>
+    <linearGradient id="photo" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#FFB54B"/>
+      <stop offset="1" stop-color="#FF4FA7"/>
+    </linearGradient>
+    <linearGradient id="tile" x1="0" y1="0" x2="1" y2="1">
+      <stop stop-color="#9A6CFF"/>
+      <stop offset="1" stop-color="#43C8FF"/>
+    </linearGradient>
+    <filter id="shadow" x="-30%" y="-30%" width="170%" height="180%">
+      <feDropShadow dx="0" dy="12" stdDeviation="12" flood-color="#6043C8" flood-opacity=".28"/>
+    </filter>
+  </defs>
+
+  <rect x="18" y="18" width="476" height="476" rx="112" fill="url(#bg)"/>
+  <path d="M66 341C144 447 334 475 454 352" fill="none" stroke="#FFF" stroke-opacity=".46" stroke-width="7" stroke-linecap="round"/>
+  <path d="M80 203C129 106 286 61 418 125" fill="none" stroke="#FFF" stroke-opacity=".3" stroke-width="5" stroke-linecap="round"/>
+
+  <g filter="url(#shadow)">
+    <circle cx="236" cy="253" r="122" fill="url(#ocean)" stroke="#F8F8FF" stroke-width="10"/>
+    <path d="M114 253h244M236 131c-39 38-59 78-59 122s20 84 59 122M236 131c39 38 59 78 59 122s-20 84-59 122" fill="none" stroke="#EAF7FF" stroke-opacity=".78" stroke-width="4"/>
+    <path d="M125 207c46 16 176 17 222 0M125 299c46-16 176-17 222 0" fill="none" stroke="#EAF7FF" stroke-opacity=".62" stroke-width="3.5"/>
+    <path d="M164 155c14-11 34-14 51-8 15 5 21 15 34 19 10 3 20 1 26 10 6 9-3 16-12 18-11 2-14 10-17 19-4 16-14 28-26 36-11 7-20 5-29 1-10-5-16-15-24-24-9-10-19-16-27-25-10-11-11-26-2-35 6-6 16-5 26-11Z" fill="#FFF" opacity=".93"/>
+    <path d="M280 164c17-7 31-3 41 7 8 9 6 18 16 24 8 5 23 2 28 12 5 10-6 17-18 20-12 4-19 15-19 27 0 10-8 18-17 14-10-4-13-20-23-24-12-5-24 2-32-8-7-9-1-23 8-30 7-5 8-13 6-21-3-9 1-17 10-21Z" fill="#FFF" opacity=".9"/>
+    <path d="M187 279c15-4 31 1 41 11 8 9 12 20 22 24 10 5 20 1 26 9 6 9 1 21-7 28-12 12-28 21-46 20-18-1-30-12-37-27-7-12-9-25-15-37-6-13 1-24 16-28Z" fill="#FFF" opacity=".92"/>
+  </g>
+
+  <g filter="url(#shadow)" transform="translate(292 315) rotate(4 82 70)">
+    <path d="M15 10h142c13 0 23 10 23 23v103c0 11-9 20-20 20H18C8 156 0 148 0 138V28C0 18 6 12 15 10Z" fill="#FFFDFE"/>
+    <path d="M157 32c19 4 29 18 29 34v67c0 14-8 24-22 28V48c0-7-2-12-7-16Z" fill="#F0E9FF" stroke="#FFF" stroke-width="5"/>
+    <rect x="18" y="31" width="61" height="48" rx="10" fill="url(#photo)"/>
+    <rect x="94" y="32" width="50" height="7" rx="3.5" fill="#A79AD5"/>
+    <rect x="94" y="48" width="44" height="7" rx="3.5" fill="#B8ADDA"/>
+    <rect x="94" y="64" width="39" height="7" rx="3.5" fill="#B8ADDA"/>
+    <rect x="18" y="91" width="68" height="7" rx="3.5" fill="#B8ADDA"/>
+    <rect x="18" y="107" width="58" height="7" rx="3.5" fill="#C4BADF"/>
+    <rect x="18" y="123" width="69" height="7" rx="3.5" fill="#C4BADF"/>
+    <rect x="101" y="87" width="43" height="40" rx="9" fill="url(#tile)"/>
+  </g>
+
+  <g transform="translate(384 105)" filter="url(#shadow)">
+    <path d="M34 16C17 16 7 29 7 45v16L1 72c-4 7 1 14 9 14h49c8 0 13-7 9-14l-6-11V45c0-16-11-29-28-29Z" fill="#FFF"/>
+    <circle cx="34" cy="89" r="8" fill="#FFF"/>
+    <path d="M-2 37c-7 7-10 16-9 25M70 37c7 7 10 16 9 25" fill="none" stroke="#FFF" stroke-width="6" stroke-linecap="round" opacity=".9"/>
+  </g>
+
+  <g fill="#FFF" opacity=".96">
+    <path d="M112 91l5 13 13 5-13 5-5 13-5-13-13-5 13-5 5-13Z"/>
+    <circle cx="87" cy="154" r="6"/>
+    <path d="M151 412l5 13 13 5-13 5-5 13-5-13-13-5 13-5 5-13Z"/>
+    <circle cx="423" cy="355" r="5"/>
+  </g>
+</svg>
