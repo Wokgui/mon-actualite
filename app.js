@@ -1,3 +1,4 @@
+import './personalization-learning-v91.js?v=98.69';
 import { createPreferenceHistory } from './services/preference-history.js?v=98.67';
 import { importOpmlPreview, fetchLiveNews, fetchBriefCandidates } from './services/source-connectors.js?v=98.67';
 import { photoSnapshot, photoArticleKey } from './services/article-photos.js?v=98.67';
@@ -10,6 +11,7 @@ const app = $('#app');
 const toastEl = $('#toast');
 const APP_VERSION = '98';
 const APP_RELEASE = '8 octobre 2026';
+const ANDROID_VERSION = '98.0.69';
 const IS_NATIVE_ANDROID = /MonActualiteAndroid\//.test(navigator.userAgent) || location.pathname.startsWith('/assets/') || new URLSearchParams(location.search).get('nativePreview') === '1';
 const savedSessionView = sessionStorage.getItem('news-active-view-v9204');
 const INITIAL_VIEW = ['home', 'settings', 'brief'].includes(savedSessionView) ? savedSessionView : 'home';
@@ -502,7 +504,7 @@ function stableHomeArticles() {
 }
 
 function preferenceWeight(article) {
-  return Number(state.topicPreferences[normalizeTopic(article.category)] || 0) + (state.followedSources.has(sourceIdentity(article)) ? 2 : 0);
+  return Number(state.topicPreferences[normalizeTopic(article.category)] || 0) + (state.followedSources.has(sourceIdentity(article)) ? 2 : 0) + (window.NewsPersonalizationV91?.learnedSignal(article) || 0) + (state.keywords.some(keyword => watchMatches(article, keyword)) ? 1 : 0);
 }
 function reconcileHomeOrder() {
   const ordered = stableHomeArticles();
@@ -525,7 +527,7 @@ function articleCard(article, index = 0) {
   const saved = state.saved.has(article.id);
   const badge = badgeFor(article);
   const title = displayTitle(article);
-  return `<article class="article-card" data-article="${escapeHtml(article.id)}" tabindex="0" aria-label="Ouvrir l’article source : ${escapeHtml(title)}">
+  return `<article class="article-card" data-article="${escapeHtml(article.id)}" tabindex="0" aria-label="Lire l’article : ${escapeHtml(title)}">
     ${articleVisual(article, index)}
     <div class="article-body">
       <button class="save-btn ${saved ? 'saved' : ''}" data-save="${escapeHtml(article.id)}" aria-label="${saved ? 'Retirer des sauvegardes' : 'Sauvegarder l’article'}">${icon('bookmark', saved)}</button>
@@ -582,6 +584,82 @@ function renderCategory() {
   </main>${nav('')}`;
 }
 
+const readerRequests = new Map();
+
+function publicArticleParagraphs(article) {
+  const uri = String(article.url || '');
+  if (!/^https?:\/\//i.test(uri)) return Promise.resolve([]);
+  if (readerRequests.has(uri)) return readerRequests.get(uri);
+  const promise = (async () => {
+    const abort = new AbortController();
+    const timer = setTimeout(() => abort.abort(), 6500);
+    try {
+      const response = await fetch('/api/news?reader=1', {
+        method: 'POST',
+        signal: abort.signal,
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ url: uri, title: displayTitle(article), source: article.source || '' })
+      });
+      if (!response.ok) return [];
+      const result = await response.json();
+      return result?.ok && Array.isArray(result.paragraphs)
+        ? result.paragraphs.filter(text => typeof text === 'string' && text.trim()).slice(0, 100) : [];
+    } catch {
+      return [];
+    } finally {
+      clearTimeout(timer);
+    }
+  })();
+  readerRequests.set(uri, promise);
+  void promise.then(paragraphs => {
+    if (!paragraphs.length && readerRequests.get(uri) === promise) readerRequests.delete(uri);
+  });
+  if (readerRequests.size > 20) readerRequests.delete(readerRequests.keys().next().value);
+  return promise;
+}
+
+function hydrateArticleReader() {
+  const target = app.querySelector('[data-public-article]');
+  const article = articleById(state.articleId);
+  if (!target || !article) return;
+  const content = String(article.contentText || '').trim();
+  const providedText = content.length >= 700 ? content.split(/\n{1,2}/).filter(Boolean) : [];
+  const request = providedText.length ? Promise.resolve(providedText) : publicArticleParagraphs(article);
+  void request.then(paragraphs => {
+    if (!target.isConnected || !paragraphs.length) return;
+    target.querySelector('strong').textContent = 'Lecture de l’article';
+    target.querySelector('[data-reader-text]').innerHTML = paragraphs.map(text => `<p>${escapeHtml(text)}</p>`).join('');
+  });
+}
+
+function publisherPage(article) {
+  try {
+    const url = new URL(article.url);
+    return ['http:', 'https:'].includes(url.protocol) ? url.href : '';
+  } catch {
+    return '';
+  }
+}
+
+function openPublisherOnAndroid(article) {
+  if (!/MonActualiteAndroid\//.test(navigator.userAgent)) return false;
+  const url = publisherPage(article);
+  if (!url) return false;
+  const route = new URL('/assets/native-publisher', location.origin);
+  route.search = new URLSearchParams({ id: String(article.id), url }).toString();
+  location.assign(route.href);
+  return true;
+}
+
+function detailSourceActions(article) {
+  const key = sourceIdentity(article);
+  if (!key) return '';
+  const followed = state.followedSources.has(key);
+  const blocked = state.blockedSources.has(key);
+  return `<button type="button" class="secondary-btn" data-detail-source="follow" aria-pressed="${followed}">${followed ? 'Source suivie' : 'Suivre la source'}</button>
+    <button type="button" class="secondary-btn" data-detail-source="block" aria-pressed="${blocked}">${blocked ? 'Rétablir la source' : 'Masquer la source'}</button>`;
+}
+
 function renderDetail() {
   const article = articleById(state.articleId);
   if (!article) return `<main class="page">${topbar('Article')}${emptyState('Article indisponible', 'Il n’est plus présent dans le flux actuel.')}</main>${nav('')}`;
@@ -592,11 +670,15 @@ function renderDetail() {
     <div class="detail-hero article-placeholder">${icon(meta.icon)}<span>${escapeHtml(article.category)}</span></div>
     <article class="detail-content"><span class="badge ${badgeFor(article) === 'Important' ? 'important' : ''}">${badgeFor(article)}</span><h1>${escapeHtml(article.title)}</h1>
       <div class="detail-meta">${escapeHtml(article.source)} · ${articleDateTimeLabel(article.publishedAt)} · <button class="category-link" data-category="${escapeHtml(article.category)}">${escapeHtml(article.category)}</button></div>
-      <section class="ai-summary source-excerpt"><strong>${icon('book')} Aperçu fourni par la source</strong><p>${escapeHtml(article.summary || 'Consultez l’article original pour lire le contenu complet.')}</p></section>
-      <div class="tags">${(article.tags || [article.category]).map(tag => `<span class="tag">${escapeHtml(tag)}</span>`).join('')}</div>
-      <a class="primary-btn" href="${escapeHtml(article.url)}" target="_blank" rel="noopener noreferrer">Lire l’article original ${icon('external')}</a>
+      <div class="article-reading-preferences" aria-label="Préférences de lecture">
       <p class="feedback-title">Aidez l’application à mieux hiérarchiser vos sujets</p>
-      <div class="feedback-grid">${[['more', 'Plus comme ça'], ['less', 'Moins comme ça'], ['not', 'Pas intéressé'], ['follow', 'Sujet à suivre']].map(([key, label]) => `<button class="${currentFeedback === key ? 'selected' : ''}" data-feedback="${key}" data-id="${escapeHtml(article.id)}">${label}</button>`).join('')}</div>
+      <div class="feedback-grid">${[['more', 'Plus comme ça'], ['less', 'Moins comme ça'], ['not', 'Pas intéressé'], ['follow', 'Sujet à suivre']].map(([key, label]) => `<button class="${currentFeedback === key ? 'selected' : ''}" type="button" aria-pressed="${currentFeedback === key}" data-feedback="${key}" data-id="${escapeHtml(article.id)}">${label}</button>`).join('')}</div>
+      <div class="feedback-grid" data-detail-sources>${detailSourceActions(article)}</div>
+      <div class="feedback-grid" data-detail-keywords aria-live="polite"></div>
+      </div>
+      <section class="ai-summary source-excerpt" data-public-article><strong>${icon('book')} Aperçu fourni par la source</strong><div data-reader-text><p>${escapeHtml(article.summary || 'Consultez l’article original pour lire le contenu complet.')}</p></div></section>
+      <div class="tags">${(article.tags || [article.category]).map(tag => `<span class="tag">${escapeHtml(tag)}</span>`).join('')}</div>
+      <a class="primary-btn" data-publisher-original href="${escapeHtml(publisherPage(article) || '#')}" target="_blank" rel="noopener noreferrer">Lire l’article original ${icon('external')}</a>
       ${article.sources?.length > 1 ? `<div class="source-list detail-sources">${article.sources.map(source => `<span class="source-chip">${escapeHtml(source)}</span>`).join('')}</div>` : ''}
     </article>
   </main>${nav('')}`;
@@ -713,7 +795,7 @@ function clockLabel(value) {
 function compactArticleRow(article, index = 0) {
   rememberRenderedArticle(article);
   const title = displayTitle(article);
-  return `<article class="article-card runtime-row" data-article="${escapeHtml(article.id)}" tabindex="0" aria-label="Ouvrir l’article source : ${escapeHtml(title)}">
+  return `<article class="article-card runtime-row" data-article="${escapeHtml(article.id)}" tabindex="0" aria-label="Lire l’article : ${escapeHtml(title)}">
     ${articleVisual(article, index)}
     <div class="article-body"><h2>${escapeHtml(title)}</h2><div class="meta"><span class="source">${escapeHtml(article.source || 'Source')}</span><i class="dot source-dot"></i><button class="category-link article-category-badge" data-category="${escapeHtml(article.category || '')}">${escapeHtml(article.category || 'Actualité')}</button><i class="dot badge-age-dot"></i><span class="article-age">${escapeHtml(timeLabel(article.publishedAt))}</span></div></div>
   </article>`;
@@ -909,6 +991,90 @@ function interestEditorMarkup() {
   </div>`;
 }
 
+function preferenceTerms(input) {
+  const suggestions = { more: [], less: [] };
+  let direction = 'more';
+  for (const clause of String(input || '').split(/[,;\n.!?]+|\s+(?:mais|en revanche)\s+|\s+et\s+(?=(?:je|moins|plus|sans|évite|bannis)\b)/iu)) {
+    let term = clause.trim();
+    const negative = /^(?:(?:je\s+)?(?:(?:ne\s+)?(?:veux|souhaite)\s+pas|ne\s+(?:veux|souhaite)\s+plus)|(?:je\s+)?(?:évite|bannis|n['’]aime\s+pas)|(?:je\s+veux\s+)?moins|sans|pas)(?:\s+|$)/iu;
+    const positive = /^(?:(?:je\s+)?(?:veux|souhaite)(?:\s+voir)?(?:\s+plus)?|(?:(?:je\s+|j[’\x27])?(?:préfère|aime|adore|suis))|plus|davantage|encourage)(?:\s+|$)/iu;
+    if (negative.test(term)) {
+      direction = 'less';
+      term = term.replace(negative, '');
+    } else if (positive.test(term)) {
+      direction = 'more';
+      term = term.replace(positive, '');
+    }
+    for (const candidate of term.split(/\s+et\s+/iu)) {
+      const cleaned = candidate.trim().replace(/^(?:voir\s+|d['’]\s*|(?:de|des|du|les|la|le|un|une)\s+|l['’]\s*)+/iu, '').trim();
+      if (cleaned.length >= 2 && cleaned.length <= 70) suggestions[direction].push(cleaned);
+    }
+  }
+  return { more: uniqueTopics(suggestions.more).slice(0, 8), less: uniqueTopics(suggestions.less).slice(0, 8) };
+}
+
+function keywordSuggestionButtons(terms, direction) {
+  return terms.map(term => {
+    const label = direction === 'less' ? 'Bannir' : 'Encourager';
+    return `<button type="button" class="secondary-btn" data-preference-keyword="${escapeHtml(term)}" data-preference-direction="${direction}">${label} « ${escapeHtml(term)} »</button>`;
+  }).join('');
+}
+
+function saveKeywordPreference(value, direction) {
+  const term = String(value || '').trim();
+  const key = normalizeTopic(term);
+  if (key.length < 2 || term.length > 70 || !['more', 'less'].includes(direction)) return false;
+  state.keywords = state.keywords.filter(item => normalizeTopic(item) !== key);
+  state.blockedTerms = state.blockedTerms.filter(item => normalizeTopic(item) !== key);
+  (direction === 'less' ? state.blockedTerms : state.keywords).push(term);
+  persist();
+  reconcileHomeOrder({ reset: true });
+  if (state.view === 'home') patchHomeFeedPreservingCards();
+  if (direction === 'more') void syncNews({ silent: true });
+  toast(direction === 'less' ? 'Mot-clé banni' : 'Mot-clé encouragé');
+  return true;
+}
+
+function setReaderFeedback(article, direction) {
+  const id = article?.id;
+  if (id == null || !['more','less','not','follow'].includes(direction)) return;
+  const previous = state.feedback[id] || '';
+  if (previous !== direction) window.NewsPersonalizationV91?.recordFeedback(article, direction, previous);
+  state.feedback[id] = direction;
+  persist();
+  reconcileHomeOrder({ reset: true });
+  if (state.view === 'home') patchHomeFeedPreservingCards();
+  toast('Préférence enregistrée');
+}
+
+function setSourcePreference(key, action) {
+  if (!key || !['follow','block'].includes(action)) return false;
+  const chosen = action === 'follow' ? state.followedSources : state.blockedSources;
+  const other = action === 'follow' ? state.blockedSources : state.followedSources;
+  const enabled = !chosen.has(key);
+  if (enabled) chosen.add(key); else chosen.delete(key);
+  other.delete(key);
+  persist();
+  reconcileHomeOrder({ reset: true });
+  if (state.view === 'home') patchHomeFeedPreservingCards();
+  if (action === 'follow') void syncNews({ silent: true });
+  return enabled;
+}
+
+// Called only in the app WebView. Publisher pages run in a separate WebView.
+window.newsPublisherPreference = (id, action) => {
+  const article = articleById(id);
+  if (!article) return null;
+  const key = sourceIdentity(article);
+  if (action === 'more' || action === 'less') setReaderFeedback(article, action);
+  else if (action === 'block' && key) setSourcePreference(key, 'block');
+  return {
+    feedback: state.feedback[article.id] || '',
+    blocked: state.blockedSources.has(key),
+    hasSource: Boolean(key)
+  };
+};
+
 function keywordChips() {
   return state.keywords.length ? `<div class="keyword-list watched-keywords-v9857">${state.keywords.map((keyword, index) => `<span class="keyword-chip">${escapeHtml(keyword)}<button data-keyword-delete="${index}" aria-label="Supprimer ${escapeHtml(keyword)}">×</button></span>`).join('')}</div>` : '<p class="muted-note">Aucun mot-clé suivi.</p>';
 }
@@ -1031,8 +1197,14 @@ function renderSettings() {
       `)}
 
       ${accordion(ui('keywords'), `
-        <div class="inline-form"><input id="keyword-input" class="text-input" type="text" maxlength="70" placeholder="À surveiller"><button class="small-primary-btn" data-add-keyword>Ajouter</button></div>${keywordChips()}
-        <div class="inline-form"><input id="blocked-keyword-input" class="text-input" type="text" maxlength="70" placeholder="À éviter"><button class="small-primary-btn" data-add-blocked-keyword>Éviter</button></div>${blockedKeywordChips()}`)}
+        <form class="form-stack" data-preference-form>
+          <label for="preference-text">Préférences en une phrase</label>
+          <textarea id="preference-text" class="text-input" maxlength="450" placeholder="J’aime la VR et les voitures électriques, moins de rumeurs"></textarea>
+          <button class="secondary-btn" type="submit">Proposer des mots-clés</button>
+          <div class="keyword-list" data-preference-results aria-live="polite"></div>
+        </form>
+        <div class="inline-form"><input id="keyword-input" class="text-input" type="text" maxlength="70" placeholder="À surveiller"><button class="small-primary-btn" data-add-keyword>Ajouter</button></div><div data-preference-list="more">${keywordChips()}</div>
+        <div class="inline-form"><input id="blocked-keyword-input" class="text-input" type="text" maxlength="70" placeholder="À éviter"><button class="small-primary-btn" data-add-blocked-keyword>Éviter</button></div><div data-preference-list="less">${blockedKeywordChips()}</div>`)}
 
       ${accordion(ui('essential'), essentialSettingsMarkup())}
 
@@ -1044,7 +1216,7 @@ function renderSettings() {
 
       ${accordion(ui('operation'), `<div class="function-settings-v9186">${settingRow(ui('automaticRefresh'), ui('automaticDesc'), 'autoRefresh')}${settingRow(ui('webSearch'), ui('webSearchDesc'), 'webSearch')}</div>`)}
 
-      ${accordion(ui('version'), `<div class="app-version-row"><div><strong>Mon actualité · ${escapeHtml(ui('version').toLowerCase())} ${APP_VERSION}</strong><span>${escapeHtml(ui('publication', { date: APP_RELEASE }))}</span></div></div><button class="secondary-btn compact-btn version-update-v9186" data-check-update>${icon('refresh')} ${escapeHtml(ui('checkUpdate'))}</button><div class="preference-history-actions-v9867"><button type="button" data-preference-undo ${preferenceHistory.canUndo ? '' : 'disabled'}>${icon('undo')} Annuler</button><button type="button" data-preference-redo ${preferenceHistory.canRedo ? '' : 'disabled'}>${icon('redo')} Rétablir</button></div>`)}
+      ${accordion(ui('version'), `<div class="app-version-row"><div><strong>Mon actualité · ${escapeHtml(ui('version').toLowerCase())} ${IS_NATIVE_ANDROID ? ANDROID_VERSION : APP_VERSION}</strong><span>${escapeHtml(ui('publication', { date: APP_RELEASE }))}</span></div></div><button class="secondary-btn compact-btn version-update-v9186" data-check-update>${icon('refresh')} ${escapeHtml(ui('checkUpdate'))}</button><div class="preference-history-actions-v9867"><button type="button" data-preference-undo ${preferenceHistory.canUndo ? '' : 'disabled'}>${icon('undo')} Annuler</button><button type="button" data-preference-redo ${preferenceHistory.canRedo ? '' : 'disabled'}>${icon('redo')} Rétablir</button></div>`)}
     </div>
   </main>${nav('settings')}`;
 }
@@ -1099,6 +1271,7 @@ function render({ resetScroll = false, scrollTop = null } = {}) {
   window.scrollTo({ top: preservedScroll, behavior: 'instant' });
   if (preservedScroll > 0) requestAnimationFrame(() => window.scrollTo({ top: preservedScroll, behavior: 'instant' }));
   notifyStableRender('view');
+  if (state.view === 'detail') hydrateArticleReader();
 }
 function notifyStableRender(reason = 'update') {
   window.dispatchEvent(new CustomEvent('news:stable-render', { detail: { reason, view: state.view } }));
@@ -1666,9 +1839,11 @@ app.addEventListener('click', async event => {
     event.preventDefault();
     event.stopPropagation();
     const selected = articleById(article.dataset.article || '');
-    const url = String(selected?.url || '').trim();
     markArticleRead(selected, article);
-    if (url) window.open(url, '_blank', 'noopener,noreferrer');
+    if (selected && !openPublisherOnAndroid(selected)) {
+      history.pushState({ newsReader: { id: selected.id } }, '');
+      navigate('detail', { articleId: selected.id });
+    }
     return;
   }
   const viewButton = event.target.closest('[data-view]');
@@ -1679,10 +1854,20 @@ app.addEventListener('click', async event => {
       event.stopPropagation();
       return;
     }
-    if (view === 'sheet') openSheet(); else navigate(view, { savedOnly: false });
+    if (view === 'sheet') openSheet();
+    else {
+      if (state.view === 'detail' && history.state?.newsReader) {
+        readerReturnView = view;
+        history.back();
+      } else navigate(view, { savedOnly: false });
+    }
     return;
   }
-  if (event.target.closest('[data-back]')) { goBack(); return; }
+  if (event.target.closest('[data-back]')) {
+    if (state.view === 'detail' && history.state?.newsReader) history.back();
+    else goBack();
+    return;
+  }
   if (event.target.closest('[data-dismiss-sheet]')) { closeSheet(); return; }
   if (event.target.closest('[data-open-settings]')) { state.sheet = false; navigate('settings', { savedOnly: false }); return; }
   if (event.target.closest('[data-check-update]')) { await checkAppUpdate({ announce: true }); return; }
@@ -1712,14 +1897,27 @@ app.addEventListener('click', async event => {
     persist(); render(); syncNews({ silent: true }); return;
   }
 
+  const proposedKeyword = event.target.closest('[data-preference-keyword]');
+  if (proposedKeyword && app.contains(proposedKeyword)) {
+    const direction = proposedKeyword.dataset.preferenceDirection;
+    if (saveKeywordPreference(proposedKeyword.dataset.preferenceKeyword, direction)) {
+      proposedKeyword.disabled = true;
+      proposedKeyword.textContent += ' ✓';
+      const details = proposedKeyword.closest('details');
+      const followed = details?.querySelector('[data-preference-list="more"]');
+      const blocked = details?.querySelector('[data-preference-list="less"]');
+      if (followed) followed.innerHTML = keywordChips();
+      if (blocked) blocked.innerHTML = blockedKeywordChips();
+    }
+    return;
+  }
+
   const sourceFollow = event.target.closest('[data-source-follow]');
   if (sourceFollow) {
     const key = sourceFollow.dataset.sourceFollow || '';
     const row = sourceFollow.closest('.source-directory-row-v9186');
     const blockButton = row?.querySelector('[data-source-block]');
-    const following = !state.followedSources.has(key);
-    following ? state.followedSources.add(key) : state.followedSources.delete(key);
-    state.blockedSources.delete(key);
+    const following = setSourcePreference(key, 'follow');
     sourceFollow.classList.toggle('active', following);
     sourceFollow.textContent = (following ? '✓ ' : '') + ui(following ? 'followed' : 'follow');
     sourceFollow.setAttribute('aria-pressed', String(following));
@@ -1728,9 +1926,6 @@ app.addEventListener('click', async event => {
       blockButton.textContent = 'Bloquer';
     }
     row?.classList.remove('is-blocked');
-    persist();
-    render({ scrollTop: window.scrollY });
-    syncNews({ silent: true });
     return;
   }
   const sourceBlock = event.target.closest('[data-source-block]');
@@ -1738,9 +1933,7 @@ app.addEventListener('click', async event => {
     const key = sourceBlock.dataset.sourceBlock || '';
     const row = sourceBlock.closest('.source-directory-row-v9186');
     const followButton = row?.querySelector('[data-source-follow]');
-    const blocking = !state.blockedSources.has(key);
-    blocking ? state.blockedSources.add(key) : state.blockedSources.delete(key);
-    state.followedSources.delete(key);
+    const blocking = setSourcePreference(key, 'block');
     sourceBlock.classList.toggle('active', blocking);
     sourceBlock.textContent = ui(blocking ? 'unblock' : 'block');
     if (followButton) {
@@ -1748,7 +1941,6 @@ app.addEventListener('click', async event => {
       followButton.textContent = ui('follow');
     }
     row?.classList.toggle('is-blocked', blocking);
-    persist();
     return;
   }
 
@@ -1769,17 +1961,42 @@ app.addEventListener('click', async event => {
   if (tab) { state.categoryTab = tab.dataset.tab; render(); return; }
   const period = event.target.closest('[data-period]');
   if (period) { state.newsPeriod = period.dataset.period; render(); return; }
+  const original = event.target.closest('[data-publisher-original]');
+  if (original && state.view === 'detail') {
+    const article = articleById(state.articleId);
+    if (article && openPublisherOnAndroid(article)) event.preventDefault();
+    return;
+  }
+  const detailSource = event.target.closest('[data-detail-source]');
+  if (detailSource && state.view === 'detail') {
+    const article = articleById(state.articleId);
+    if (!article) return;
+    const action = detailSource.dataset.detailSource;
+    const enabled = setSourcePreference(sourceIdentity(article), action);
+    const container = detailSource.closest('[data-detail-sources]');
+    container.innerHTML = detailSourceActions(article);
+    container.querySelector(`[data-detail-source="${action}"]`)?.focus({ preventScroll: true });
+    toast(action === 'follow' ? (enabled ? 'Source suivie' : 'Source retirée des suivis') : (enabled ? 'Source masquée' : 'Source rétablie'));
+    return;
+  }
   const feedback = event.target.closest('[data-feedback]');
   if (feedback) {
-    const id = feedback.dataset.id;
-    const next = feedback.dataset.feedback;
-    const previous = state.feedback[id] || '';
-    const article = articleById(id);
-    if (article) window.NewsPersonalizationV91?.recordFeedback(article, next, previous);
-    state.feedback[id] = next;
-    persist();
-    toast('Préférence enregistrée');
-    render();
+    const article = articleById(feedback.dataset.id);
+    if (!article) return;
+    const direction = feedback.dataset.feedback;
+    setReaderFeedback(article, direction);
+    const group = feedback.closest('.feedback-grid');
+    for (const button of group.querySelectorAll('[data-feedback]')) {
+      button.classList.toggle('selected', button === feedback);
+      button.setAttribute('aria-pressed', String(button === feedback));
+    }
+    const suggestions = app.querySelector('[data-detail-keywords]');
+    const terms = uniqueTopics([
+      ...(Array.isArray(article.tags) ? article.tags : []),
+      ...(Array.isArray(article.matches) ? article.matches : []),
+      article.category
+    ]).filter(term => term.length >= 2 && term.length <= 70 && normalizeTopic(term) !== 'a suivre').slice(0, 5);
+    if (suggestions) suggestions.innerHTML = ['more','less'].includes(direction) ? keywordSuggestionButtons(terms, direction) : '';
     return;
   }
   const toggle = event.target.closest('[data-setting-toggle]');
@@ -2083,6 +2300,30 @@ window.addEventListener('beforeinstallprompt', event => {
   if (state.view === 'settings') render();
 });
 window.addEventListener('appinstalled', () => { deferredInstallPrompt = null; isInstalled = true; render(); toast('Mon actualité est installée'); });
+let readerReturnView = null;
+window.addEventListener('popstate', event => {
+  if (state.view === 'detail' && !event.state?.newsReader) {
+    goBack();
+    if (readerReturnView) {
+      const view = readerReturnView;
+      readerReturnView = null;
+      if (view !== state.view) navigate(view, { savedOnly: false });
+    }
+  } else if (state.view !== 'detail' && event.state?.newsReader?.id != null) {
+    navigate('detail', { articleId: event.state.newsReader.id });
+  }
+});
+
+app.addEventListener('submit', event => {
+  const form = event.target.closest('[data-preference-form]');
+  if (!form) return;
+  event.preventDefault();
+  const terms = preferenceTerms(form.querySelector('textarea').value);
+  form.querySelector('[data-preference-results]').innerHTML =
+    keywordSuggestionButtons(terms.more, 'more') + keywordSuggestionButtons(terms.less, 'less')
+    || '<span>Aucun mot-clé proposé. Essaie de nommer les sujets à encourager ou à bannir.</span>';
+});
+
 window.addEventListener('online', () => syncNews({ silent: true }));
 window.addEventListener('focus', () => {
   state.feedback = safeJson('news-feedback', state.feedback);

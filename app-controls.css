@@ -188,3 +188,10 @@ html[data-show-badges="0"][data-show-age="0"] #app .article-card h2{margin-botto
 #app .function-settings-v9186 .switch::after{width:16px!important;height:16px!important;left:3px!important;top:3px!important;box-shadow:0 1px 3px rgba(20,18,40,.18)}
 #app .function-settings-v9186 .switch.on::after{transform:translateX(16px)!important}
 #app .function-settings-v9186 .switch:focus-visible{outline:2px solid var(--app-accent);outline-offset:4px}
+
+.article-reading-preferences{display:grid;gap:7px;margin:14px 0}
+.article-reading-preferences .feedback-title{margin:0}
+.article-reading-preferences .feedback-grid:empty{display:none}
+.article-reading-preferences .feedback-grid button{min-height:44px}
+.article-reading-preferences .feedback-grid button[aria-pressed="true"]{border-color:currentColor}
+[data-preference-form] textarea{min-height:75px;resize:vertical}
