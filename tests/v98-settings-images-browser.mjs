@@ -159,12 +159,12 @@ assert.ok(looseGap - denseGap >= 15, `density must visibly reduce physical artic
 
 await page.locator('[data-view="settings"]').click(); await open('Taille et densité du texte');
 const articleRange = page.locator('[data-ui-range="textSize"]');
-assert.equal(await articleRange.getAttribute('min'), '100');
-assert.equal(await articleRange.getAttribute('max'), '175');
-await articleRange.fill('100'); await page.locator('[data-view="home"]').click();
+assert.equal(await articleRange.getAttribute('min'), '0');
+assert.equal(await articleRange.getAttribute('max'), '100');
+await articleRange.fill('0'); await page.locator('[data-view="home"]').click();
 const smallArticle = await visibleArticleGeometry();
 await page.locator('[data-view="settings"]').click(); await open('Taille et densité du texte');
-await page.locator('[data-ui-range="textSize"]').fill('175'); await page.locator('[data-view="home"]').click();
+await page.locator('[data-ui-range="textSize"]').fill('100'); await page.locator('[data-view="home"]').click();
 const largeArticle = await visibleArticleGeometry();
 assert.ok(largeArticle.title > smallArticle.title && largeArticle.badge > smallArticle.badge, `article text slider must resize titles and badges (${JSON.stringify({smallArticle,largeArticle})})`);
 assert.ok(largeArticle.width > smallArticle.width && largeArticle.height > smallArticle.height, 'article photos must grow with article text');
