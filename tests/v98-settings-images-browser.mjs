@@ -116,15 +116,15 @@ await page.waitForSelector('.settings-accordions-v9185');
 const titles = await page.locator('.settings-accordion-v9185>summary').allTextContents();
 assert.deepEqual(titles.slice(0,3), ['Langue','Taille et densité du texte','Affichage']);
 assert.equal(titles.filter(title => title === 'Taille du texte').length, 0);
-assert.ok(titles.includes('Sources d’information de base'));
-assert.equal(titles.includes('Sources d’information'), false);
+assert.ok(titles.includes('Sources d’information'));
+assert.equal(titles.includes('Sources d’information de base'), false);
 assert.equal(titles.includes('Centres d’intérêt'), false);
 assert.ok(titles.indexOf('L’essentiel') < titles.indexOf('Veille'));
 assert.equal(new Set(titles).size, titles.length, 'settings sections must not be duplicated');
 await page.screenshot({ path: `${evidenceDir}/settings.png`, fullPage: true });
 
 const open = async title => page.locator('.settings-accordion-v9185').filter({ has: page.locator(`summary:text-is("${title}")`) }).evaluate(element => { element.open = true; });
-await open('Sources d’information de base');
+await open('Sources d’information');
 const sourceActionWidths = await page.locator('.source-actions-v9186').first().locator('button').evaluateAll(buttons => buttons.map(button => button.getBoundingClientRect().width));
 assert.equal(sourceActionWidths.length, 2);
 assert.ok(Math.abs(sourceActionWidths[0] - sourceActionWidths[1]) < .5, 'follow and block source buttons must have equal widths');
