@@ -62,7 +62,10 @@ try {
   assert.equal(geometryAfter.width, geometryBefore.width);
   assert.equal(geometryAfter.height, geometryBefore.height);
   const guard = await page.evaluate(async () => {
-    const { commitReplacement, photoRecordByKey } = await import(document.querySelector('script[type="module"][src*="app.js"]').src.replace(/app\.js/, 'services/article-photos.js'));
+    const photoModule = performance.getEntriesByType('resource')
+      .find(entry => new URL(entry.name).pathname.endsWith('/services/article-photos.js'));
+    if (!photoModule) throw new Error('The active photo module was not loaded');
+    const { commitReplacement, photoRecordByKey } = await import(photoModule.name);
     const image = document.querySelector('img[data-photo-final="1"]');
     const src = image.src;
     const record = photoRecordByKey(image.dataset.photoKey);
