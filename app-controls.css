@@ -72,7 +72,7 @@ html[data-show-badges="0"][data-show-age="0"] #app .article-card h2{margin-botto
 
 .essential-domains,.centered-interest-grid-v9184{justify-content:center!important}
 .source-actions-v9186{display:grid!important;grid-template-columns:repeat(2,82px)!important;gap:5px!important}
-.source-actions-v9186 button{width:82px!important;min-width:82px!important;justify-content:center!important}
+#app .settings-page-v9185 .source-actions-v9186 > button{box-sizing:border-box!important;width:82px!important;min-width:82px!important;max-width:82px!important;justify-content:center!important}
 .brief-history-date-v9138,.watch-day-v9138>h3{text-align:center!important;width:100%!important}
 .watch-empty-day-v9138{display:none!important}
 .toast,.toast.show{bottom:calc(84px + env(safe-area-inset-bottom))!important}
