@@ -1,0 +1,66 @@
+/* v91.87 — bandeaux mauves, onglet actif plein, sources stables. */
+
+/* Bandeau mauve sous les en-têtes des trois vues principales. */
+.hero-header,
+.page-masthead-v9186{
+  position:relative!important;
+  border-bottom:0!important;
+  overflow:visible!important;
+}
+.hero-header::after,
+.page-masthead-v9186::after{
+  content:""!important;
+  display:block!important;
+  position:absolute!important;
+  left:0!important;
+  right:0!important;
+  bottom:-10px!important;
+  height:10px!important;
+  background:#eeeafd!important;
+}
+.hero-header{
+  margin-bottom:34px!important;
+}
+.page-masthead-v9186{
+  margin-bottom:24px!important;
+}
+
+/* Barre basse : chaque vue occupe exactement un tiers.
+   L'onglet actif remplit entièrement son tiers jusqu'en bas. */
+.bottom-nav.stable-bottom-nav-v9184{
+  height:calc(72px + env(safe-area-inset-bottom))!important;
+  padding:0!important;
+  grid-template-columns:repeat(3,minmax(0,1fr))!important;
+  align-items:stretch!important;
+  background:#fff!important;
+  border-top:1px solid #ddd8e6!important;
+  box-shadow:0 -5px 18px rgba(52,42,78,.06)!important;
+  overflow:hidden!important;
+}
+.bottom-nav.stable-bottom-nav-v9184 .nav-item{
+  width:100%!important;
+  height:calc(72px + env(safe-area-inset-bottom))!important;
+  min-height:0!important;
+  margin:0!important;
+  padding:8px 4px calc(6px + env(safe-area-inset-bottom))!important;
+  border:0!important;
+  border-radius:0!important;
+  background:#fff!important;
+  color:#918b98!important;
+  box-shadow:none!important;
+}
+.bottom-nav.stable-bottom-nav-v9184 .nav-item.active{
+  background:#eeeafd!important;
+  color:#6149d0!important;
+}
+.bottom-nav.stable-bottom-nav-v9184 .nav-item.active::before,
+.bottom-nav.stable-bottom-nav-v9184 .nav-item.active::after{
+  content:none!important;
+  display:none!important;
+}
+
+/* Le changement Suivre/Bloquer ne doit donner aucun effet de fermeture. */
+.source-directory-row-v9186,
+.source-directory-row-v9186 *{
+  -webkit-tap-highlight-color:transparent!important;
+}

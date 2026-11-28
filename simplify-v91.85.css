@@ -1,0 +1,253 @@
+/* v91.85 — interface simplifiée et stable. */
+
+/* Barre basse : Accueil à gauche, Réglages au centre, Brief à droite. */
+.bottom-nav.stable-bottom-nav-v9184{
+  visibility:visible!important;
+  pointer-events:auto!important;
+  display:grid!important;
+  grid-template-columns:repeat(3,minmax(0,1fr))!important;
+  overflow:hidden!important;
+  border-radius:0!important;
+  background:#fff!important;
+}
+.bottom-nav.stable-bottom-nav-v9184::before,
+.bottom-nav.stable-bottom-nav-v9184::after{
+  content:none!important;
+  display:none!important;
+}
+.bottom-nav.stable-bottom-nav-v9184 [data-view="home"]{
+  order:1!important;
+  transform:none!important;
+}
+.bottom-nav.stable-bottom-nav-v9184 [data-view="settings"]{
+  order:2!important;
+  transform:none!important;
+}
+.bottom-nav.stable-bottom-nav-v9184 [data-view="brief"]{
+  order:3!important;
+  transform:none!important;
+}
+.bottom-nav.stable-bottom-nav-v9184 .nav-item{
+  justify-self:stretch!important;
+  align-self:stretch!important;
+  border-radius:0!important;
+  background:#fff!important;
+  box-shadow:none!important;
+}
+.bottom-nav.stable-bottom-nav-v9184 .nav-item.active{
+  background:#fff!important;
+  color:#6852d8!important;
+}
+.bottom-nav.stable-bottom-nav-v9184 .nav-item.active::before,
+.bottom-nav.stable-bottom-nav-v9184 .nav-item.active::after{
+  content:none!important;
+  display:none!important;
+}
+
+/* Réglages : accordéons fermés, sans tuiles. */
+.settings-page-v9185{
+  background:#f7f5fc!important;
+}
+.settings-page-v9185>.topbar{
+  margin-bottom:10px!important;
+}
+.settings-page-v9185>.topbar h1{
+  text-align:center!important;
+}
+.settings-accordions-v9185{
+  width:100%!important;
+  margin:0 auto!important;
+  padding:0 2px!important;
+}
+.settings-accordion-v9185{
+  margin:0!important;
+  padding:0!important;
+  border:0!important;
+  border-bottom:1px solid #ddd8e5!important;
+  border-radius:0!important;
+  background:transparent!important;
+  box-shadow:none!important;
+}
+.settings-accordion-v9185>summary{
+  position:relative!important;
+  min-height:58px!important;
+  margin:0!important;
+  padding:18px 34px 16px!important;
+  list-style:none!important;
+  cursor:pointer!important;
+  text-align:center!important;
+  color:#2d2832!important;
+  font-size:16px!important;
+  line-height:1.25!important;
+  font-weight:850!important;
+}
+.settings-accordion-v9185>summary::-webkit-details-marker{display:none!important}
+.settings-accordion-v9185>summary::after{
+  content:"⌄"!important;
+  position:absolute!important;
+  right:8px!important;
+  top:50%!important;
+  transform:translateY(-52%)!important;
+  color:#81798a!important;
+  font-size:20px!important;
+  font-weight:600!important;
+}
+.settings-accordion-v9185[open]>summary::after{
+  content:"⌃"!important;
+}
+.settings-accordion-content-v9185{
+  padding:0 8px 22px!important;
+  background:transparent!important;
+}
+.settings-accordion-content-v9185>p,
+.settings-accordion-content-v9185 .setting-label span,
+.settings-accordion-content-v9185 .muted-note,
+.settings-accordion-content-v9185 .settings-help{
+  max-width:560px!important;
+  margin-left:auto!important;
+  margin-right:auto!important;
+  text-align:justify!important;
+  text-align-last:center!important;
+  line-height:1.55!important;
+}
+.settings-accordion-content-v9185 h3,
+.settings-accordion-content-v9185 .settings-subtitle-v9184{
+  text-align:center!important;
+}
+.settings-accordion-content-v9185 .form-stack,
+.settings-accordion-content-v9185 .inline-form{
+  max-width:560px!important;
+  margin-left:auto!important;
+  margin-right:auto!important;
+}
+.settings-accordion-content-v9185 .secondary-btn,
+.settings-accordion-content-v9185 .small-primary-btn,
+.settings-accordion-content-v9185 label.secondary-btn{
+  margin-left:auto!important;
+  margin-right:auto!important;
+}
+.settings-accordion-content-v9185 .setting-row{
+  max-width:560px!important;
+  margin:0 auto!important;
+  padding:13px 0!important;
+  border:0!important;
+  border-bottom:1px solid #e7e2eb!important;
+  border-radius:0!important;
+  background:transparent!important;
+  box-shadow:none!important;
+}
+.settings-accordion-content-v9185 .setting-label{
+  text-align:center!important;
+}
+.settings-accordion-content-v9185 .source-directory-v9184,
+.settings-accordion-content-v9185 .source-settings-list,
+.settings-accordion-content-v9185 .domain-list-v9184,
+.settings-accordion-content-v9185 .watch-rules-v9184{
+  max-width:600px!important;
+  margin-left:auto!important;
+  margin-right:auto!important;
+}
+.settings-accordion-content-v9185 .source-directory-row-v9184,
+.settings-accordion-content-v9185 .source-setting,
+.settings-accordion-content-v9185 .domain-list-v9184>div,
+.settings-accordion-content-v9185 .watch-rule-v9184{
+  margin:0!important;
+  padding:12px 0!important;
+  border:0!important;
+  border-bottom:1px solid #e4dfe8!important;
+  border-radius:0!important;
+  background:transparent!important;
+  box-shadow:none!important;
+}
+.settings-accordion-content-v9185 .import-status{
+  justify-content:center!important;
+  text-align:center!important;
+  background:transparent!important;
+  border:0!important;
+  box-shadow:none!important;
+}
+.centered-interest-grid-v9184{
+  max-width:600px!important;
+  margin-left:auto!important;
+  margin-right:auto!important;
+}
+
+/* Écran de lancement minimal, plus proche d'une appli native. */
+.minimal-loading-v9185{
+  min-height:100dvh!important;
+  display:flex!important;
+  flex-direction:column!important;
+  align-items:center!important;
+  justify-content:center!important;
+  gap:14px!important;
+  padding:32px!important;
+  box-sizing:border-box!important;
+  background:#f7f5fc!important;
+  color:#28232d!important;
+  text-align:center!important;
+}
+.minimal-loading-v9185__logo{
+  width:52px!important;
+  height:52px!important;
+  display:grid!important;
+  place-items:center!important;
+  border-radius:16px!important;
+  background:#ede9fb!important;
+  color:#6c56d8!important;
+}
+.minimal-loading-v9185__logo svg{
+  width:26px!important;
+  height:26px!important;
+}
+.minimal-loading-v9185 h1{
+  margin:0!important;
+  font-size:28px!important;
+  line-height:1.1!important;
+  font-weight:850!important;
+  letter-spacing:-.03em!important;
+}
+.minimal-loading-v9185 p{
+  margin:0!important;
+  color:#817a88!important;
+  font-size:13px!important;
+  line-height:1.35!important;
+}
+.minimal-loading-v9185__bar{
+  width:min(220px,68vw)!important;
+  height:4px!important;
+  overflow:hidden!important;
+  border-radius:999px!important;
+  background:#e4dfed!important;
+}
+.minimal-loading-v9185__bar span{
+  display:block!important;
+  width:42%!important;
+  height:100%!important;
+  border-radius:999px!important;
+  background:#7059df!important;
+  animation:minimal-load-v9185 1.05s ease-in-out infinite!important;
+}
+@keyframes minimal-load-v9185{
+  0%{transform:translateX(-110%)}
+  100%{transform:translateX(350%)}
+}
+
+/* L'ancien squelette n'est plus utilisé. */
+.fresh-loading-v9182{display:none!important}
+
+/* Plus aucun style du lecteur interne. */
+.quick-summary-backdrop,
+.quick-summary-sheet{
+  display:none!important;
+}
+
+@media(max-width:520px){
+  .settings-accordion-v9185>summary{
+    padding-left:26px!important;
+    padding-right:30px!important;
+  }
+  .settings-accordion-content-v9185{
+    padding-left:4px!important;
+    padding-right:4px!important;
+  }
+}

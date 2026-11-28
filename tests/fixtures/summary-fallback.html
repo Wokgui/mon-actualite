@@ -1,0 +1,52 @@
+<!doctype html>
+<html lang="fr">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>Test local du fallback de résumé</title>
+  <style>
+    body { font: 16px/1.5 system-ui, sans-serif; max-width: 44rem; margin: 3rem auto; padding: 0 1rem; }
+    #result { padding: 1rem; border-radius: .75rem; background: #eef7ee; }
+  </style>
+  <script>
+    window.__summaryFixtureCalls = { smart: 0, groq: 0 };
+    window.fetch = async function fixtureFetch(input) {
+      const url = new URL(typeof input === 'string' ? input : input.url, location.href);
+      const fallback = 'Le conseil municipal a adopté la mesure lundi. Elle entrera en vigueur en septembre et concernera directement les habitants de la commune.';
+      if (url.pathname === '/api/article-summary-smart') {
+        window.__summaryFixtureCalls.smart += 1;
+        return Response.json({ ok: true, text: fallback, ai: false, grounded: true, unavailable: false, origin: 'factual-fallback', fallbackQuality: 'trusted', diagnostics: { fallbackQuality: 'trusted' } });
+      }
+      if (url.pathname === '/api/article-summary-groq') {
+        window.__summaryFixtureCalls.groq += 1;
+        return Response.json({ summary: '', ai: false, unavailable: true, provider: 'unavailable' });
+      }
+      return Response.json({});
+    };
+  </script>
+  <script src="../../summary-demand-v91.43.js"></script>
+</head>
+<body>
+  <h1>Test local du fallback de résumé</h1>
+  <p id="result">Test en cours…</p>
+  <script>
+    (async () => {
+      const article = { id: 'fixture-fallback', url: 'https://publisher.example/article', title: 'Une mesure locale entre en vigueur', source: 'Publisher', summary: '' };
+      const response = await fetch('/api/article-summary-groq?intent=foreground', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ mode: 'article', article })
+      });
+      const data = await response.json();
+      const passed = data.unavailable === false && data.grounded === true && data.ai === false && /conseil municipal/.test(data.summary || '');
+      document.body.dataset.testStatus = passed ? 'passed' : 'failed';
+      document.getElementById('result').textContent = passed
+        ? `PASS — fallback factuel affiché ; appels smart=${window.__summaryFixtureCalls.smart}, Groq=${window.__summaryFixtureCalls.groq}`
+        : `FAIL — ${JSON.stringify(data)}`;
+    })().catch(error => {
+      document.body.dataset.testStatus = 'failed';
+      document.getElementById('result').textContent = `FAIL — ${error.message}`;
+    });
+  </script>
+</body>
+</html>
